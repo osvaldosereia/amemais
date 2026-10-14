@@ -322,11 +322,11 @@ alter table public.audit_log enable row level security;
 
 create function app_private.shares_event(p_other_user uuid)
 returns boolean language sql stable security definer set search_path = ''
-as $ select exists(
+as $$ select exists(
   select 1 from public.event_members mine
   join public.event_members theirs on mine.event_id = theirs.event_id
   where mine.user_id = (select auth.uid()) and theirs.user_id = p_other_user
-); $;
+); $$;
 revoke all on function app_private.shares_event(uuid) from public;
 grant execute on function app_private.shares_event(uuid) to authenticated;
 
