@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
+import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261014cat2';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261014b';
@@ -48,13 +49,14 @@ const nav = [
   {id:'balanco',label:'Balanço rápido',ico:'clipboard'},
   {id:'eventos',label:'Eventos',ico:'calendar'},
   {id:'movimentacoes',label:'Movimentações',ico:'arrows'},
-  {id:'categorias',label:'Categorias e tags',ico:'layers'},
+  {id:'categorias',label:'Categorias',ico:'layers'},
+  {id:'tags',label:'Tags',ico:'more'},
   {id:'usuarios',label:'Usuários',ico:'users'}
 ];
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
-  imageCache:new Map(),collapsedCategories:new Set(),loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
+  imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
 let notifyTimer;
@@ -235,17 +237,45 @@ function categorySelector(item=null){
 }
 function chosenCategory(form){return form?.querySelector('input[name="category_id"]')?.value||null;}
 
-function tagChipsHTML(selected=[]){
-  const values=new Set(selected.map(t=>t.toLocaleLowerCase('pt-BR')));
-  return state.tags.length?state.tags.map(t=>
-    '<label class="tag-choice"><input type="checkbox" name="chosen_tags" value="'+h(t.name)+'" '+(values.has(t.name.toLocaleLowerCase('pt-BR'))?'checked':'')+
-    '><span>'+h(t.name)+'</span></label>').join(''):'<span class="muted">Nenhuma tag cadastrada ainda.</span>';
+function tagChipsHTML(selected=[],categoryId=null){
+  const chosen=new Set(selected.map(t=>t.toLocaleLowerCase('pt-BR')));
+  if(!state.tags.length)return '<span class="muted">Nenhuma tag cadastrada ainda.</span>';
+  const {recommended,other}=rankTagsForCategory({
+    categoryId,categories:state.categories,products:state.items,tags:state.tags,selected
+  });
+  const renderTags=list=>list.map(t=>
+    '<label class="tag-choice"><input type="checkbox" name="chosen_tags" value="'+h(t.name)+'" '+
+    (chosen.has(t.name.toLocaleLowerCase('pt-BR'))?'checked':'')+
+    '><span>'+h(t.name)+'</span></label>').join('');
+  if(!categoryId)return '<div class="catalog-tag-pills">'+renderTags([...recommended,...other])+'</div>';
+  return '<div class="catalog-tag-guide"><strong>'+
+      (recommended.length?'Recomendadas para esta categoria':'Nenhuma tag utilizada nesta categoria ainda')+
+      '</strong><small>'+(recommended.length?'Ordenadas pelas tags dos produtos ativos desta categoria e subcategorias.':
+       'Você pode usar qualquer tag já cadastrada.')+'</small></div>'+
+    (recommended.length?'<div class="catalog-tag-pills">'+renderTags(recommended)+'</div>':'')+
+    (other.length?'<button type="button" class="catalog-show-tags" data-action="tag-show-all" aria-expanded="false">'+
+      'Ver outras '+other.length+' tags ▾</button>'+
+      '<div class="catalog-tag-pills catalog-more-tags" data-other-tags hidden>'+renderTags(other)+'</div>':'');
+}
+function refreshProductTagChoices(form){
+  if(!form)return;
+  const el=form.querySelector('[data-tag-choices]');
+  if(!el)return;
+  const selected=[...el.querySelectorAll('input[name="chosen_tags"]:checked')].map(input=>input.value);
+  const opened=!el.querySelector('[data-other-tags]')?.hidden;
+  el.innerHTML=tagChipsHTML(selected,chosenCategory(form));
+  if(opened){
+    const others=el.querySelector('[data-other-tags]'),control=el.querySelector('[data-action="tag-show-all"]');
+    if(others){others.hidden=false;if(control){control.setAttribute('aria-expanded','true');control.textContent='Ocultar outras tags ▴';}}
+  }
 }
 function productTagChooser(item=null){
   return '<section class="form-section wide"><div class="section-head"><strong>Tags</strong>'+
-    (isManager()?button('+ Criar tag','quick-tag','','small'):'')+'</div><p class="help">Toque nas características que identificam o produto.</p>'+
-    '<div class="tag-choices" data-tag-choices>'+tagChipsHTML(item?.tags||[])+'</div></section>';
+    (isManager()?button('+ Criar tag','quick-tag','','small'):'')+
+    '</div><p class="help">Primeiro, as tags já utilizadas em produtos da mesma categoria. As demais continuam disponíveis.</p>'+
+    '<div class="tag-choices" data-tag-choices>'+tagChipsHTML(item?.tags||[],item?.category_id||null)+'</div></section>';
 }
+
 function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
   const form=document.querySelector('form[data-form="product-new"],form[data-form="product-edit"],form[data-form="apparel-create"]');
   if(!form)return;
@@ -261,7 +291,7 @@ function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
   if(checks){
     const selected=[...form.querySelectorAll('input[name="chosen_tags"]:checked')].map(el=>el.value);
     if(selectedTag)selected.push(selectedTag);
-    checks.innerHTML=tagChipsHTML(selected);
+    checks.innerHTML=tagChipsHTML(selected,chosenCategory(form));
   }
 }
 
@@ -287,9 +317,9 @@ function render(){
   if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
   if(!state.profile.active){pendingAccessScreen();return;}
   if(isStockkeeper()&&!permittedView(state.view))state.view='balanco';
-  if((state.view==='usuarios'&&!isAdmin())||(state.view==='categorias'&&!isManager()))state.view='inicio';
+  if((state.view==='usuarios'&&!isAdmin())||(['categorias','tags'].includes(state.view)&&!isManager()))state.view='inicio';
   const mark='<img class="ame-brand-logo" src="./ame-plus-logo.svg" alt="Ame+ Store" width="132" height="70">';
-  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager()))
+  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='usuarios'||isAdmin())&&(!['categorias','tags'].includes(x.id)||isManager()))
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'">'+
       uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('');
   const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
@@ -311,7 +341,7 @@ function render(){
     '<nav class="bottom-nav '+(isStockkeeper()?'bottom-nav-stockkeeper':'bottom-nav-five')+
     '" aria-label="Navegação do aplicativo">'+bottomItems.map(item=>{
       const primary=item.id==='scan';
-      const on=item.id===state.view||item.id==='more'&&['eventos','movimentacoes','categorias','usuarios'].includes(state.view);
+      const on=item.id===state.view||item.id==='more'&&['eventos','movimentacoes','categorias','tags','usuarios'].includes(state.view);
       return '<button type="button" class="'+(primary?'bottom-scan ':'')+(on?'active':'')+
         '" data-action="'+(primary?'global-scan':item.id==='more'?'mobile-more':'view')+'"'+
         (primary?'':' data-view="'+item.id+'"')+' aria-label="'+h(item.label)+'"'+(on?' aria-current="page"':'')+'>'+
@@ -326,6 +356,7 @@ function pageContent(){
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):eventsPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='categorias')return categoriesPage();
+  if(state.view==='tags')return tagsPage();
   if(state.view==='usuarios')return usersPage();
   return dashboard();
 }
@@ -546,49 +577,45 @@ function movementsPage(){
       '<div class="tablewrap"><table class="table"><thead><tr><th>Data</th><th>Área</th><th>Ação</th><th>Autor</th></tr></thead><tbody>'+
       state.audits.map(a=>'<tr><td>'+niceTime(a.created_at)+'</td><td>'+h(a.entity)+'</td><td>'+h(a.action)+'</td><td>'+h(username(a.actor_id))+'</td></tr>').join('')+'</tbody></table></div></div>'):'');
 }
-function categoriesPage(){
-  const sorted=categoryTree();
-  const visible=sorted.filter(c=>!categoryChain(c.id).slice(0,-1).some(parent=>state.collapsedCategories.has(parent.id)));
-  const rowData=visible.map(c=>{
-    const childCount=state.categories.filter(x=>x.parent_id===c.id).length;
-    const used=state.items.filter(p=>p.category_id===c.id).length;
-    const folded=state.collapsedCategories.has(c.id);
-    const tone=(c.depth-1)%6+1;
-    const level=c.depth===1?'Principal':'Nível '+c.depth;
-    const indent=Math.min(c.depth-1,5)*17;
-    const name='<div class="category-hierarchy-name" style="--category-indent:'+indent+'px">'+
-      (childCount?'<button type="button" class="category-fold" data-action="category-toggle" data-id="'+h(c.id)+'"'+
-        ' aria-label="'+(folded?'Mostrar':'Ocultar')+' subcategorias de '+h(c.name)+'"'+
-        ' aria-expanded="'+(!folded)+'">'+(folded?'▸':'▾')+'</button>':
-        '<span class="category-fold-spacer">·</span>')+
-      '<span><strong>'+h(c.name)+'</strong>'+
-      (c.depth>1?'<small>'+h(categoryFull(c.parent_id))+'</small>':'')+'</span></div>';
-    const actions=button('+ Subcategoria','category-child','data-id="'+h(c.id)+'"','small')+
-      button('Editar','category-edit','data-id="'+h(c.id)+'"','small')+
-      button('Excluir','category-delete','data-id="'+h(c.id)+'"','small danger');
-    return {c,tone,level,name,used,actions};
+function renderCatalogTree(){
+  return catalogCategoryRows({
+    categories:state.categories,items:state.items,expanded:state.catalogExpanded,
+    query:state.catalogSearch,h,button,categoryChain,categoryFull
   });
-  const rows=rowData.map(v=>'<tr class="category-tone-'+v.tone+(v.c.depth===1?' category-root':'')+'">'+
-    '<td>'+v.name+'</td><td><span class="category-level-chip">'+h(v.level)+'</span></td>'+
-    '<td class="qty">'+v.used+'</td><td><div class="inline">'+v.actions+'</div></td></tr>').join('');
-  const mobile=rowData.map(v=>'<article class="category-mobile-row category-tone-'+v.tone+(v.c.depth===1?' category-root':'')+'">'+
-    v.name+'<div class="category-mobile-details"><span class="category-level-chip">'+h(v.level)+'</span>'+
-    '<small>'+v.used+' produto(s)</small></div><div class="category-mobile-actions">'+v.actions+'</div></article>').join('');
-  const tags=state.tags.map(t=>{
-    const used=state.items.filter(p=>(p.tags||[]).includes(t.name)).length;
-    return '<div class="tag-row"><span class="tag">'+h(t.name)+'</span><small>'+used+' produto(s)</small>'+
-      button('Excluir','tag-delete','data-id="'+h(t.id)+'"','small danger')+'</div>';
-  }).join('');
-  return tabHead('Categorias e tags','Categorias organizadas em árvore, com quantos níveis forem necessários.',
-    button('+ Nova categoria','category-new','','primary'))+
-    panel('Árvore de categorias','<div class="panelbody"><p class="muted">Cada nível tem um fundo suave diferente. Toque na seta para recolher ou abrir um grupo, ou use + Subcategoria para acrescentar outro nível.</p></div>'+
-    (visible.length?'<div class="category-table-wrap tablewrap"><table class="table category-tree-table">'+
-    '<thead><tr><th>Categoria / caminho</th><th>Nível</th><th>Produtos</th><th>Ações</th></tr></thead>'+
-    '<tbody>'+rows+'</tbody></table></div><div class="category-mobile-tree">'+mobile+'</div>':
-    '<div class="muteblock">Nenhuma categoria cadastrada.</div>'))+
-    panel('Tags reutilizáveis','<div class="panelbody"><p class="muted">Exemplos: Nossa Senhora, Primeira Comunhão, Infantil, Presente.</p>'+
-    (tags||'<p class="muted">Nenhuma tag cadastrada.</p>')+'</div>',button('+ Nova tag','tag-new','','small'));
 }
+function categoriesPage(){
+  const active=state.items.filter(p=>p.active).length;
+  const retained=state.items.length-active;
+  return tabHead('Categorias','Organize por departamentos e subcategorias; expanda apenas o ramo que deseja editar.',
+    button('+ Nova categoria','category-new','','primary')+
+    button('Gerenciar tags','view','data-view="tags"',''))+
+    '<section class="panel catalog-panel"><div class="catalog-toolbar">'+
+    '<label class="catalog-search-label"><span>Buscar categoria ou caminho</span>'+
+    '<input id="catalog-category-search" type="search" class="search" placeholder="Ex.: Roupas / Camisetas" autocomplete="off" value="'+h(state.catalogSearch)+'"></label>'+
+    '<div class="catalog-toolbar-actions">'+
+    button('Expandir tudo','category-expand-all','','small')+
+    button('Recolher tudo','category-collapse-all','','small')+'</div></div>'+
+    '<div class="catalog-guidance"><strong>Produtos ativos: '+active+'</strong>'+
+    (retained?' · '+retained+' registro(s) inativo(s) preservado(s) para o histórico.':'')+
+    '<p>As quantidades por categoria mostram apenas produtos ativos. Abra um grupo para ver seus subníveis. Produtos inativos não entram na contagem.</p></div>'+
+    '<div class="catalog-tree-list">'+renderCatalogTree()+'</div></section>';
+}
+function renderTagsCatalog(){
+  return catalogTagCards({tags:state.tags,items:state.items,
+    query:state.catalogTagsSearch,h,button});
+}
+function tagsPage(){
+  return tabHead('Tags','Características para identificação e filtros dos produtos.',
+    button('+ Nova tag','tag-new','','primary')+
+    button('Gerenciar categorias','view','data-view="categorias"',''))+
+    '<section class="panel catalog-panel"><div class="catalog-toolbar">'+
+    '<label class="catalog-search-label"><span>Buscar tag</span>'+
+    '<input id="catalog-tags-search" type="search" class="search" placeholder="Ex.: Nossa Senhora, Branco…" autocomplete="off" value="'+h(state.catalogTagsSearch)+'"></label></div>'+
+    '<div class="catalog-guidance"><strong>'+state.tags.length+' tags cadastradas</strong>'+
+    '<p>As mais utilizadas aparecem primeiro. A contagem considera produtos ativos e não duplica o mesmo modelo por tamanho. Excluir uma tag retira sua associação dos produtos, sem mexer no estoque.</p></div>'+
+    '<div class="catalog-tags-list">'+renderTagsCatalog()+'</div></section>';
+}
+
 function usersPage(){
   return tabHead('Usuários','Cada pessoa utiliza sua própria senha e permissões.',button('+ Novo usuário','user-new','','primary'))+
     panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Usuário</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
@@ -959,13 +986,13 @@ async function handleClick(event){
     const opts=[
       ['inicio','Início','home'],['produtos','Produtos','package'],['balanco','Balanço rápido','clipboard'],
       ['eventos','Eventos','calendar'],['movimentacoes','Movimentações','arrows'],
-      ['categorias','Categorias e tags','layers'],['usuarios','Usuários','users']
+      ['categorias','Categorias','layers'],['tags','Tags','more'],['usuarios','Usuários','users']
     ];
     sheet.innerHTML='<div class="mobile-more-sheet" role="dialog" aria-modal="true" aria-label="Mais opções">'+
       '<div class="c-sheet-handle" aria-hidden="true"></div>'+
       '<div class="section-head"><strong>Menu do sistema</strong><button type="button" data-action="mobile-more-close" class="plain" aria-label="Fechar">✕</button></div>'+
       '<div class="c-more-items">'+opts.filter(([id])=>permittedView(id)&&
-        (id!=='categorias'||isManager())&&(id!=='usuarios'||isAdmin()))
+        (!['categorias','tags'].includes(id)||isManager())&&(id!=='usuarios'||isAdmin()))
         .map(([id,name,ico])=>'<button type="button" class="'+(state.view===id?'active':'')+
           '" data-action="view" data-view="'+id+'">'+uiIcon(ico,21)+'<span>'+h(name)+'</span>'+uiIcon('chevron',17)+'</button>').join('')+
       '</div><div class="c-more-account"><strong>'+h(state.profile.full_name)+'</strong><small>'+
@@ -1013,6 +1040,7 @@ async function handleClick(event){
         const label=target.querySelector('[data-category-label]');
         if(label)label.textContent=value?categoryFull(value):(mode==='parent'?'Nenhuma (principal)':'Escolher categoria');
         if(mode==='product'){
+          refreshProductTagChoices(form);
           const add=form.querySelector('[data-action="quick-category"]');
           if(add)add.textContent=value?'+ Subcategoria':'+ Categoria';
         }
@@ -1020,9 +1048,26 @@ async function handleClick(event){
     });return;
   }
   if(action==='category-toggle'){
-    if(state.collapsedCategories.has(id))state.collapsedCategories.delete(id);
-    else state.collapsedCategories.add(id);
-    render();return;
+    if(state.catalogExpanded.has(id))state.catalogExpanded.delete(id);
+    else state.catalogExpanded.add(id);
+    const tree=document.querySelector('.catalog-tree-list');
+    if(tree)tree.innerHTML=renderCatalogTree();
+    else render();
+    return;
+  }
+  if(action==='category-expand-all'||action==='category-collapse-all'){
+    state.catalogExpanded=new Set(action==='category-expand-all'?state.categories.map(c=>c.id):[]);
+    const tree=document.querySelector('.catalog-tree-list');if(tree)tree.innerHTML=renderCatalogTree();
+    return;
+  }
+  if(action==='tag-show-all'){
+    const wrapper=target.closest('[data-tag-choices]');
+    const others=wrapper?.querySelector('[data-other-tags]');
+    if(!others)return;
+    others.hidden=!others.hidden;
+    target.setAttribute('aria-expanded',String(!others.hidden));
+    target.textContent=others.hidden?'Ver outras tags ▾':'Ocultar outras tags ▴';
+    return;
   }
   if(action==='modal-close'){closeTopModal();return;}
   if(action==='login-mode'){state.loginMode=state.loginMode==='link'?'password':'link';state.loginNotice='';render();return;}
@@ -1485,6 +1530,14 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
   if(['product-search','movement-search','quick-search'].includes(event.target.id))updateFiltered(event.target.id,event.target.value);
+  if(event.target.id==='catalog-category-search'){
+    state.catalogSearch=event.target.value;
+    const list=document.querySelector('.catalog-tree-list');if(list)list.innerHTML=renderCatalogTree();
+  }
+  if(event.target.id==='catalog-tags-search'){
+    state.catalogTagsSearch=event.target.value;
+    const list=document.querySelector('.catalog-tags-list');if(list)list.innerHTML=renderTagsCatalog();
+  }
   if(event.target.matches('[data-event-batch-search]')){
     filterWorkflowRows(event.target.closest('form'),event.target.value,'batch');
   }
@@ -1517,6 +1570,7 @@ document.addEventListener('change',event=>{
         const choice=standard||rootCat;
         form.querySelector('[name="category_id"]').value=choice.id;
         form.querySelector('[data-category-label]').textContent=categoryFull(choice.id);
+        refreshProductTagChoices(form);
       }
     }
   }
