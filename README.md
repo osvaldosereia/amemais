@@ -53,7 +53,7 @@ A configuração final do domínio personalizado (GitHub Pages, Registro.br e UR
 
 No celular, o sistema usa navegação inferior, botões de toque ampliados e formulários em tela cheia. Em **Produtos > Novo produto**, use **Tirar foto** para abrir a câmera ou **Escolher da galeria** para buscar imagens. O arquivo é compactado no aparelho antes do envio. A foto de cada produto pode ser ampliada por toque.
 
-A seleção rápida de categoria, subcategoria e subsubcategoria fica separada dos botões `+` de criação. Tags existentes são escolhidas por toque; o botão **Criar tag** abre cadastro curto sem apagar o formulário de produto. Há suporte básico a instalação na tela inicial via manifesto web.
+A seleção de categorias usa campos encadeados com profundidade ilimitada: cada nova escolha revela o próximo nível; botões `+` abrem uma tela separada para criar uma categoria ou subcategoria. Tags existentes são escolhidas por toque; o botão **Criar tag** abre cadastro curto sem apagar o formulário de produto. Há suporte básico a instalação na tela inicial via manifesto web.
 
 ## Cadastro sem email de confirmação
 
@@ -62,3 +62,5 @@ O administrador preenche nome, email de login, função, senha inicial e confirm
 As contas preexistentes criadas por link continuam preservadas. Para entrar pela primeira vez após a atualização e estabelecer senha, existe a opção **Ainda não tenho senha (acesso antigo)** no login. Não use links de confirmação para criar novas contas.
 
 O sistema aceita senhas a partir de **6 caracteres** na interface e no serviço de cadastro. Senhas mais longas continuam recomendadas para administradores. A política de senhas do Supabase Auth deve permitir esse mínimo.
+
+O banco não impõe um limite fixo de profundidade na hierarquia de categorias. A interface carrega a lista completa em páginas e bloqueia referências circulares. Categorias com descendentes não podem ser movidas para outro pai sem reorganizar primeiro a árvore.
