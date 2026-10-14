@@ -36,7 +36,8 @@ begin
  if not app_private.has_permission(v_required) then
     raise exception 'Sem permissão para a operação: %',v_required;
  end if;
- return case when tg_op='DELETE' then old else new end;
+ if tg_op='DELETE' then return old;end if;
+ return new;
 end;$body$;
 
 drop trigger if exists products_granular_permission on public.products;
