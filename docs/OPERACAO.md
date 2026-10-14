@@ -1,0 +1,45 @@
+# Operação — Estoque AME MAIS
+
+## Menus e perfis
+
+- **Admin:** usuários, cadastros, eventos, estoque, auditoria.
+- **Gerente:** produtos, categorias, eventos, estoque da loja e relatórios.
+- **Evento:** apenas eventos aos quais foi associado. Responsável pode registrar devolução e encerrar; operador registra vendas.
+- **Consulta:** visualização de produtos, saldos, eventos e movimentações sem alterações.
+
+Cada pessoa entra com seu próprio email e senha. O histórico registra o UUID de quem executou cada movimento e o horário. A interface apresenta o nome do usuário correspondente.
+
+## Produtos
+
+Categorias têm até três níveis: por exemplo, Roupas > Camisetas > Adulto; Terços > Madeira; Imagens > Nossa Senhora. Tags são termos livres separados por vírgula. Produto contém nome, SKU opcional, EAN opcional, categoria, foto e status.
+
+Uma peça de roupa com tamanho/cor diferente deve ter SKU/EAN e saldo próprio (produto distinto). O cadastro de produto não altera o saldo por si só: use **Entrada** para quantidade inicial.
+
+Fotos de celular são reduzidas até 1280 px e aproximadamente 450 KB antes do envio. O arquivo vai para bucket privado; acesso é temporário e depende de login.
+
+## Eventos — fluxo correto
+
+1. O gerente cria um evento com nome, início e término estimado.
+2. Associa colaboradores como **responsável** ou **operador**.
+3. Ativa o evento e transfere quantidades da loja.
+4. Durante o evento, registra cada venda, diminuindo apenas o saldo daquele evento.
+5. No retorno, o responsável registra devoluções dos produtos não vendidos para a loja.
+6. O evento só pode ser encerrado com saldo zero em todos os itens.
+
+**Exemplo:** Loja tem 30 terços. Transfere 12 ao evento → loja 18, evento 12. Vende 7 → evento 5. Devolve 5 → loja 23, evento 0. Encerra evento. Histórico mostra os três movimentos com usuários e datas.
+
+Uma transferência adicional é permitida enquanto o evento estiver ativo, respeitando o saldo. Eventos encerrados são somente leitura.
+
+## Lançamentos e correções
+
+Ações de estoque da loja: **Entrada**, **Venda loja**, **Ajuste** (requer motivo). Ações de evento: **Transferir**, **Venda evento**, **Devolver**. Todos os lançamentos têm quantidade explícita, nome do produto, usuário e data/hora.
+
+Os saldos são conferidos dentro de transação SQL com bloqueio de linhas, evitando corrida entre dois operadores. Não é permitido saldo negativo. Um erro de lançamento deve ser corrigido por outra movimentação válida com justificativa; o histórico anterior permanece.
+
+## Limitações conscientes da versão inicial
+
+- Operações exigem conexão à internet; não há lançamentos offline, evitando conflitos de sincronização.
+- Não há integração automática com PDV, Bling ou emissor fiscal; vendas são registradas manualmente e devem ser conciliadas com o caixa.
+- O relatório apresenta histórico recente e exportação CSV; não substitui demonstrações contábeis.
+- O leitor usa biblioteca ZXing quando disponível; câmera pode variar conforme permissões e dispositivo.
+- Atualize políticas, testes e procedimentos de backup antes de uso com grande volume.
