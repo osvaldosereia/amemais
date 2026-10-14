@@ -8,7 +8,7 @@ Sistema web de gestão de produtos, estoque da loja e estoques temporários de e
 
 - Aplicação responsiva em HTML, CSS e JavaScript com publicação pelo GitHub Pages (branch main).
 - Banco PostgreSQL exclusivo com RLS nas oito tabelas públicas do sistema.
-- Autenticação por **email (link sem senha)**, ativação inicial protegida por código de uso único e convites de colaboradores pelo administrador.
+- Autenticação com **email e senha definidos pelo administrador**, sem convite ou confirmação por email no cadastro de colaboradores. Contas legadas podem entrar temporariamente por link para definir sua senha.
 - Papéis: administrador, gerente, equipe do evento (responsável/operador) e consulta.
 - Estoque e movimentos transacionais e auditáveis, com devolução e encerramento de eventos.
 - Imagens compactadas antes do envio para bucket privado; leitura EAN via câmera.
@@ -22,8 +22,8 @@ Sistema web de gestão de produtos, estoque da loja e estoques temporários de e
    - **Redirect URLs:** adicione `https://cdsb.net.br/`.
 2. Abra o site e informe seu email. Supabase envia um link de confirmação/acesso.
 3. Depois de confirmar o email, digite seu nome e o **código de ativação temporário entregue diretamente ao gestor**. O código não está no GitHub.
-4. Após a ativação, gerencie convites em **Usuários** e faça testes de ponta a ponta antes do uso comercial.
-5. Depois da ativação, recomenda-se desativar inscrições públicas em **Authentication > Providers > Email**, mantendo os convites administrativos; valide o fluxo de convites antes de restringir cadastro.
+4. Após a ativação, cadastre colaboradores em **Usuários** informando email, função e senha inicial. Defina a sua própria senha em **Minha senha**. Faça testes de ponta a ponta antes do uso comercial.
+5. Mantenha o cadastro público desabilitado. A função protegida cria usuários pelo Admin Auth API, diretamente e sem email de confirmação.
 
 A conta Supabase Pro do gestor **não é outra conta do aplicativo**. O aplicativo usa autenticação própria para associar cada ação ao responsável.
 
@@ -40,7 +40,7 @@ A conta Supabase Pro do gestor **não é outra conta do aplicativo**. O aplicati
 - `index.html`, `styles.css`, `src/`: interface web.
 - `config.js`: apenas URL e chave pública do Supabase.
 - `supabase/migrations/`: estrutura e ativação segura.
-- `supabase/functions/admin-create-user/`: convites administrativos.
+- `supabase/functions/admin-create-user/`: criação de usuário com senha e redefinição administrativa.
 - `docs/INSTALACAO.md`: instalação e testes.
 - `docs/OPERACAO.md`: operação diária e regras de eventos.
 - Publicação: GitHub Pages configurado para a branch `main` (sem workflow duplicado).
@@ -54,3 +54,9 @@ A configuração final do domínio personalizado (GitHub Pages, Registro.br e UR
 No celular, o sistema usa navegação inferior, botões de toque ampliados e formulários em tela cheia. Em **Produtos > Novo produto**, use **Tirar foto** para abrir a câmera ou **Escolher da galeria** para buscar imagens. O arquivo é compactado no aparelho antes do envio. A foto de cada produto pode ser ampliada por toque.
 
 A seleção rápida de categoria, subcategoria e subsubcategoria fica separada dos botões `+` de criação. Tags existentes são escolhidas por toque; o botão **Criar tag** abre cadastro curto sem apagar o formulário de produto. Há suporte básico a instalação na tela inicial via manifesto web.
+
+## Cadastro sem email de confirmação
+
+O administrador preenche nome, email de login, função, senha inicial e confirmação da senha no painel **Usuários**. O backend valida o JWT do administrador, usa o Supabase Auth Admin API com `email_confirm: true` (sem envio de link) e vincula a conta a `staff_profiles`. A senha não é salva no banco da aplicação nem nos logs. É possível redefinir senhas por **Usuários > Definir senha**. Cada usuário pode trocar a própria senha pelo menu **Minha senha**.
+
+As contas preexistentes criadas por link continuam preservadas. Para entrar pela primeira vez após a atualização e estabelecer senha, existe a opção **Ainda não tenho senha (acesso antigo)** no login. Não use links de confirmação para criar novas contas.
