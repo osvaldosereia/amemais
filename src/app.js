@@ -1196,8 +1196,27 @@ async function handleClick(event){
   if(action==='category-edit')return categoryModal(null,false,state.categories.find(c=>c.id===id));
   if(action==='category-delete'){
     const cat=state.categories.find(c=>c.id===id);
-    if(!isManager()||!cat||!window.confirm('Excluir "'+cat.name+'" e suas subcategorias?\nA exclusão será impedida se houver produtos vinculados a qualquer nível.'))return;
-    return exec(async()=>assertOk(await db.rpc('remove_category_branch',{p_category_id:id})),'Categoria e subcategorias excluídas.');
+    if(!isManager()||!cat)return;
+    const categoryIds=new Set(state.categories.filter(c=>
+      c.id===id||categoryChain(c.id).some(ancestor=>ancestor.id===id)
+    ).map(c=>c.id));
+    const linkedModels=new Set(state.apparelModels.filter(m=>categoryIds.has(m.category_id)).map(m=>m.id));
+    const affected=state.items.filter(p=>categoryIds.has(p.category_id)||
+      (p.apparel_model_id&&linkedModels.has(p.apparel_model_id)));
+    const active=affected.filter(p=>p.active).length;
+    if(active){
+      toast('Há '+active+' produto(s) ativo(s) nesta categoria ou subcategorias. Desative ou reclassifique esses produtos antes de excluir.',true);
+      return;
+    }
+    const archived=affected.filter(p=>!p.active).length;
+    const message='Excluir a categoria "'+cat.name+'" e todas as suas subcategorias?'+
+      (archived?'\n\nHá '+archived+' produto(s) desativado(s) vinculados. Suas movimentações serão preservadas e a classificação antiga ficará salva no histórico.':'')+
+      '\n\nEsta exclusão não poderá ser desfeita.';
+    if(!window.confirm(message))return;
+    return exec(async()=>{
+      assertOk(await db.rpc('remove_category_branch',{p_category_id:id}));
+      for(const c of categoryIds)state.catalogExpanded.delete(c);
+    },'Categoria e subcategorias excluídas. Histórico preservado.');
   }
   if(action==='tag-new')return tagModal();
   if(action==='tag-delete'){
