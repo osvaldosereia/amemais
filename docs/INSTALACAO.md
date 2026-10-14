@@ -2,7 +2,7 @@
 
 ## 0. Domínio próprio cdsb.net.br
 
-O domínio oficial da aplicação será **https://cdsb.net.br/** (domínio principal, sem prefixo admin). A publicação é por **GitHub Actions**.
+O domínio oficial da aplicação será **https://cdsb.net.br/** (domínio principal, sem prefixo admin). A publicação atual usa **GitHub Pages a partir da branch main**, com fluxo automático do GitHub.
 
 **No GitHub**: [Settings > Pages](https://github.com/osvaldosereia/amemais/settings/pages) > **Custom domain** > informe `cdsb.net.br` > **Save**. Ative **Enforce HTTPS** quando o certificado estiver disponível.
 
@@ -18,7 +18,7 @@ O domínio oficial da aplicação será **https://cdsb.net.br/** (domínio princ
 
 O `www` é opcional, mas recomendado. Não inclua `https://` nos registros. Revise entradas DNS antigas do domínio raiz que entrem em conflito; preserve registros de e-mail (MX, SPF, DKIM, DMARC). A propagação do DNS e o certificado HTTPS podem levar até 24 horas.
 
-**Importante:** quando o GitHub Pages utiliza **GitHub Actions** como origem, um arquivo `CNAME` no repositório é ignorado; é indispensável preencher **Custom domain** em Settings > Pages.
+**Importante:** configure sempre **Custom domain** em Settings > Pages. Não use mais de uma forma de publicação simultaneamente.
 
 Depois configure o **Supabase Auth** do projeto AME MAIS (seção 1) para o domínio novo. Links de convites de colaboradores já apontam para `https://cdsb.net.br/`; o formulário de login usa automaticamente o endereço atual do site.
 
@@ -69,7 +69,7 @@ Em **Usuários > Novo usuário**, o administrador informa nome, email e perfil, 
 
 O arquivo `config.js` já aponta **somente para o projeto novo da AME MAIS**, usando URL e chave publicável. Não há nenhuma chave de serviço no código público.
 
-O pipeline `.github/workflows/pages.yml` publica automaticamente atualizações do branch `main` em GitHub Pages. Confira o status do último workflow [aqui](https://github.com/osvaldosereia/amemais/actions).
+A publicação utiliza **GitHub Pages → Deploy from a branch (main, /root)**. O workflow manual duplicado foi removido, pois ocasionava conflito entre duas implantações. Confira o status em [GitHub Actions](https://github.com/osvaldosereia/amemais/actions).
 
 ## 5. Testes antes de liberar
 
