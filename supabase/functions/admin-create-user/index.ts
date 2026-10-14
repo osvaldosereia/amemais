@@ -68,7 +68,7 @@ Deno.serve(async (request) => {
     const role = String(payload.role || 'evento');
     if (!/^[A-Za-z][A-Za-z0-9._-]{2,31}$/.test(username) ||
         fullName.length < 2 || fullName.length > 120 ||
-        !['admin','gerente','evento','consulta'].includes(role)) {
+        !['admin','gerente','estoquista','evento','consulta'].includes(role)) {
       return respond({error:'Informe nome, usuário de 3 a 32 caracteres e função.'},400);
     }
 
