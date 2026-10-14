@@ -1633,8 +1633,12 @@ async function saveQuickGroupCounts(card,onlyId=null){
   let selected;
   try{selected=collectQuickCounts(card,onlyId);}catch(error){toast(error.message,true);return;}
   state.loading=true;
-  const buttons=[...card.querySelectorAll('button')];
-  buttons.forEach(btn=>btn.disabled=true);
+  const buttons=[...card.querySelectorAll('button')].map(button=>({button,disabled:button.disabled}));
+  const selectedInputs=selected.map(item=>[...card.querySelectorAll('[data-quick-row]')]
+    .find(row=>row.dataset.quickRow===item.product_id)?.querySelector('[data-quick-count]')).filter(Boolean);
+  buttons.forEach(({button})=>button.disabled=true);
+  selectedInputs.forEach(input=>input.disabled=true);
+  let resultMessage='';
   const status=card.querySelector('[data-quick-status]');
   if(status)status.textContent='Salvando contagens…';
   try{
@@ -1657,11 +1661,11 @@ async function saveQuickGroupCounts(card,onlyId=null){
     const total=card.querySelector('[data-quick-total]');
     if(total)total.textContent=String(qty);
     const adjusted=Number(saved.adjusted)||0;
-    if(status)status.textContent=selected.length+' tamanho(s) salvo(s) · '+adjusted+' ajuste(s) de estoque';
+    resultMessage=selected.length+' tamanho(s) salvo(s) · '+adjusted+' ajuste(s) de estoque';
     toast(selected.length===1?'Contagem salva sem recarregar a tela.':selected.length+' contagens salvas sem recarregar a tela.');
   }catch(error){
     fail(error);
-    if(status)status.textContent='Não foi salvo. Revise as contagens antes de tentar novamente.';
+    resultMessage='Não foi salvo. Revise as contagens antes de tentar novamente.';
     // Se outro operador alterou o saldo, atualiza apenas a referência das linhas,
     // preservando os campos digitados e a posição da rolagem.
     try{
@@ -1679,7 +1683,10 @@ async function saveQuickGroupCounts(card,onlyId=null){
     }catch(syncError){console.warn('Não foi possível sincronizar saldo após falha',syncError);}
   }finally{
     state.loading=false;
+    selectedInputs.forEach(input=>input.disabled=false);
+    buttons.forEach(({button,disabled})=>{if(button.isConnected)button.disabled=disabled;});
     updateQuickCountButtons(card);
+    if(status&&resultMessage)status.textContent=resultMessage;
   }
 }
 
