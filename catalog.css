@@ -1,0 +1,98 @@
+/* AME MAIS | Catálogo administrativo C - categorias e tags em páginas separadas. */
+.catalog-panel{overflow:hidden;background:#fff;border:1px solid #e1ebe5;border-radius:17px}
+.catalog-toolbar{
+  display:flex;justify-content:space-between;align-items:end;gap:14px;
+  padding:17px 20px;background:#fff;border-bottom:1px solid #e8efea
+}
+.catalog-search-label{display:flex;flex:1;max-width:520px;flex-direction:column;gap:7px;min-width:0}
+.catalog-search-label span{color:#5a7164;font-size:.81rem;font-weight:680}
+.catalog-search-label input{width:100%;min-height:48px;font-size:16px;border-radius:10px}
+.catalog-toolbar-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.catalog-toolbar-actions .button{min-height:43px}
+.catalog-guidance{
+  margin:17px 20px 7px;background:#f0f7f2;border:1px solid #dbece0;
+  padding:13px 15px;border-radius:12px;color:#306a49;font-size:.85rem;line-height:1.45
+}
+.catalog-guidance strong{font-weight:800}
+.catalog-guidance p{margin:6px 0 0;color:#627b69;font-size:.81rem;line-height:1.48}
+.catalog-tree-list{padding:13px 20px 21px;display:flex;flex-direction:column;gap:7px}
+.catalog-tree-summary{font-size:.78rem;color:#799085;margin:2px 0 6px}
+.catalog-category-node{
+  position:relative;display:flex;align-items:center;justify-content:space-between;
+  min-width:0;gap:12px;flex-wrap:wrap;
+  border:1px solid #e1ebe4;border-radius:12px;background:#fff;
+  margin-left:calc(var(--catalog-depth,0) * 16px);
+  padding:10px 12px;box-shadow:0 1px 3px #1d47380a
+}
+.catalog-category-node.root-node{background:#eaf5ee;border-color:#cfdfd4}
+.catalog-category-node:not(.root-node){border-left:3px solid #c0d8c6}
+.catalog-node-main{display:flex;align-items:center;gap:11px;flex:1;min-width:260px}
+.catalog-expand{width:37px;height:37px;flex:0 0 37px;display:grid;place-items:center;
+  border:1px solid #d7e8dc;border-radius:9px;background:#fff;color:#2b744c;font-weight:800;font-size:1.04rem}
+.catalog-expand-placeholder{border-color:transparent;background:transparent;color:#c0d2c4}
+.catalog-node-info{display:flex;flex-direction:column;align-items:flex-start;gap:4px;
+  flex:1;min-width:100px;border:0;background:transparent;text-align:left;padding:2px 0;color:#2a4536
+}
+.catalog-node-open{cursor:pointer}
+.catalog-node-open:hover strong{text-decoration:underline}
+.catalog-node-info strong{font-size:.88rem;line-height:1.3;overflow-wrap:anywhere}
+.catalog-node-info small{font-size:.72rem;color:#8b9d90;line-height:1.25;overflow-wrap:anywhere}
+.catalog-node-count{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;
+  gap:2px;min-width:96px;white-space:nowrap;text-align:right}
+.catalog-node-count strong{font-size:1.08rem;font-variant-numeric:tabular-nums;color:#216d43}
+.catalog-node-count>span{color:#64796b;font-size:.68rem}
+.catalog-node-count small{font-size:.66rem;color:#a07b52}
+.catalog-node-actions{display:flex;align-items:center;gap:7px;flex:0 0 auto}
+.catalog-node-actions .button{min-height:38px;border-radius:9px;font-size:.76rem;padding:7px 10px}
+.catalog-node-actions .danger{color:#ab3937}
+.catalog-tags-list{padding:16px 20px 21px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.catalog-tag-card{border:1px solid #e1ebe3;border-radius:12px;min-width:0;
+  padding:13px;background:#fff;display:flex;align-items:center;gap:9px}
+.catalog-tag-card:nth-child(4n+2){background:#f5f9f6}
+.catalog-tag-name{display:inline-flex;padding:8px 11px;border-radius:19px;background:#e4f3e9;
+  font-size:.83rem;font-weight:710;color:#245e3a;max-width:100%;overflow-wrap:anywhere}
+.catalog-tag-card>small{flex:1;min-width:70px;text-align:right;font-size:.73rem;color:#6e8375}
+.catalog-tag-card .button{min-height:37px;font-size:.77rem}
+.catalog-no-results{color:#6c8072;padding:24px 11px;font-size:.89rem}
+.catalog-tag-guide{display:flex;flex-direction:column;gap:6px;background:#edf6f0;padding:11px 13px;
+  border-radius:10px;color:#245d3f;margin-bottom:10px;line-height:1.35}
+.catalog-tag-guide strong{font-size:.87rem}
+.catalog-tag-guide small{font-size:.78rem;color:#657d6a}
+.catalog-tag-pills{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.catalog-show-tags{margin:10px 0 8px;border:1px solid #c0d8c8;background:#f6faf7;color:#235e40;
+  padding:11px 13px;min-height:43px;font-size:.86rem;font-weight:730;border-radius:10px;width:100%;text-align:left}
+.catalog-more-tags{background:#f8faf8;padding:12px;border:1px solid #e2ebe2;border-radius:11px}
+.catalog-more-tags[hidden]{display:none!important}
+@media(max-width:900px){
+ .catalog-tags-list{grid-template-columns:1fr}
+ .catalog-category-node{margin-left:calc(var(--catalog-depth,0) * 10px)}
+}
+@media(max-width:760px){
+ .catalog-toolbar{flex-direction:column;align-items:stretch;padding:13px;gap:10px}
+ .catalog-search-label{max-width:none}
+ .catalog-toolbar-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .catalog-toolbar-actions .button{min-height:44px;padding:8px 5px}
+ .catalog-guidance{margin:12px 13px 6px;padding:12px;font-size:.79rem}
+ .catalog-tree-list{padding:8px 10px 16px;gap:9px}
+ .catalog-category-node{padding:11px;gap:8px;margin-left:calc(var(--catalog-depth,0) * 8px);align-items:flex-start;flex-direction:column}
+ .catalog-node-main{flex:none;width:100%;min-width:0;gap:8px}
+ .catalog-expand{width:37px;flex-basis:37px}
+ .catalog-node-info{min-width:0}
+ .catalog-node-info strong{font-size:.9rem}
+ .catalog-node-count{min-width:65px;align-items:flex-end}
+ .catalog-node-count strong{font-size:1rem}
+ .catalog-node-count small{font-size:.64rem;white-space:normal}
+ .catalog-node-actions{padding-left:0;width:100%;display:grid;grid-template-columns:1.5fr 1fr 1fr}
+ .catalog-node-actions .button{min-height:43px;padding:7px 5px;font-size:.74rem}
+ .catalog-tags-list{padding:11px;gap:9px}
+ .catalog-tag-card{padding:11px;gap:8px}
+ .catalog-tag-name{max-width:55%}
+ .catalog-tag-card>small{font-size:.69rem}
+ .catalog-tag-pills{gap:7px}
+ .catalog-more-tags{padding:8px}
+}
+@media(max-width:355px){
+ .catalog-category-node{margin-left:calc(var(--catalog-depth,0) * 4px)}
+ .catalog-node-count{min-width:58px}
+ .catalog-node-actions .button{font-size:.66rem}
+}
