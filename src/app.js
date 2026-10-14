@@ -70,7 +70,7 @@ async function loadData(){
     ['members',db.from('event_members').select('*').limit(2000)],
     ['balances',db.from('stock_balances').select('*').limit(10000)],
     ['movements',db.from('stock_movements').select('*').order('created_at',{ascending:false}).limit(1000)],
-    ['users',db.from('staff_profiles').select('id,full_name,email,role,active,created_at').order('full_name').limit(1000)]
+    ['users',db.from('staff_profiles').select('id,full_name,username,role,active,created_at').order('full_name').limit(1000)]
   ];
   if(isManager())resources.push(['audits',db.from('audit_log').select('id,entity,entity_id,action,actor_id,created_at').order('created_at',{ascending:false}).limit(100)]);
   const results=await Promise.all(resources.map(async ([key,request])=>[key,await request]));
@@ -92,16 +92,16 @@ async function loadProfile(){
   try {await loadData();}catch(err){fail(err);render();}
 }
 function loginScreen(message=''){
-  const legacy=state.loginMode==='link';
+  const legacy=false;
   root.innerHTML='<div class="login-wrap"><section class="login">'+
   '<div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
   '<h1>Entrar no sistema</h1><p class="muted">'+
   (legacy?'Acesso por email para contas antigas que ainda não definiram senha.':
-    'Entre com seu email de acesso e a senha definida pelo administrador.')+'</p>'+
+    'Entre com seu usuário e senha.')+'</p>'+
   (message?'<div class="alert">'+h(message)+'</div>':'')+
   (state.loginNotice?'<div class="note" role="status">'+h(state.loginNotice)+'</div>':'')+
   '<form data-form="'+(legacy?'login-link':'login-password')+'">'+
-  field('Email de acesso','email','email','','required autocomplete="username"')+
+  field('Usuário','username','text','','required autocomplete="username" autocapitalize="none" spellcheck="false"')+
   (legacy?'':field('Senha','password','password','','required autocomplete="current-password"'))+
   '<button class="button primary" type="submit">'+(legacy?'Enviar link para meu email':'Entrar')+'</button></form>'+
   '<button type="button" class="plain" style="margin-top:12px" data-action="login-mode">'+
@@ -418,8 +418,8 @@ function categoriesPage(){
 
 function usersPage(){
   return tabHead('Usuários','Cada pessoa utiliza sua própria senha e permissões.',button('+ Novo usuário','user-new','','primary'))+
-    panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Email</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
-    state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.email)+'</td><td>'+h(roles[u.role]||u.role)+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
+    panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Usuário</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
+    state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.username)+'</td><td>'+h(roles[u.role]||u.role)+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
       (u.id!==state.user.id?'<div class="inline">'+button('Função','user-role','data-id="'+h(u.id)+'"','small')+
       button('Definir senha','set-user-password','data-id="'+h(u.id)+'"','small')+
       button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+'</div>':
@@ -618,7 +618,7 @@ function userModal(){
   if(!isAdmin())return;
   formModal('Cadastrar usuário','<div class="formgrid">'+
     field('Nome completo','full_name','text','','required minlength="2" maxlength="120" autocomplete="name"')+
-    field('Email de acesso','email','email','','required autocomplete="off"')+
+    field('Usuário','username','text','','required minlength="3" maxlength="32" autocapitalize="none"')+
     selectField('Função','role',Object.entries(roles),'evento')+
     field('Senha inicial','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"',
       'Mínimo de 12 caracteres. A senha não será enviada por email.')+
@@ -838,7 +838,7 @@ async function handleSubmit(event){
     state.loading=true;
     try{
       assertOk(await db.auth.signInWithPassword({
-        email:String(values.email||'').trim().toLowerCase(),password:String(values.password||'')
+        username:String(values.username||'').trim(),password:String(values.password||'')
       }));
       state.loginNotice='';
       await loadProfile();
