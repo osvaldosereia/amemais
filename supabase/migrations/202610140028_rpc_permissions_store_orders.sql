@@ -54,7 +54,7 @@ begin
        on conflict (product_id) where event_id is null do nothing;
      select quantity into v_current from public.stock_balances
        where product_id=v_item.product_id and event_id is null for update;
-     if v_current<v_item.quantity then raise exception 'Saldo insuficiente do produto %',v_item.product_id;end if;
+     if coalesce(v_current,0)<v_item.quantity then raise exception 'Saldo insuficiente do produto %',v_item.product_id;end if;
      update public.stock_balances set quantity=quantity-v_item.quantity,updated_at=now()
        where product_id=v_item.product_id and event_id is null;
      insert into public.stock_movements(product_id,event_id,action,quantity,delta_store,delta_event,actor_id,note)
@@ -65,7 +65,7 @@ begin
        values(v_order.from_store_id,v_item.product_id,0) on conflict do nothing;
      select quantity into v_current from public.store_stock
        where store_id=v_order.from_store_id and product_id=v_item.product_id for update;
-     if v_current<v_item.quantity then raise exception 'Saldo insuficiente do produto %',v_item.product_id;end if;
+     if coalesce(v_current,0)<v_item.quantity then raise exception 'Saldo insuficiente do produto %',v_item.product_id;end if;
      update public.store_stock set quantity=quantity-v_item.quantity,updated_at=now()
        where store_id=v_order.from_store_id and product_id=v_item.product_id;
    end if;
