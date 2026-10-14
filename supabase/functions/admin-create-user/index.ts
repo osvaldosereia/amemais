@@ -51,7 +51,7 @@ Deno.serve(async (request) => {
       const { data: target, error: targetError } = await admin.from('staff_profiles')
         .select('id,active').eq('id',targetId).maybeSingle();
       if (targetError || !target) return respond({error:'Colaborador não encontrado.'},404);
-      const {error:updateError} = await admin.auth.admin.updateUserById(targetId,{password,email_confirm:true});
+      const {error:updateError} = await admin.auth.admin.updateUserById(targetId,{password});
       if (updateError) return respond({error:'Não foi possível definir a senha. Confira o usuário.'},400);
       const {error:auditError} = await admin.from('audit_log').insert({
         entity:'staff_profiles',entity_id:targetId,action:'PASSWORD_RESET_BY_ADMIN',
