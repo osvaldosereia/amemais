@@ -101,12 +101,12 @@ export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,cho
   const providedSkus=variants.map(x=>x.sku).filter(Boolean);
   const providedEans=variants.map(x=>x.ean).filter(Boolean);
   if(providedSkus.length){
-    const check=assertOk(await db.from('products').select('sku').in('sku',providedSkus).limit(100))||[];
-    if(check.length)throw new Error('O SKU "'+check[0].sku+'" já pertence a outro produto. Apague esse código do tamanho para gerar um novo automaticamente.');
+    const check=assertOk(await db.from('products').select('sku').in('sku',providedSkus).eq('active',true).limit(100))||[];
+    if(check.length)throw new Error('O SKU "'+check[0].sku+'" está em uso por outro produto ativo. Informe outro código ou deixe vazio para gerar automaticamente.');
   }
   if(providedEans.length){
-    const check=assertOk(await db.from('products').select('ean').in('ean',providedEans).limit(100))||[];
-    if(check.length)throw new Error('O EAN "'+check[0].ean+'" já está cadastrado. Confira a etiqueta desse tamanho.');
+    const check=assertOk(await db.from('products').select('ean').in('ean',providedEans).eq('active',true).limit(100))||[];
+    if(check.length)throw new Error('O EAN "'+check[0].ean+'" está em uso por outro produto ativo. Confira a etiqueta desse tamanho.');
   }
   const v=n=>form.elements.namedItem(n)?.value?.trim()||'';
   const photo=form.__photoBlob||null;
@@ -118,9 +118,9 @@ export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,cho
       p_variants:variants,p_gondola:v('gondola'),p_prateleira:v('prateleira')
     }));
   }catch(error){
-    if(error?.code==='23505'&&/products_sku_key/.test(error.message||''))
-      throw new Error('Este código interno já foi usado. Apague o SKU do tamanho em conflito para que o sistema gere um novo.');
-    if(error?.code==='23505'&&/products_ean_key/.test(error.message||''))
+    if(error?.code==='23505'&&/products_(?:active_sku_unique|sku_key)/.test((error.message||'')+' '+(error.details||'')))
+      throw new Error('Código interno já utilizado por outro produto ativo. Troque o SKU ou deixe vazio para gerar automaticamente.');
+    if(error?.code==='23505'&&/products_(?:active_ean_unique|ean_key)/.test((error.message||'')+' '+(error.details||'')))
       throw new Error('EAN duplicado. Confira os códigos das etiquetas dos tamanhos selecionados.');
     throw error;
   }
