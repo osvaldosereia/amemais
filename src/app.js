@@ -106,7 +106,7 @@ function fail(err){
 async function exec(work,success='Operação registrada.'){
   if(state.loading)return;
   state.loading=true;
-  try { await work(); await loadData(); document.querySelector('.modalback')?.remove(); toast(success); }
+  try { await work(); await loadData(); document.querySelector('.modalback')?.remove(); toast(typeof success==='function'?success():success); }
   catch(error){fail(error);}
   finally {state.loading=false;}
 }
@@ -1328,26 +1328,39 @@ async function handleSubmit(event){
     };
     if(editing)payload.active=values.active==='true';
     else payload.created_by=state.user.id;
+    let photoWarning=false;
     await exec(async()=>{
       let productId=id;
       if(editing)assertOk(await db.from('products').update(payload).eq('id',id));
       else {
-        const created=assertOk(await db.from('products').insert(payload).select('id').single());
-        productId=created.id;
+        const initial=Number(values.initial_quantity||0);
+        if(!Number.isInteger(initial)||initial<0||initial>1000000)
+          throw new Error('Estoque inicial inválido. Informe de 0 a 1.000.000 unidades.');
+        // O produto e a movimentação inicial são salvos juntos no Supabase.
+        // Se falhar alguma etapa, o banco desfaz todo o cadastro.
+        productId=assertOk(await db.rpc('create_single_product_with_stock',{
+          p_name:payload.name,p_sku:payload.sku,p_ean:payload.ean,
+          p_category_id:payload.category_id,p_tags:payload.tags,
+          p_gondola:payload.gondola,p_prateleira:payload.prateleira,
+          p_initial_quantity:initial
+        }));
       }
       if(form.__photoBlob){
-        const compressed=form.__photoBlob;
-        const path=productId+'/'+crypto.randomUUID()+'.'+(compressed.type==='image/webp'?'webp':'jpg');
-        assertOk(await db.storage.from('ame-produtos').upload(path,compressed,{contentType:compressed.type,upsert:false}));
-        assertOk(await db.from('products').update({image_path:path}).eq('id',productId));
+        try{
+          const compressed=form.__photoBlob;
+          const path=productId+'/'+crypto.randomUUID()+'.'+(compressed.type==='image/webp'?'webp':'jpg');
+          assertOk(await db.storage.from('ame-produtos').upload(path,compressed,{contentType:compressed.type,upsert:false}));
+          assertOk(await db.from('products').update({image_path:path}).eq('id',productId));
+        }catch(error){
+          // Falha de foto não significa falha de cadastro: evita que o usuário
+          // envie o mesmo produto novamente e encontre SKU/EAN duplicado.
+          photoWarning=true;
+          console.error('Produto salvo; foto pendente',error);
+        }
       }
-      const initial=Number(values.initial_quantity||0);
-      if(!editing&&initial>0){
-        if(!Number.isInteger(initial)||initial>1000000)throw new Error('Quantidade inicial inválida');
-        if(isStockkeeper())assertOk(await db.rpc('quick_stock_count',{p_product_id:productId,p_expected:0,p_counted:initial,p_note:'Cadastro inicial'}));
-        else assertOk(await db.rpc('move_stock',{p_product_id:productId,p_action:'entrada',p_quantity:initial}));
-      }
-    },editing?'Produto atualizado.':'Produto cadastrado.');
+    },()=>photoWarning?
+      (editing?'Produto atualizado; foto não enviada.':'Produto cadastrado; foto pendente de envio.'):
+      (editing?'Produto atualizado.':'Produto cadastrado.'));
     return;
   }
   if(type==='apparel-create'){
