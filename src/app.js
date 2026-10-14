@@ -515,8 +515,10 @@ function eventDetails(){
     '<div class="actions" style="margin-bottom:18px">'+actions+'</div>'+
     (e.status==='ativo'&&balance>0?'<div class="note">Para encerrar, registre a venda ou a devolução de todas as '+balance+' unidades ainda no evento.</div>':'')+
     panel('Produtos ainda no evento',
-      stored.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Produto</th><th>EAN / SKU</th><th>No evento</th></tr></thead><tbody>'+
-      stored.map(b=>{const p=product(b.product_id);return '<tr><td>'+h(p?.name||'Produto removido')+'</td><td>'+h(p?.ean||p?.sku||'—')+'</td><td class="qty">'+b.quantity+'</td></tr>';}).join('')+'</tbody></table></div>':
+      stored.length?'<div class="grouped-inventory-grid event-stock-grid">'+
+        groupInventory(stored.map(b=>product(b.product_id)).filter(Boolean),state.apparelModels).map(g=>groupedCard(g,{
+          h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts,mode:'event',eventId:e.id
+        })).join('')+'</div>':
       '<div class="muteblock">Nenhum produto pendente neste evento.</div>')+
     panel('Equipe responsável', '<div class="panelbody">'+(mem.length?mem.map(m=>'<div class="inline" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid #edf1ee"><div><strong>'+h(username(m.user_id))+'</strong> <span class="pill">'+(m.role==='responsavel'?'Responsável':'Operador')+'</span></div>'+
       (isManager()?button('Remover','member-remove','data-user="'+h(m.user_id)+'" data-event="'+h(e.id)+'"','small'):'')+'</div>').join(''):'<p class="muted">Nenhum usuário associado.</p>')+
@@ -1113,7 +1115,8 @@ async function handleClick(event){
     state.eventWorkflow='return';state.eventReturnQuery='';render();window.scrollTo(0,0);return;
   }
   if(action==='event-return-back'){state.eventWorkflow=null;state.eventReturnQuery='';render();return;}
-  if(action==='event-return-scan')return scanEAN(code=>{
+  if(action==='event-return-scan'){
+    try {return scanEAN(code=>{
     state.eventReturnQuery=code;
     const input=document.querySelector('#event-return-search');
     if(input){input.value=code;filterWorkflowRows(input.closest('.main'),code,'return');}
@@ -1121,7 +1124,8 @@ async function handleClick(event){
       !el.hidden&&el.dataset.search?.split(' ').includes(code));
     if(form)form.querySelector('[name="quantity"]')?.focus();
     else toast('EAN não está entre os produtos pendentes neste evento.',true);
-  });
+    });}catch(error){fail(error);return;}
+  }
   if(action==='return-all'){
     const form=target.closest('form');
     const quantity=form?.querySelector('[name="quantity"]');
