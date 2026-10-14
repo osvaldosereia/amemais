@@ -485,7 +485,8 @@ function productsPage(){
     button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+
     (filtersApplied?button('Limpar filtros','products-clear-filters','','small primary'):'')+'</div>'+
     '<div class="grouped-inventory-grid">'+(list.length?list.map(g=>groupedCard(g,{
-      h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts
+      h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts,
+      canShare:canRegisterProducts()
     })).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
       (filtersApplied?'<p>Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.</p>'+
       button('Mostrar todos os produtos','products-clear-filters','','primary'):
@@ -742,6 +743,30 @@ function productModal(item=null){
   const form=document.querySelector('.modalback form');
   if(item)form.dataset.id=item.id;
   if(item?.image_path)hydrateImages();
+}
+
+function shareProductModal(title,shareUrl){
+  document.querySelector('.share-product-modal')?.remove();
+  const layer=document.createElement('div');
+  layer.className='share-product-modal';
+  layer.setAttribute('role','presentation');
+  layer.innerHTML='<section class="share-product-sheet" role="dialog" aria-modal="true" aria-label="Compartilhar produto">'+
+    '<header><h2>Compartilhar pelo WhatsApp</h2><button type="button" data-action="share-close" aria-label="Fechar">✕</button></header>'+
+    '<p><strong>'+h(title)+'</strong></p>'+
+    '<p>O link mostra a foto, o estoque da loja por tamanho, o EAN e o código interno. '+
+    'As quantidades são atualizadas quando a pessoa abre o visualizador.</p>'+
+    '<p class="share-expiry">O link vale por 7 dias. Qualquer pessoa que tiver o link poderá consultar este produto enquanto ele estiver ativo.</p>'+
+    '<div class="share-link" id="share-url-preview"></div>'+
+    '<div class="share-actions">'+
+      '<button type="button" class="share-whatsapp-send" data-action="share-send-whatsapp">Enviar pelo WhatsApp</button>'+
+      '<button type="button" class="share-copy" data-action="share-copy-link">Copiar link</button>'+
+    '</div></section>';
+  layer.dataset.shareUrl=shareUrl;
+  layer.dataset.shareTitle=title;
+  layer.querySelector('#share-url-preview').textContent=shareUrl;
+  layer.addEventListener('click',e=>{if(e.target===layer)layer.remove();});
+  document.body.append(layer);
+  layer.querySelector('[data-action="share-send-whatsapp"]')?.focus({preventScroll:true});
 }
 
 function stockModal(id){
@@ -1142,6 +1167,38 @@ async function handleClick(event){
     return;
   }
   if(action==='extra-size-toggle')return toggleExtraSize(target.closest('form'),target.dataset.size);
+  if(action==='share-product'){
+    if(!canRegisterProducts())return;
+    const selected=product(id);if(!selected?.active)return toast('Produto indisponível para compartilhamento.',true);
+    target.disabled=true;
+    try{
+      const token=assertOk(await db.rpc('create_product_share',{p_product_id:id}));
+      if(!/^[0-9a-f]{64}$/.test(token||''))throw new Error('Não foi possível gerar um link seguro.');
+      const url=new URL('./share.html',window.location.href);
+      url.search='';url.hash='t='+token;
+      const model=state.apparelModels.find(m=>m.id===selected.apparel_model_id);
+      shareProductModal(model?.name||selected.name,url.toString());
+    }catch(error){fail(error);}
+    finally{if(target.isConnected)target.disabled=false;}
+    return;
+  }
+  if(action==='share-close'){document.querySelector('.share-product-modal')?.remove();return;}
+  if(action==='share-send-whatsapp'){
+    const layer=target.closest('.share-product-modal'),url=layer?.dataset.shareUrl;
+    if(!url)return;
+    const title=layer.dataset.shareTitle||'Produto Ame+';
+    const message='Ame+ Store — '+title+'\nConsulte a foto, os tamanhos, o estoque, SKU e EAN:\n'+url;
+    const whatsapp='https://wa.me/?text='+encodeURIComponent(message);
+    const windowRef=window.open(whatsapp,'_blank','noopener,noreferrer');
+    if(!windowRef)window.location.assign(whatsapp);
+    return;
+  }
+  if(action==='share-copy-link'){
+    const url=target.closest('.share-product-modal')?.dataset.shareUrl;if(!url)return;
+    try{await navigator.clipboard.writeText(url);toast('Link copiado.');}
+    catch{window.prompt('Copie o link do produto:',url);}
+    return;
+  }
   if(action==='product-new')return productModal();
   if(action==='products-toggle-inactive'){state.showInactiveProducts=!state.showInactiveProducts;state.page=0;render();return;}
   if(action==='products-clear-filters'){
@@ -1574,7 +1631,8 @@ document.addEventListener('click',event=>{
 });
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
-    if(document.querySelector('.tax-backdrop'))closeTaxonomyPicker();
+    if(document.querySelector('.share-product-modal'))document.querySelector('.share-product-modal').remove();
+    else if(document.querySelector('.tax-backdrop'))closeTaxonomyPicker();
     else if(document.querySelector('.photo-lightbox'))document.querySelector('.photo-lightbox').remove();
     else if(document.querySelector('.mobile-more-overlay'))document.querySelector('.mobile-more-overlay').remove();
     else if(document.querySelector('.modalback'))closeTopModal();
