@@ -23,33 +23,47 @@ export function groupInventory(items,models){
     return g;
   }).sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts,mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts,canShare=false,mode='products',eventId=null}){
   const main=group.main;
   const count=group.products.reduce((sum,p)=>sum+(mode==='event'?qtyEvent(p.id,eventId):qtyStore(p.id)),0);
   const canManage=mode==='products'&&canRegisterProducts();
-  const productActions=(p)=>{
+  const actions=p=>{
     if(mode==='event')return '';
-    const extra=canManage?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'';
-    return '<div class="group-variant-actions">'+extra+
+    return '<div class="group-variant-actions">'+
+      (canManage?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+
       (isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
       (isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div>';
   };
   const variants=group.products.map(p=>{
-    const n=mode==='event'?qtyEvent(p.id,eventId):qtyStore(p.id);
+    const qty=mode==='event'?qtyEvent(p.id,eventId):qtyStore(p.id);
     return '<div class="group-variant-row" data-product-id="'+h(p.id)+'">'+
-      '<div class="group-variant-description"><strong>'+h(group.modelId?(p.apparel_color+' · '+p.apparel_size):p.name)+'</strong>'+
-      '<small>'+h(p.ean||p.sku||'Sem EAN / SKU')+'</small></div>'+
-      '<span class="group-variant-stock '+(n===0?'stock-zero':'')+'">'+n+' un.</span>'+
-      productActions(p)+'</div>';
+      '<div class="group-variant-description"><strong>'+h(group.modelId?
+        (p.apparel_color+' · '+p.apparel_size):p.name)+'</strong>'+
+      '<small><b>SKU:</b> '+h(p.sku||'—')+'</small>'+
+      '<small><b>EAN:</b> '+h(p.ean||'—')+'</small></div>'+
+      '<span class="group-variant-stock '+(qty===0?'stock-zero':'')+'">'+qty+' un.</span>'+
+      actions(p)+'</div>';
   }).join('');
+  const share=(mode==='products'&&canShare)
+    ?'<button type="button" class="group-whatsapp" data-action="share-product" data-id="'+h(main.id)+
+      '" aria-label="Compartilhar '+h(group.title)+' pelo WhatsApp">'+
+      '<span aria-hidden="true">↗</span> Compartilhar no WhatsApp</button>':'';
   return '<article class="grouped-inventory-card">'+
     '<div class="grouped-inventory-top">'+
-      '<div class="grouped-inventory-photo">'+photoButton(main)+'</div>'+
-      '<div class="grouped-inventory-info"><strong>'+h(group.title)+'</strong>'+
-      '<small>'+h(group.modelId?'Produto com '+group.products.length+' variação(ões)':'Produto único')+'</small>'+
-      '<span class="grouped-total">Total '+(mode==='event'?'no evento':'na loja')+': <b>'+count+'</b></span>'+
-      (group.modelId&&canManage?button('+ Novos tamanhos','add-variants','data-id="'+h(group.modelId)+'"','small primary'):'')+
-      '</div></div><div class="group-variant-list">'+variants+'</div></article>';
+    '<div class="grouped-inventory-photo">'+photoButton(main)+'</div>'+
+    '<div class="grouped-inventory-info"><strong>'+h(group.title)+'</strong>'+
+    '<small>'+h(group.modelId?group.products.length+' tamanho(s)/variação(ões)':'Produto único')+'</small>'+
+    '<span class="grouped-total">Estoque '+(mode==='event'?'no evento':'na loja')+': <b>'+count+'</b> un.</span>'+
+    (group.modelId&&canManage?button('+ Novos tamanhos','add-variants','data-id="'+h(group.modelId)+'"','small primary'):'')+
+    share+'</div></div>'+
+    '<div class="grouped-variants-desktop" aria-label="Estoque por tamanho">'+
+    '<div class="group-variants-heading">Estoque por '+(group.modelId?'tamanho':'produto')+'</div>'+
+    '<div class="group-variant-list">'+variants+'</div></div>'+
+    '<details class="grouped-variants-mobile">'+
+    '<summary><span>Ver estoque por '+(group.modelId?'tamanho':'produto')+'</span>'+
+    '<span class="group-mobile-total">'+count+' un. <span aria-hidden="true">⌄</span></span></summary>'+
+    '<div class="group-variant-list">'+variants+'</div></details>'+
+    '</article>';
 }
 function sizeLine(size){
   return '<div class="add-size-row" data-extra-size="'+size+'" hidden>'+
