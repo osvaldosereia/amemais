@@ -6,7 +6,7 @@ function sizeCard(size){
     '<div class="size-variant-heading"><strong>Tamanho '+size+'</strong>'+
     '<button type="button" class="button small" data-action="size-remove" data-size="'+size+'">Remover</button></div>'+
     '<div class="size-fields">'+
-    '<label class="field"><span>Código interno (SKU) *</span><input name="size_sku" maxlength="80" disabled required autocomplete="off" placeholder="Ex.: CAM-M"></label>'+
+    '<label class="field"><span>Código interno (SKU)</span><input name="size_sku" maxlength="80" disabled autocomplete="off" placeholder="Gerado automaticamente se vazio"></label>'+
     '<label class="field"><span>EAN (se houver)</span><div class="inline apparel-ean"><input name="size_ean" maxlength="14" inputmode="numeric" disabled placeholder="Código de barras">'+
     '<button class="button small" type="button" data-action="size-scan" aria-label="Ler EAN do tamanho '+size+'">📷</button></div></label>'+
     '<label class="field"><span>Estoque inicial *</span><input name="size_qty" type="number" step="1" min="0" max="1000000" value="0" disabled required inputmode="numeric"></label>'+
@@ -31,7 +31,7 @@ export function sizesSection(){
     '<div class="size-chip-group" role="group" aria-label="Tamanhos para cadastrar">'+
     STANDARD_SIZES.map(size=>'<button type="button" class="size-chip" aria-pressed="false" data-action="size-toggle" data-size="'+size+'">'+size+'</button>').join('')+
     '</div><div class="size-variant-list">'+STANDARD_SIZES.map(sizeCard).join('')+'</div>'+
-    '<p class="help">O código interno é obrigatório para cada tamanho. Preencha EAN apenas quando existir. Cada quantidade pertence ao tamanho correspondente.</p>'+
+    '<p class="help">Se deixar o SKU vazio, o sistema cria um código exclusivo para cada tamanho. Só informe EAN quando existir na etiqueta.</p>'+
     '</div></section>';
 }
 export function setSizesMode(form,checked){
@@ -62,25 +62,26 @@ export function setSizeSelected(form,size,enabled){
   chip.classList.toggle('selected',enabled);
   chip.setAttribute('aria-pressed',String(enabled));
   row.querySelectorAll('input').forEach(input=>input.disabled=!enabled);
-  if(enabled){
-    const sku=row.querySelector('[name="size_sku"]');
-    if(!sku.value){
-      const random=crypto.randomUUID().replaceAll('-','').slice(0,8).toUpperCase();
-      sku.value='AM-'+random+'-'+size;
-    }
-  }
+
 }
 export function collectSizeVariants(form){
   const color=form.querySelector('[name="apparel_color"]')?.value?.trim()||'';
   if(color.length<2||color.length>40)throw new Error('Informe uma cor com 2 a 40 caracteres.');
   const rows=[...form.querySelectorAll('[data-size-variant]')].filter(x=>!x.hidden);
   if(!rows.length)throw new Error('Selecione pelo menos um tamanho.');
+  const usedSkus=new Set(),usedEans=new Set();
   return rows.map(row=>{
     const get=n=>row.querySelector('[name="'+n+'"]')?.value?.trim()||'';
     const size=row.dataset.sizeVariant;
     const sku=get('size_sku'),ean=get('size_ean').replace(/[\s-]/g,'');
     const text=get('size_qty'),quantity=Number(text);
-    if(!sku||sku.length>80)throw new Error('Informe o código interno do tamanho '+size+'.');
+    if(sku.length>80)throw new Error('SKU do tamanho '+size+' é longo demais.');
+    if(sku&&usedSkus.has(sku.toLocaleUpperCase('pt-BR')))
+      throw new Error('O SKU "'+sku+'" foi repetido em dois tamanhos. Deixe vazio para gerar automaticamente.');
+    if(sku)usedSkus.add(sku.toLocaleUpperCase('pt-BR'));
+    if(ean&&usedEans.has(ean))
+      throw new Error('O EAN "'+ean+'" foi repetido em dois tamanhos. Cada código deve identificar apenas uma variação.');
+    if(ean)usedEans.add(ean);
     if(ean&&!/^[0-9]{8,14}$/.test(ean))throw new Error('EAN inválido no tamanho '+size+'.');
     if(text===''||!Number.isInteger(quantity)||quantity<0||quantity>1000000)
       throw new Error('Estoque inválido no tamanho '+size+'.');
@@ -96,13 +97,33 @@ export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,cho
   if(!ancestry.some(c=>!c.parent_id&&c.name.toLocaleLowerCase('pt-BR')==='roupas'))
     throw new Error('Produtos com tamanhos devem usar uma categoria dentro de Roupas.');
   const variants=collectSizeVariants(form);
+  // Antecipar conflitos para exibir a causa e preservar todo o preenchimento.
+  const providedSkus=variants.map(x=>x.sku).filter(Boolean);
+  const providedEans=variants.map(x=>x.ean).filter(Boolean);
+  if(providedSkus.length){
+    const check=assertOk(await db.from('products').select('sku').in('sku',providedSkus).limit(100))||[];
+    if(check.length)throw new Error('O SKU "'+check[0].sku+'" já pertence a outro produto. Apague esse código do tamanho para gerar um novo automaticamente.');
+  }
+  if(providedEans.length){
+    const check=assertOk(await db.from('products').select('ean').in('ean',providedEans).limit(100))||[];
+    if(check.length)throw new Error('O EAN "'+check[0].ean+'" já está cadastrado. Confira a etiqueta desse tamanho.');
+  }
   const v=n=>form.elements.namedItem(n)?.value?.trim()||'';
   const photo=form.__photoBlob||null;
-  const id=assertOk(await db.rpc('create_apparel_with_location',{
-    p_name:name,p_type:v('apparel_type'),p_audience:v('apparel_audience'),
-    p_age_group:v('apparel_age'),p_category_id:category,p_tags:productTagValues(form),
-    p_variants:variants,p_gondola:v('gondola'),p_prateleira:v('prateleira')
-  }));
+  let id;
+  try{
+    id=assertOk(await db.rpc('create_apparel_with_location',{
+      p_name:name,p_type:v('apparel_type'),p_audience:v('apparel_audience'),
+      p_age_group:v('apparel_age'),p_category_id:category,p_tags:productTagValues(form),
+      p_variants:variants,p_gondola:v('gondola'),p_prateleira:v('prateleira')
+    }));
+  }catch(error){
+    if(error?.code==='23505'&&/products_sku_key/.test(error.message||''))
+      throw new Error('Este código interno já foi usado. Apague o SKU do tamanho em conflito para que o sistema gere um novo.');
+    if(error?.code==='23505'&&/products_ean_key/.test(error.message||''))
+      throw new Error('EAN duplicado. Confira os códigos das etiquetas dos tamanhos selecionados.');
+    throw error;
+  }
   let photoWarning=false;
   if(photo){
     try{
