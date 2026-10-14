@@ -112,3 +112,13 @@ Se já foi cadastrada uma camiseta tamanho P e depois chegarem M, G ou outro tam
 7. Repita com os demais tamanhos. Quando não houver pendências no evento, o responsável poderá encerrá-lo.
 
 **Importante:** a devolução não cria novos produtos e não ajusta diretamente o estoque físico informado no Balanço rápido; é uma movimentação de retorno do evento, vinculada ao produto original. Somente saldo ainda disponível no evento pode ser devolvido, evitando devoluções duplicadas. Se o código não estiver legível, o leitor permite selecionar uma foto ou digitar o EAN. O leitor tenta a câmera nativa e, quando necessário, um método alternativo; alguns aparelhos também permitem ligar a luz pelo leitor.
+
+## Administração de Categorias e Tags (visual 2026-10-14)
+
+A gestão foi separada em **Categorias** e **Tags** no menu lateral e em **Mais** no celular.
+
+Em **Categorias**, os grupos começam recolhidos. Toque na seta **ou no nome** para expandir as subcategorias. Use a busca por nome/caminho, **Expandir tudo** ou **Recolher tudo**. Cada categoria mostra quantos **produtos ativos** pertencem diretamente a ela. Registros desativados não são contados como produtos disponíveis; quando existirem, aparece uma indicação separada de **inativos no histórico**. Esses registros não são apagados automaticamente porque podem estar ligados a movimentações e à auditoria. A regra de exclusão de categorias com vínculos históricos continua protegida no Supabase.
+
+Em **Tags**, a lista fica pesquisável e apresenta as tags mais usadas primeiro. A quantidade de uso considera **somente produtos ativos**, contando uma roupa com vários tamanhos como um modelo para fins de sugestão e estatística de tags.
+
+No **cadastro de produtos**, selecione primeiro a categoria. O sistema apresentará na frente as tags dos produtos ativos cadastrados nessa mesma categoria, priorizando correspondência exata, subcategorias e ascendentes. As tags já selecionadas continuam marcadas; o botão **Ver outras tags** mostra todas as opções que não apareceram nas sugestões, sem restringir nenhuma.
