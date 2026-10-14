@@ -1,0 +1,18 @@
+*{box-sizing:border-box}body{margin:0;background:#f4f8f5;color:#254b35;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+[hidden]{display:none!important}.receipt-head{display:flex;align-items:center;justify-content:space-between;background:white;border-bottom:1px solid #e0ebe2;padding:5px max(16px,calc((100vw - 840px)/2))}
+.receipt-head img{width:140px;height:74px;object-fit:contain}.receipt-head span{font-size:.71rem;letter-spacing:.13em;color:#477b60;font-weight:800}
+main{max-width:840px;margin:22px auto;padding:0 16px;min-height:69dvh}
+#receipt-loading,#receipt-error{background:#fff;border-radius:13px;padding:30px;text-align:center}#receipt-error{color:#a94435}
+#receipt-card{border:1px solid #d9e7de;border-radius:18px;padding:clamp(17px,4vw,35px);background:#fff;box-shadow:0 9px 26px #113c2110}
+.receipt-kicker{font-size:.7rem;color:#228250;letter-spacing:.1em;font-weight:820}
+h1{font-size:clamp(1.6rem,4vw,2.2rem);margin:8px 0 25px}h2{font-size:1.07rem;margin:25px 0 13px}
+.receipt-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.receipt-info>div{background:#f4f9f5;padding:14px;border-radius:11px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.receipt-info small{color:#7d9283;font-size:.75rem}.receipt-info strong{font-size:.93rem;overflow-wrap:anywhere}
+.receipt-item{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:15px 12px;border-bottom:1px solid #e5ede6}
+.receipt-item:nth-child(odd){background:#fbfdfb}.receipt-item>div{display:flex;flex-direction:column;gap:6px;min-width:0}
+.receipt-item strong{font-size:.9rem}.receipt-item small{color:#799080;font-size:.76rem}
+.receipt-item>span{font-weight:820;color:#256b43;white-space:nowrap}
+.receipt-total{border-radius:11px;background:#e8f5ed;color:#1b613b;padding:16px;text-align:right;font-weight:800;margin-top:15px}
+.receipt-note{color:#667f6f;font-size:.82rem;line-height:1.6;margin-top:20px}footer{text-align:center;padding:20px;color:#8aa28e;font-size:.68rem}
+@media(max-width:550px){.receipt-info{grid-template-columns:1fr}.receipt-head img{width:114px;height:64px}.receipt-head span{font-size:.58rem}}
