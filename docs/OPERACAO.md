@@ -59,3 +59,11 @@ Em smartphones, a navegação fica no rodapé e o formulário de produto ocupa a
 Em **Usuários > Novo usuário**, informe nome, email de login, função e senha inicial; confirme a senha. Não é necessário confirmar o email para ativar a conta. O usuário já pode fazer login imediatamente. A senha não fica visível após o cadastro e não é armazenada na tabela de usuários.
 
 O administrador pode selecionar **Definir senha** para outro usuário. Para trocar a própria senha, use **Minha senha** no painel. Todas as ações administrativas de senha são registradas na auditoria sem incluir o texto da senha. Bloquear uma conta impede seu acesso ao estoque sem apagar seu histórico.
+
+## Seleção visual de categorias (celular e desktop)
+
+Na lista de produtos, o filtro **Todas as categorias** abre um painel do AME MAIS, em vez do seletor nativo do telefone. No cadastro ou na edição do produto, **Escolher categoria** abre o mesmo painel. Use a busca por nome ou caminho completo, toque no nome para selecionar imediatamente ou na seta lateral para entrar no próximo nível. **Sem categoria** e **Todas as categorias** limpam a escolha conforme o contexto. Os filtros de tags também utilizam o painel próprio.
+
+O botão **+ Categoria / + Subcategoria** abre um formulário separado do seletor e mantém os dados já digitados no produto. Ao criar, a categoria nova é selecionada automaticamente.
+
+Na administração, a hierarquia mostra tons de fundo distintos conforme o nível, com grupos principais mais destacados. Toque na pequena seta ao lado do nome para recolher ou expandir as subcategorias. O visual foi adaptado para cartões em telas pequenas. Não há mudança na estrutura do Supabase nem migração de produtos.
