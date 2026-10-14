@@ -60,7 +60,7 @@ function sizeLine(size){
 }
 export function addSizesContent(model,variants){
   const color=variants[0]?.apparel_color||'Branco';
-  const existing=new Set(variants.filter(p=>String(p.apparel_color).toLowerCase()===color.toLowerCase()).map(p=>p.apparel_size));
+  const existing=new Set(variants.filter(p=>p.active&&String(p.apparel_color).toLowerCase()===color.toLowerCase()).map(p=>p.apparel_size));
   return '<p class="muted">Adicione novos tamanhos ao mesmo produto. Os já cadastrados serão preservados, inclusive o histórico.</p>'+
     '<div class="formgrid"><label class="field wide"><span>Cor</span><input type="text" name="new_color" required minlength="2" maxlength="40" value="'+esc(color)+'"></label></div>'+
     '<div class="note">Escolha uma cor e marque os tamanhos que chegaram. O SKU será gerado automaticamente, se ficar vazio.</div>'+
@@ -71,7 +71,7 @@ export function addSizesContent(model,variants){
 export function updateExtraSizeButtons(form,products){
   const color=(form.querySelector('[name="new_color"]')?.value||'').trim().toLowerCase();
   for(const btn of form.querySelectorAll('[data-action="extra-size-toggle"]')){
-    const taken=products.some(p=>p.apparel_size===btn.dataset.size&&String(p.apparel_color).toLowerCase()===color);
+    const taken=products.some(p=>p.active&&p.apparel_size===btn.dataset.size&&String(p.apparel_color).toLowerCase()===color);
     btn.disabled=taken;
     btn.title=taken?'Este tamanho já existe nesta cor':'';
     if(taken){
@@ -101,7 +101,7 @@ export function collectExtraSizes(form,products){
     const take=n=>(row.querySelector('[name="'+n+'"]')?.value||'').trim();
     const size=row.dataset.extraSize,sku=take('sku')||null,ean=take('ean')||null,raw=take('quantity');
     const quantity=Number(raw);
-    if(products.some(p=>p.apparel_size===size&&String(p.apparel_color).toLowerCase()===color.toLowerCase()))
+    if(products.some(p=>p.active&&p.apparel_size===size&&String(p.apparel_color).toLowerCase()===color.toLowerCase()))
       throw new Error('O tamanho '+size+' já existe nessa cor.');
     if(sku&&sku.length>80)throw new Error('SKU muito longo: '+size);
     if(ean&&!/^[0-9]{8,14}$/.test(ean))throw new Error('EAN inválido: '+size);
