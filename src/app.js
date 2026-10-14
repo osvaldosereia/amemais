@@ -173,9 +173,9 @@ async function loadData(){
     resources.push(['storeOrderItems',db.from('store_order_items').select('*').limit(5000)]);
   }
   resources.push(['ownPermissions',db.rpc('my_permissions').then(r=>({data:(r.data||[]).map(x=>x.permission),error:r.error}))]);
+  resources.push(['staffStores',db.from('staff_stores').select('*').limit(5000)]);
   if(isAdmin()){
     resources.push(['userPermissions',db.from('staff_permissions').select('*').limit(5000)]);
-    resources.push(['staffStores',db.from('staff_stores').select('*').limit(5000)]);
   }
   if(hasPermission('movements.read') || hasPermission('users.manage')){
     resources.push(['audits',db.from('audit_log').select('id,entity,entity_id,action,actor_id,created_at').order('created_at',{ascending:false}).limit(100)]);
@@ -1166,7 +1166,7 @@ async function saveTaxonomyFromProduct(form,table,data,success){
 
 function permissionFields(userId){
  const explicit=state.userPermissions.filter(x=>x.user_id===userId).map(x=>x.permission);
- const chosen=explicit.length?explicit:permissionDefaults[state.users.find(x=>x.id===userId)?.role]||[];
+ const chosen=explicit.length?explicit:(permissionDefaults[state.users.find(x=>x.id===userId)?.role||'evento']||[]);
  return '<section class="form-section wide"><strong>Autorizações individuais</strong><p class="help">Marque cada operação permitida. As permissões são cumulativas.</p>'+
  permissionCatalog.map(([key,label])=>'<label class="field"><span><input type="checkbox" name="perm" value="'+h(key)+'" '+(chosen.includes(key)?'checked':'')+'> '+h(label)+'</span></label>').join('')+
  '</section><section class="form-section wide"><strong>Lojas autorizadas</strong><p class="help">Sem seleção, o acesso a estoques de outras lojas não é liberado.</p>'+
@@ -1206,6 +1206,7 @@ function userModal(){
     field('Nome completo','full_name','text','','required minlength="2" maxlength="120" autocomplete="name"')+
     field('Usuário','username','text','','required minlength="3" maxlength="32" autocapitalize="none"')+
     selectField('Função','role',Object.entries(roles),'evento')+
+    permissionFields('')+
     field('Senha inicial','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"',
       'Mínimo de 6 caracteres. A senha não será enviada por email.')+
     field('Confirmar senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
@@ -2127,11 +2128,9 @@ async function handleSubmit(event){
     if(!perms.every(p=>permissionCatalog.some(([key])=>p===key)))throw Error('Permissão inválida.');
     if(!perms.length)throw Error('Selecione ao menos uma autorização.');
     await exec(async()=>{
-      assertOk(await db.from('staff_profiles').update({role:values.role}).eq('id',uid));
-      assertOk(await db.from('staff_permissions').delete().eq('user_id',uid));
-      if(perms.length)assertOk(await db.from('staff_permissions').insert(perms.map(permission=>({user_id:uid,permission}))));
-      assertOk(await db.from('staff_stores').delete().eq('user_id',uid));
-      if(stores.length)assertOk(await db.from('staff_stores').insert(stores.map(store_id=>({user_id:uid,store_id}))));
+      assertOk(await db.rpc('set_staff_access',{
+        p_user_id:uid,p_role:values.role,p_permissions:perms,p_store_ids:stores
+      }));
     },'Autorizações atualizadas.');return;
   }
   if(type==='user-role'){
@@ -2145,10 +2144,13 @@ async function handleSubmit(event){
     let password;
     try{password=passwordsValid(values);}catch(e){fail(e);return;}
     await exec(async()=>{
+      const permissions=[...form.querySelectorAll('[name="perm"]:checked')].map(x=>x.value);
+      const store_ids=[...form.querySelectorAll('[name="store"]:checked')].map(x=>x.value);
+      if(!permissions.length)throw new Error('Selecione ao menos uma permissão.');
       await invokeUserAdmin('create',{
         full_name:String(values.full_name||'').trim(),
         username:String(values.username||'').trim(),
-        role:values.role,password
+        role:values.role,password,permissions,store_ids
       });
     },'Usuário cadastrado. Entregue a senha ao colaborador por um canal seguro.');
     return;
@@ -2363,6 +2365,10 @@ document.addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('form[data-form="user-new"] select[name="role"]')){
+    const defaults=permissionDefaults[event.target.value]||[];
+    event.target.closest('form').querySelectorAll('[name="perm"]').forEach(el=>el.checked=defaults.includes(el.value));
+  }
   if(event.target.matches('.stock-destination-field select')){
     state.stockSelectedDestination=event.target.value;
     updateStockOperationBasket(false);
