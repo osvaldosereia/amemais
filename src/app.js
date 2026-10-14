@@ -133,61 +133,93 @@ function selectField(label,name,options,value='',attr=''){
 function textareaField(label,name,value='',required=false){
   return '<label class="field wide"><span>'+h(label)+'</span><textarea name="'+h(name)+'" '+(required?'required':'')+'>'+h(value)+'</textarea></label>';
 }
+// Uma hierarquia pode ter qualquer número de níveis. A lista usa DFS iterativo
+// para não esgotar a pilha do navegador com categorias muito profundas.
 function categoryTree(){
-  const ordered=[],visited=new Set();
-  function visit(parent,level){
-    const children=state.categories.filter(c=>c.parent_id===parent).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
-    for(const cat of children){
-      if(visited.has(cat.id))continue;
-      visited.add(cat.id);ordered.push({...cat,visualDepth:level});
-      visit(cat.id,level+1);
-    }
+  const byParent=new Map(),visited=new Set(),ordered=[];
+  for(const cat of state.categories){
+    const key=cat.parent_id||null;
+    if(!byParent.has(key))byParent.set(key,[]);
+    byParent.get(key).push(cat);
   }
-  visit(null,1);
+  for(const items of byParent.values())items.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+  const stack=[...(byParent.get(null)||[])].reverse();
+  while(stack.length){
+    const cat=stack.pop();
+    if(visited.has(cat.id))continue;
+    visited.add(cat.id);ordered.push({...cat,visualDepth:cat.depth});
+    const children=byParent.get(cat.id)||[];
+    for(let i=children.length-1;i>=0;i--)stack.push(children[i]);
+  }
   for(const cat of state.categories)if(!visited.has(cat.id))ordered.push({...cat,visualDepth:cat.depth});
   return ordered;
 }
 function categoryChain(id){
-  const chain=[],seen=new Set();let item=state.categories.find(c=>c.id===id);
+  const chain=[],seen=new Set();
+  const byId=new Map(state.categories.map(c=>[c.id,c]));
+  let item=byId.get(id);
   while(item&&!seen.has(item.id)){
-    seen.add(item.id);chain.unshift(item);item=state.categories.find(c=>c.id===item.parent_id);
+    seen.add(item.id);chain.unshift(item);item=byId.get(item.parent_id);
   }
   return chain;
 }
 function categoriesOptions(blank=true){
-  return (blank?[['','Sem categoria']]:[]).concat(categoryTree().map(c=>[c.id,'— '.repeat(Math.max(0,c.visualDepth-1))+c.name]));
+  return (blank?[['','Sem categoria']]:[]).concat(categoryTree().map(c=>[
+    c.id, '— '.repeat(Math.min(3,Math.max(0,c.visualDepth-1)))+c.name+
+      (c.visualDepth>4?' · nível '+c.visualDepth:'')
+  ]));
 }
-function categorySelectItems(form,level,parentId,selected=''){
-  const el=form.elements.namedItem('category_'+level);
-  if(!el)return;
-  const opts=state.categories.filter(c=>c.parent_id===parentId).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
-  const label=level==='main'?'Sem categoria':'Nenhuma';
-  el.replaceChildren(new Option(label,''),...opts.map(c=>new Option(c.name,c.id)));
-  el.value=selected;
-  el.disabled=level!=='main'&&(!parentId||!opts.length);
+function categoryChildren(parentId){
+  return state.categories.filter(c=>c.parent_id===parentId)
+    .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+}
+function categoryLevelRow(parentId,selectedId='',level=1){
+  const options=categoryChildren(parentId);
+  const label=level===1?'Categoria principal':level===2?'Subcategoria':'Subcategoria · nível '+level;
+  const placeholder=level===1?'Selecione uma categoria':options.length?'Nenhuma (manter nível anterior)':'Nenhuma cadastrada neste nível';
+  const choices='<option value="">'+h(placeholder)+'</option>'+
+    options.map(c=>'<option value="'+h(c.id)+'" '+(selectedId===c.id?'selected':'')+'>'+h(c.name)+'</option>').join('');
+  return '<div class="cat-field" data-category-level="'+level+'">'+
+    '<label class="field"><span>'+h(label)+'</span>'+
+    '<select name="category_level_'+level+'" data-category-select aria-label="'+h(label)+'" '+(options.length?'':'disabled')+'>'+
+    choices+'</select></label>'+
+    button('+','quick-category','aria-label="Criar categoria neste nível" title="Criar neste nível"','square')+'</div>';
+}
+function categoryPathMarkup(selectedPath=[]){
+  let markup=categoryLevelRow(null,selectedPath[0]?.id||'',1);
+  for(let index=1;index<selectedPath.length;index++){
+    markup+=categoryLevelRow(selectedPath[index-1].id,selectedPath[index].id,index+1);
+  }
+  if(selectedPath.length)markup+=categoryLevelRow(selectedPath[selectedPath.length-1].id,'',selectedPath.length+1);
+  return markup;
 }
 function categorySelector(item=null){
-  const chain=categoryChain(item?.category_id);
-  const id0=chain[0]?.id||'',id1=chain[1]?.id||'',id2=chain[2]?.id||'';
-  const options=(parent,selected,label)=>'<option value="">'+label+'</option>'+
-    state.categories.filter(c=>c.parent_id===parent).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
-    .map(c=>'<option value="'+h(c.id)+'" '+(c.id===selected?'selected':'')+'>'+h(c.name)+'</option>').join('');
-  return '<section class="form-section wide"><div class="section-head"><strong>Organização</strong><small>Escolha o nível desejado</small></div>'+
-    '<div class="cat-three">'+
-    '<div class="cat-field"><label class="field"><span>Categoria</span><select name="category_main">'+options(null,id0,'Selecione')+'</select></label>'+
-    button('+','quick-category','data-level="1" aria-label="Criar categoria" title="Criar categoria"','square')+'</div>'+
-    '<div class="cat-field"><label class="field"><span>Subcategoria</span><select name="category_child" '+(!id0?'disabled':'')+'>'+options(id0,id1,'Nenhuma')+'</select></label>'+
-    button('+','quick-category','data-level="2" aria-label="Criar subcategoria" title="Criar subcategoria"','square')+'</div>'+
-    '<div class="cat-field"><label class="field"><span>Subsubcategoria</span><select name="category_leaf" '+(!id1?'disabled':'')+'>'+options(id1,id2,'Nenhuma')+'</select></label>'+
-    button('+','quick-category','data-level="3" aria-label="Criar subsubcategoria" title="Criar subsubcategoria"','square')+'</div>'+
-    '</div></section>';
+  return '<section class="form-section wide"><div class="section-head"><strong>Categoria do produto</strong>'+
+    '<small>Escolha quantos níveis precisar</small></div>'+
+    '<div class="cat-levels" data-category-steps>'+categoryPathMarkup(categoryChain(item?.category_id))+'</div>'+
+    '<p class="help">Os botões + abrem um cadastro separado. Sua seleção não será perdida.</p></section>';
 }
 function categorySelectorChanged(select){
-  const form=select.closest('form');if(!form)return;
-  const main=form.elements.namedItem('category_main'),child=form.elements.namedItem('category_child');
-  if(select===main)categorySelectItems(form,'child',main.value);
-  categorySelectItems(form,'leaf',child.value);
+  const row=select.closest('[data-category-level]');
+  const container=row?.parentElement;
+  if(!row||!container)return;
+  let following=row.nextElementSibling;
+  while(following){
+    const next=following.nextElementSibling;following.remove();following=next;
+  }
+  if(select.value){
+    const current=Number(row.dataset.categoryLevel);
+    container.insertAdjacentHTML('beforeend',categoryLevelRow(select.value,'',current+1));
+  }
 }
+function chosenCategory(form){
+  const selects=[...form.querySelectorAll('[data-category-select]')];
+  for(let index=selects.length-1;index>=0;index--){
+    if(selects[index].value)return selects[index].value;
+  }
+  return null;
+}
+
 function tagChipsHTML(selected=[]){
   const values=new Set(selected.map(t=>t.toLocaleLowerCase('pt-BR')));
   return state.tags.length?state.tags.map(t=>
@@ -202,14 +234,10 @@ function productTagChooser(item=null){
 function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
   const form=document.querySelector('form[data-form="product-new"],form[data-form="product-edit"]');
   if(!form)return;
-  const main=form.elements.namedItem('category_main'),child=form.elements.namedItem('category_child'),leaf=form.elements.namedItem('category_leaf');
-  const current=selectedCategory?categoryChain(selectedCategory):[];
-  const first=main?.value||current[0]?.id||'';
-  const second=selectedCategory?current[1]?.id||'':child?.value||'';
-  const third=selectedCategory?current[2]?.id||'':leaf?.value||'';
-  categorySelectItems(form,'main',null,first);
-  categorySelectItems(form,'child',first,second);
-  categorySelectItems(form,'leaf',second,third);
+  if(selectedCategory){
+    const categoryContainer=form.querySelector('[data-category-steps]');
+    if(categoryContainer)categoryContainer.innerHTML=categoryPathMarkup(categoryChain(selectedCategory));
+  }
   const checkContainer=form.querySelector('[data-tag-choices]');
   if(checkContainer){
     const chosen=[...form.querySelectorAll('input[name="chosen_tags"]:checked')].map(i=>i.value);
@@ -217,6 +245,7 @@ function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
     checkContainer.innerHTML=tagChipsHTML(chosen);
   }
 }
+
 function productTagValues(form){
   return [...form.querySelectorAll('input[name="chosen_tags"]:checked')].map(x=>x.value);
 }
@@ -395,10 +424,12 @@ function categoriesPage(){
   const rows=sorted.map(c=>{
     const children=state.categories.some(x=>x.parent_id===c.id),
       used=state.items.filter(p=>p.category_id===c.id).length;
-    const next=c.depth===1?'Subcategoria':'Subsubcategoria';
-    return '<tr><td><div class="category-name tier-'+c.depth+'">'+(c.depth>1?'↳ ':'')+'<strong>'+h(c.name)+'</strong></div></td>'+
-      '<td><span class="pill">'+h(['','Categoria','Subcategoria','Subsubcategoria'][c.depth])+'</span></td><td>'+used+'</td>'+
-      '<td><div class="inline">'+(c.depth<3?button('+ '+next,'category-child','data-id="'+h(c.id)+'"','small'):'')+
+    const depthLabel=c.depth===1?'Principal':'Nível '+c.depth;
+    const indent=Math.min(Math.max(c.depth-1,0),4);
+    return '<tr><td><div class="category-name" style="padding-left:'+(indent*13)+'px" title="'+h(categoryFull(c.id))+'">'+
+      (c.depth>1?'↳ ':'')+'<strong>'+h(c.name)+'</strong></div></td>'+
+      '<td><span class="pill">'+h(depthLabel)+'</span></td><td>'+used+'</td>'+
+      '<td><div class="inline">'+button('+ Subcategoria','category-child','data-id="'+h(c.id)+'"','small')+
       button('Editar','category-edit','data-id="'+h(c.id)+'"','small')+
       (!children&&!used?button('Excluir','category-delete','data-id="'+h(c.id)+'"','small'):'')+'</div></td></tr>';
   }).join('');
@@ -407,9 +438,9 @@ function categoriesPage(){
     return '<div class="tag-row"><span class="tag">'+h(t.name)+'</span><small>'+used+' produto(s)</small>'+
       (used===0?button('Excluir','tag-delete','data-id="'+h(t.id)+'"','small'):'')+'</div>';
   }).join('');
-  return tabHead('Categorias e tags','Crie subcategorias em até três níveis; reutilize tags em vários produtos.',
+  return tabHead('Categorias e tags','Crie categorias e subcategorias sem limite de níveis.',
     button('+ Nova categoria','category-new','','primary'))+
-    panel('Categorias organizadas','<div class="panelbody"><p class="muted">Exemplo: Roupas → Camisetas → Adulto. Crie um nível clicando em “+ Subcategoria” ou “+ Subsubcategoria”.</p></div>'+
+    panel('Categorias organizadas','<div class="panelbody"><p class="muted">Crie uma categoria principal ou toque em “+ Subcategoria” em qualquer nível para adicionar outro.</p></div>'+
     (sorted.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Nível</th><th>Produtos</th><th>Ações</th></tr></thead><tbody>'+
     rows+'</tbody></table></div>':'<div class="muteblock">Nenhuma categoria cadastrada.</div>'))+
     panel('Tags reutilizáveis','<div class="panelbody"><p class="muted">Exemplos: Nossa Senhora, Primeira Comunhão, Infantil, Presente.</p>'+
@@ -567,21 +598,25 @@ function categoryModal(parentId=null,fromProduct=false,item=null){
   if(!isManager())return;
   const editing=Boolean(item),hasChildren=editing&&state.categories.some(c=>c.parent_id===item.id);
   const parent=editing?(item.parent_id||''):(parentId||'');
-  const depth=parent?(state.categories.find(c=>c.id===parent)?.depth||0)+1:1;
-  if(depth>3){toast('Limite de três níveis.',true);return;}
-  const label=editing?'Editar categoria':['','Nova categoria','Nova subcategoria','Nova subsubcategoria'][depth];
-  const choices=categoryTree().filter(c=>c.depth<3&&(!item||c.id!==item.id)).map(c=>[c.id,categoryFull(c.id)]);
+  const parentCat=parent?state.categories.find(c=>c.id===parent):null;
+  if(parent&&!parentCat){toast('Categoria superior não encontrada.',true);return;}
+  const depth=parentCat?parentCat.depth+1:1;
+  const label=editing?'Editar categoria':depth===1?'Nova categoria':'Nova subcategoria · nível '+depth;
+  // Escondemos a própria categoria e descendentes do menu de categoria superior.
+  const choices=categoryTree().filter(c=>!item||!categoryChain(c.id).some(x=>x.id===item.id))
+    .map(c=>[c.id,categoryFull(c.id)]);
   const parentField=fromProduct?
-    '<div class="field"><span>Categoria superior</span><div class="readonly-field">'+h(categoryFull(parent)||'—')+'</div></div>':
+    '<div class="field"><span>Categoria superior</span><div class="readonly-field">'+h(parentCat?categoryFull(parent):'Categoria principal')+'</div></div>':
     selectField('Categoria superior','parent_id',[['','Nenhuma (principal)'],...choices],parent,hasChildren?'disabled':'');
   formModal(label,'<div class="formgrid">'+field('Nome','name','text',item?.name||'','required minlength="2" maxlength="90"')+
     parentField+'</div>'+
-    '<p class="help" style="margin-top:12px">Cadastro separado para não misturar seleção e criação de categorias.</p>',
+    '<p class="help" style="margin-top:12px">Criação separada da seleção do produto para manter o cadastro rápido.</p>',
     editing?'category-edit':'category-new',editing?'Salvar':'Criar categoria',fromProduct);
   const form=[...document.querySelectorAll('.modalback form')].at(-1);
   form.dataset.parent=parent;form.dataset.fromProduct=fromProduct?'1':'0';
   if(editing)form.dataset.id=item.id;
 }
+
 function tagModal(fromProduct=false){
   if(!isManager())return;
   formModal('Criar tag',
@@ -798,11 +833,11 @@ async function handleClick(event){
     return exec(async()=>assertOk(await db.from('tags').delete().eq('id',id)),'Tag excluída.');
   }
   if(action==='quick-category'){
+    const row=target.closest('[data-category-level]');
     const form=target.closest('form');
-    const level=Number(target.dataset.level);
-    const parent=level===2?form?.elements.namedItem('category_main')?.value:
-      level===3?form?.elements.namedItem('category_child')?.value:null;
-    if(level>1&&!parent){toast('Selecione primeiro o nível acima.',true);return;}
+    const level=Number(row?.dataset.categoryLevel);
+    const parent=level===1?null:form?.querySelector('[data-category-level="'+(level-1)+'"] [data-category-select]')?.value;
+    if(!level||(level>1&&!parent)){toast('Selecione primeiro a categoria superior.',true);return;}
     return categoryModal(parent,true);
   }
   if(action==='quick-tag')return tagModal(true);
@@ -884,7 +919,7 @@ async function handleSubmit(event){
     const payload={
       name:String(values.name).trim(),sku:String(values.sku||'').trim()||null,ean:ean||null,
       tags:productTagValues(form),
-      category_id:values.category_leaf||values.category_child||values.category_main||null
+      category_id:chosenCategory(form)
     };
     if(editing)payload.active=values.active==='true';
     else payload.created_by=state.user.id;
@@ -1038,7 +1073,7 @@ document.addEventListener('change',event=>{
   if(event.target.matches('input[name="camera_file"],input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
   if(event.target.id==='category-filter'){state.categoryFilter=event.target.value;state.page=0;render();}
   if(event.target.id==='tag-filter'){state.tagFilter=event.target.value;state.page=0;render();}
-  if(event.target.matches('select[name="category_main"],select[name="category_child"]'))categorySelectorChanged(event.target);
+  if(event.target.matches('[data-category-select]'))categorySelectorChanged(event.target);
   if(event.target.id==='event-filter'){state.eventFilter=event.target.value;render();}
   if(event.target.id==='movement-filter'){state.movementFilter=event.target.value;render();}
 });
