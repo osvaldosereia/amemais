@@ -6,7 +6,7 @@ Sistema web de gestão de produtos, estoque da loja e estoques temporários de e
 
 ## Situação
 
-- Aplicação responsiva em HTML, CSS e JavaScript com publicação automatizada via GitHub Pages.
+- Aplicação responsiva em HTML, CSS e JavaScript com publicação pelo GitHub Pages (branch main).
 - Banco PostgreSQL exclusivo com RLS nas oito tabelas públicas do sistema.
 - Autenticação por **email (link sem senha)**, ativação inicial protegida por código de uso único e convites de colaboradores pelo administrador.
 - Papéis: administrador, gerente, equipe do evento (responsável/operador) e consulta.
@@ -43,8 +43,14 @@ A conta Supabase Pro do gestor **não é outra conta do aplicativo**. O aplicati
 - `supabase/functions/admin-create-user/`: convites administrativos.
 - `docs/INSTALACAO.md`: instalação e testes.
 - `docs/OPERACAO.md`: operação diária e regras de eventos.
-- `.github/workflows/pages.yml`: publicação.
+- Publicação: GitHub Pages configurado para a branch `main` (sem workflow duplicado).
 
 **Limite atual:** vendas são registradas manualmente; não há integração automática de PDV, nota fiscal ou Bling.
 
 A configuração final do domínio personalizado (GitHub Pages, Registro.br e URLs permitidas no Supabase Auth) está detalhada em [Instalação — Domínio](docs/INSTALACAO.md#0-domínio-próprio-cdsbnetbr). **Não considerar o domínio ativo antes de confirmar o DNS e o HTTPS.**
+
+## Operação mobile
+
+No celular, o sistema usa navegação inferior, botões de toque ampliados e formulários em tela cheia. Em **Produtos > Novo produto**, use **Tirar foto** para abrir a câmera ou **Escolher da galeria** para buscar imagens. O arquivo é compactado no aparelho antes do envio. A foto de cada produto pode ser ampliada por toque.
+
+A seleção rápida de categoria, subcategoria e subsubcategoria fica separada dos botões `+` de criação. Tags existentes são escolhidas por toque; o botão **Criar tag** abre cadastro curto sem apagar o formulário de produto. Há suporte básico a instalação na tela inicial via manifesto web.
