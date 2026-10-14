@@ -38,6 +38,14 @@ Deno.serve(async (request) => {
       await admin.auth.admin.deleteUser(created.user.id);
       return respond({ error: 'Não foi possível configurar permissões do usuário' }, 500);
     }
+    const { error: auditError } = await admin.from('audit_log').insert({
+      entity: 'staff_profiles', entity_id: created.user.id, action: 'CREATE_USER',
+      actor_id: user.id, details: { name: fullName, email, role }
+    });
+    if (auditError) {
+      // O cadastro permanece válido, mas a criação não deve parecer totalmente auditada.
+      return respond({ success: true, user_id: created.user.id, warning: 'Registro de auditoria adicional não foi salvo.' }, 201);
+    }
     return respond({ success: true, user_id: created.user.id }, 201);
   } catch {
     return respond({ error: 'Erro ao criar usuário' }, 500);
