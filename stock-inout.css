@@ -96,3 +96,21 @@
  .stock-operation-history{margin-top:12px}
  .stock-destination-row{flex-wrap:wrap}
 }
+
+
+/* Histórico compacto, expansível por operação, preservando local e quantidades. */
+.stock-operation-history details.stock-history-row{display:block;padding:0;border:1px solid #e3eee6;border-radius:10px;overflow:hidden;margin:0 0 7px;background:#fff}
+.stock-history-row>summary{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:12px}
+.stock-history-row>summary::-webkit-details-marker{display:none}
+.stock-history-description{display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
+.stock-history-description>strong{color:#315b40;font-size:.84rem}
+.stock-history-description>small{color:#839488;font-size:.73rem;line-height:1.4}
+.stock-history-arrow{color:#43815d;transition:transform .2s;font-size:1.05rem}
+.stock-history-row[open] .stock-history-arrow{transform:rotate(180deg)}
+.stock-history-details{border-top:1px solid #e4ece5;background:#f8fbf9;padding:6px 12px}
+.stock-history-details>div{display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid #e5efe8;padding:10px 0}
+.stock-history-details>div:last-child{border:0}
+.stock-history-details span{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere;font-size:.8rem}
+.stock-history-details span small{font-size:.7rem;color:#829488}
+.stock-history-details strong{color:#256945;font-size:.82rem;white-space:nowrap}
+@media(prefers-reduced-motion:reduce){.stock-history-arrow{transition:none}}
