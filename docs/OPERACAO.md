@@ -165,3 +165,22 @@ Em **Pedidos Avulsos**, administradores e gerentes podem criar um pedido com **n
 **Acesso de cliente ao catálogo completo:** em Pedidos Avulsos, use **+ Acesso para cliente**, dê uma identificação ao acesso e copie ou envie por WhatsApp o link individual de cliente.html. O link dura **30 dias** e pode ser **revogado** pelo administrador ou gerente. Essa página permite pesquisar produtos, ver fotos e variações e informar quantidades desejadas, mas **não revela estoques reais**, não exige conta administrativa e não dá acesso a outras telas do sistema. O cliente informa nome e telefone com DDD e salva o pedido; o sistema gera um link de pedido.html que mostra o pedido registrado e **não permite edição**. Todos os pedidos ficam na seção Pedidos Avulsos. Qualquer pessoa com o link de catálogo poderá montar pedidos até o acesso expirar ou ser revogado; compartilhe-o somente com clientes pretendidos.
 
 **Privacidade:** o comprovante apresenta nome e telefone do solicitante. Qualquer pessoa que tenha o link do comprovante pode consultá-lo. Evite publicar comprovantes com dados pessoais em grupos públicos.
+
+
+## Entrada de estoque — recebimento de fábrica, fornecedor ou remessa
+
+Em **Entrada**, localize o produto pelo nome, SKU ou EAN. Use **Ler EAN** para abrir a câmera do celular, digite o código ou use leitor externo que finalize com Enter. Se houver um único produto ativo com o EAN/SKU lido, ele entra no carrinho automaticamente; ler o mesmo código outra vez acrescenta outra unidade. Para camisetas e roupas, selecione a variação correta (cor e tamanho) diretamente na lista.
+
+É possível incluir **diversos produtos e diversas variações** na mesma remessa, ajustar quantidades individualmente por botões +/− ou digitando o número e adicionar uma identificação opcional da remessa (ex.: fábrica ou nota fiscal). **Confirmar entrada** soma as quantidades na loja de uma vez, preservando usuário, data, itens, quantidades e observação no histórico. Se qualquer item apresentar problema, a transação é revertida inteira, sem entrada parcial.
+
+Se um EAN ainda não existir, use **+ Cadastrar produto**. A tela de cadastro abre sem descartar os itens já selecionados; quando o código pesquisado for um EAN válido, ele é sugerido no cadastro simples. Depois do registro, volte ao carrinho de Entrada para adicionar as quantidades. Evite lançar a mesma quantidade duas vezes: se a remessa será registrada pela Entrada, informe **estoque inicial zero** no cadastro do novo produto.
+
+## Saída de estoque — encaminhamento para destino identificado
+
+Em **Saída**, a busca e leitura EAN funcionam como na Entrada. Acrescente quantos produtos e tamanhos forem necessários no carrinho. É obrigatório selecionar um **destino ativo**, como outra unidade, um responsável, doação ou qualquer outro local configurado por você, antes de confirmar. Os destinos são administrados na própria seção pelos botões **+ Criar destino** e **Gerenciar destinos**; podem ser editados e desativados (sem apagar históricos).
+
+A Saída registra uma **baixa física neutra**, sem lançar venda nem pedido. Antes de confirmar, verifique a quantidade disponível em cada variação. Saídas maiores que o saldo são bloqueadas; se qualquer item não puder ser movimentado, nenhuma baixa daquele lote é aplicada. Os destinos, usuário, horário, quantidades e produtos ficam vinculados à operação e podem ser expandidos em **Últimas operações**. Salvar não recarrega a página nem interrompe os itens que ainda estão sendo separados.
+
+**Eventos** continuam independentes: o envio para um evento ativo deve ser feito pela transferência específica de Eventos, pois somente ela mantém o controle de retorno do evento. Uma Saída comum não constitui transferência para evento e não gera saldo a devolver.
+
+**Permissões:** Entrada e Saída estão disponíveis para Administrador e Gerente. O acesso do Estoquista continua restrito ao cadastro de Produtos e ao Balanço rápido, conforme definido anteriormente. Um acesso de Cliente nunca vê essas seções.
