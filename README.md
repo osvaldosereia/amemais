@@ -2,43 +2,47 @@
 
 Sistema web de gestão de produtos, estoque da loja e estoques temporários de eventos da **empresa AME MAIS**.
 
-**Empresa independente:** usa um projeto Supabase exclusivo, dentro da mesma organização administrativa de outras empresas. Nenhum banco de outra empresa é consultado, modificado ou sincronizado.
+**Empresa independente:** projeto Supabase exclusivo dentro da **mesma organização Pro** do proprietário. Não consulta nem sincroniza bancos de outras empresas.
 
 ## Situação
 
-- Código web responsivo publicado no GitHub (HTML, CSS, JavaScript).
-- Banco PostgreSQL dedicado instalado e com **RLS nas 8 tabelas**.
-- Supabase Auth com cadastro restrito e funções de operador, responsável, gerente, administrador e consulta.
-- Movimentações transacionais, imutáveis e com responsável.
-- Fotos de celular compactadas antes do upload e armazenadas em bucket privado.
-- Leitura EAN pela câmera, com digitação manual como alternativa.
-- Projeto Supabase: [AME MAIS Estoque](https://supabase.com/dashboard/project/awcclxehwzvvgajgpnmf).
-- Publicação configurada via GitHub Actions Pages. Antes de usar o endereço público, verifique se a implantação foi concluída e se o GitHub Pages está ativado.
+- Aplicação responsiva em HTML, CSS e JavaScript com publicação automatizada via GitHub Pages.
+- Banco PostgreSQL exclusivo com RLS nas oito tabelas públicas do sistema.
+- Autenticação por **email (link sem senha)**, ativação inicial protegida por código de uso único e convites de colaboradores pelo administrador.
+- Papéis: administrador, gerente, equipe do evento (responsável/operador) e consulta.
+- Estoque e movimentos transacionais e auditáveis, com devolução e encerramento de eventos.
+- Imagens compactadas antes do envio para bucket privado; leitura EAN via câmera.
+- [Supabase AME MAIS](https://supabase.com/dashboard/project/awcclxehwzvvgajgpnmf)
+- [Site AME MAIS](https://osvaldosereia.github.io/amemais/)
 
-## Primeiro acesso (obrigatório)
+## Primeira ativação
 
-O novo banco começa **sem usuários**. Para cadastrar o primeiro administrador, siga [Instalação](docs/INSTALACAO.md#2-primeiro-administrador): crie o usuário no Auth do novo projeto, copie o UUID e vincule em `staff_profiles` como admin. Em seguida, o administrador poderá cadastrar outras pessoas pela tela Usuários.
+1. Confirme a configuração do Supabase Auth em [URL Configuration](https://supabase.com/dashboard/project/awcclxehwzvvgajgpnmf/auth/url-configuration):
+   - **Site URL:** `https://osvaldosereia.github.io/amemais/`
+   - **Redirect URLs:** adicione `https://osvaldosereia.github.io/amemais/`.
+2. Abra o site e informe seu email. Supabase envia um link de confirmação/acesso.
+3. Depois de confirmar o email, digite seu nome e o **código de ativação temporário entregue diretamente ao gestor**. O código não está no GitHub.
+4. Após a ativação, gerencie convites em **Usuários** e faça testes de ponta a ponta antes do uso comercial.
+5. Depois da ativação, recomenda-se desativar inscrições públicas em **Authentication > Providers > Email**, mantendo os convites administrativos; valide o fluxo de convites antes de restringir cadastro.
 
-**Não crie conta de administrador via cadastro público; não forneça senhas em commits ou mensagens.**
+A conta Supabase Pro do gestor **não é outra conta do aplicativo**. O aplicativo usa autenticação própria para associar cada ação ao responsável.
 
-## Regras essenciais
+## Segurança
 
-1. Cada produto tem nome, SKU opcional, EAN opcional, foto, tags e categoria em até três níveis.
-2. A loja e cada evento possuem saldos separados.
-3. Transferência para evento não é venda.
-4. O evento só encerra com saldo zero, após registrar vendas ou devolver todos os itens.
-5. Ninguém edita/exclui registros antigos de movimentação; alterações são lançamentos novos e auditáveis.
-6. As permissões também são aplicadas no banco, não apenas na interface.
-7. Nenhum lançamento funciona offline, prevenindo conflitos de sincronização.
+- A primeira ativação requer email comprovado, código secreto aleatório, validação transacional e prazo de expiração.
+- O código é armazenado no banco somente por hash SHA-256, não pode ser lido pelo navegador e é invalidado após a primeira utilização.
+- Saldos não podem ser escritos diretamente pelo navegador. Apenas RPCs protegidas movimentam produtos.
+- A chave privilegiada Supabase não é publicada no GitHub.
+- Testes funcionais com sessões reais ainda precisam ser realizados antes da liberação da equipe.
 
 ## Arquivos
 
-- `index.html`, `styles.css`, `src/`: site web.
-- `config.js`: somente URL e chave **publishable** do Supabase dedicado.
-- `supabase/migrations/`: estrutura do banco.
-- `supabase/functions/admin-create-user/`: cadastro seguro de colaboradores.
-- `docs/INSTALACAO.md`: implantação, primeiro administrador e testes.
-- `docs/OPERACAO.md`: como usar produtos, eventos e auditoria.
-- `.github/workflows/pages.yml`: publicação do site.
+- `index.html`, `styles.css`, `src/`: interface web.
+- `config.js`: apenas URL e chave pública do Supabase.
+- `supabase/migrations/`: estrutura e ativação segura.
+- `supabase/functions/admin-create-user/`: convites administrativos.
+- `docs/INSTALACAO.md`: instalação e testes.
+- `docs/OPERACAO.md`: operação diária e regras de eventos.
+- `.github/workflows/pages.yml`: publicação.
 
-**Atenção:** a integração com caixa/PDV ou emissão de notas fiscais não está incluída. Vendas de eventos são lançadas manualmente. A aplicação precisa de teste funcional com conta real antes de ser liberada para toda a equipe.
+**Limite atual:** vendas são registradas manualmente; não há integração automática de PDV, nota fiscal ou Bling.
