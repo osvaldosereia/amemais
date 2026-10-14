@@ -73,7 +73,7 @@ export function operationCartLines(cart,products,qtyStore,kind){
   if(arr.length>100)throw Error('Limite de 100 variações por operação.');
   return arr;
 }
-export function stockOperationPage({kind,query,cart,items,models,destinations,batches,qtyStore,groupInventory,photoButton,h=esc,button}){
+export function stockOperationPage({kind,query,cart,items,models,destinations,batches,selectedDestination='',qtyStore,groupInventory,photoButton,h=esc,button}){
   const entry=kind==='entrada',groups=stockOperationResults(items,models,query,groupInventory);
   const active=destinations.filter(d=>d.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
   const total=[...cart.values()].reduce((a,x)=>a+(Number(x.quantity)||0),0);
@@ -101,7 +101,7 @@ export function stockOperationPage({kind,query,cart,items,models,destinations,ba
      '<form data-form="stock-operation" class="stock-operation-final" novalidate>'+
       (!entry?'<label class="stock-destination-field"><span>Destino da saída *</span>'+
         '<select name="destination_id" required><option value="">Selecione o destino…</option>'+
-          active.map(d=>'<option value="'+h(d.id)+'">'+h(d.name)+'</option>').join('')+'</select></label>'+
+          active.map(d=>'<option value="'+h(d.id)+'" '+(d.id===selectedDestination?'selected':'')+'>'+h(d.name)+'</option>').join('')+'</select></label>'+
         '<div class="stock-destination-tools">'+button('+ Criar destino','stock-destination-new','','small')+
         button('Gerenciar destinos','stock-destinations-toggle','','small')+'</div>'+
         '<div class="stock-destination-list" data-stock-destinations hidden>'+
