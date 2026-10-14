@@ -92,7 +92,7 @@ Em **Produtos**, os tamanhos aparecem como itens identificados por cor e tamanho
 
 **Produtos → Excluir:** permitido a administrador ou gerente. Caso o produto tenha saldo em loja ou eventos, a exclusão é bloqueada até zerar todos os saldos. Sem movimentações nem contagens, o produto pode ser apagado definitivamente. Se existir histórico, o produto é **desativado**, não apagado, mantendo os vínculos para auditoria. Use **Mostrar inativos** na tela de Produtos para localizá-lo ou reativá-lo quando necessário.
 
-**Categorias e tags → Excluir:** permite excluir uma categoria e suas subcategorias em uma operação, desde que nenhum produto ou modelo esteja ligado a qualquer nível da ramificação. A exclusão de uma tag é permitida mesmo em uso, mas a tag é desvinculada dos produtos e modelos antes de ser apagada. Em todos os casos há confirmação antes da alteração. O banco valida as regras e registra a auditoria; o administrador não precisa fazer operações diretamente no Supabase.
+**Categorias → Excluir:** permite excluir um ramo inteiro quando não existirem produtos ativos nem saldos de estoque vinculados à categoria ou a suas subcategorias. Produtos e modelos desativados continuam no banco com o caminho da antiga categoria registrado em `historical_category_path`, e suas movimentações e auditorias são preservadas. A exclusão da categoria não apaga esses produtos nem altera quantidades. **Tags → Excluir:** a tag pode ser desvinculada dos produtos antes de ser apagada. Em todos os casos há confirmação antes da alteração. O banco valida as regras e registra a auditoria; o administrador não precisa fazer operações diretamente no Supabase.
 
 
 ## Produtos agrupados e inclusão posterior de tamanhos
@@ -117,8 +117,14 @@ Se já foi cadastrada uma camiseta tamanho P e depois chegarem M, G ou outro tam
 
 A gestão foi separada em **Categorias** e **Tags** no menu lateral e em **Mais** no celular.
 
-Em **Categorias**, os grupos começam recolhidos. Toque na seta **ou no nome** para expandir as subcategorias. Use a busca por nome/caminho, **Expandir tudo** ou **Recolher tudo**. Cada categoria mostra quantos **produtos ativos** pertencem diretamente a ela. Registros desativados não são contados como produtos disponíveis; quando existirem, aparece uma indicação separada de **inativos no histórico**. Esses registros não são apagados automaticamente porque podem estar ligados a movimentações e à auditoria. A regra de exclusão de categorias com vínculos históricos continua protegida no Supabase.
+Em **Categorias**, os grupos começam recolhidos. Toque na seta **ou no nome** para expandir as subcategorias. Use a busca por nome/caminho, **Expandir tudo** ou **Recolher tudo**. Cada categoria mostra quantos **produtos ativos** pertencem diretamente a ela. Registros desativados não são contados como produtos disponíveis; quando existirem, aparece uma indicação separada de **inativos no histórico**. Esses registros não são apagados automaticamente porque podem estar ligados a movimentações e à auditoria. Você pode excluir categorias que tenham somente registros históricos inativos com saldo zero: o sistema mantém os produtos e modelos arquivados e salva seu caminho original antes de retirar a categoria.
 
 Em **Tags**, a lista fica pesquisável e apresenta as tags mais usadas primeiro. A quantidade de uso considera **somente produtos ativos**, contando uma roupa com vários tamanhos como um modelo para fins de sugestão e estatística de tags.
 
 No **cadastro de produtos**, selecione primeiro a categoria. O sistema apresentará na frente as tags dos produtos ativos cadastrados nessa mesma categoria, priorizando correspondência exata, subcategorias e ascendentes. As tags já selecionadas continuam marcadas; o botão **Ver outras tags** mostra todas as opções que não apareceram nas sugestões, sem restringir nenhuma.
+
+## Hierarquia visual e exclusão de categorias arquivadas
+
+Na lista de **Categorias**, cada subnível recebe recuo horizontal progressivo e linhas-guia, tanto no computador quanto no celular. Toque no nome ou na seta para expandir o grupo. A administração distingue **ativos** de **registros históricos inativos**.
+
+Se o ramo tiver zero produtos ativos e nenhum saldo na loja ou em eventos, **Excluir** remove a categoria e suas subcategorias. Produtos e modelos históricos permanecem disponíveis para auditoria; sua antiga classificação é salva no próprio registro. Categorias com produtos ativos exigem reclassificar ou desativar os produtos primeiro. Essa alteração não elimina produtos nem seus movimentos.
