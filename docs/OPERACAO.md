@@ -128,3 +128,11 @@ No **cadastro de produtos**, selecione primeiro a categoria. O sistema apresenta
 Na lista de **Categorias**, cada subnível recebe recuo horizontal progressivo e linhas-guia, tanto no computador quanto no celular. Toque no nome ou na seta para expandir o grupo. A administração distingue **ativos** de **registros históricos inativos**.
 
 Se o ramo tiver zero produtos ativos e nenhum saldo na loja ou em eventos, **Excluir** remove a categoria e suas subcategorias. Produtos e modelos históricos permanecem disponíveis para auditoria; sua antiga classificação é salva no próprio registro. Categorias com produtos ativos exigem reclassificar ou desativar os produtos primeiro. Essa alteração não elimina produtos nem seus movimentos.
+
+## Recadastro de produto com SKU ou EAN antigo
+
+Quando um produto for **excluído/desativado**, ele continua disponível no banco para o histórico, mas seu **código interno (SKU) e seu EAN podem ser reutilizados em um novo produto ativo**. Isso vale para produto simples, cadastro inicial de roupas e inclusão de novos tamanhos. Dois produtos **ativos** nunca podem possuir o mesmo SKU ou o mesmo EAN; o sistema informa o conflito em português. Uma tentativa de reativar o produto antigo enquanto outro ativo usa seu código é bloqueada.
+
+No cadastro de produtos simples, **produto e quantidade inicial** são gravados em uma única operação no Supabase. Se ocorrer erro, a transação é revertida integralmente. O envio da foto acontece depois; se a foto falhar, o produto **continua salvo** e o aviso será *Produto cadastrado; foto pendente de envio*, evitando recadastramentos acidentais.
+
+Na lista de Produtos, caso uma pesquisa ou filtro oculte mercadorias cadastradas, use **Limpar filtros** ou **Mostrar todos os produtos**. Registros excluídos não aparecem normalmente, mas podem ser consultados em **Mostrar inativos**.
