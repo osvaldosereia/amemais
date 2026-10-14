@@ -164,7 +164,8 @@ export function eventReturnPage(event,items,models,balances,photoButton){
           '<div class="return-variant-info"><strong>'+esc(g.modelId?p.apparel_color+' · '+p.apparel_size:p.name)+'</strong>'+
           '<small>'+esc(p.ean||p.sku||'Sem código')+'</small>'+
           '<small>No evento: <b>'+qty+'</b></small></div>'+
-          '<div class="return-variant-entry"><input name="quantity" type="number" inputmode="numeric" step="1" min="1" max="'+qty+
+          '<div class="return-variant-entry"><button class="return-all" data-action="return-all" type="button" aria-label="Preencher '+qty+' unidades para devolver">Tudo</button>'+
+          '<input name="quantity" type="number" inputmode="numeric" step="1" min="1" max="'+qty+
           '" placeholder="Qtd." required aria-label="Quantidade devolvida de '+esc(p.name)+'">'+
           '<button type="submit" class="button primary">Devolver</button></div></form>';
       }).join('')+'</article>').join('')+'</div>';
