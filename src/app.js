@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import { scanEAN } from './scan.js';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js';
+import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel } from './apparel.js';
 
 const cfg = window.AME_CONFIG || {};
 const root = document.querySelector('#app');
@@ -20,7 +21,7 @@ const nav = [
   {id:'usuarios',label:'Usuários',ico:'♙'}
 ];
 const state = {
-  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],events:[],members:[],
+  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),events:[],members:[],
   balances:[],movements:[],users:[],audits:[],search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
@@ -30,7 +31,7 @@ const isManager = () => ['admin','gerente'].includes(state.profile?.role);
 const isStockkeeper = () => state.profile?.role === 'estoquista';
 const canRegisterProducts = () => isManager() || isStockkeeper();
 const canQuickBalance = () => canRegisterProducts();
-const permittedView = v => !isStockkeeper() || ['produtos','balanco'].includes(v);
+const permittedView = v => !isStockkeeper() || ['produtos','roupas','balanco'].includes(v);
 const isAdmin = () => state.profile?.role === 'admin';
 const isReader = () => state.profile?.role === 'consulta';
 const product = id => state.items.find(x => x.id === id);
@@ -80,6 +81,7 @@ async function loadData(){
   if(!state.user)return;
   const resources=[
     ['items',db.from('products').select('*').order('name').limit(2500)],
+    ['apparelModels',db.from('apparel_models').select('*').order('created_at',{ascending:false}).limit(1000)],
     ['categories',fetchAllCategories()],
     ['tags',db.from('tags').select('*').order('name').limit(1000)],
     ['events',db.from('events').select('*').order('starts_at',{ascending:false}).limit(1000)],
@@ -214,7 +216,7 @@ function productTagChooser(item=null){
     '<div class="tag-choices" data-tag-choices>'+tagChipsHTML(item?.tags||[])+'</div></section>';
 }
 function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
-  const form=document.querySelector('form[data-form="product-new"],form[data-form="product-edit"]');
+  const form=document.querySelector('form[data-form="product-new"],form[data-form="product-edit"],form[data-form="apparel-create"]');
   if(!form)return;
   if(selectedCategory){
     const input=form.querySelector('input[name="category_id"]');
@@ -272,6 +274,7 @@ function render(){
   hydrateImages();
 }
 function pageContent(){
+  if(state.view==='roupas')return apparelPage(state,{h,tabHead,button,qtyStore,photoButton});
   if(state.view==='balanco')return quickBalancePage();
   if(state.view==='produtos')return productsPage();
   if(state.view==='eventos')return state.activeEvent?eventDetails():eventsPage();
@@ -335,7 +338,7 @@ function productsPage(){
   const pageSize=30,totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=filtered.slice(state.page*pageSize,(state.page+1)*pageSize);
-  const add=canRegisterProducts()?button('+ Novo produto','product-new','','primary'):'';
+  const add=canRegisterProducts()?button('+ Novo produto','product-new','','primary')+button('👕 Roupas e tamanhos','view','data-view="roupas"',''):'';
   return tabHead('Produtos','Pesquise por nome, código, EAN ou tags.',add)+
     '<section class="panel products-panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, SKU ou tag…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="filter" aria-haspopup="dialog"><span>'+h(state.categoryFilter?categoryFull(state.categoryFilter):'Todas as categorias')+'</span><span aria-hidden="true">⌄</span></button>'+
@@ -870,6 +873,28 @@ async function handleClick(event){
     if(res.error)fail(res.error);else toast('Se o email estiver cadastrado, as instruções serão enviadas.');
     return;
   }
+  if(action==='apparel-new'){
+    if(!canRegisterProducts())return;
+    try{return apparelModal(state,{h,formModal,photoChooser,categorySelector,productTagChooser});}
+    catch(error){fail(error);return;}
+  }
+  if(action==='apparel-add-row'){
+    try{return apparelAddRow(target,{h});}catch(error){fail(error);return;}
+  }
+  if(action==='apparel-remove-row'){
+    try{return apparelRemoveRow(target);}catch(error){fail(error);return;}
+  }
+  if(action==='apparel-expand'){
+    if(state.apparelOpen.has(id))state.apparelOpen.delete(id);
+    else state.apparelOpen.add(id);
+    render();return;
+  }
+  if(action==='apparel-product'){
+    state.view='produtos';state.search=product(id)?.name||'';state.page=0;render();return;
+  }
+  if(action==='apparel-scan'){
+    return scanInto('input[data-variant-ean]',target.closest('[data-apparel-row]'));
+  }
   if(action==='product-new')return productModal();
   if(action==='product-edit')return productModal(product(id));
   if(action==='stock-modal')return stockModal(id);
@@ -998,6 +1023,17 @@ async function handleSubmit(event){
         else assertOk(await db.rpc('move_stock',{p_product_id:productId,p_action:'entrada',p_quantity:initial}));
       }
     },editing?'Produto atualizado.':'Produto cadastrado.');
+    return;
+  }
+  if(type==='apparel-create'){
+    if(!canRegisterProducts())return;
+    state.loading=true;
+    try{
+      await submitApparel(form,{
+        state,db,assertOk,chosenCategory,productTagValues,loadData,closeTopModal,toast
+      });
+    }catch(error){fail(error);}
+    finally{state.loading=false;}
     return;
   }
   if(type==='quick-count'){
