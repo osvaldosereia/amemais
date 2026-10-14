@@ -62,19 +62,20 @@ Deno.serve(async (request) => {
     }
 
     if (action !== 'create') return respond({error:'Operação inválida.'},400);
-    const email = String(payload.email || '').trim().toLowerCase();
+    const username = String(payload.username || '').trim();
+    const email = username.toLowerCase() + '@login.amemais.invalid';
     const fullName = String(payload.full_name || '').trim();
     const role = String(payload.role || 'evento');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+    if (!/^[A-Za-z][A-Za-z0-9._-]{2,31}$/.test(username) ||
         fullName.length < 2 || fullName.length > 120 ||
         !['admin','gerente','evento','consulta'].includes(role)) {
-      return respond({error:'Informe nome, email válido e função.'},400);
+      return respond({error:'Informe nome, usuário de 3 a 32 caracteres e função.'},400);
     }
 
     const {data: duplicate,error: duplicateError} = await admin.from('staff_profiles')
-      .select('id').ilike('email',email).limit(1);
+      .select('id').ilike('username',username).limit(2);
     if (duplicateError) return respond({error:'Não foi possível verificar o cadastro.'},500);
-    if (duplicate?.length) return respond({error:'Este email já pertence a um colaborador. Use Definir senha.'},409);
+    if (duplicate?.length) return respond({error:'Este nome de usuário já está em uso. Escolha outro.'},409);
 
     // Admin SDK: conta habilitada e email considerado confirmado sem enviar link de confirmação.
     const { data: created, error:createError } = await admin.auth.admin.createUser({
@@ -82,14 +83,14 @@ Deno.serve(async (request) => {
     });
     if (createError || !created.user) {
       if (/already|exists|registered|duplicate/i.test(createError?.message || '')) {
-        return respond({error:'Este email já existe no Auth. Entre em contato com o suporte para vincular a conta.'},409);
+        return respond({error:'Este nome de usuário já está em uso.'},409);
       }
       return respond({error:createError?.message || 'Não foi possível cadastrar o usuário.'},400);
     }
 
     const userId=created.user.id;
     const {error: profileError} = await admin.from('staff_profiles').insert({
-      id:userId,full_name:fullName,email,role,active:true
+      id:userId,full_name:fullName,email,username,role,active:true
     });
     if(profileError){
       await admin.auth.admin.deleteUser(userId);
@@ -99,7 +100,7 @@ Deno.serve(async (request) => {
     // A auditoria da inserção de perfil é feita também por trigger no PostgreSQL.
     const {error:auditError} = await admin.from('audit_log').insert({
       entity:'staff_profiles',entity_id:userId,action:'CREATE_USER_PASSWORD',
-      actor_id:user.id,details:{name:fullName,email,role}
+      actor_id:user.id,details:{name:fullName,username,role}
     });
     if(auditError) console.error('Falha ao auditar criação de usuário',auditError.code);
     return respond({success:true,user_id:userId,warning:auditError?'Usuário criado, mas houve falha na auditoria adicional.':undefined},201);
