@@ -81,3 +81,36 @@
  .stock-op-v2 .stock-operation-history{margin-top:14px}
 }
 @media(max-width:375px){.stock-op-v2 .stock-destination-inline{flex-direction:column}.stock-op-v2 .stock-destination-inline>.button{align-self:stretch}.stock-op-v2 .stock-confirm-summary strong{font-size:.76rem}}
+
+/* Fechamento mobile: confirmação visível durante busca e separação, sem esconder o carrinho. */
+@media(max-width:760px){
+ .stock-op-v2{
+   padding-bottom:calc(130px + env(safe-area-inset-bottom,0px));
+ }
+ .stock-op-v2 .stock-confirm-dock{
+   position:fixed;
+   z-index:55;
+   left:max(10px,env(safe-area-inset-left,0px));
+   right:max(10px,env(safe-area-inset-right,0px));
+   bottom:calc(9px + env(safe-area-inset-bottom,0px));
+   width:auto;
+   margin:0;
+   border:1px solid #cbded0;
+   border-radius:13px;
+   box-shadow:0 8px 35px rgba(9,42,22,.2);
+ }
+ .stock-op-v2 .stock-confirm-dock .stock-confirm-summary{
+   flex:1;
+   min-width:0;
+ }
+ .stock-op-v2 .stock-confirm-dock .stock-confirm-summary strong,
+ .stock-op-v2 .stock-confirm-dock .stock-confirm-summary small{
+   display:block;
+   white-space:nowrap;
+   overflow:hidden;
+   text-overflow:ellipsis;
+ }
+ .stock-op-v2 .stock-confirm-dock button{
+   flex-shrink:0;
+ }
+}
