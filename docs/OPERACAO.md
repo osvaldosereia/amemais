@@ -93,3 +93,22 @@ Em **Produtos**, os tamanhos aparecem como itens identificados por cor e tamanho
 **Produtos → Excluir:** permitido a administrador ou gerente. Caso o produto tenha saldo em loja ou eventos, a exclusão é bloqueada até zerar todos os saldos. Sem movimentações nem contagens, o produto pode ser apagado definitivamente. Se existir histórico, o produto é **desativado**, não apagado, mantendo os vínculos para auditoria. Use **Mostrar inativos** na tela de Produtos para localizá-lo ou reativá-lo quando necessário.
 
 **Categorias e tags → Excluir:** permite excluir uma categoria e suas subcategorias em uma operação, desde que nenhum produto ou modelo esteja ligado a qualquer nível da ramificação. A exclusão de uma tag é permitida mesmo em uso, mas a tag é desvinculada dos produtos e modelos antes de ser apagada. Em todos os casos há confirmação antes da alteração. O banco valida as regras e registra a auditoria; o administrador não precisa fazer operações diretamente no Supabase.
+
+
+## Produtos agrupados e inclusão posterior de tamanhos
+
+Em **Produtos**, cada modelo de roupa aparece em **um único cartão**. Abaixo da foto ficam todas as combinações de cor e tamanho, com código interno/EAN e a quantidade disponível **na loja** de cada variação. O total do modelo é a soma dessas quantidades. Produtos sem variação também aparecem em um cartão único.
+
+Se já foi cadastrada uma camiseta tamanho P e depois chegarem M, G ou outro tamanho, abra **Produtos**, encontre o cartão da camiseta e toque em **+ Novos tamanhos**. Confirme a cor, marque somente os tamanhos novos e informe o estoque inicial. SKU vazio gera um código interno exclusivo; informe EAN somente se houver etiqueta com código válido. O cadastro existente e seu histórico permanecem no mesmo modelo.
+
+## Separação e devolução nos eventos
+
+1. Crie o evento e **ative-o**.
+2. Em **Eventos → Gerenciar evento → Separar produtos para o evento**, consulte os cartões dos modelos com seus tamanhos e saldos disponíveis **na loja**. Informe quantas unidades de cada tamanho serão enviadas. Zero significa não enviar. Use a busca por nome, SKU ou EAN.
+3. Toque em **Confirmar transferência** e confirme o resumo. A operação ocorre como um lote: se qualquer quantidade ultrapassar o saldo ou houver erro, nenhuma parte da separação será aplicada. As quantidades são subtraídas da loja e adicionadas ao estoque do evento, com movimentações auditadas.
+4. Registre as vendas do evento normalmente; cada venda baixa seu tamanho específico.
+5. Na volta, abra **Eventos → Gerenciar evento → Devolução rápida por EAN**. Leia o código de barras no botão da tela ou na navegação inferior, ou pesquise o nome e o tamanho. Cada variação mostra quantas unidades **ainda restam no evento**.
+6. Digite quantas unidades voltaram fisicamente ou toque em **Tudo** e depois **Devolver**. Confirme. O sistema reduz o saldo do evento, repõe o da loja e registra data, usuário e histórico.
+7. Repita com os demais tamanhos. Quando não houver pendências no evento, o responsável poderá encerrá-lo.
+
+**Importante:** a devolução não cria novos produtos e não ajusta diretamente o estoque físico informado no Balanço rápido; é uma movimentação de retorno do evento, vinculada ao produto original. Somente saldo ainda disponível no evento pode ser devolvido, evitando devoluções duplicadas. Se o código não estiver legível, o leitor permite selecionar uma foto ou digitar o EAN. O leitor tenta a câmera nativa e, quando necessário, um método alternativo; alguns aparelhos também permitem ligar a luz pelo leitor.
