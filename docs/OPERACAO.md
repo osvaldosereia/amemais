@@ -76,28 +76,20 @@ Na administração, a hierarquia mostra tons de fundo distintos conforme o níve
 
 As contagens são transacionais: um saldo modificado depois que a tela foi aberta bloqueia a correção e pede atualização, evitando substituir alterações concorrentes. Estoques de eventos não são incluídos no balanço da loja. O saldo não pode ficar negativo. Os registros de contagem ficam em `stock_counts` e alterações de quantidade em `stock_movements`.
 
-## Roupas: modelos e variações
+## Produtos com tamanhos, gôndola e prateleira
 
-Abra **Roupas** (ou **Produtos → Roupas e tamanhos**) e selecione **Nova roupa**. A tela foi preparada para uso direto:
+Todo cadastro começa em **Produtos → Novo produto**. Não há seção separada para roupas. Preencha nome, categoria, foto, tags e os campos opcionais **Gôndola** e **Prateleira**. Esses campos também aparecem na lista de produtos e no balanço rápido.
 
-1. **Modelo** — nome (ex.: Camiseta Nossa Senhora Aparecida), tipo de roupa, público (Unissex/Feminino/Masculino), faixa etária (Adulto/Infantil/Bebê) e categoria. O tipo Camiseta sugere a categoria Roupas / Camisetas, mas é possível escolher uma subcategoria específica.
-2. **Imagem e tags** — foto única opcional tirada no celular ou da galeria (compactada antes do envio); escolha as tags cadastradas.
-3. **Variações** — informe cor, tamanho, SKU (opcional), EAN (opcional) e **quantidade inicial**. Toque em **Preencher P, M, G e GG** para criar tamanhos comuns, ou em **+ Adicionar variação** para outras cores/tamanhos.
-4. Toque em **Cadastrar roupa**. A operação cria um único modelo e uma linha de produto independente para cada combinação tamanho + cor.
+Para produtos **sem variações**, deixe desmarcada a opção **Este produto tem tamanhos?**, informe o SKU, EAN (se houver) e estoque inicial normalmente.
 
-**Atenção:** não cadastre tamanhos como categorias. A categoria é, por exemplo, Roupas / Camisetas; **M, G, GG e XXG são variações** do modelo. SKU e EAN, quando informados, devem ser exclusivos de cada variação. Se um produto não possuir EAN, deixe vazio.
+Para roupas, marque **Este produto tem tamanhos?**. Escolha uma categoria dentro de **Roupas**, tipo, público, faixa etária e cor. Toque nos tamanhos disponíveis: **P, M, G, GG, XGG, XXGG, EXGG** (ou use **Selecionar P, M, G, GG**). Para cada tamanho selecionado preencha ou confirme o código interno (SKU, gerado inicialmente e editável), informe o EAN real se existir e a quantidade física da loja. Não invente números EAN. Ao salvar, o Supabase cria um modelo e um registro de estoque por tamanho, preservando uma foto compartilhada e os valores iniciais de localização.
 
-No agrupamento de roupas, **Ver tamanhos** mostra SKU/EAN e saldo de cada variante. **Editar** permite corrigir tamanho, cor, EAN e SKU sem mexer no estoque, enquanto **Foto** troca a imagem compartilhada. Para alterar quantidades, use **Balanço rápido** ou as movimentações permitidas ao seu perfil.
+Exemplo orientativo, não inserido automaticamente: *Camiseta Nossa Senhora*, cor Branca, tamanho P (4 unidades), M (8), G (5). Cada variação possui identificação própria para leitura por câmera, contagem, venda e transferência de eventos.
 
-Cada variação integra automaticamente os módulos existentes: balanço, pesquisa por código, transferência para eventos, venda, devolução e histórico. Assim, 3 camisetas tamanho M e 2 tamanho GG são movimentadas separadamente. Não existem estoques duplicados.
+Em **Produtos**, os tamanhos aparecem como itens identificados por cor e tamanho. **Editar** permite mudar EAN, SKU, cor, tamanho, gôndola e prateleira sem mexer no estoque. Para alterar quantidade use as operações de estoque permitidas ao perfil ou o Balanço rápido.
 
-As categorias básicas Roupas / Camisetas, Camisas, Polos, Blusas, Vestidos, Casacos, Calças e Outras roupas foram criadas sem excluir as pastas antigas. Faça a reorganização das categorias legadas gradualmente, quando conveniente.
+## Exclusão com proteção do histórico
 
-**Exemplo orientativo (não cadastrado no banco)**:
-- Modelo: Camiseta Nossa Senhora Aparecida
-- Tipo: Camiseta; público: Unissex; faixa etária: Adulto; categoria: Roupas / Camisetas
-- Branco / P — quantidade 4
-- Branco / M — quantidade 8
-- Branco / G — quantidade 5
+**Produtos → Excluir:** permitido a administrador ou gerente. Caso o produto tenha saldo em loja ou eventos, a exclusão é bloqueada até zerar todos os saldos. Sem movimentações nem contagens, o produto pode ser apagado definitivamente. Se existir histórico, o produto é **desativado**, não apagado, mantendo os vínculos para auditoria. Use **Mostrar inativos** na tela de Produtos para localizá-lo ou reativá-lo quando necessário.
 
-Não é obrigatório ter todos os tamanhos ou todas as cores. O sistema aceita até 40 variações por modelo no cadastro inicial.
+**Categorias e tags → Excluir:** permite excluir uma categoria e suas subcategorias em uma operação, desde que nenhum produto ou modelo esteja ligado a qualquer nível da ramificação. A exclusão de uma tag é permitida mesmo em uso, mas a tag é desvinculada dos produtos e modelos antes de ser apagada. Em todos os casos há confirmação antes da alteração. O banco valida as regras e registra a auditoria; o administrador não precisa fazer operações diretamente no Supabase.
