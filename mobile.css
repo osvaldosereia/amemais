@@ -408,3 +408,17 @@ button, select, input, textarea { touch-action: manipulation; }
  .apparel-variant{padding:12px}
  .apparel-form .form-section{padding:12px}
 }
+
+/* Ações de modelo e tamanhos rápidos */
+.apparel-card-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.apparel-add-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.apparel-add-actions .button{min-height:49px;padding:9px;font-size:.86rem}
+.apparel-add-actions .apparel-add{min-width:0}
+.apparel-detail-right .button{font-size:.78rem}
+@media(max-width:760px){
+ .apparel-model-main .apparel-card-actions{width:100%}
+ .apparel-model-main .apparel-card-actions>.button{flex:1;min-height:45px}
+ .apparel-add-actions{grid-template-columns:1fr}
+ .apparel-detail-right{flex-wrap:wrap;justify-content:flex-end}
+ .apparel-detail-right>span{width:100%;text-align:right}
+}
