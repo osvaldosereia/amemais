@@ -9,7 +9,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https://awcclxehwzvvgajgpnmf.supabase.co; script-src 'self'; style-src 'self'; connect-src https://awcclxehwzvvgajgpnmf.supabase.co; base-uri 'none'; form-action 'none'">
   <title>Produto compartilhado | Ame+ Store</title>
   <link rel="icon" type="image/svg+xml" href="./ame-plus-logo.svg">
-  <link rel="stylesheet" href="./share.css?v=1">
+  <link rel="stylesheet" href="./share.css?v=2">
 </head>
 <body>
   <header class="shared-header">
@@ -32,11 +32,22 @@
         <div id="variants" class="share-variants"></div>
         <p class="share-footnote">Estoque da loja no momento desta consulta. Quantidades podem mudar com novas vendas e movimentações.</p>
         <div class="share-updated" id="last-updated"></div>
-        <button type="button" class="share-refresh" id="reload">↻ Atualizar estoque</button>
+        <button type="button" class="share-order-open" id="order-open">Fazer Pedido</button>
+        <section class="share-order-section" id="order-section" hidden>
+          <h2>Montar pedido</h2>
+          <p class="share-footnote">Informe os tamanhos e as quantidades desejadas. O pedido não reserva nem retira produtos do estoque.</p>
+          <form id="order-form">
+            <div id="order-variants" class="share-order-variants"></div>
+            <label class="share-order-field">Seu nome<input name="name" required minlength="2" maxlength="120" autocomplete="name" placeholder="Nome completo"></label>
+            <label class="share-order-field">Telefone com DDD<input name="phone" type="tel" required inputmode="tel" autocomplete="tel" maxlength="20" placeholder="(65) 99999-9999"></label>
+            <button type="submit" id="order-submit" class="share-order-save">Salvar pedido e compartilhar no WhatsApp</button>
+          </form>
+          <div class="share-order-feedback" id="order-feedback" role="status" hidden></div>
+        </section>
       </div>
     </article>
   </main>
   <footer>AME+ STORE · VISUALIZAÇÃO COMPARTILHADA · ACESSO SOMENTE LEITURA</footer>
-  <script src="./share.js?v=1" defer></script>
+  <script src="./share.js?v=2" defer></script>
 </body>
 </html>
