@@ -910,7 +910,11 @@ async function handleClick(event){
     return scanInto('input[data-variant-ean]',target.closest('[data-apparel-row]')||target.closest('form'));
   }
   if(action==='product-new')return productModal();
-  if(action==='product-edit')return productModal(product(id));
+  if(action==='product-edit'){
+    const item=product(id);
+    if(item?.apparel_model_id)return apparelVariantEditModal(item,{h,formModal});
+    return productModal(item);
+  }
   if(action==='stock-modal')return stockModal(id);
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
