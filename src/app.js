@@ -8,6 +8,7 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261014codes1';
 import { groupInventory, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
   eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261014codes1';
+import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014q2';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -500,29 +501,22 @@ function productsPage(){
 
 function quickBalancePage(){
   if(!canQuickBalance())return '<div class="muteblock">Sem acesso.</div>';
-  const q=state.search.trim().toLocaleLowerCase('pt-BR');
-  const results=state.items.filter(p=>p.active&&(!q||
-    [p.name,p.sku,p.ean,p.gondola,p.prateleira,categoryFull(p.category_id)].join(' ').toLocaleLowerCase('pt-BR').includes(q)));
-  // Nenhum campo vem previamente preenchido para evitar zerar produtos por engano.
-  const rows=results.slice(0,50).map(p=>{
-    const balance=qtyStore(p.id);
-    return '<form class="quick-count-card" data-form="quick-count" data-count-product="'+h(p.id)+'">'+
-      '<div class="quick-count-main">'+photoButton(p)+
-      '<div class="quick-count-name"><strong>'+h(p.name)+'</strong><small>'+h(p.ean||p.sku||'Sem código')+'</small>'+(p.gondola||p.prateleira?'<small><strong>Local:</strong> '+h([p.gondola,p.prateleira].filter(Boolean).join(' · '))+'</small>':'')+
-      '<span class="quick-count-balance">No sistema: <b>'+balance+'</b></span></div></div>'+
-      '<div class="quick-count-fields"><label><span>Quantidade contada</span>'+
-      '<input type="number" name="counted" inputmode="numeric" min="0" max="1000000" step="1" required placeholder="Digite a contagem" autocomplete="off"></label>'+
-      '<input type="hidden" name="expected" value="'+balance+'">'+
-      '<button class="button primary" type="submit">Conferir</button></div></form>';
-  }).join('');
-  return tabHead('Balanço rápido','Conte o estoque físico da loja. Diferenças serão registradas com seu usuário.')+
+  const groups=groupInventory(state.items.filter(p=>p.active),state.apparelModels);
+  const query=state.search.trim().toLocaleLowerCase('pt-BR');
+  const filtered=groups.filter(g=>!query||[g.title,...g.products.flatMap(p=>
+    [p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira])].join(' ').toLocaleLowerCase('pt-BR').includes(query));
+  const cards=filtered.slice(0,50).map(g=>quickBalanceCard(g,{photoButton,qtyStore,h})).join('');
+  return tabHead('Balanço rápido','Um produto por card; conte os tamanhos sem sair da tela.')+
     '<section class="quick-balance-intro"><div class="quick-balance-search">'+
-    '<input id="quick-search" type="search" class="search" placeholder="Nome, EAN ou código do produto…" aria-label="Buscar para contagem" value="'+h(state.search)+'">'+
+    '<input id="quick-search" type="search" class="search" placeholder="Produto, tamanho, SKU ou EAN…" aria-label="Buscar para contagem" value="'+h(state.search)+'">'+
     button('📷 Ler EAN','quick-scan','','primary')+'</div>'+
-    '<p class="help">Pesquise ou leia o código. Digite a quantidade física e toque em Conferir. Nunca é necessário preencher todos os produtos.</p></section>'+
-    '<div class="quick-count-list">'+(rows||'<div class="panel muteblock">Nenhum produto encontrado.</div>')+'</div>'+
-    (results.length>50?'<p class="muted">Mostrando 50 resultados. Refine a busca para localizar seu produto.</p>':'');
+    '<p class="help">Digite a quantidade física apenas dos tamanhos conferidos. <strong>Zero</strong> significa estoque zerado; campo vazio não altera nada. '+
+    'Use Salvar em um tamanho ou Salvar contagens do card. O restante da página não será recarregado.</p></section>'+
+    '<div class="quick-group-list">'+(cards||'<div class="panel muteblock">Nenhum produto encontrado.</div>')+
+    (cards?'<div class="quick-group-empty panel muteblock" data-quick-empty hidden>Nenhum produto corresponde à busca.</div>':'')+'</div>'+
+    (filtered.length>50?'<p class="muted">Exibindo 50 modelos. Refine a busca para localizar os demais.</p>':'');
 }
+
 function eventsPage(){
   const add=isManager()?button('+ Criar evento','event-new','','primary'):'';
   return tabHead('Eventos','Controle de produtos enviados, vendidos e devolvidos.',add)+
@@ -1005,7 +999,15 @@ async function handleClick(event){
         return;
       }
       if(state.view==='balanco'){
-        state.search=code;state.page=0;render();return;
+        state.search=code;state.page=0;
+        const search=document.getElementById('quick-search'),list=document.querySelector('.quick-group-list');
+        if(search&&list){
+          search.value=code;
+          const found=filterQuickCountCards(list,code);
+          if(found)list.querySelector('[data-quick-group]:not([hidden])')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+          else toast('EAN não encontrado nos produtos exibidos.',true);
+        }else render();
+        return;
       }
       state.view='produtos';state.search=code;state.page=0;state.categoryFilter='';state.tagFilter='';
       render();
@@ -1021,6 +1023,11 @@ async function handleClick(event){
     render();return;
   }
   if(action==='count-focus')return document.querySelector('[data-count-product="'+id+'"] input[name="counted"]')?.focus();
+  if(action==='quick-save-one'){
+    const card=target.closest('[data-quick-group]');
+    if(card)return saveQuickGroupCounts(card,id);
+    return;
+  }
   if(action==='quick-scan')return scanInto('#quick-search');
   if(action==='mobile-more'){
     document.querySelector('.mobile-more-overlay')?.remove();
@@ -1499,6 +1506,10 @@ async function handleSubmit(event){
     finally{state.loading=false;}
     return;
   }
+  if(type==='quick-group-count'){
+    if(!canQuickBalance())return;
+    return saveQuickGroupCounts(form);
+  }
   if(type==='quick-count'){
     if(!canQuickBalance())return;
     const counted=Number(values.counted),expected=Number(values.expected);
@@ -1617,10 +1628,71 @@ async function handleSubmit(event){
   }
 
 }
+async function saveQuickGroupCounts(card,onlyId=null){
+  if(!canQuickBalance()||state.loading||!card?.isConnected)return;
+  let selected;
+  try{selected=collectQuickCounts(card,onlyId);}catch(error){toast(error.message,true);return;}
+  state.loading=true;
+  const buttons=[...card.querySelectorAll('button')];
+  buttons.forEach(btn=>btn.disabled=true);
+  const status=card.querySelector('[data-quick-status]');
+  if(status)status.textContent='Salvando contagens…';
+  try{
+    const saved=assertOk(await db.rpc('quick_stock_count_batch',{p_items:selected}));
+    if(!saved||saved.saved!==selected.length)throw new Error('O balanço não retornou a confirmação esperada.');
+    // Atualização de dados e elementos locais: NÃO chama render nem loadData.
+    for(const item of selected){
+      let balance=state.balances.find(b=>b.product_id===item.product_id&&!b.event_id);
+      if(balance)balance.quantity=item.counted;
+      else state.balances.push({product_id:item.product_id,event_id:null,quantity:item.counted});
+      const row=[...card.querySelectorAll('[data-quick-row]')].find(r=>r.dataset.quickRow===item.product_id);
+      if(!row)continue;
+      row.querySelector('[data-quick-expected]').value=String(item.counted);
+      row.querySelector('[data-quick-current]').textContent=String(item.counted);
+      row.querySelector('[data-quick-count]').value='';
+      row.classList.add('quick-just-saved');
+      // A mensagem confirma o salvamento sem deslocar o card.
+    }
+    const qty=[...card.querySelectorAll('[data-quick-expected]')].reduce((sum,input)=>sum+Number(input.value||0),0);
+    const total=card.querySelector('[data-quick-total]');
+    if(total)total.textContent=String(qty);
+    const adjusted=Number(saved.adjusted)||0;
+    if(status)status.textContent=selected.length+' tamanho(s) salvo(s) · '+adjusted+' ajuste(s) de estoque';
+    toast(selected.length===1?'Contagem salva sem recarregar a tela.':selected.length+' contagens salvas sem recarregar a tela.');
+  }catch(error){
+    fail(error);
+    if(status)status.textContent='Não foi salvo. Revise as contagens antes de tentar novamente.';
+    // Se outro operador alterou o saldo, atualiza apenas a referência das linhas,
+    // preservando os campos digitados e a posição da rolagem.
+    try{
+      const ids=selected.map(x=>x.product_id);
+      const current=assertOk(await db.from('stock_balances').select('product_id,quantity')
+        .in('product_id',ids).is('event_id',null))||[];
+      for(const bal of current){
+        const row=[...card.querySelectorAll('[data-quick-row]')].find(r=>r.dataset.quickRow===bal.product_id);
+        if(!row)continue;
+        row.querySelector('[data-quick-expected]').value=String(bal.quantity);
+        row.querySelector('[data-quick-current]').textContent=String(bal.quantity);
+        const cached=state.balances.find(b=>b.product_id===bal.product_id&&!b.event_id);
+        if(cached)cached.quantity=bal.quantity;
+      }
+    }catch(syncError){console.warn('Não foi possível sincronizar saldo após falha',syncError);}
+  }finally{
+    state.loading=false;
+    updateQuickCountButtons(card);
+  }
+}
+
 function updateFiltered(id,value){
   const active=document.activeElement;
   const selection=active?.selectionStart??null;
-  state.search=value;state.page=0;render();
+  state.search=value;state.page=0;
+  if(id==='quick-search'){
+    const area=document.querySelector('.quick-group-list');
+    if(area)filterQuickCountCards(area,value);
+    return;
+  }
+  render();
   const field=document.getElementById(id);
   if(field&&selection!==null){field.focus();field.setSelectionRange(selection,selection);}
 }
@@ -1641,6 +1713,10 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
   if(['product-search','movement-search','quick-search'].includes(event.target.id))updateFiltered(event.target.id,event.target.value);
+  if(event.target.matches('[data-quick-count]')){
+    const card=event.target.closest('[data-quick-group]');
+    if(card)updateQuickCountButtons(card);
+  }
   if(event.target.id==='catalog-category-search'){
     state.catalogSearch=event.target.value;
     const list=document.querySelector('.catalog-tree-list');if(list)list.innerHTML=renderCatalogTree();
