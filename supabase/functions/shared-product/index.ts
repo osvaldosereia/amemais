@@ -31,7 +31,7 @@ Deno.serve(async(request:Request)=>{
   const origin=request.headers.get("origin");
   if(origin&&!allowedOrigins.has(origin))return json({error:"Origem não autorizada"},403,headers);
   // Token no corpo da requisição; não trafega em URLs nem em logs de acesso.
-  if(Number(request.headers.get("content-length")||0)>1024)
+  if(Number(request.headers.get("content-length")||0)>16000)
     return json({error:"Requisição inválida"},400,headers);
   let payload:Record<string,unknown>={};
   try{payload=await request.json();}catch{return json({error:"Requisição inválida"},400,headers);}
@@ -43,6 +43,60 @@ Deno.serve(async(request:Request)=>{
   if(!url||!key)return json({error:"Serviço temporariamente indisponível"},503,headers);
   const client=createClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
   try{
+    if(payload.action==="receipt"){
+      const {data:receipt,error:receiptError}=await client.rpc("get_avulso_receipt_for_server",{p_token:token});
+      if(receiptError)return json({error:"Não foi possível consultar o pedido"},500,headers);
+      if(!receipt)return json({error:"Pedido não encontrado"},404,headers);
+      return json(receipt,200,headers);
+    }
+    if(payload.action==="catalog"){
+      const {data:catalog,error:catalogError}=await client.rpc("get_customer_catalog_for_server",{p_token:token});
+      if(catalogError)return json({error:"Não foi possível carregar o catálogo"},500,headers);
+      if(!catalog)return json({error:"Acesso vencido ou revogado"},404,headers);
+      const signed=new Map<string,string>();
+      let images=0;
+      const products=[];
+      for(const product of catalog.products||[]){
+        let image_url:null|string=null;
+        const path=product.image_path;
+        if(typeof path==="string"&&path&&images<120){
+          if(!signed.has(path)){
+            const result=await client.storage.from("ame-produtos").createSignedUrl(path,600);
+            if(!result.error&&result.data?.signedUrl){
+              signed.set(path,result.data.signedUrl);
+              images++;
+            }
+          }
+          image_url=signed.get(path)||null;
+        }
+        const {image_path:privatePath,...safe}=product;
+        products.push({...safe,image_url});
+      }
+      return json({products},200,headers);
+    }
+    if(payload.action==="catalog_order"){
+      const name=typeof payload.name==="string"?payload.name:"";
+      const phone=typeof payload.phone==="string"?payload.phone:"";
+      const items=payload.items;
+      const requestId=typeof payload.request_id==="string"?payload.request_id:"";
+      if(name.length>120||phone.length>25||!Array.isArray(items)||items.length>40||
+        !/^[0-9a-fA-F-]{36}$/.test(requestId))
+        return json({error:"Dados do pedido inválidos"},400,headers);
+      const {data:orderId,error:orderError}=await client.rpc("create_customer_catalog_order",{
+        p_token:token,p_name:name,p_phone:phone,p_items:items,p_request_id:requestId
+      });
+      if(orderError){
+        console.warn("catalog order rejected",orderError.code);
+        const message=String(orderError.message||"");
+        return json({error:/nome|telefone|pedido|quantidade|Variação|variação|Produto|produto|Acesso|acesso|Limite|limite/i.test(message)?
+          message:"Não foi possível registrar o pedido"},400,headers);
+      }
+      const {data:receiptToken,error:receiptError}=await client.rpc("issue_avulso_receipt_for_server",{
+        p_order_id:orderId,p_request_id:requestId
+      });
+      if(receiptError||!receiptToken)return json({error:"Pedido salvo, mas não foi possível gerar o comprovante. Tente novamente."},503,headers);
+      return json({order_id:orderId,receipt_token:receiptToken},200,headers);
+    }
     if(payload.action==="place_order"){
       const name=typeof payload.name==="string"?payload.name:"";
       const phone=typeof payload.phone==="string"?payload.phone:"";
@@ -61,7 +115,11 @@ Deno.serve(async(request:Request)=>{
         const expected=/nome|telefone|pedido|quantidade|variação|Produto|produto|Link|link|Muitos pedidos/i.test(message);
         return json({error:expected?message:"Não foi possível registrar o pedido"},expected?400:500,headers);
       }
-      return json({order_id:orderId,created_at:new Date().toISOString()},200,headers);
+      const {data:receiptToken,error:receiptError}=await client.rpc("issue_avulso_receipt_for_server",{
+        p_order_id:orderId,p_request_id:requestId
+      });
+      if(receiptError||!receiptToken)return json({error:"Pedido salvo, mas não foi possível gerar comprovante. Reenvie."},503,headers);
+      return json({order_id:orderId,receipt_token:receiptToken,created_at:new Date().toISOString()},200,headers);
     }
     if(payload.action!==undefined && payload.action!=="get")
       return json({error:"Operação não reconhecida"},400,headers);
