@@ -184,3 +184,12 @@ A Saída registra uma **baixa física neutra**, sem lançar venda nem pedido. An
 **Eventos** continuam independentes: o envio para um evento ativo deve ser feito pela transferência específica de Eventos, pois somente ela mantém o controle de retorno do evento. Uma Saída comum não constitui transferência para evento e não gera saldo a devolver.
 
 **Permissões:** Entrada e Saída estão disponíveis para Administrador e Gerente. O acesso do Estoquista continua restrito ao cadastro de Produtos e ao Balanço rápido, conforme definido anteriormente. Um acesso de Cliente nunca vê essas seções.
+
+
+## Produtos — cards compactos (versão 3)
+
+Na seção **Produtos**, o título e **+ Novo produto** ficam na mesma linha, e o campo de busca divide a linha com o leitor de EAN. Filtros de categoria e tags permanecem visíveis, enquanto **Mostrar inativos** está em **Mais filtros**; **Limpar filtros** aparece quando há filtros ativos.
+
+Cada modelo/produto aparece em **um único card**. No celular, a foto fica à esquerda e nome, cor, estoque total e localização à direita. Toque na foto para ampliar. O botão **Tamanhos** abre e fecha a lista de variações, que mostra para cada tamanho a quantidade, SKU, EAN e localização específica. Produtos sem estoque são sinalizados de forma discreta. No desktop, o mesmo card fica horizontal e a lista de variações aparece aberta ao lado direito.
+
+**Editar** abre o cadastro simples ou, nas roupas, um gerenciador de todas as variações. O gerenciador permite editar um tamanho específico, atualizar a foto, adicionar tamanhos ou excluir uma variação autorizada. O menu **⋯** mantém as ações secundárias, incluindo compartilhamento pelo WhatsApp e movimentação de estoque (conforme a permissão). Nenhuma alteração visual modifica saldos ou movimentações armazenadas no Supabase.
