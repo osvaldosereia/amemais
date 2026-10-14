@@ -129,6 +129,7 @@ function button(label,action,extra='',kind=''){
 function pill(status){return '<span class="pill '+h(status)+'">'+h({ativo:'Ativo',encerrado:'Encerrado',rascunho:'Rascunho'}[status]||status)+'</span>';}
 function render(){
   if(!db){root.innerHTML='<div class="login-wrap"><div class="login"><div class="brand">AME MAIS <span>Estoque</span></div><h2>Configuração necessária</h2><p>Informe URL e chave pública do novo projeto Supabase em <code>config.js</code>. Não utilize o banco de outras empresas.</p><p class="muted">Veja docs/INSTALACAO.md no repositório.</p></div></div>';return;}
+  if(state.passwordRecovery){loginScreen();return;}
   if(!state.user){loginScreen();return;}
   if(!state.profile?.active){loginScreen('Conta sem permissão de acesso. Peça ao administrador para liberar seu perfil.');return;}
   if(state.view==='usuarios'&&!isAdmin() || state.view==='categorias'&&!isManager())state.view='inicio';
@@ -267,7 +268,7 @@ function usersPage(){
   return tabHead('Usuários','Cada pessoa utiliza sua própria senha e permissões.',button('+ Novo usuário','user-new','','primary'))+
     panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Email</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
     state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.email)+'</td><td>'+h(roles[u.role]||u.role)+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
-      (u.id!==state.user.id?button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small'):'Sua conta')+'</td></tr>').join('')+'</tbody></table></div>')+
+      (u.id!==state.user.id?'<div class="inline">'+button('Função','user-role','data-id="'+h(u.id)+'"','small')+button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+'</div>':'Sua conta')+'</td></tr>').join('')+'</tbody></table></div>')+
     '<div class="note">Os acessos são individuais. Bloquear um usuário não apaga seu histórico de operações. Senhas não são armazenadas pela aplicação.</div>';
 }
 function formModal(title,contents,formName,submitLabel='Salvar'){
@@ -349,6 +350,16 @@ function categoryModal(){
     selectField('Categoria mãe','parent_id',[['','Nenhuma (categoria principal)'],...state.categories.filter(c=>c.depth<3).map(c=>[c.id,categoryFull(c.id)])])+
     '</div>','category-new');
 }
+function userRoleModal(id){
+  if(!isAdmin() || id===state.user?.id)return;
+  const target=state.users.find(x=>x.id===id);
+  if(!target)return;
+  formModal('Função · '+target.full_name,
+    '<div class="formgrid">'+selectField('Permissão de acesso','role',Object.entries(roles),target.role)+'</div>'+
+    '<div class="note">Mudanças de função ficam registradas na auditoria.</div>',
+    'user-role','Atualizar função');
+  document.querySelector('.modal form').dataset.id=id;
+}
 function userModal(){
   if(!isAdmin())return;
   formModal('Cadastrar usuário','<div class="formgrid">'+
@@ -429,6 +440,7 @@ async function handleClick(event){
   if(action==='member-add')return memberModal(id);
   if(action==='category-new')return categoryModal();
   if(action==='user-new')return userModal();
+  if(action==='user-role')return userRoleModal(id);
   if(action==='search-scan')return scanInto('#product-search');
   if(action==='form-scan')return scanInto('input[name="'+scanTarget+'"]');
   if(action==='product-prev'){state.page=Math.max(0,state.page-1);render();return;}
@@ -546,6 +558,12 @@ async function handleSubmit(event){
     await exec(async()=>assertOk(await db.from('categories').insert({
       name:String(values.name).trim(),parent_id:values.parent_id||null
     })),'Categoria criada.');
+    return;
+  }
+  if(type==='user-role'){
+    if(!isAdmin() || form.dataset.id===state.user.id)return;
+    if(!Object.hasOwn(roles,values.role))throw new Error('Função inválida.');
+    await exec(async()=>assertOk(await db.from('staff_profiles').update({role:values.role}).eq('id',form.dataset.id)),'Função atualizada.');
     return;
   }
   if(type==='user-new'){
