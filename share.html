@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https://awcclxehwzvvgajgpnmf.supabase.co; script-src 'self'; style-src 'self'; connect-src https://awcclxehwzvvgajgpnmf.supabase.co; base-uri 'none'; form-action 'none'">
+  <title>Produto compartilhado | Ame+ Store</title>
+  <link rel="icon" type="image/svg+xml" href="./ame-plus-logo.svg">
+  <link rel="stylesheet" href="./share.css?v=1">
+</head>
+<body>
+  <header class="shared-header">
+    <img src="./ame-plus-logo.svg" alt="Ame+ Store" width="146" height="78">
+    <span>CONSULTA DE ESTOQUE</span>
+  </header>
+  <main class="share-main" id="shared-main">
+    <div id="loading" role="status" class="share-status">Carregando produto compartilhado…</div>
+    <div id="error" class="share-error" role="alert" hidden></div>
+    <article id="shared-card" class="share-card" hidden>
+      <div class="share-photo-box" id="photo-box">
+        <img id="shared-photo" alt="Foto do produto" hidden>
+        <span id="no-photo" class="share-no-photo" hidden>Foto não disponível</span>
+      </div>
+      <div class="share-data">
+        <small class="share-eyebrow">AME+ STORE · PRODUTO</small>
+        <h1 id="product-title"></h1>
+        <div class="share-stock"><span>Total disponível na loja</span><strong id="stock-total"></strong></div>
+        <h2>Estoque por variação</h2>
+        <div id="variants" class="share-variants"></div>
+        <p class="share-footnote">Estoque da loja no momento desta consulta. Quantidades podem mudar com novas vendas e movimentações.</p>
+        <div class="share-updated" id="last-updated"></div>
+        <button type="button" class="share-refresh" id="reload">↻ Atualizar estoque</button>
+      </div>
+    </article>
+  </main>
+  <footer>AME+ STORE · VISUALIZAÇÃO COMPARTILHADA · ACESSO SOMENTE LEITURA</footer>
+  <script src="./share.js?v=1" defer></script>
+</body>
+</html>
