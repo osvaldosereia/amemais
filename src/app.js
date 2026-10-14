@@ -2,7 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import { scanEAN } from './scan.js';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js';
-import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel } from './apparel.js';
+import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
+  apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto } from './apparel.js';
 
 const cfg = window.AME_CONFIG || {};
 const root = document.querySelector('#app');
@@ -14,6 +15,7 @@ const roles = {admin:'Administrador',gerente:'Gerente',estoquista:'Estoquista',e
 const nav = [
   {id:'inicio',label:'Visão geral',ico:'▦'},
   {id:'produtos',label:'Produtos',ico:'□'},
+  {id:'roupas',label:'Roupas',ico:'♧'},
   {id:'balanco',label:'Balanço rápido',ico:'☑'},
   {id:'eventos',label:'Eventos',ico:'▣'},
   {id:'movimentacoes',label:'Movimentações',ico:'⇄'},
@@ -257,7 +259,7 @@ function render(){
   if(!state.profile.active){pendingAccessScreen();return;}
   if(isStockkeeper()&&!permittedView(state.view))state.view='balanco';
   if(state.view==='usuarios'&&!isAdmin() || state.view==='categorias'&&!isManager())state.view='inicio';
-  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager())).map(x=>
+  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='roupas'||!isStockkeeper())&&(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager())).map(x=>
     '<button data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'"><span aria-hidden="true">'+x.ico+'</span> '+h(x.label)+'</button>').join('');
   root.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand">AME MAIS <span>Estoque</span></div><nav class="nav" aria-label="Menu principal">'+menu+'</nav><div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+'<br><button class="plain" data-action="my-password">Minha senha</button><br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
     '<div class="main"><header class="topbar"><strong>Gestão de estoque</strong><div class="inline"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span><button class="plain only-mobile" data-action="logout">Sair</button></div></header>'+
@@ -804,10 +806,10 @@ async function handleClick(event){
   if(action==='mobile-more'){
     document.querySelector('.mobile-more-overlay')?.remove();
     const sheet=document.createElement('div');sheet.className='mobile-more-overlay';
-    const opts=[['inicio','Início'],['categorias','Categorias e tags'],['usuarios','Usuários']];
+    const opts=[['inicio','Início'],['roupas','Roupas e tamanhos'],['categorias','Categorias e tags'],['usuarios','Usuários']];
     sheet.innerHTML='<div class="mobile-more-sheet" role="dialog" aria-modal="true" aria-label="Mais opções">'+
       '<div class="section-head"><strong>Mais opções</strong><button type="button" data-action="mobile-more-close" class="plain">Fechar ✕</button></div>'+
-      opts.filter(([id])=>id==='inicio'||(id==='categorias'&&isManager())||(id==='usuarios'&&isAdmin()))
+      opts.filter(([id])=>['inicio','roupas'].includes(id)||(id==='categorias'&&isManager())||(id==='usuarios'&&isAdmin()))
         .map(([id,name])=>button(name,'view','data-view="'+id+'"','')).join('')+
       button('Minha senha','my-password')+button('Sair da conta','logout','','danger')+'</div>';
     document.body.append(sheet);return;
@@ -881,6 +883,18 @@ async function handleClick(event){
   if(action==='apparel-add-row'){
     try{return apparelAddRow(target,{h});}catch(error){fail(error);return;}
   }
+  if(action==='apparel-fill-sizes'){
+    try{return apparelFillSizes(target,{h});}catch(error){fail(error);return;}
+  }
+  if(action==='apparel-variant-edit'){
+    if(!canRegisterProducts())return;
+    try{return apparelVariantEditModal(product(id),{h,formModal});}catch(error){fail(error);return;}
+  }
+  if(action==='apparel-photo'){
+    if(!canRegisterProducts())return;
+    try{return apparelPhotoModal(state.apparelModels.find(m=>m.id===id),state,{formModal,photoChooser,hydrateImages});}
+    catch(error){fail(error);return;}
+  }
   if(action==='apparel-remove-row'){
     try{return apparelRemoveRow(target);}catch(error){fail(error);return;}
   }
@@ -893,7 +907,7 @@ async function handleClick(event){
     state.view='produtos';state.search=product(id)?.name||'';state.page=0;render();return;
   }
   if(action==='apparel-scan'){
-    return scanInto('input[data-variant-ean]',target.closest('[data-apparel-row]'));
+    return scanInto('input[data-variant-ean]',target.closest('[data-apparel-row]')||target.closest('form'));
   }
   if(action==='product-new')return productModal();
   if(action==='product-edit')return productModal(product(id));
@@ -1034,6 +1048,20 @@ async function handleSubmit(event){
       });
     }catch(error){fail(error);}
     finally{state.loading=false;}
+    return;
+  }
+  if(type==='apparel-edit-variant'){
+    if(!canRegisterProducts())return;
+    state.loading=true;
+    try{await saveApparelVariant(form,{db,assertOk,loadData,closeTopModal,toast});}
+    catch(error){fail(error);}finally{state.loading=false;}
+    return;
+  }
+  if(type==='apparel-photo'){
+    if(!canRegisterProducts())return;
+    state.loading=true;
+    try{await saveApparelPhoto(form,{db,assertOk,loadData,closeTopModal,toast});}
+    catch(error){fail(error);}finally{state.loading=false;}
     return;
   }
   if(type==='quick-count'){
