@@ -4,6 +4,7 @@ import { scanEAN } from './scan.js';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
+import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js';
 
 const cfg = window.AME_CONFIG || {};
 const root = document.querySelector('#app');
@@ -15,7 +16,6 @@ const roles = {admin:'Administrador',gerente:'Gerente',estoquista:'Estoquista',e
 const nav = [
   {id:'inicio',label:'Visão geral',ico:'▦'},
   {id:'produtos',label:'Produtos',ico:'□'},
-  {id:'roupas',label:'Roupas',ico:'♧'},
   {id:'balanco',label:'Balanço rápido',ico:'☑'},
   {id:'eventos',label:'Eventos',ico:'▣'},
   {id:'movimentacoes',label:'Movimentações',ico:'⇄'},
@@ -23,7 +23,7 @@ const nav = [
   {id:'usuarios',label:'Usuários',ico:'♙'}
 ];
 const state = {
-  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),events:[],members:[],
+  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,events:[],members:[],
   balances:[],movements:[],users:[],audits:[],search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
@@ -33,7 +33,7 @@ const isManager = () => ['admin','gerente'].includes(state.profile?.role);
 const isStockkeeper = () => state.profile?.role === 'estoquista';
 const canRegisterProducts = () => isManager() || isStockkeeper();
 const canQuickBalance = () => canRegisterProducts();
-const permittedView = v => !isStockkeeper() || ['produtos','roupas','balanco'].includes(v);
+const permittedView = v => !isStockkeeper() || ['produtos','balanco'].includes(v);
 const isAdmin = () => state.profile?.role === 'admin';
 const isReader = () => state.profile?.role === 'consulta';
 const product = id => state.items.find(x => x.id === id);
@@ -259,7 +259,7 @@ function render(){
   if(!state.profile.active){pendingAccessScreen();return;}
   if(isStockkeeper()&&!permittedView(state.view))state.view='balanco';
   if(state.view==='usuarios'&&!isAdmin() || state.view==='categorias'&&!isManager())state.view='inicio';
-  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='roupas'||!isStockkeeper())&&(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager())).map(x=>
+  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager())).map(x=>
     '<button data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'"><span aria-hidden="true">'+x.ico+'</span> '+h(x.label)+'</button>').join('');
   root.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand">AME MAIS <span>Estoque</span></div><nav class="nav" aria-label="Menu principal">'+menu+'</nav><div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+'<br><button class="plain" data-action="my-password">Minha senha</button><br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
     '<div class="main"><header class="topbar"><strong>Gestão de estoque</strong><div class="inline"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span><button class="plain only-mobile" data-action="logout">Sair</button></div></header>'+
@@ -276,7 +276,6 @@ function render(){
   hydrateImages();
 }
 function pageContent(){
-  if(state.view==='roupas')return apparelPage(state,{h,tabHead,button,qtyStore,photoButton});
   if(state.view==='balanco')return quickBalancePage();
   if(state.view==='produtos')return productsPage();
   if(state.view==='eventos')return state.activeEvent?eventDetails():eventsPage();
@@ -320,11 +319,13 @@ function productCell(p){
 function mobileProductCard(p){
   return '<article class="mobile-product-card">'+photoButton(p)+
     '<div class="mobile-product-info"><strong>'+h(p.name)+'</strong><small>'+h(categoryFull(p.category_id))+'</small>'+
-    '<small>'+h(p.sku||p.ean||'Sem código')+'</small>'+
+    '<small>'+h(p.sku||p.ean||'Sem código')+'</small>'+ 
+    '<small>'+h([p.gondola,p.prateleira].filter(Boolean).join(' · '))+'</small>'+
     '<div class="product-tags">'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</div>'+
     '<div class="mobile-product-actions"><span class="qty">Loja: '+qtyStore(p.id)+'</span>'+
     (isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
-    (canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+'</div></div></article>';
+    (canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+
+    (isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></div></article>';
 }
 
 function categoryFull(id){
@@ -334,20 +335,20 @@ function categoryFull(id){
 }
 function productsPage(){
   const q=state.search.toLocaleLowerCase('pt-BR').trim();
-  const filtered=state.items.filter(p=>(!q||[p.name,p.sku,p.ean,...(p.tags||[])].join(' ').toLocaleLowerCase('pt-BR').includes(q))
+  const filtered=state.items.filter(p=>(state.showInactiveProducts||p.active)&&(!q||[p.name,p.sku,p.ean,p.gondola,p.prateleira,...(p.tags||[])].join(' ').toLocaleLowerCase('pt-BR').includes(q))
     &&(!state.categoryFilter||categoryChain(p.category_id).some(c=>c.id===state.categoryFilter))
     &&(!state.tagFilter||(p.tags||[]).includes(state.tagFilter)));
   const pageSize=30,totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=filtered.slice(state.page*pageSize,(state.page+1)*pageSize);
-  const add=canRegisterProducts()?button('+ Novo produto','product-new','','primary')+button('👕 Roupas e tamanhos','view','data-view="roupas"',''):'';
+  const add=canRegisterProducts()?button('+ Novo produto','product-new','','primary'):'';
   return tabHead('Produtos','Pesquise por nome, código, EAN ou tags.',add)+
     '<section class="panel products-panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, SKU ou tag…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="filter" aria-haspopup="dialog"><span>'+h(state.categoryFilter?categoryFull(state.categoryFilter):'Todas as categorias')+'</span><span aria-hidden="true">⌄</span></button>'+
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="tag" aria-haspopup="dialog"><span>'+h(state.tagFilter||'Todas as tags')+'</span><span aria-hidden="true">⌄</span></button>'+
-    button('Ler EAN','search-scan','','small')+'</div>'+
+    button('Ler EAN','search-scan','','small')+button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+'</div>'+
     (list.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Produto</th><th>Categoria</th><th>Tags</th><th>Loja</th><th>Situação</th><th></th></tr></thead><tbody>'+
-      list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
+      list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+(isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
       '<div class="muteblock">Nenhum produto encontrado.</div>')+
     '<div class="mobile-products">'+list.map(mobileProductCard).join('')+'</div>'+
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+filtered.length+' produto(s) · página '+(state.page+1)+' de '+totalPages+'</small><div class="actions">'+
@@ -458,7 +459,7 @@ function categoriesPage(){
       (c.depth>1?'<small>'+h(categoryFull(c.parent_id))+'</small>':'')+'</span></div>';
     const actions=button('+ Subcategoria','category-child','data-id="'+h(c.id)+'"','small')+
       button('Editar','category-edit','data-id="'+h(c.id)+'"','small')+
-      (!childCount&&!used?button('Excluir','category-delete','data-id="'+h(c.id)+'"','small'):'');
+      button('Excluir','category-delete','data-id="'+h(c.id)+'"','small danger');
     return {c,tone,level,name,used,actions};
   });
   const rows=rowData.map(v=>'<tr class="category-tone-'+v.tone+(v.c.depth===1?' category-root':'')+'">'+
@@ -470,7 +471,7 @@ function categoriesPage(){
   const tags=state.tags.map(t=>{
     const used=state.items.filter(p=>(p.tags||[]).includes(t.name)).length;
     return '<div class="tag-row"><span class="tag">'+h(t.name)+'</span><small>'+used+' produto(s)</small>'+
-      (used===0?button('Excluir','tag-delete','data-id="'+h(t.id)+'"','small'):'')+'</div>';
+      button('Excluir','tag-delete','data-id="'+h(t.id)+'"','small danger')+'</div>';
   }).join('');
   return tabHead('Categorias e tags','Categorias organizadas em árvore, com quantos níveis forem necessários.',
     button('+ Nova categoria','category-new','','primary'))+
@@ -568,17 +569,28 @@ function photoChooser(item){
 }
 function productModal(item=null){
   if(!canRegisterProducts())return;
+  const single='<div data-single-fields class="single-fields wide">'+
+    field('Código interno (SKU)','sku','text',item?.sku||'','maxlength="80" autocomplete="off"')+
+    '<div class="field"><span>EAN / código de barras</span><div class="inline">'+
+    '<input style="flex:1;min-width:145px" name="ean" type="text" inputmode="numeric" placeholder="8 a 14 dígitos" value="'+h(item?.ean||'')+'">'+
+    button('📷 Ler','form-scan','data-target="ean"','small')+'</div></div></div>';
+  const locations='<section class="form-section wide location-section">'+
+    '<div class="section-head"><strong>Localização na loja</strong><small>Opcional</small></div>'+
+    '<div class="location-fields">'+
+    field('Gôndola','gondola','text',item?.gondola||'','maxlength="40" placeholder="Ex.: Gôndola 02"')+
+    field('Prateleira','prateleira','text',item?.prateleira||'','maxlength="40" placeholder="Ex.: Prateleira B"')+
+    '</div></section>';
   const markup='<div class="formgrid">'+
-    field('Nome do produto *','name','text',item?.name||'','required maxlength="180"')+
-    field('Código interno (SKU)','sku','text',item?.sku||'','maxlength="80"')+
-    '<div class="field wide"><span>EAN / código de barras</span><div class="inline">'+
-    '<input style="flex:1;min-width:155px" name="ean" type="text" inputmode="numeric" placeholder="8 a 14 dígitos" value="'+h(item?.ean||'')+'">'+
-    button('Ler câmera','form-scan','data-target="ean"','')+'</div></div>'+
-    photoChooser(item)+categorySelector(item)+productTagChooser(item)+
-    (!item?field('Quantidade inicial na loja','initial_quantity','number','0','min="0" max="1000000" step="1"','Entrada registrada no histórico.'):'')+
+    '<div class="wide">'+field('Nome do produto *','name','text',item?.name||'','required maxlength="180"')+'</div>'+
+    (!item?sizesSection():'')+
+    single+photoChooser(item)+categorySelector(item)+productTagChooser(item)+locations+
+    (!item?'<div class="wide" data-single-stock>'+
+      field('Quantidade inicial na loja','initial_quantity','number','0','min="0" max="1000000" step="1"','Entrada registrada no histórico.')+'</div>':'')+
     (item?selectField('Situação','active',[['true','Ativo'],['false','Inativo']],String(item.active)):'')+'</div>';
-  formModal(item?'Editar produto':'Novo produto',markup,item?'product-edit':'product-new',item?'Salvar alterações':'Cadastrar produto');
-  const form=document.querySelector('.modalback form');if(item)form.dataset.id=item.id;
+  formModal(item?'Editar produto':'Novo produto',markup,item?'product-edit':'product-new',
+    item?'Salvar alterações':'Cadastrar produto');
+  const form=document.querySelector('.modalback form');
+  if(item)form.dataset.id=item.id;
   if(item?.image_path)hydrateImages();
 }
 
@@ -776,6 +788,7 @@ async function hydrateImages(){
   }));
 }
 function switchView(view) {
+  if(view==='roupas')view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;
   if(view!=='eventos')state.activeEvent=null;
@@ -806,10 +819,10 @@ async function handleClick(event){
   if(action==='mobile-more'){
     document.querySelector('.mobile-more-overlay')?.remove();
     const sheet=document.createElement('div');sheet.className='mobile-more-overlay';
-    const opts=[['inicio','Início'],['roupas','Roupas e tamanhos'],['categorias','Categorias e tags'],['usuarios','Usuários']];
+    const opts=[['inicio','Início'],['categorias','Categorias e tags'],['usuarios','Usuários']];
     sheet.innerHTML='<div class="mobile-more-sheet" role="dialog" aria-modal="true" aria-label="Mais opções">'+
       '<div class="section-head"><strong>Mais opções</strong><button type="button" data-action="mobile-more-close" class="plain">Fechar ✕</button></div>'+
-      opts.filter(([id])=>['inicio','roupas'].includes(id)||(id==='categorias'&&isManager())||(id==='usuarios'&&isAdmin()))
+      opts.filter(([id])=>id==='inicio'||(id==='categorias'&&isManager())||(id==='usuarios'&&isAdmin()))
         .map(([id,name])=>button(name,'view','data-view="'+id+'"','')).join('')+
       button('Minha senha','my-password')+button('Sair da conta','logout','','danger')+'</div>';
     document.body.append(sheet);return;
@@ -910,6 +923,27 @@ async function handleClick(event){
     return scanInto('input[data-variant-ean]',target.closest('[data-apparel-row]')||target.closest('form'));
   }
   if(action==='product-new')return productModal();
+  if(action==='products-toggle-inactive'){state.showInactiveProducts=!state.showInactiveProducts;state.page=0;render();return;}
+  if(action==='size-toggle'||action==='size-remove'){
+    const form=target.closest('form'),size=target.dataset.size;
+    const row=[...form.querySelectorAll('[data-size-variant]')].find(x=>x.dataset.sizeVariant===size);
+    setSizeSelected(form,size,action==='size-remove'?false:row?.hidden);return;
+  }
+  if(action==='size-common'){
+    const form=target.closest('form');
+    for(const size of ['P','M','G','GG'])setSizeSelected(form,size,true);
+    return;
+  }
+  if(action==='size-scan')return scanInto('input[name="size_ean"]',target.closest('[data-size-variant]'));
+  if(action==='product-delete'){
+    if(!isManager())return;
+    const item=product(id);if(!item)return;
+    if(!window.confirm('Excluir o produto "'+item.name+'"?\nSe existir histórico, ele será desativado para preservar as movimentações. O estoque deve estar zerado.'))return;
+    return exec(async()=>{
+      const status=assertOk(await db.rpc('remove_product_safely',{p_product_id:id}));
+      if(status==='archived')state.showInactiveProducts=false;
+    },'Produto excluído ou desativado para preservar o histórico.');
+  }
   if(action==='product-edit'){
     const item=product(id);
     if(item?.apparel_model_id)return apparelVariantEditModal(item,{h,formModal});
@@ -928,14 +962,14 @@ async function handleClick(event){
   if(action==='category-edit')return categoryModal(null,false,state.categories.find(c=>c.id===id));
   if(action==='category-delete'){
     const cat=state.categories.find(c=>c.id===id);
-    if(!isManager()||!cat||!window.confirm('Excluir a categoria '+cat.name+'?'))return;
-    return exec(async()=>assertOk(await db.from('categories').delete().eq('id',id)),'Categoria excluída.');
+    if(!isManager()||!cat||!window.confirm('Excluir "'+cat.name+'" e suas subcategorias?\nA exclusão será impedida se houver produtos vinculados a qualquer nível.'))return;
+    return exec(async()=>assertOk(await db.rpc('remove_category_branch',{p_category_id:id})),'Categoria e subcategorias excluídas.');
   }
   if(action==='tag-new')return tagModal();
   if(action==='tag-delete'){
     const tag=state.tags.find(t=>t.id===id);
-    if(!isManager()||!tag||!window.confirm('Excluir a tag '+tag.name+'?'))return;
-    return exec(async()=>assertOk(await db.from('tags').delete().eq('id',id)),'Tag excluída.');
+    if(!isManager()||!tag||!window.confirm('Excluir a tag "'+tag.name+'"?\nEla também será desvinculada de todos os produtos, sem afetar estoques.'))return;
+    return exec(async()=>assertOk(await db.rpc('remove_tag_safely',{p_tag_id:id})),'Tag excluída e removida dos produtos.');
   }
   if(action==='quick-category')return categoryModal(chosenCategory(target.closest('form')),true);
   if(action==='quick-tag')return tagModal(true);
@@ -1011,13 +1045,22 @@ async function handleSubmit(event){
   }
   if(type==='product-new'||type==='product-edit'){
     if(!canRegisterProducts())return;
+    if(type==='product-new'&&form.querySelector('[data-use-sizes]')?.checked){
+      state.loading=true;
+      try{await saveSizedProduct(form,{
+        db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast
+      });}catch(error){fail(error);}finally{state.loading=false;}
+      return;
+    }
     const editing=type==='product-edit',id=form.dataset.id;
     const ean=String(values.ean||'').replace(/[\s-]/g,'');
     if(ean && !/^\d{8,14}$/.test(ean)){toast('O EAN deve conter de 8 a 14 dígitos.',true);return;}
     const payload={
       name:String(values.name).trim(),sku:String(values.sku||'').trim()||null,ean:ean||null,
       tags:productTagValues(form),
-      category_id:chosenCategory(form)
+      category_id:chosenCategory(form),
+      gondola:String(values.gondola||'').trim()||null,
+      prateleira:String(values.prateleira||'').trim()||null
     };
     if(editing)payload.active=values.active==='true';
     else payload.created_by=state.user.id;
@@ -1217,6 +1260,20 @@ document.addEventListener('input',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('[data-use-sizes]')){
+    const form=event.target.closest('form');const checked=event.target.checked;
+    setSizesMode(form,checked);
+    if(checked){
+      const current=chosenCategory(form),ancestors=categoryChain(current);
+      const rootCat=state.categories.find(c=>!c.parent_id&&c.name.toLocaleLowerCase('pt-BR')==='roupas');
+      if(rootCat&&!ancestors.some(x=>x.id===rootCat.id)){
+        const standard=state.categories.find(c=>c.parent_id===rootCat.id&&c.name.toLocaleLowerCase('pt-BR')==='camisetas');
+        const choice=standard||rootCat;
+        form.querySelector('[name="category_id"]').value=choice.id;
+        form.querySelector('[data-category-label]').textContent=categoryFull(choice.id);
+      }
+    }
+  }
   if(event.target.matches('select[name="apparel_type"]'))apparelSyncCategory(event.target,state,{categoryFull});
   if(event.target.matches('input[name="camera_file"],input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
   if(event.target.id==='event-filter'){state.eventFilter=event.target.value;render();}
