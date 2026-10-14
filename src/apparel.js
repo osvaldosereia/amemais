@@ -203,6 +203,8 @@ export function apparelVariantEditModal(p,{h,formModal}){
     '<label class="field"><span>SKU</span><input name="sku" maxlength="80" value="'+h(p.sku||'')+'"></label>'+
     '<label class="field"><span>EAN</span><div class="inline apparel-ean"><input name="ean" data-variant-ean inputmode="numeric" maxlength="18" value="'+h(p.ean||'')+'">'+
     '<button type="button" class="button small" data-action="apparel-scan">📷</button></div></label>'+
+    '<label class="field"><span>Gôndola</span><input name="gondola" maxlength="40" value="'+h(p.gondola||'')+'"></label>'+
+    '<label class="field"><span>Prateleira</span><input name="prateleira" maxlength="40" value="'+h(p.prateleira||'')+'"></label>'+
     '<label class="field"><span>Situação</span><select name="active"><option value="true" '+(p.active?'selected':'')+'>Ativa</option>'+
     '<option value="false" '+(!p.active?'selected':'')+'>Inativa</option></select></label>'+
     '</div><div class="note">Esta edição não altera saldos. Use Balanço rápido ou Estoque para ajustar quantidades.</div>',
@@ -220,6 +222,9 @@ export async function saveApparelVariant(form,{db,assertOk,loadData,closeTopModa
     p_product_id:form.dataset.productId,p_color:color,p_size:size,
     p_sku:sku||null,p_ean:ean||null,p_active:v('active')==='true'
   }));
+  assertOk(await db.from('products').update({
+    gondola:v('gondola')||null,prateleira:v('prateleira')||null
+  }).eq('id',form.dataset.productId));
   closeTopModal();
   await loadData();
   toast('Variação atualizada sem alterar estoque.');
