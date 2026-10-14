@@ -20,7 +20,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],events:[],members:[],
   balances:[],movements:[],users:[],audits:[],search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',
-  imageCache:new Map(),loading:false,toastTimer:0,passwordRecovery:false
+  imageCache:new Map(),loading:false,toastTimer:0,passwordRecovery:false,loginNotice:'',setupPending:false
 };
 let db = null;
 let notifyTimer;
@@ -86,22 +86,33 @@ async function loadProfile(){
   const response=await db.from('staff_profiles').select('id,full_name,email,role,active').eq('id',user.id).maybeSingle();
   if(response.error){fail(response.error);return;}
   state.profile=response.data;
+  if(!state.profile){const r=await db.rpc('is_initial_admin_pending');state.setupPending=Boolean(r.data)&&!r.error;}
   if(!state.profile?.active){render();return;}
   try {await loadData();}catch(err){fail(err);render();}
 }
 function loginScreen(message=''){
   root.innerHTML='<div class="login-wrap"><section class="login">'+
-    '<div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
-    '<h1>'+ (state.passwordRecovery?'Nova senha':'Entrar no sistema')+'</h1>'+
-    '<p class="muted">'+(state.passwordRecovery?'Defina uma nova senha para sua conta.':'Acesso restrito à equipe autorizada.')+'</p>'+
-    (message?'<div class="alert">'+h(message)+'</div>':'')+
-    '<form data-form="'+(state.passwordRecovery?'reset-password':'login')+'">'+
-    (state.passwordRecovery ? field('Nova senha (mínimo 12 caracteres)','password','password','', 'required minlength="12"') :
-      field('Email','email','email','', 'required autocomplete="username"')+
-      field('Senha','password','password','', 'required autocomplete="current-password"'))+
-    '<button class="button primary" type="submit">'+(state.passwordRecovery?'Atualizar senha':'Entrar')+'</button></form>'+
-    (!state.passwordRecovery?'<button class="plain" style="margin-top:15px" data-action="forgot">Esqueci minha senha</button>':'')+
-    '<p class="help" style="margin-top:16px">Solicite uma conta ao administrador. Não há cadastro público.</p></section></div>';
+  '<div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
+  '<h1>Entrar no sistema</h1><p class="muted">Informe seu email para receber um link de acesso. Não é preciso criar outra senha.</p>'+
+  (message?'<div class="alert">'+h(message)+'</div>':'')+
+  (state.loginNotice?'<div class="note" role="status">'+h(state.loginNotice)+'</div>':'')+
+  '<form data-form="login">'+field('Seu email','email','email','','required autocomplete="email"')+
+  '<button class="button primary" type="submit">Receber link de acesso</button></form>'+
+  '<p class="help" style="margin-top:16px">Somente pessoas autorizadas conseguem acessar o estoque.</p></section></div>';
+}
+function pendingAccessScreen(){
+  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
+  '<h1>Acesso pendente</h1><p>O email <strong>'+h(state.user?.email)+'</strong> já foi identificado, mas precisa ser liberado por um administrador.</p>'+
+  '<button class="button" data-action="logout">Sair</button></section></div>';
+}
+function initialAdminScreen(){
+  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
+  '<h1>Ativar administrador</h1><p>Email confirmado: <strong>'+h(state.user?.email)+'</strong>. Informe o código de ativação de uso único.</p>'+
+  '<form data-form="admin-bootstrap">'+
+  field('Nome do administrador','full_name','text','','required minlength="2" maxlength="120"')+
+  field('Código de ativação','activation_code','password','','required autocomplete="off"')+
+  '<button class="button primary" type="submit">Ativar acesso</button></form>'+
+  '<button class="plain" data-action="logout" style="margin-top:12px">Trocar de email</button></section></div>';
 }
 function field(label,name,type='text',value='',attr='',help=''){
   return '<label class="field"><span>'+h(label)+'</span><input name="'+h(name)+'" type="'+h(type)+'" value="'+h(value)+'" '+attr+' />'+(help?'<span class="help">'+h(help)+'</span>':'')+'</label>';
@@ -129,9 +140,9 @@ function button(label,action,extra='',kind=''){
 function pill(status){return '<span class="pill '+h(status)+'">'+h({ativo:'Ativo',encerrado:'Encerrado',rascunho:'Rascunho'}[status]||status)+'</span>';}
 function render(){
   if(!db){root.innerHTML='<div class="login-wrap"><div class="login"><div class="brand">AME MAIS <span>Estoque</span></div><h2>Configuração necessária</h2><p>Informe URL e chave pública do novo projeto Supabase em <code>config.js</code>. Não utilize o banco de outras empresas.</p><p class="muted">Veja docs/INSTALACAO.md no repositório.</p></div></div>';return;}
-  if(state.passwordRecovery){loginScreen();return;}
   if(!state.user){loginScreen();return;}
-  if(!state.profile?.active){loginScreen('Conta sem permissão de acesso. Peça ao administrador para liberar seu perfil.');return;}
+  if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
+  if(!state.profile.active){pendingAccessScreen();return;}
   if(state.view==='usuarios'&&!isAdmin() || state.view==='categorias'&&!isManager())state.view='inicio';
   const menu=nav.filter(x=>(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager())).map(x=>
     '<button data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'"><span aria-hidden="true">'+x.ico+'</span> '+h(x.label)+'</button>').join('');
@@ -365,10 +376,9 @@ function userModal(){
   formModal('Cadastrar usuário','<div class="formgrid">'+
     field('Nome completo','full_name','text','','required minlength="2" maxlength="120"')+
     field('Email','email','email','','required')+
-    field('Senha inicial','password','password','','required minlength="12" autocomplete="new-password"','Mínimo de 12 caracteres. Entregue a senha diretamente ao colaborador.')+
     selectField('Função','role',Object.entries(roles),'evento')+'</div>'+
-    '<div class="note">A conta será criada no Auth do Supabase. Não use senhas compartilhadas.</div>',
-    'user-new','Criar usuário');
+    '<div class="note">O funcionário receberá um convite por email, sem senha inicial.</div>',
+    'user-new','Convidar usuário');
 }
 function csvCell(value){
   let text=String(value??'');
@@ -473,18 +483,22 @@ async function handleSubmit(event){
   if(type==='login'){
     state.loading=true;
     try {
-      const response=await db.auth.signInWithPassword({email:String(values.email).trim(),password:String(values.password)});
-      assertOk(response);
-      await loadProfile();
+      const email=String(values.email).trim().toLowerCase();
+      assertOk(await db.auth.signInWithOtp({email,options:{
+        emailRedirectTo:location.origin+location.pathname,shouldCreateUser:true
+      }}));
+      state.loginNotice='Verifique seu email ('+email+') e abra o link recebido para acessar.';
+      render();
     }catch(error){fail(error);}finally{state.loading=false;}
     return;
   }
-  if(type==='reset-password'){
+  if(type==='admin-bootstrap'){
+    const code=String(values.activation_code||'').trim(),name=String(values.full_name||'').trim();
+    if(!code||name.length<2){toast('Informe nome e código de ativação.',true);return;}
     await exec(async()=>{
-      assertOk(await db.auth.updateUser({password:String(values.password)}));
-      state.passwordRecovery=false;
-      await loadProfile();
-    },'Senha atualizada.');
+      assertOk(await db.rpc('claim_initial_admin',{p_activation_code:code,p_name:name}));
+      state.profile={id:state.user.id,full_name:name,email:state.user.email,role:'admin',active:true};
+    },'Administrador ativado com sucesso.');
     return;
   }
   if(type==='product-new'||type==='product-edit'){
@@ -572,11 +586,11 @@ async function handleSubmit(event){
       const {data:{session}}=await db.auth.getSession();
       if(!session)throw new Error('Sessão expirada.');
       const response=await db.functions.invoke('admin-create-user',{
-        body:{full_name:String(values.full_name).trim(),email:String(values.email).trim(),password:String(values.password),role:values.role}
+        body:{full_name:String(values.full_name).trim(),email:String(values.email).trim(),role:values.role}
       });
       if(response.error)throw response.error;
       if(!response.data?.success)throw new Error(response.data?.error||'Erro ao criar usuário.');
-    },'Usuário cadastrado.');
+    },'Colaborador autorizado. Se a conta era nova, o convite foi enviado por email.');
   }
 }
 function updateFiltered(id,value){
@@ -602,8 +616,8 @@ async function start(){
     auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
   });
   db.auth.onAuthStateChange((event)=>{
-    if(event==='PASSWORD_RECOVERY'){state.passwordRecovery=true;state.user=null;render();}
-    if(event==='SIGNED_OUT'){state.user=null;state.profile=null;render();}
+    if(event==='SIGNED_IN'){state.loginNotice='';setTimeout(()=>loadProfile().catch(fail),0);}
+    if(event==='SIGNED_OUT'){state.user=null;state.profile=null;state.setupPending=false;render();}
   });
   await loadProfile();
 }
