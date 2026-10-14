@@ -923,6 +923,18 @@ async function handleClick(event){
   if(action==='global-scan'){
     document.querySelector('.mobile-more-overlay')?.remove();
     try {return scanEAN(code=>{
+      if(state.view==='eventos'&&state.eventWorkflow==='return'){
+        state.eventReturnQuery=code;
+        const search=document.querySelector('#event-return-search');
+        if(search){
+          search.value=code;filterWorkflowRows(search.closest('.main'),code,'return');
+          const form=[...document.querySelectorAll('.return-variant')].find(x=>
+            !x.hidden&&x.dataset.search?.split(' ').includes(code));
+          if(form)form.querySelector('[name="quantity"]')?.focus();
+          else toast('EAN não encontrado entre os itens pendentes do evento.',true);
+        }
+        return;
+      }
       if(state.view==='balanco'){
         state.search=code;state.page=0;render();return;
       }
