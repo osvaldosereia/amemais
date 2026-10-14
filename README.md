@@ -13,13 +13,13 @@ Sistema web de gestão de produtos, estoque da loja e estoques temporários de e
 - Estoque e movimentos transacionais e auditáveis, com devolução e encerramento de eventos.
 - Imagens compactadas antes do envio para bucket privado; leitura EAN via câmera.
 - [Supabase AME MAIS](https://supabase.com/dashboard/project/awcclxehwzvvgajgpnmf)
-- [Site AME MAIS](https://osvaldosereia.github.io/amemais/)
+- [Site AME MAIS (domínio oficial, após apontamento DNS)](https://cdsb.net.br/)
 
 ## Primeira ativação
 
 1. Confirme a configuração do Supabase Auth em [URL Configuration](https://supabase.com/dashboard/project/awcclxehwzvvgajgpnmf/auth/url-configuration):
-   - **Site URL:** `https://osvaldosereia.github.io/amemais/`
-   - **Redirect URLs:** adicione `https://osvaldosereia.github.io/amemais/`.
+   - **Site URL:** `https://cdsb.net.br/`
+   - **Redirect URLs:** adicione `https://cdsb.net.br/`.
 2. Abra o site e informe seu email. Supabase envia um link de confirmação/acesso.
 3. Depois de confirmar o email, digite seu nome e o **código de ativação temporário entregue diretamente ao gestor**. O código não está no GitHub.
 4. Após a ativação, gerencie convites em **Usuários** e faça testes de ponta a ponta antes do uso comercial.
@@ -46,3 +46,5 @@ A conta Supabase Pro do gestor **não é outra conta do aplicativo**. O aplicati
 - `.github/workflows/pages.yml`: publicação.
 
 **Limite atual:** vendas são registradas manualmente; não há integração automática de PDV, nota fiscal ou Bling.
+
+A configuração final do domínio personalizado (GitHub Pages, Registro.br e URLs permitidas no Supabase Auth) está detalhada em [Instalação — Domínio](docs/INSTALACAO.md#0-domínio-próprio-cdsbnetbr). **Não considerar o domínio ativo antes de confirmar o DNS e o HTTPS.**
