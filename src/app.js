@@ -5,6 +5,8 @@ import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=2026
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261014b';
+import { groupInventory, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261014w1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -50,7 +52,7 @@ const nav = [
   {id:'usuarios',label:'Usuários',ico:'users'}
 ];
 const state = {
-  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,events:[],members:[],
+  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
@@ -321,7 +323,7 @@ function render(){
 function pageContent(){
   if(state.view==='balanco')return quickBalancePage();
   if(state.view==='produtos')return productsPage();
-  if(state.view==='eventos')return state.activeEvent?eventDetails():eventsPage();
+  if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):eventsPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='categorias')return categoriesPage();
   if(state.view==='usuarios')return usersPage();
@@ -419,25 +421,35 @@ function categoryFull(id){
 }
 function productsPage(){
   const q=state.search.toLocaleLowerCase('pt-BR').trim();
-  const filtered=state.items.filter(p=>(state.showInactiveProducts||p.active)&&(!q||[p.name,p.sku,p.ean,p.gondola,p.prateleira,...(p.tags||[])].join(' ').toLocaleLowerCase('pt-BR').includes(q))
-    &&(!state.categoryFilter||categoryChain(p.category_id).some(c=>c.id===state.categoryFilter))
-    &&(!state.tagFilter||(p.tags||[]).includes(state.tagFilter)));
-  const pageSize=30,totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));
+  const matched=state.items.filter(p=>(state.showInactiveProducts||p.active)&&
+    (!q||[p.name,p.sku,p.ean,p.gondola,p.prateleira,...(p.tags||[])].join(' ').toLocaleLowerCase('pt-BR').includes(q))&&
+    (!state.categoryFilter||categoryChain(p.category_id).some(c=>c.id===state.categoryFilter))&&
+    (!state.tagFilter||(p.tags||[]).includes(state.tagFilter)));
+  const groupKeys=new Set(matched.map(p=>p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id));
+  // A busca por um único EAN retorna o modelo completo com todos os seus tamanhos.
+  const expanded=state.items.filter(p=>(state.showInactiveProducts||p.active)&&
+    groupKeys.has(p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id));
+  const groups=groupInventory(expanded,state.apparelModels);
+  const pageSize=20,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
-  const list=filtered.slice(state.page*pageSize,(state.page+1)*pageSize);
+  const list=groups.slice(state.page*pageSize,(state.page+1)*pageSize);
   const add=canRegisterProducts()?button('+ Novo produto','product-new','','primary'):'';
-  return tabHead('Produtos','Pesquise por nome, código, EAN ou tags.',add)+
-    '<section class="panel products-panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, SKU ou tag…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
+  return tabHead('Produtos','Um cartão por modelo, com quantidade individual de cada tamanho.',add)+
+    '<section class="panel products-panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, tamanho ou SKU…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="filter" aria-haspopup="dialog"><span>'+h(state.categoryFilter?categoryFull(state.categoryFilter):'Todas as categorias')+'</span><span aria-hidden="true">⌄</span></button>'+
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="tag" aria-haspopup="dialog"><span>'+h(state.tagFilter||'Todas as tags')+'</span><span aria-hidden="true">⌄</span></button>'+
-    button('Ler EAN','search-scan','','small')+button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+'</div>'+
-    (list.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Produto</th><th>Categoria</th><th>Localização</th><th>Tags</th><th>Loja</th><th>Situação</th><th></th></tr></thead><tbody>'+
-      list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+h([p.gondola,p.prateleira].filter(Boolean).join(' · ')||'—')+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+(isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
-      '<div class="muteblock">Nenhum produto encontrado.</div>')+
-    '<div class="mobile-products">'+list.map(mobileProductCard).join('')+'</div>'+
-    '<div class="panelbody inline" style="justify-content:space-between"><small>'+filtered.length+' produto(s) · página '+(state.page+1)+' de '+totalPages+'</small><div class="actions">'+
-    button('Anterior','product-prev',state.page===0?'disabled':'','small')+button('Próxima','product-next',state.page+1>=totalPages?'disabled':'','small')+'</div></div></section>';
+    button('📷 Ler EAN','search-scan','','small')+
+    button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+'</div>'+
+    '<div class="grouped-inventory-grid">'+(list.length?list.map(g=>groupedCard(g,{
+      h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts
+    })).join(''):'<div class="muteblock">Nenhum produto encontrado.</div>')+'</div>'+
+    '<div class="panelbody inline" style="justify-content:space-between"><small>'+
+    groups.length+' modelo(s)/produto(s) · '+matched.length+' variação(ões) · página '+(state.page+1)+' de '+totalPages+
+    '</small><div class="actions">'+
+    button('Anterior','product-prev',state.page===0?'disabled':'','small')+
+    button('Próxima','product-next',state.page+1>=totalPages?'disabled':'','small')+'</div></div></section>';
 }
+
 function quickBalancePage(){
   if(!canQuickBalance())return '<div class="muteblock">Sem acesso.</div>';
   const q=state.search.trim().toLocaleLowerCase('pt-BR');
@@ -473,6 +485,14 @@ function eventsPage(){
         button('Gerenciar evento','event-detail','data-id="'+h(e.id)+'"','primary')+'</article>';
     }).join('')+'</div>'+(state.events.length?'':'<div class="panel muteblock">Nenhum evento cadastrado.</div>');
 }
+function returnWorkflowPage(){
+  const e=eventById(state.activeEvent);
+  if(!e){state.eventWorkflow=null;state.activeEvent=null;return eventsPage();}
+  if(!canReturn(e.id)||e.status!=='ativo'){
+    state.eventWorkflow=null;return eventDetails();
+  }
+  return eventReturnPage(e,state.items,state.apparelModels,state.balances,photoButton);
+}
 function eventDetails(){
   const e=eventById(state.activeEvent);
   if(!e){state.activeEvent=null;return eventsPage();}
@@ -483,9 +503,9 @@ function eventDetails(){
   const returned=entries.filter(m=>m.action==='devolucao').reduce((a,m)=>a+m.quantity,0);
   const balance=quantity(e.id), canModify=e.status==='ativo';
   const actions=(isManager()&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
-    (isManager()&&canModify?button('Transferir produtos','event-transfer','','primary'):'')+
+    (isManager()&&canModify?button('Separar produtos para o evento','event-transfer','','primary'):'')+
     (canModify&&canSell(e.id)?button('Registrar venda','event-sale'):'')+
-    (canModify&&canReturn(e.id)?button('Devolver produtos','event-return'):'')+
+    (canModify&&canReturn(e.id)?button('Devolução rápida por EAN','event-return','','primary'):'')+
     (canModify&&canReturn(e.id)?button('Encerrar','event-close','data-id="'+h(e.id)+'"'):'');
   const stored=state.balances.filter(b=>b.event_id===e.id&&b.quantity>0);
   return '<div class="crumb"><button class="plain" data-action="back-events">← Eventos</button></div>'+
@@ -875,7 +895,7 @@ function switchView(view) {
   if(view==='roupas')view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;
-  if(view!=='eventos')state.activeEvent=null;
+  if(view!=='eventos'){state.activeEvent=null;state.eventWorkflow=null;state.eventReturnQuery='';}
   render();window.scrollTo(0,0);
 }
 async function scanInto(selector, scope=document){
@@ -1035,6 +1055,17 @@ async function handleClick(event){
   if(action==='apparel-scan'){
     return scanInto('input[data-variant-ean]',target.closest('[data-apparel-row]')||target.closest('form'));
   }
+  if(action==='add-variants'){
+    if(!canRegisterProducts())return;
+    const model=state.apparelModels.find(m=>m.id===id);if(!model)return toast('Modelo não encontrado.',true);
+    const variants=state.items.filter(p=>p.apparel_model_id===id);
+    formModal('Adicionar tamanhos · '+model.name,addSizesContent(model,variants),'extra-sizes','Cadastrar novos tamanhos');
+    const form=document.querySelector('.modalback form[data-form="extra-sizes"]');
+    form.dataset.modelId=id;
+    form.querySelector('[name="new_color"]')?.addEventListener('input',()=>updateExtraSizeButtons(form,variants));
+    return;
+  }
+  if(action==='extra-size-toggle')return toggleExtraSize(target.closest('form'),target.dataset.size);
   if(action==='product-new')return productModal();
   if(action==='products-toggle-inactive'){state.showInactiveProducts=!state.showInactiveProducts;state.page=0;render();return;}
   if(action==='size-toggle'||action==='size-remove'){
@@ -1065,10 +1096,38 @@ async function handleClick(event){
   if(action==='stock-modal')return stockModal(id);
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
-  if(action==='back-events'){state.activeEvent=null;render();return;}
-  if(action==='event-transfer')return eventMove('transferencia');
+  if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
+  if(action==='event-transfer'){
+    if(!isManager()||eventStatus(state.activeEvent)!=='ativo')return;
+    const eligible=state.items.filter(p=>p.active&&qtyStore(p.id)>0);
+    if(!eligible.length)return toast('Nenhum produto com saldo na loja.',true);
+    formModal('Separação para o evento',eventBatchContent(eligible,state.apparelModels,qtyStore,photoButton),
+      'event-batch','Confirmar transferência');
+    const form=document.querySelector('.modalback form[data-form="event-batch"]');
+    form.dataset.event=state.activeEvent;
+    hydrateImages();return;
+  }
   if(action==='event-sale')return eventMove('venda_evento');
-  if(action==='event-return')return eventMove('devolucao');
+  if(action==='event-return'){
+    if(!canReturn(state.activeEvent)||eventStatus(state.activeEvent)!=='ativo')return;
+    state.eventWorkflow='return';state.eventReturnQuery='';render();window.scrollTo(0,0);return;
+  }
+  if(action==='event-return-back'){state.eventWorkflow=null;state.eventReturnQuery='';render();return;}
+  if(action==='event-return-scan')return scanEAN(code=>{
+    state.eventReturnQuery=code;
+    const input=document.querySelector('#event-return-search');
+    if(input){input.value=code;filterWorkflowRows(input.closest('.main'),code,'return');}
+    const form=[...document.querySelectorAll('.return-variant')].find(el=>
+      !el.hidden&&el.dataset.search?.split(' ').includes(code));
+    if(form)form.querySelector('[name="quantity"]')?.focus();
+    else toast('EAN não está entre os produtos pendentes neste evento.',true);
+  });
+  if(action==='return-all'){
+    const form=target.closest('form');
+    const quantity=form?.querySelector('[name="quantity"]');
+    if(quantity){quantity.value=quantity.max;quantity.focus();}
+    return;
+  }
   if(action==='member-add')return memberModal(id);
   if(action==='category-new')return categoryModal();
   if(action==='category-child')return categoryModal(id);
@@ -1224,6 +1283,50 @@ async function handleSubmit(event){
     catch(error){fail(error);}finally{state.loading=false;}
     return;
   }
+  if(type==='extra-sizes'){
+    if(!canRegisterProducts())return;
+    const modelId=form.dataset.modelId;
+    const existing=state.items.filter(p=>p.apparel_model_id===modelId);
+    let payload;
+    try{payload=collectExtraSizes(form,existing);}catch(error){fail(error);return;}
+    await exec(async()=>assertOk(await db.rpc('add_apparel_variants',{
+      p_model_id:modelId,p_variants:payload
+    })),'Novos tamanhos adicionados ao mesmo produto.');
+    return;
+  }
+  if(type==='event-batch'){
+    if(!isManager()||eventStatus(form.dataset.event)!=='ativo')return;
+    let items;
+    try{items=collectEventBatch(form);}catch(error){fail(error);return;}
+    const sum=items.reduce((acc,item)=>acc+item.quantity,0);
+    if(!window.confirm('Separar '+sum+' unidade(s) em '+items.length+
+      ' variação(ões) para o evento?\nOs saldos sairão da loja e ficarão no evento.'))return;
+    await exec(async()=>assertOk(await db.rpc('transfer_event_batch',{
+      p_event_id:form.dataset.event,p_items:items,p_note:form.elements.namedItem('note')?.value||null
+    })),'Separação concluída. Os produtos foram transferidos para o evento.');
+    return;
+  }
+  if(type==='event-return-quick'){
+    const eid=state.activeEvent;
+    if(!canReturn(eid)||eventStatus(eid)!=='ativo')return;
+    const id=form.dataset.id,p=product(id);
+    const qty=Number(values.quantity),maximum=Number(form.querySelector('[name="quantity"]')?.max);
+    if(!p||!Number.isInteger(qty)||qty<1||qty>maximum){
+      toast('Quantidade inválida ou maior que o disponível no evento.',true);return;
+    }
+    if(!window.confirm('Devolver '+qty+' unidade(s) de '+p.name+' à loja?'))return;
+    state.loading=true;
+    try{
+      assertOk(await db.rpc('move_stock',{
+        p_product_id:id,p_event_id:eid,p_action:'devolucao',p_quantity:qty,p_note:'Devolução rápida por contagem/EAN'
+      }));
+      await loadData();
+      state.eventReturnQuery='';
+      toast(qty+' unidade(s) devolvida(s) ao estoque da loja. Pode ler o próximo EAN.');
+    }catch(error){fail(error);await loadData().catch(()=>{});}
+    finally{state.loading=false;}
+    return;
+  }
   if(type==='quick-count'){
     if(!canQuickBalance())return;
     const counted=Number(values.counted),expected=Number(values.expected);
@@ -1365,6 +1468,19 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
   if(['product-search','movement-search','quick-search'].includes(event.target.id))updateFiltered(event.target.id,event.target.value);
+  if(event.target.matches('[data-event-batch-search]')){
+    filterWorkflowRows(event.target.closest('form'),event.target.value,'batch');
+  }
+  if(event.target.id==='event-return-search'){
+    state.eventReturnQuery=event.target.value;
+    filterWorkflowRows(event.target.closest('.main'),event.target.value,'return');
+  }
+  if(event.target.matches('[data-batch-id]')){
+    const form=event.target.closest('form');const total=[...form.querySelectorAll('[data-batch-id]')]
+      .reduce((sum,i)=>sum+(Number(i.value)||0),0);
+    const badge=form.querySelector('[data-batch-summary]');
+    if(badge)badge.textContent=total+' unidade(s) selecionada(s)';
+  }
   if(event.target.matches('[data-tag-search]')){
     const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
     event.target.closest('.form-section')?.querySelectorAll('.tag-choice').forEach(el=>{
