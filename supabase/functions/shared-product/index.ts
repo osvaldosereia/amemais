@@ -11,7 +11,7 @@ function cors(request: Request) {
   const origin=request.headers.get("origin")||"";
   return {
     ...(allowedOrigins.has(origin)?{"Access-Control-Allow-Origin":origin}:{}),
-    "Access-Control-Allow-Methods":"GET, OPTIONS",
+    "Access-Control-Allow-Methods":"POST, OPTIONS",
     "Access-Control-Allow-Headers":"Content-Type, apikey, x-client-info",
     "Vary":"Origin",
     "Cache-Control":"no-store, private",
@@ -27,11 +27,15 @@ function json(data:unknown,status:number,headers:Record<string,string>) {
 Deno.serve(async(request:Request)=>{
   const headers=cors(request);
   if(request.method==="OPTIONS")return new Response(null,{status:204,headers});
-  if(request.method!=="GET")return json({error:"Método não permitido"},405,headers);
+  if(request.method!=="POST")return json({error:"Método não permitido"},405,headers);
   const origin=request.headers.get("origin");
   if(origin&&!allowedOrigins.has(origin))return json({error:"Origem não autorizada"},403,headers);
-  const requestUrl=new URL(request.url);
-  const token=requestUrl.searchParams.get("token")||"";
+  // Token no corpo da requisição; não trafega em URLs nem em logs de acesso.
+  if(Number(request.headers.get("content-length")||0)>1024)
+    return json({error:"Requisição inválida"},400,headers);
+  let payload:Record<string,unknown>={};
+  try{payload=await request.json();}catch{return json({error:"Requisição inválida"},400,headers);}
+  const token=typeof payload.token==="string"?payload.token:"";
   if(!/^[0-9a-f]{64}$/.test(token))
     return json({error:"Link inválido ou expirado"},404,headers);
   const url=Deno.env.get("SUPABASE_URL");
