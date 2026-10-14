@@ -116,7 +116,7 @@ function categoriesOptions(blank=true) {
   return (blank?[['','Sem categoria']]:[]).concat([...state.categories].sort((a,b)=>a.depth-b.depth||a.name.localeCompare(b.name)).map(c=>[c.id, '— '.repeat(c.depth-1)+c.name]));
 }
 function productOptions(includeEmpty=false, eventId=null) {
-  const arr=state.items.filter(p=>p.active&&(!eventId||qtyEvent(p.id,eventId)>0));
+  const arr=state.items.filter(p=>eventId ? qtyEvent(p.id,eventId)>0 : p.active);
   return (includeEmpty?[['','Escolha um produto']]:[]).concat(arr.map(x=>[x.id,x.name+(x.sku?' ('+x.sku+')':'')]));
 }
 function eventOptions(){return [['','Todos os eventos']].concat(state.events.map(e=>[e.id,e.name]));}
