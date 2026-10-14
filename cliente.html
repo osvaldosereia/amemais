@@ -1,0 +1,31 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#ffffff">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https://awcclxehwzvvgajgpnmf.supabase.co; script-src 'self'; style-src 'self'; connect-src https://awcclxehwzvvgajgpnmf.supabase.co; base-uri 'none'; form-action 'none'">
+<title>Montar pedido | Ame+ Store</title><link rel="icon" href="./ame-plus-logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./cliente.css?v=1">
+</head><body>
+<header class="client-header"><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="140" height="75"><small>CATÁLOGO PARA PEDIDOS</small></header>
+<main>
+ <div class="client-intro"><h1>Monte seu pedido</h1><p>Escolha produtos e tamanhos, informe as quantidades e seus dados. <strong>O pedido não reserva ou retira mercadorias do estoque.</strong></p></div>
+ <div id="client-error" role="alert" hidden></div>
+ <div id="client-loading" role="status">Carregando produtos…</div>
+ <section id="client-content" hidden>
+  <label class="client-search">Buscar produto ou tamanho<input type="search" id="client-search" autocomplete="off" placeholder="Nome, tamanho, SKU…"></label>
+  <div class="client-count" id="client-count"></div>
+  <div id="client-products" class="client-products"></div>
+  <form id="client-checkout" class="client-checkout">
+   <h2>Concluir pedido</h2><p>Preencha seu nome e telefone. O pedido será salvo na AME+ antes do compartilhamento.</p>
+   <div class="client-checkout-fields">
+    <label>Seu nome<input name="name" required minlength="2" maxlength="120" autocomplete="name" placeholder="Nome completo"></label>
+    <label>Telefone com DDD<input name="phone" type="tel" inputmode="tel" required maxlength="20" autocomplete="tel" placeholder="(65) 99999-9999"></label>
+   </div>
+   <div class="client-order-summary" id="client-order-summary">Nenhum item selecionado.</div>
+   <button type="submit" id="client-submit">Salvar pedido e compartilhar no WhatsApp</button>
+   <div id="client-feedback" role="status" hidden></div>
+  </form>
+ </section>
+</main>
+<footer>AME+ STORE · CATÁLOGO EXCLUSIVO PARA PEDIDOS · SEM ACESSO AO ESTOQUE</footer>
+<script src="./cliente.js?v=1" defer></script></body></html>
