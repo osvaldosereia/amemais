@@ -1,10 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import { scanEAN } from './scan.js';
-import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js';
+import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014b';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
-import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js';
+import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261014b';
 
 const cfg = window.AME_CONFIG || {};
 const root = document.querySelector('#app');
