@@ -56,6 +56,7 @@ const nav = [
   {id:'balanco',label:'Balanço rápido',ico:'clipboard'},
   {id:'eventos',label:'Eventos',ico:'calendar'},
   {id:'pedidos',label:'Pedidos Avulsos',ico:'clipboard'},
+  {id:'pedidos-lojas',label:'Pedidos entre lojas',ico:'arrows'},
   {id:'movimentacoes',label:'Movimentações',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
   {id:'tags',label:'Tags',ico:'more'},
@@ -65,7 +66,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],
-  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],storeOrders:[],storeOrderItems:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -73,26 +74,30 @@ const state = {
 let db = null;
 let notifyTimer;
 const permissionDefaults = {
- gerente:['products.read','products.create','products.edit','products.delete','stock.entry','stock.exit','stock.balance','events.manage','events.separate','orders.create','orders.read','movements.read','categories.manage','tags.manage','stores.read'],
- estoquista:['products.read','products.create','products.edit','stock.balance'],
- evento:['products.read','events.separate'],consulta:['products.read','orders.read','movements.read']
+ gerente:['products.read','products.create','products.edit','products.delete','stock.entry','stock.exit','stock.balance','stock.destinations','events.read','events.manage','events.separate','events.return','events.sell','events.close','orders.read','orders.internal','orders.assign','orders.central','orders.franchise','orders.separate','orders.receive','orders.cancel','movements.read','movements.export','categories.manage','tags.manage','catalog.manage','products.share','stores.read','stores.manage'],
+ estoquista:['products.read','products.create','products.edit','stock.balance','products.share','stores.read'],
+ evento:['products.read','events.read','events.return','events.sell'],
+ consulta:['products.read','events.read','orders.read','movements.read','stores.read']
 };
-const permissionCatalog = [
+const permissionCatalog=[
  ['products.read','Consultar produtos'],['products.create','Cadastrar produtos'],['products.edit','Editar produtos'],['products.delete','Excluir produtos'],
- ['stock.entry','Entrada de mercadoria'],['stock.exit','Saída de mercadoria'],['stock.balance','Realizar balanço'],
- ['events.manage','Administrar eventos'],['events.separate','Separar mercadorias'],
- ['orders.create','Criar pedidos'],['orders.read','Consultar pedidos'],
- ['movements.read','Consultar movimentações'],['categories.manage','Gerenciar categorias'],['tags.manage','Gerenciar tags'],
- ['stores.read','Consultar lojas'],['stores.manage','Gerenciar lojas'],['users.manage','Gerenciar usuários']
+ ['stock.entry','Registrar entrada'],['stock.exit','Registrar saída'],['stock.balance','Realizar balanço'],['stock.destinations','Gerenciar destinos'],
+ ['events.read','Consultar eventos'],['events.manage','Administrar eventos'],['events.separate','Separar para eventos'],['events.return','Devolver de eventos'],['events.sell','Baixar no evento'],['events.close','Encerrar eventos'],
+ ['orders.read','Consultar pedidos avulsos'],['orders.internal','Criar pedidos avulsos'],['orders.assign','Vincular pedidos a eventos'],
+ ['orders.central','Pedir para loja central'],['orders.franchise','Pedir para franquia'],['orders.separate','Separar pedidos de lojas'],['orders.receive','Receber pedidos'],['orders.cancel','Cancelar pedidos'],
+ ['movements.read','Consultar movimentações'],['movements.export','Exportar relatórios'],
+ ['categories.manage','Gerenciar categorias'],['tags.manage','Gerenciar tags'],
+ ['catalog.manage','Gerenciar catálogos de clientes'],['products.share','Compartilhar produtos'],
+ ['stores.read','Consultar lojas'],['stores.manage','Administrar lojas'],['users.manage','Administrar usuários']
 ];
-const hasPermission = p => state.profile?.role==='admin' ||
- (state.ownPermissions.length ? state.ownPermissions.includes(p) : (permissionDefaults[state.profile?.role]||[]).includes(p));
-const isManager = () => ['admin','gerente'].includes(state.profile?.role);
+const hasPermission = p => Boolean(state.profile?.active) && (state.profile?.role==='admin'||state.ownPermissions.includes(p));
+const canUseStoreOrders=()=>['orders.central','orders.franchise','orders.separate','orders.receive','orders.cancel'].some(hasPermission);
+const isManager = () => hasPermission('events.manage');
 const isStockkeeper = () => state.profile?.role === 'estoquista';
 const canRegisterProducts = () => hasPermission('products.create') || hasPermission('products.edit');
 const canQuickBalance = () => hasPermission('stock.balance');
-const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',balanco:'stock.balance',eventos:'events.separate',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
-const permittedView = v => v==='inicio' || hasPermission(viewPermission[v]||'products.read') || (v==='lojas'&&hasPermission('stores.manage')) || (v==='eventos'&&hasPermission('events.manage'));
+const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',balanco:'stock.balance',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
+const permittedView = v => v==='inicio'||(v==='pedidos-lojas'&&canUseStoreOrders())||hasPermission(viewPermission[v]||'products.read')||(v==='lojas'&&hasPermission('stores.manage'))||(v==='eventos'&&(hasPermission('events.manage')||hasPermission('events.separate')));
 const isAdmin = () => state.profile?.role === 'admin';
 const isReader = () => state.profile?.role === 'consulta';
 const product = id => state.items.find(x => x.id === id);
@@ -101,8 +106,8 @@ const username = id => state.users.find(x => x.id === id)?.full_name || (id === 
 const qtyStore = id => state.balances.find(x => x.product_id === id && !x.event_id)?.quantity || 0;
 const qtyEvent = (id,eventId) => state.balances.find(x => x.product_id === id && x.event_id === eventId)?.quantity || 0;
 const memberRole = eventId => state.members.find(m => m.event_id === eventId && m.user_id === state.user?.id)?.role;
-const canSell = id => isManager() || Boolean(memberRole(id));
-const canReturn = id => isManager() || memberRole(id) === 'responsavel';
+const canSell = id => hasPermission('events.sell') && (hasPermission('events.manage') || Boolean(memberRole(id)));
+const canReturn = id => hasPermission('events.return') && (hasPermission('events.manage') || memberRole(id) === 'responsavel');
 const eventStatus = id => eventById(id)?.status;
 function dateToday() {
   return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Cuiaba',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -162,21 +167,30 @@ async function loadData(){
     ['users',db.from('staff_profiles').select('id,full_name,username,role,active,created_at').order('full_name').limit(1000)]
   ];
   resources.push(['stores',db.from('stores').select('*').order('name')]);
+  resources.push(['storeBalances',db.from('store_stock').select('store_id,product_id,quantity').limit(10000)]);
+  if(canUseStoreOrders() || hasPermission('orders.read')){
+    resources.push(['storeOrders',db.from('store_orders').select('*').order('created_at',{ascending:false}).limit(500)]);
+    resources.push(['storeOrderItems',db.from('store_order_items').select('*').limit(5000)]);
+  }
   resources.push(['ownPermissions',db.rpc('my_permissions').then(r=>({data:(r.data||[]).map(x=>x.permission),error:r.error}))]);
   if(isAdmin()){
     resources.push(['userPermissions',db.from('staff_permissions').select('*').limit(5000)]);
     resources.push(['staffStores',db.from('staff_stores').select('*').limit(5000)]);
   }
-  if(isManager()){
+  if(hasPermission('movements.read') || hasPermission('users.manage')){
     resources.push(['audits',db.from('audit_log').select('id,entity,entity_id,action,actor_id,created_at').order('created_at',{ascending:false}).limit(100)]);
+  }
+  if(hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('catalog.manage')){
     resources.push(['orders',db.from('avulso_orders').select('id,customer_name,customer_phone,created_at,source,event_id').order('created_at',{ascending:false}).limit(1000)]);
     resources.push(['orderItems',db.from('avulso_order_items').select('order_id,product_name,color,size,sku,ean,quantity').limit(3000)]);
+  }
+  if(hasPermission('catalog.manage')){
     resources.push(['customerAccess',db.from('customer_catalog_access').select('id,label,created_at,expires_at,revoked_at').order('created_at',{ascending:false}).limit(250)]);
+  }
+  if(hasPermission('stock.entry')||hasPermission('stock.exit')||hasPermission('stock.destinations')){
     resources.push(['stockDestinations',db.from('stock_destinations').select('id,name,description,active,created_at').order('name').limit(1000)]);
     resources.push(['stockBatches',db.from('stock_operation_batches').select('id,operation,destination_id,note,created_at').order('created_at',{ascending:false}).limit(100)]);
-    resources.push(['stockBatchLines',db.from('stock_movements')
-      .select('product_id,operation_batch_id,quantity').not('operation_batch_id','is',null)
-      .order('created_at',{ascending:false}).limit(2500)]);
+    resources.push(['stockBatchLines',db.from('stock_movements').select('product_id,operation_batch_id,quantity').not('operation_batch_id','is',null).order('created_at',{ascending:false}).limit(2500)]);
   }
   const results=await Promise.all(resources.map(async ([key,request])=>[key,await request]));
   for(const [key,result] of results) state[key]=assertOk(result)||[];
@@ -194,7 +208,11 @@ async function loadProfile(){
   state.profile=response.data;
   if(!state.profile){const r=await db.rpc('is_initial_admin_pending');state.setupPending=Boolean(r.data)&&!r.error;}
   if(!state.profile?.active){render();return;}
-  try {await loadData();}catch(err){fail(err);render();}
+  try {
+    const p=assertOk(await db.rpc('my_permissions'))||[];
+    state.ownPermissions=p.map(x=>x.permission);
+    await loadData();
+  }catch(err){fail(err);render();}
 }
 function loginScreen(message=''){
   const legacy=false;
@@ -400,6 +418,7 @@ function pageContent(){
   if(state.view==='tags')return tagsPage();
   if(state.view==='usuarios')return usersPage();
   if(state.view==='lojas')return storesPage();
+  if(state.view==='pedidos-lojas')return storeOrdersPage();
   return dashboard();
 }
 function panel(title,content,buttonMarkup=''){
