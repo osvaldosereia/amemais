@@ -837,10 +837,12 @@ async function handleSubmit(event){
   if(type==='login-password'){
     state.loading=true;
     try{
-      assertOk(await db.auth.signInWithPassword({
-        username:String(values.username||'').trim(),password:String(values.password||'')
+      const username=String(values.username||'').trim();
+      const response=await db.functions.invoke('username-login',{body:{username,password:String(values.password||'')}});
+      if(response.error||!response.data?.access_token)throw new Error('Usuário ou senha inválidos.');
+      assertOk(await db.auth.setSession({
+        access_token:response.data.access_token,refresh_token:response.data.refresh_token
       }));
-      state.loginNotice='';
       await loadProfile();
     }catch(error){fail(error);}finally{state.loading=false;}
     return;
