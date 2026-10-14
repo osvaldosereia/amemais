@@ -121,8 +121,7 @@ declare v_order public.store_orders%rowtype;
 begin
  select * into v_order from public.store_orders where id=p_order for update;
  if not found or v_order.status<>'solicitado' then raise exception 'Somente pedidos não separados podem ser cancelados';end if;
- if not (v_order.created_by=auth.uid() or
-   (app_private.has_permission('orders.cancel') and app_private.can_access_store(v_order.to_store_id)))
+ if not (app_private.has_permission('orders.cancel') and app_private.can_access_store(v_order.to_store_id))
  then raise exception 'Sem autorização para cancelar este pedido';end if;
  update public.store_orders set status='cancelado',canceled_by=auth.uid(),canceled_at=now() where id=p_order;
  insert into public.audit_log(entity,entity_id,action,actor_id)
