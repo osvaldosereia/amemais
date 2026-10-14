@@ -319,3 +319,39 @@ button, select, input, textarea { touch-action: manipulation; }
 @media(prefers-reduced-motion:reduce){
  .tax-sheet,.tax-backdrop{animation:none;transition:none}
 }
+
+
+/* Balanço rápido: cartões focados na contagem, sem campos apertados. */
+.quick-balance-intro{background:#f4f8f5;border:1px solid #dce9df;padding:16px;border-radius:12px;margin-bottom:15px}
+.quick-balance-search{display:flex;gap:10px;align-items:stretch}
+.quick-balance-search .search{min-height:49px;flex:1;min-width:0;width:100%;font-size:16px}
+.quick-balance-search .button{min-height:49px;white-space:nowrap}
+.quick-balance-intro .help{margin:12px 0 0;color:#64756b}
+.quick-count-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));align-items:stretch;gap:12px}
+.quick-count-card{background:#fff;border:1px solid #dce6df;border-radius:13px;padding:15px;box-shadow:0 1px 3px #18382b08;display:flex;flex-direction:column;gap:15px}
+.quick-count-main{display:flex;gap:13px;align-items:flex-start}
+.quick-count-main .product-photo .thumb{width:84px;height:84px;border-radius:11px;object-fit:cover}
+.quick-count-name{display:flex;flex:1;min-width:0;flex-direction:column;gap:6px}
+.quick-count-name strong{font-size:.99rem;overflow-wrap:anywhere;line-height:1.3}
+.quick-count-name small{color:#627268;overflow-wrap:anywhere}
+.quick-count-balance{padding:7px 10px;background:#eaf3ee;color:#295844;border-radius:8px;align-self:flex-start;font-size:.89rem}
+.quick-count-balance b{font-size:1.15rem}
+.quick-count-fields{display:flex;align-items:end;gap:10px;margin-top:auto}
+.quick-count-fields label{display:flex;flex:1;min-width:0;flex-direction:column;gap:6px;color:#53695d;font-size:.83rem;font-weight:650}
+.quick-count-fields input{width:100%;min-width:0;min-height:53px;border-radius:9px;border:1px solid #cbdcd0;padding:10px;font-size:18px;color:#1b392b}
+.quick-count-fields input:focus{outline:2px solid #75ab91;outline-offset:1px}
+.quick-count-fields .button{min-height:53px;padding-inline:18px}
+.bottom-nav:not(.bottom-nav-two){grid-template-columns:repeat(6,minmax(0,1fr))}
+.bottom-nav-two{grid-template-columns:repeat(2,minmax(0,1fr));}
+@media(max-width:760px){
+ .quick-count-list{display:flex;flex-direction:column;gap:10px}
+ .quick-balance-intro{padding:12px}
+ .quick-balance-search{display:grid;grid-template-columns:1fr auto}
+ .quick-balance-search .button{padding-inline:12px}
+ .quick-count-card{padding:14px 13px}
+ .quick-count-main .product-photo .thumb{width:92px;height:92px}
+ .quick-count-fields .button{min-width:110px}
+ .bottom-nav:not(.bottom-nav-two) button small{font-size:.61rem}
+ .bottom-nav:not(.bottom-nav-two) button span{font-size:1.23rem}
+}
+@media(max-width:365px){.quick-balance-search{grid-template-columns:1fr}.quick-count-fields{flex-wrap:wrap}.quick-count-fields .button{min-width:100px}.bottom-nav:not(.bottom-nav-two) button small{font-size:.58rem}}
