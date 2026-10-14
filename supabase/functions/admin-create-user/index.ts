@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
 
+// O navegador usa somente a chave PUBLICÁVEL. A chave de serviço existe apenas aqui.
 const headers = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -7,79 +8,103 @@ const headers = {
   'Content-Type': 'application/json'
 };
 const respond = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
+const validPassword = (password: string) => password.length >= 12 && password.length <= 128;
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response(null, { headers });
   if (request.method !== 'POST') return respond({ error: 'Método inválido' }, 405);
+
   try {
     const jwt = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
-    if (!jwt) return respond({ error: 'Acesso negado' }, 401);
+    if (!jwt) return respond({ error: 'Entre novamente para continuar.' }, 401);
+    const origin = request.headers.get('Origin');
+    if (!['https://osvaldosereia.github.io','https://cdsb.net.br'].includes(origin || '')) {
+      return respond({ error: 'Origem não autorizada.' }, 403);
+    }
+
     const url = Deno.env.get('SUPABASE_URL')!;
-    const publishable = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const authClient = createClient(url, publishable);
-    const { data: { user }, error: authError } = await authClient.auth.getUser(jwt);
-    if (authError || !user) return respond({ error: 'Sessão inválida' }, 401);
-    const admin = createClient(url, service, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data: operator, error: operatorError } = await admin.from('staff_profiles').select('role,active').eq('id', user.id).single();
-    if (operatorError || !operator?.active || operator.role !== 'admin') return respond({ error: 'Somente administradores' }, 403);
-    const origin = request.headers.get('Origin') || '';
-    const allowedRedirects: Record<string, string> = {
-      'https://osvaldosereia.github.io': 'https://osvaldosereia.github.io/amemais/',
-      'https://cdsb.net.br': 'https://cdsb.net.br/'
-    };
-    const redirectTo = allowedRedirects[origin];
-    if (!redirectTo) return respond({ error: 'Origem do aplicativo não autorizada.' }, 403);
+    const publicKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const authClient = createClient(url, publicKey, { auth:{ autoRefreshToken:false, persistSession:false } });
+    const { data:{ user }, error: authError } = await authClient.auth.getUser(jwt);
+    if (authError || !user) return respond({ error: 'Sua sessão expirou. Faça login novamente.' }, 401);
+
+    const admin = createClient(url, serviceKey, { auth:{ autoRefreshToken:false, persistSession:false } });
+    const { data: operator, error: operatorError } = await admin.from('staff_profiles')
+      .select('role,active').eq('id',user.id).single();
+    if (operatorError || !operator?.active || operator.role !== 'admin') {
+      return respond({ error:'Somente administradores podem cadastrar usuários e definir suas senhas.' },403);
+    }
     const payload = await request.json();
+    const action = String(payload?.action || 'create');
+    const password = String(payload?.password || '');
+    if (!validPassword(password)) {
+      return respond({ error:'A senha deve ter entre 12 e 128 caracteres.' },400);
+    }
+
+    if (action === 'set-password') {
+      const targetId = String(payload?.user_id || '');
+      if (!/^[0-9a-f-]{36}$/i.test(targetId)) return respond({error:'Usuário inválido.'},400);
+      if (targetId === user.id) {
+        return respond({error:'Altere sua própria senha pelo botão Minha senha.'},400);
+      }
+      const { data: target, error: targetError } = await admin.from('staff_profiles')
+        .select('id,active').eq('id',targetId).maybeSingle();
+      if (targetError || !target) return respond({error:'Colaborador não encontrado.'},404);
+      const {error:updateError} = await admin.auth.admin.updateUserById(targetId,{password});
+      if (updateError) return respond({error:'Não foi possível definir a senha. Confira o usuário.'},400);
+      const {error:auditError} = await admin.from('audit_log').insert({
+        entity:'staff_profiles',entity_id:targetId,action:'PASSWORD_RESET_BY_ADMIN',
+        actor_id:user.id,details:{ performed_by:'admin' }
+      });
+      if (auditError) console.error('Falha ao auditar redefinição de senha', auditError.code);
+      return respond({ success:true, action:'set-password', warning:auditError?'Senha definida, mas houve falha na auditoria.':undefined });
+    }
+
+    if (action !== 'create') return respond({error:'Operação inválida.'},400);
     const email = String(payload.email || '').trim().toLowerCase();
     const fullName = String(payload.full_name || '').trim();
     const role = String(payload.role || 'evento');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || fullName.length < 2 || fullName.length > 120 ||
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+        fullName.length < 2 || fullName.length > 120 ||
         !['admin','gerente','evento','consulta'].includes(role)) {
-      return respond({ error: 'Informe nome, email válido e função.' }, 400);
+      return respond({error:'Informe nome, email válido e função.'},400);
     }
-    // Um usuário que já tentou entrar via link não precisa ser duplicado.
-    let existingUserId: string | null = null;
-    let page = 1;
-    while (page <= 10 && !existingUserId) {
-      const { data: list, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 100 });
-      if (listError) return respond({ error: 'Não foi possível verificar contas existentes.' }, 500);
-      existingUserId = list.users.find(u => u.email?.toLowerCase() === email)?.id || null;
-      if (list.users.length < 100) break;
-      page++;
-    }
-    let userId: string;
-    let invited = false;
-    if (existingUserId) {
-      userId = existingUserId;
-    } else {
-      const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo,
-        data: { full_name: fullName }
-      });
-      if (inviteError || !created.user) {
-        return respond({ error: inviteError?.message || 'Não foi possível enviar convite.' }, 400);
+
+    const {data: duplicate,error: duplicateError} = await admin.from('staff_profiles')
+      .select('id').ilike('email',email).limit(1);
+    if (duplicateError) return respond({error:'Não foi possível verificar o cadastro.'},500);
+    if (duplicate?.length) return respond({error:'Este email já pertence a um colaborador. Use Definir senha.'},409);
+
+    // Admin SDK: conta habilitada e email considerado confirmado sem enviar link de confirmação.
+    const { data: created, error:createError } = await admin.auth.admin.createUser({
+      email, password, email_confirm:true, user_metadata:{full_name:fullName}
+    });
+    if (createError || !created.user) {
+      if (/already|exists|registered|duplicate/i.test(createError?.message || '')) {
+        return respond({error:'Este email já existe no Auth. Entre em contato com o suporte para vincular a conta.'},409);
       }
-      userId = created.user.id;
-      invited = true;
+      return respond({error:createError?.message || 'Não foi possível cadastrar o usuário.'},400);
     }
-    const { error: profileError } = await admin.from('staff_profiles').insert({
-      id: userId, full_name: fullName, email, role, active: true
+
+    const userId=created.user.id;
+    const {error: profileError} = await admin.from('staff_profiles').insert({
+      id:userId,full_name:fullName,email,role,active:true
     });
-    if (profileError) {
-      if (invited) await admin.auth.admin.deleteUser(userId);
-      return respond({ error: profileError.code === '23505' ? 'Colaborador já cadastrado.' : 'Não foi possível configurar permissões.' }, 400);
+    if(profileError){
+      await admin.auth.admin.deleteUser(userId);
+      return respond({error:'A conta não pôde receber as permissões de acesso.'},500);
     }
-    const { error: auditError } = await admin.from('audit_log').insert({
-      entity: 'staff_profiles', entity_id: userId, action: 'INVITE_USER',
-      actor_id: user.id, details: { name: fullName, email, role }
+
+    // A auditoria da inserção de perfil é feita também por trigger no PostgreSQL.
+    const {error:auditError} = await admin.from('audit_log').insert({
+      entity:'staff_profiles',entity_id:userId,action:'CREATE_USER_PASSWORD',
+      actor_id:user.id,details:{name:fullName,email,role}
     });
-    if (auditError) {
-      // O cadastro permanece válido, mas a criação não deve parecer totalmente auditada.
-      return respond({ success: true, user_id: userId, invited, warning: 'Registro de auditoria adicional não foi salvo.' }, 201);
-    }
-    return respond({ success: true, user_id: userId, invited }, 201);
-  } catch {
-    return respond({ error: 'Erro ao criar usuário' }, 500);
+    if(auditError) console.error('Falha ao auditar criação de usuário',auditError.code);
+    return respond({success:true,user_id:userId,warning:auditError?'Usuário criado, mas houve falha na auditoria adicional.':undefined},201);
+  } catch(error) {
+    console.error('Erro controlado no cadastro de usuários',error instanceof Error?error.name:'unknown');
+    return respond({error:'Não foi possível concluir a operação. Tente novamente.'},500);
   }
 });
