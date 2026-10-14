@@ -66,12 +66,42 @@ Deno.serve(async (request) => {
     const email = username.toLowerCase() + '@login.amemais.invalid';
     const fullName = String(payload.full_name || '').trim();
     const role = String(payload.role || 'evento');
+    const permissions = Array.isArray(payload.permissions) ? [...new Set(payload.permissions.map(String))] : [];
+    const storeIds = Array.isArray(payload.store_ids) ? [...new Set(payload.store_ids.map(String))] : [];
+    const validPermissionNames = new Set([
+      'products.read','products.create','products.edit','products.delete',
+      'stock.entry','stock.exit','stock.balance','stock.destinations',
+      'events.read','events.manage','events.separate','events.return','events.sell','events.close',
+      'orders.read','orders.internal','orders.assign','orders.central','orders.franchise',
+      'orders.separate','orders.receive','orders.cancel','movements.read','movements.export',
+      'categories.manage','tags.manage','catalog.manage','products.share','stores.read','stores.manage','users.manage'
+    ]);
     if (!/^[A-Za-z][A-Za-z0-9._-]{2,31}$/.test(username) ||
         fullName.length < 2 || fullName.length > 120 ||
-        !['admin','gerente','estoquista','evento','consulta'].includes(role)) {
+        !['admin','gerente','estoquista','evento','consulta'].includes(role) ||
+        permissions.length === 0 || permissions.some(p => !validPermissionNames.has(p)) ||
+        storeIds.some(id => !/^[0-9a-f-]{36}$/i.test(id))) {
       return respond({error:'Informe nome, usuário de 3 a 32 caracteres e função.'},400);
     }
 
+    if (storeIds.length) {
+      const {data: activeStores,error: storesError} = await admin.from('stores')
+        .select('id').in('id',storeIds).eq('active',true);
+      if (storesError || (activeStores?.length ?? 0) !== storeIds.length) {
+        return respond({error:'Uma ou mais lojas selecionadas não estão ativas.'},400);
+      }
+    }
+    // Compatibilidade com verificações de perfil das rotinas legadas.
+    // O acesso real é restringido pelas permissões individuais e pelos gatilhos SQL.
+    const legacyManagerActions = new Set([
+      'stock.entry','stock.exit','stock.destinations','events.manage','events.separate',
+      'orders.internal','orders.assign','products.delete','categories.manage',
+      'tags.manage','catalog.manage','products.share'
+    ]);
+    const technicalRole = role === 'admin' ? 'admin'
+      : permissions.some(p => legacyManagerActions.has(p)) ? 'gerente'
+      : permissions.some(p => ['products.create','products.edit','stock.balance'].includes(p)) ? 'estoquista'
+      : role;
     const {data: duplicate,error: duplicateError} = await admin.from('staff_profiles')
       .select('id').ilike('username',username).limit(2);
     if (duplicateError) return respond({error:'Não foi possível verificar o cadastro.'},500);
@@ -90,17 +120,31 @@ Deno.serve(async (request) => {
 
     const userId=created.user.id;
     const {error: profileError} = await admin.from('staff_profiles').insert({
-      id:userId,full_name:fullName,email,username,role,active:true
+      id:userId,full_name:fullName,email,username,role:technicalRole,active:true,permissions_customized:true
     });
     if(profileError){
       await admin.auth.admin.deleteUser(userId);
       return respond({error:'A conta não pôde receber as permissões de acesso.'},500);
     }
 
+    const {error:permissionsError} = await admin.from('staff_permissions').insert(
+      permissions.map(permission => ({user_id:userId,permission}))
+    );
+    const {error:storesAssignmentError} = permissionsError || !storeIds.length
+      ? {error:null} : await admin.from('staff_stores').insert(
+          storeIds.map(store_id => ({user_id:userId,store_id}))
+        );
+    if (permissionsError || storesAssignmentError) {
+      await admin.from('staff_permissions').delete().eq('user_id',userId);
+      await admin.from('staff_stores').delete().eq('user_id',userId);
+      await admin.from('staff_profiles').delete().eq('id',userId);
+      await admin.auth.admin.deleteUser(userId);
+      return respond({error:'Não foi possível concluir as permissões da nova conta.'},500);
+    }
     // A auditoria da inserção de perfil é feita também por trigger no PostgreSQL.
     const {error:auditError} = await admin.from('audit_log').insert({
       entity:'staff_profiles',entity_id:userId,action:'CREATE_USER_PASSWORD',
-      actor_id:user.id,details:{name:fullName,username,role}
+      actor_id:user.id,details:{name:fullName,username,role,permissions,store_ids:storeIds}
     });
     if(auditError) console.error('Falha ao auditar criação de usuário',auditError.code);
     return respond({success:true,user_id:userId,warning:auditError?'Usuário criado, mas houve falha na auditoria adicional.':undefined},201);

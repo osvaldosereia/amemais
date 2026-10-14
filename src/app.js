@@ -48,6 +48,7 @@ const niceDate = value => value ? new Intl.DateTimeFormat('pt-BR', { timeZone:'A
 const niceTime = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short', timeZone:'America/Cuiaba' }).format(new Date(value)) : '—';
 const actionNames = {entrada:'Entrada',venda_loja:'Baixa (loja)',transferencia:'Enviado ao evento',venda_evento:'Baixa antiga (evento)',devolucao:'Retornou à loja',baixa_evento:'Não retornou ao estoque',ajuste_loja:'Ajuste'};
 const roles = {admin:'Administrador',gerente:'Gerente',estoquista:'Estoquista',evento:'Equipe de evento',consulta:'Consulta'};
+const profileLabel = u => u?.role==='admin'?'Administrador':u?.permissions_customized?'Personalizado':(roles[u?.role]||u?.role||'—');
 const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
@@ -56,26 +57,56 @@ const nav = [
   {id:'balanco',label:'Balanço rápido',ico:'clipboard'},
   {id:'eventos',label:'Eventos',ico:'calendar'},
   {id:'pedidos',label:'Pedidos Avulsos',ico:'clipboard'},
+  {id:'pedidos-lojas',label:'Pedidos entre lojas',ico:'arrows'},
   {id:'movimentacoes',label:'Movimentações',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
   {id:'tags',label:'Tags',ico:'more'},
-  {id:'usuarios',label:'Usuários',ico:'users'}
+  {id:'usuarios',label:'Usuários',ico:'users'},
+  {id:'lojas',label:'Lojas',ico:'home'}
 ];
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],
-  stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],storeOrders:[],storeOrderItems:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
 let notifyTimer;
-const isManager = () => ['admin','gerente'].includes(state.profile?.role);
+const permissionDefaults = {
+ gerente:['products.read','products.create','products.edit','products.delete','stock.entry','stock.exit','stock.balance','stock.destinations','events.read','events.manage','events.separate','events.return','events.sell','events.close','orders.read','orders.internal','orders.assign','orders.central','orders.franchise','orders.separate','orders.receive','orders.cancel','movements.read','movements.export','categories.manage','tags.manage','catalog.manage','products.share','stores.read','stores.manage'],
+ estoquista:['products.read','products.create','products.edit','stock.balance','products.share','stores.read'],
+ evento:['products.read','events.read','events.return','events.sell'],
+ consulta:['products.read','events.read','orders.read','movements.read','stores.read']
+};
+const permissionCatalog=[
+ ['products.read','Consultar produtos'],['products.create','Cadastrar produtos'],['products.edit','Editar produtos'],['products.delete','Excluir produtos'],
+ ['stock.entry','Registrar entrada'],['stock.exit','Registrar saída'],['stock.balance','Realizar balanço'],['stock.destinations','Gerenciar destinos'],
+ ['events.read','Consultar eventos'],['events.manage','Administrar eventos'],['events.separate','Separar para eventos'],['events.return','Devolver de eventos'],['events.sell','Baixar no evento'],['events.close','Encerrar eventos'],
+ ['orders.read','Consultar pedidos avulsos'],['orders.internal','Criar pedidos avulsos'],['orders.assign','Vincular pedidos a eventos'],
+ ['orders.central','Pedir para loja central'],['orders.franchise','Pedir para franquia'],['orders.separate','Separar pedidos de lojas'],['orders.receive','Receber pedidos'],['orders.cancel','Cancelar pedidos'],
+ ['movements.read','Consultar movimentações'],['movements.export','Exportar relatórios'],
+ ['categories.manage','Gerenciar categorias'],['tags.manage','Gerenciar tags'],
+ ['catalog.manage','Gerenciar catálogos de clientes'],['products.share','Compartilhar produtos'],
+ ['stores.read','Consultar lojas'],['stores.manage','Administrar lojas'],['users.manage','Administrar usuários']
+];
+const hasPermission = p => Boolean(state.profile?.active) && (state.profile?.role==='admin'||state.ownPermissions.includes(p));
+const canUseStoreOrders=()=>['orders.central','orders.franchise','orders.separate','orders.receive','orders.cancel'].some(hasPermission);
+const isManager = () => hasPermission('events.manage');
 const isStockkeeper = () => state.profile?.role === 'estoquista';
-const canRegisterProducts = () => isManager() || isStockkeeper();
-const canQuickBalance = () => canRegisterProducts();
-const permittedView = v => !isStockkeeper() || ['produtos','balanco'].includes(v);
+const canRegisterProducts = () => hasPermission('products.create') || hasPermission('products.edit');
+const canQuickBalance = () => hasPermission('stock.balance');
+const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',balanco:'stock.balance',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
+const permittedView = v => {
+ if(v==='inicio')return true;
+ if(v==='pedidos-lojas')return canUseStoreOrders();
+ if(v==='pedidos')return hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
+ if(v==='usuarios')return isAdmin();
+ if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
+ if(v==='eventos')return hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.separate');
+ return Boolean(viewPermission[v]&&hasPermission(viewPermission[v]));
+};
 const isAdmin = () => state.profile?.role === 'admin';
 const isReader = () => state.profile?.role === 'consulta';
 const product = id => state.items.find(x => x.id === id);
@@ -84,8 +115,8 @@ const username = id => state.users.find(x => x.id === id)?.full_name || (id === 
 const qtyStore = id => state.balances.find(x => x.product_id === id && !x.event_id)?.quantity || 0;
 const qtyEvent = (id,eventId) => state.balances.find(x => x.product_id === id && x.event_id === eventId)?.quantity || 0;
 const memberRole = eventId => state.members.find(m => m.event_id === eventId && m.user_id === state.user?.id)?.role;
-const canSell = id => isManager() || Boolean(memberRole(id));
-const canReturn = id => isManager() || memberRole(id) === 'responsavel';
+const canSell = id => hasPermission('events.sell') && (hasPermission('events.manage') || Boolean(memberRole(id)));
+const canReturn = id => hasPermission('events.return') && (hasPermission('events.manage') || memberRole(id) === 'responsavel');
 const eventStatus = id => eventById(id)?.status;
 function dateToday() {
   return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Cuiaba',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -142,18 +173,33 @@ async function loadData(){
     ['members',db.from('event_members').select('*').limit(2000)],
     ['balances',db.from('stock_balances').select('*').limit(10000)],
     ['movements',db.from('stock_movements').select('*').order('created_at',{ascending:false}).limit(1000)],
-    ['users',db.from('staff_profiles').select('id,full_name,username,role,active,created_at').order('full_name').limit(1000)]
+    ['users',db.from('staff_profiles').select('id,full_name,username,role,active,permissions_customized,created_at').order('full_name').limit(1000)]
   ];
-  if(isManager()){
+  resources.push(['stores',db.from('stores').select('*').order('name')]);
+  resources.push(['storeBalances',db.from('store_stock').select('store_id,product_id,quantity').limit(10000)]);
+  if(canUseStoreOrders() || hasPermission('orders.read')){
+    resources.push(['storeOrders',db.from('store_orders').select('*').order('created_at',{ascending:false}).limit(500)]);
+    resources.push(['storeOrderItems',db.from('store_order_items').select('*').limit(5000)]);
+  }
+  resources.push(['ownPermissions',db.rpc('my_permissions').then(r=>({data:(r.data||[]).map(x=>x.permission),error:r.error}))]);
+  resources.push(['staffStores',db.from('staff_stores').select('*').limit(5000)]);
+  if(isAdmin()){
+    resources.push(['userPermissions',db.from('staff_permissions').select('*').limit(5000)]);
+  }
+  if(hasPermission('movements.read') || hasPermission('users.manage')){
     resources.push(['audits',db.from('audit_log').select('id,entity,entity_id,action,actor_id,created_at').order('created_at',{ascending:false}).limit(100)]);
+  }
+  if(hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('catalog.manage')){
     resources.push(['orders',db.from('avulso_orders').select('id,customer_name,customer_phone,created_at,source,event_id').order('created_at',{ascending:false}).limit(1000)]);
     resources.push(['orderItems',db.from('avulso_order_items').select('order_id,product_name,color,size,sku,ean,quantity').limit(3000)]);
+  }
+  if(hasPermission('catalog.manage')){
     resources.push(['customerAccess',db.from('customer_catalog_access').select('id,label,created_at,expires_at,revoked_at').order('created_at',{ascending:false}).limit(250)]);
+  }
+  if(hasPermission('stock.entry')||hasPermission('stock.exit')||hasPermission('stock.destinations')){
     resources.push(['stockDestinations',db.from('stock_destinations').select('id,name,description,active,created_at').order('name').limit(1000)]);
     resources.push(['stockBatches',db.from('stock_operation_batches').select('id,operation,destination_id,note,created_at').order('created_at',{ascending:false}).limit(100)]);
-    resources.push(['stockBatchLines',db.from('stock_movements')
-      .select('product_id,operation_batch_id,quantity').not('operation_batch_id','is',null)
-      .order('created_at',{ascending:false}).limit(2500)]);
+    resources.push(['stockBatchLines',db.from('stock_movements').select('product_id,operation_batch_id,quantity').not('operation_batch_id','is',null).order('created_at',{ascending:false}).limit(2500)]);
   }
   const results=await Promise.all(resources.map(async ([key,request])=>[key,await request]));
   for(const [key,result] of results) state[key]=assertOk(result)||[];
@@ -166,12 +212,16 @@ async function loadProfile(){
   const {data:{user},error}=await db.auth.getUser();
   if(error||!user){state.user=null;state.profile=null;render();return;}
   state.user=user;
-  const response=await db.from('staff_profiles').select('id,full_name,email,role,active').eq('id',user.id).maybeSingle();
+  const response=await db.from('staff_profiles').select('id,full_name,email,role,active,permissions_customized').eq('id',user.id).maybeSingle();
   if(response.error){fail(response.error);return;}
   state.profile=response.data;
   if(!state.profile){const r=await db.rpc('is_initial_admin_pending');state.setupPending=Boolean(r.data)&&!r.error;}
   if(!state.profile?.active){render();return;}
-  try {await loadData();}catch(err){fail(err);render();}
+  try {
+    const p=assertOk(await db.rpc('my_permissions'))||[];
+    state.ownPermissions=p.map(x=>x.permission);
+    await loadData();
+  }catch(err){fail(err);render();}
 }
 function loginScreen(message=''){
   const legacy=false;
@@ -263,7 +313,7 @@ function categorySelector(item=null){
     '<button type="button" class="taxonomy-trigger" data-action="taxonomy-open" data-mode="product" aria-haspopup="dialog">'+
     '<span class="taxonomy-icon">▤</span><span class="taxonomy-text"><small>Categoria selecionada</small><strong data-category-label>'+h(id?categoryFull(id):'Escolher categoria')+'</strong></span>'+
     '<span aria-hidden="true" class="taxonomy-arrow">⌄</span></button>'+
-    (isManager()?button(id?'+ Subcategoria':'+ Categoria','quick-category','','small'):'')+'</div>'+
+    (hasPermission('categories.manage')?button(id?'+ Subcategoria':'+ Categoria','quick-category','','small'):'')+'</div>'+
     '<p class="help">Busque ou navegue pela hierarquia. Criar categoria abre um cadastro separado.</p></section>';
 }
 function chosenCategory(form){return form?.querySelector('input[name="category_id"]')?.value||null;}
@@ -302,7 +352,7 @@ function refreshProductTagChoices(form){
 }
 function productTagChooser(item=null){
   return '<section class="form-section wide"><div class="section-head"><strong>Tags</strong>'+
-    (isManager()?button('+ Criar tag','quick-tag','','small'):'')+
+    (hasPermission('tags.manage')?button('+ Criar tag','quick-tag','','small'):'')+
     '</div><p class="help">Primeiro, as tags já utilizadas em produtos da mesma categoria. As demais continuam disponíveis.</p>'+
     '<div class="tag-choices" data-tag-choices>'+tagChipsHTML(item?.tags||[],item?.category_id||null)+'</div></section>';
 }
@@ -347,21 +397,20 @@ function render(){
   if(!state.user){loginScreen();return;}
   if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
   if(!state.profile.active){pendingAccessScreen();return;}
-  if(isStockkeeper()&&!permittedView(state.view))state.view='balanco';
-  if((state.view==='usuarios'&&!isAdmin())||(['categorias','tags','pedidos','entrada','saida'].includes(state.view)&&!isManager()))state.view='inicio';
+  if(!permittedView(state.view))state.view='inicio';
   const mark='<img class="ame-brand-logo" src="./ame-plus-logo.svg" alt="Ame+ Store" width="132" height="70">';
-  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='usuarios'||isAdmin())&&(!['categorias','tags','pedidos','entrada','saida'].includes(x.id)||isManager()))
+  const menu=nav.filter(x=>permittedView(x.id))
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'">'+
       uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('');
   const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
   root.innerHTML='<div class="app-shell mobile-c-app"><aside class="sidebar">'+desktopIdentity+
     '<nav class="nav" aria-label="Menu principal">'+menu+'</nav>'+
-    '<div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+
+    '<div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(profileLabel(state.profile))+
     '<br><button class="plain" data-action="my-password">Minha senha</button>'+
     '<br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
     '<div class="main"><header class="topbar"><div class="topbar-brand">'+mark+
     '<span class="ame-header-title">ESTOQUE</span></div>'+
-    '<div class="topbar-right"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span>'+
+    '<div class="topbar-right"><span class="userpill">'+h(state.profile.full_name)+' · '+h(profileLabel(state.profile))+'</span>'+
     '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-expanded="false" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>';
   hydrateImages();
@@ -377,6 +426,8 @@ function pageContent(){
   if(state.view==='categorias')return categoriesPage();
   if(state.view==='tags')return tagsPage();
   if(state.view==='usuarios')return usersPage();
+  if(state.view==='lojas')return storesPage();
+  if(state.view==='pedidos-lojas')return storeOrdersPage();
   return dashboard();
 }
 function panel(title,content,buttonMarkup=''){
@@ -426,7 +477,7 @@ function dashboard(){
     '<div class="c-dashboard-actions">'+
       (canRegisterProducts()?'<button type="button" class="c-action-primary" data-action="product-new">'+
         uiIcon('plus',20)+' Novo produto</button>':'')+
-      (isManager()?'<button type="button" class="c-action-outline" data-action="view" data-view="entrada">'+
+      (hasPermission('stock.entry')?'<button type="button" class="c-action-outline" data-action="view" data-view="entrada">'+
         uiIcon('arrow-down-to-line',20)+' Entrada</button>'+
         '<button type="button" class="c-action-outline" data-action="view" data-view="saida">'+
         uiIcon('arrow-up-from-line',20)+' Saída</button>':'')+
@@ -463,9 +514,9 @@ function mobileProductCard(p){
     '<small>'+h([p.gondola,p.prateleira].filter(Boolean).join(' · '))+'</small>'+
     '<div class="product-tags">'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</div>'+
     '<div class="mobile-product-actions"><span class="qty">Loja: '+qtyStore(p.id)+'</span>'+
-    (isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
-    (canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+
-    (isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></div></article>';
+    ((hasPermission('stock.entry')||hasPermission('stock.exit'))?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
+    (hasPermission('products.edit')?button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+
+    (hasPermission('products.delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></div></article>';
 }
 
 function categoryFull(id){
@@ -487,7 +538,7 @@ function productModelManager(modelId){
       '<small>SKU: '+h(p.sku||'—')+' · EAN: '+h(p.ean||'—')+'</small>'+
       (!p.active?'<small>Variação inativa</small>':'')+'</div>'+
     '<div class="actions">'+button('Editar','product-edit','data-id="'+h(p.id)+'"','small')+
-      (isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
+      (hasPermission('products.delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
     '</div></div>').join('');
   overlay.innerHTML='<section class="modal" role="dialog" aria-modal="true" aria-label="Editar '+h(model.name)+'">'+
     '<div class="modalhead"><h2>Editar · '+h(model.name)+'</h2>'+
@@ -520,7 +571,7 @@ function productsPage(){
   const pageSize=20,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=groups.slice(state.page*pageSize,(state.page+1)*pageSize);
-  const add=canRegisterProducts()?button('+ Novo produto','product-new','','primary'):'';
+  const add=hasPermission('products.create')?button('+ Novo produto','product-new','','primary'):'';
   return '<header class="pagehead products-pagehead"><div><h1>Produtos</h1>'+
     '<p>Catálogo e estoque</p></div><div class="actions">'+add+'</div></header>'+
     '<section class="panel products-panel"><div class="product-toolbar-v3">'+
@@ -576,7 +627,7 @@ function quickBalancePage(){
 }
 
 function eventsPage(){
-  const add=isManager()?button('+ Criar evento','event-new','','primary'):'';
+  const add=hasPermission('events.manage')?button('+ Criar evento','event-new','','primary'):'';
   return tabHead('Eventos','Controle de mercadorias enviadas, devolvidas e não retornadas.',add)+
     '<div class="eventgrid">'+state.events.map(e=>{
       const remaining=state.balances.filter(b=>b.event_id===e.id).reduce((s,b)=>s+b.quantity,0);
@@ -604,10 +655,10 @@ function eventDetails(){
   const unreturned=entries.filter(m=>['baixa_evento','venda_evento'].includes(m.action)).reduce((n,m)=>n+m.quantity,0);
   const pending=state.balances.filter(b=>b.event_id===e.id).reduce((n,b)=>n+b.quantity,0);
   const canModify=e.status==='ativo';
-  const actions=(isManager()&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
-    (isManager()&&canModify?button('Separar produtos para o evento','event-transfer','','primary'):'')+
+  const actions=(hasPermission('events.manage')&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
+    (hasPermission('events.separate')&&canModify?button('Separar produtos para o evento','event-transfer','','primary'):'')+
     (canModify&&canReturn(e.id)?button('Devolução rápida por EAN','event-return','','primary'):'')+
-    (canModify&&canReturn(e.id)?button('Encerrar evento','event-close','data-id="'+h(e.id)+'"'):'');
+    (canModify&&hasPermission('events.close')?button('Encerrar evento','event-close','data-id="'+h(e.id)+'"'):'');
   const history=eventHistoryCards({
     movements:entries,products:state.items,models:state.apparelModels,
     balances:state.balances.filter(b=>b.event_id===e.id),
@@ -625,9 +676,9 @@ function eventDetails(){
       '<div class="inline" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid #edf1ee">'+
       '<div><strong>'+h(username(m.user_id))+'</strong> <span class="pill">'+
       (m.role==='responsavel'?'Responsável':'Operador')+'</span></div>'+
-      (isManager()?button('Remover','member-remove','data-user="'+h(m.user_id)+'" data-event="'+h(e.id)+'"','small'):'')+
+      (hasPermission('events.manage')?button('Remover','member-remove','data-user="'+h(m.user_id)+'" data-event="'+h(e.id)+'"','small'):'')+
       '</div>').join(''):'<p class="muted">Nenhum usuário associado.</p>')+
-      (isManager()&&e.status!=='encerrado'?'<div style="margin-top:13px">'+
+      (hasPermission('events.manage')&&e.status!=='encerrado'?'<div style="margin-top:13px">'+
         button('+ Adicionar usuário','member-add','data-id="'+h(e.id)+'"','small')+'</div>':'')+'</div>');
 }
 function movementTable(rows){
@@ -647,7 +698,7 @@ function movementsPage(){
     '<select id="event-filter" class="filter" style="max-width:210px" aria-label="Filtrar por evento">'+eventOptions().map(([v,t])=>'<option value="'+h(v)+'" '+(v===state.eventFilter?'selected':'')+'>'+h(t)+'</option>').join('')+'</select>'+
     '<select id="movement-filter" class="filter" style="max-width:185px" aria-label="Filtrar operação">'+[['','Todas as operações'],...Object.entries(actionNames)].map(([v,t])=>'<option value="'+h(v)+'" '+(v===state.movementFilter?'selected':'')+'>'+h(t)+'</option>').join('')+'</select></div>'+
     movementTable(list)+'<div class="panelbody"><small>Mostrando até 1.000 lançamentos recentes. O banco preserva todo o histórico.</small></div></section>'+
-    (isManager()?panel('Auditoria de cadastros','<div class="panelbody"><p class="muted">Últimas alterações de produtos, categorias, eventos, acessos e responsáveis.</p>'+
+    (hasPermission('movements.read')?panel('Auditoria de cadastros','<div class="panelbody"><p class="muted">Últimas alterações de produtos, categorias, eventos, acessos e responsáveis.</p>'+
       '<div class="tablewrap"><table class="table"><thead><tr><th>Data</th><th>Área</th><th>Ação</th><th>Autor</th></tr></thead><tbody>'+
       state.audits.map(a=>'<tr><td>'+niceTime(a.created_at)+'</td><td>'+h(a.entity)+'</td><td>'+h(a.action)+'</td><td>'+h(username(a.actor_id))+'</td></tr>').join('')+'</tbody></table></div></div>'):'');
 }
@@ -691,7 +742,7 @@ function tagsPage(){
 }
 
 function ordersPage(){
-  if(!isManager())return '<div class="muteblock">Sem permissão.</div>';
+  if(!hasPermission('orders.read')&&!hasPermission('orders.internal'))return '<div class="muteblock">Sem permissão.</div>';
   const activeAccess=state.customerAccess.filter(a=>!a.revoked_at&&new Date(a.expires_at)>new Date()).length;
   const links='<div class="avulso-access-list">'+(state.customerAccess.length?
     state.customerAccess.map(access=>{
@@ -699,7 +750,7 @@ function ordersPage(){
       return '<div class="avulso-access-row"><div><strong>'+h(access.label)+'</strong>'+
         '<small>Criado: '+h(niceTime(access.created_at))+' · Válido até '+h(niceTime(access.expires_at))+'</small></div>'+
         '<span class="pill '+(valid?'ativo':'encerrado')+'">'+(valid?'Ativo':'Encerrado')+'</span>'+
-        (valid?button('Revogar link','customer-link-revoke','data-id="'+h(access.id)+'"','small danger'):'')+
+        (valid&&hasPermission('catalog.manage')?button('Revogar link','customer-link-revoke','data-id="'+h(access.id)+'"','small danger'):'')+
         '</div>';
     }).join(''):'<p class="muted">Nenhum acesso para clientes criado ainda.</p>')+'</div>';
   const orders=ordersPageMarkup({
@@ -707,8 +758,8 @@ function ordersPage(){
     photoButton,button,niceTime
   });
   return tabHead('Pedidos Avulsos','Pedidos são independentes do estoque e podem ser vinculados a um evento depois.',
-    button('+ Criar pedido','order-new','','primary')+
-    button('+ Acesso para cliente','customer-link-new','','primary'))+
+    (hasPermission('orders.internal')?button('+ Criar pedido','order-new','','primary'):'')+
+    (hasPermission('catalog.manage')?button('+ Acesso para cliente','customer-link-new','','primary'):''))+
     '<div class="orders-overview"><div><strong>'+state.orders.length+'</strong><span>Pedidos registrados</span></div>'+
     '<div><strong>'+state.orders.filter(o=>!o.event_id).length+'</strong><span>Sem evento</span></div>'+
     '<div><strong>'+activeAccess+'</strong><span>Acessos ativos de clientes</span></div></div>'+
@@ -744,8 +795,8 @@ function orderEventModal(orderId){
 function usersPage(){
   return tabHead('Usuários','Cada pessoa utiliza sua própria senha e permissões.',button('+ Novo usuário','user-new','','primary'))+
     panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Usuário</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
-    state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.username)+'</td><td>'+h(roles[u.role]||u.role)+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
-      (u.id!==state.user.id?'<div class="inline">'+button('Função','user-role','data-id="'+h(u.id)+'"','small')+
+    state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.username)+'</td><td>'+h(profileLabel(u))+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
+      (u.id!==state.user.id?'<div class="inline">'+button('Funções e lojas','user-role','data-id="'+h(u.id)+'"','small')+
       button('Definir senha','set-user-password','data-id="'+h(u.id)+'"','small')+
       button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+'</div>':
       button('Minha senha','my-password','','small'))+'</td></tr>').join('')+'</tbody></table></div>')+
@@ -878,7 +929,7 @@ function shareProductModal(title,shareUrl){
 }
 
 function renderStockOperationPage(){
-  if(!isManager())return '<div class="muteblock">Sem permissão.</div>';
+  if(!hasPermission(state.view==='entrada'?'stock.entry':'stock.exit'))return '<div class="muteblock">Sem permissão.</div>';
   const kind=state.view;
   return stockOperationPage({
     kind,query:state.stockQuery[kind],cart:state.stockCarts[kind],
@@ -926,7 +977,7 @@ function updateStockOperationBasket(redraw=true,clearError=true){
   if(error&&clearError)error.hidden=true;
 }
 function addStockOperationItem(id){
-  if(!isManager()||!['entrada','saida'].includes(state.view))return;
+  if(!hasPermission(state.view==='entrada'?'stock.entry':'stock.exit')||!['entrada','saida'].includes(state.view))return;
   const p=product(id);if(!p?.active)return toast('Produto não encontrado ou inativo.',true);
   const cart=state.stockCarts[state.view],previous=cart.get(id);
   if(previous){
@@ -959,7 +1010,7 @@ function handleOperationScanCode(code){
   }
 }
 async function saveStockOperation(form){
-  if(!isManager()||state.loading)return;
+  if(!hasPermission(state.view==='entrada'?'stock.entry':'stock.exit')||state.loading)return;
   const kind=state.view,cart=state.stockCarts[kind],data=new FormData(form);
   const dest=String(data.get('destination_id')||'').trim();
   if(kind==='saida'&&!state.stockDestinations.some(d=>d.active&&d.id===dest))
@@ -1030,17 +1081,17 @@ async function saveStockOperation(form){
 }
 
 function stockModal(id){
-  if(!isManager())return;
+  if(!(hasPermission('stock.entry')||hasPermission('stock.exit')))return;
   const p=product(id);if(!p)return;
   formModal('Movimentar · '+p.name,
     '<div class="note">Saldo atual na loja: <strong>'+qtyStore(id)+' unidade(s)</strong></div>'+
     '<p class="help">Entradas e saídas têm processos independentes, com histórico e destino obrigatório nas saídas.</p>'+
-    selectField('O que deseja fazer?','operation_kind',[['entrada','Entrada · receber mercadoria'],['saida','Saída · encaminhar a um destino']]),
+    selectField('O que deseja fazer?','operation_kind',[...(hasPermission('stock.entry')?[['entrada','Entrada · receber mercadoria']]:[]),...(hasPermission('stock.exit')?[['saida','Saída · encaminhar a um destino']]:[])]),
     'stock-choose-direction','Continuar');
   document.querySelector('.modalback form[data-form="stock-choose-direction"]').dataset.id=id;
 }
 function eventModal(){
-  if(!isManager())return;
+  if(!hasPermission('events.manage'))return;
   formModal('Criar evento','<div class="formgrid">'+field('Nome do evento','name','text','','required maxlength="150"')+
     field('Data de início','starts_at','date',dateToday(),'required')+
     field('Data de término (opcional)','ends_at','date')+
@@ -1051,7 +1102,7 @@ function eventMove(action){
   const eid=state.activeEvent;
   if(eventStatus(eid)!=='ativo')return;
   const labels={transferencia:'Transferir produtos',venda_evento:'Registrar venda',devolucao:'Devolver produtos'};
-  if(action==='transferencia'&&!isManager() || action==='venda_evento'&&!canSell(eid) ||
+  if(action==='transferencia'&&!hasPermission('events.separate') || action==='venda_evento'&&!canSell(eid) ||
     action==='devolucao'&&!canReturn(eid))return;
   const opts=action==='transferencia'?productOptions(true):productOptions(true,eid);
   if(opts.length===1){toast('Não há produtos disponíveis para essa operação.',true);return;}
@@ -1064,7 +1115,7 @@ function eventMove(action){
   const form=document.querySelector('.modal form');form.dataset.event=eid;form.dataset.movement=action;
 }
 function memberModal(eid){
-  if(!isManager())return;
+  if(!hasPermission('events.manage'))return;
   const occupied=new Set(state.members.filter(m=>m.event_id===eid).map(m=>m.user_id));
   const users=state.users.filter(u=>u.active&&!occupied.has(u.id));
   if(!users.length){toast('Nenhum usuário ativo disponível. Cadastre usuários primeiro.',true);return;}
@@ -1076,7 +1127,7 @@ function memberModal(eid){
 }
 
 function categoryModal(parentId=null,fromProduct=false,item=null){
-  if(!isManager())return;
+  if(!hasPermission('categories.manage'))return;
   const editing=Boolean(item),hasChildren=editing&&state.categories.some(c=>c.parent_id===item.id);
   const parent=editing?(item.parent_id||''):(parentId||'');
   const parentCat=parent?state.categories.find(c=>c.id===parent):null;
@@ -1101,7 +1152,7 @@ function categoryModal(parentId=null,fromProduct=false,item=null){
 }
 
 function tagModal(fromProduct=false){
-  if(!isManager())return;
+  if(!hasPermission('tags.manage'))return;
   formModal('Criar tag',
     '<div class="formgrid">'+field('Nome da tag','name','text','','required minlength="2" maxlength="40"')+'</div>'+
     '<p class="help" style="margin-top:12px">A tag ficará disponível para todos os produtos.</p>',
@@ -1122,15 +1173,87 @@ async function saveTaxonomyFromProduct(form,table,data,success){
   }catch(e){fail(e);}finally{state.loading=false;}
 }
 
+function permissionFields(userId){
+ const explicit=state.userPermissions.filter(x=>x.user_id===userId).map(x=>x.permission);
+ const chosen=explicit.length?explicit:(state.users.find(x=>x.id===userId)?.role==='admin'?permissionCatalog.map(([key])=>key):(permissionDefaults[state.users.find(x=>x.id===userId)?.role||'evento']||[]));
+ return '<section class="form-section wide"><strong>Autorizações individuais</strong><p class="help">Marque cada operação permitida. As permissões são cumulativas.</p>'+
+ permissionCatalog.map(([key,label])=>'<label class="field"><span><input type="checkbox" name="perm" value="'+h(key)+'" '+(chosen.includes(key)?'checked':'')+'> '+h(label)+'</span></label>').join('')+
+ '</section><section class="form-section wide"><strong>Lojas autorizadas</strong><p class="help">Sem seleção, o acesso a estoques de outras lojas não é liberado.</p>'+
+ state.stores.filter(x=>x.active).map(x=>'<label class="field"><span><input type="checkbox" name="store" value="'+h(x.id)+'" '+((state.staffStores.some(ss=>ss.user_id===userId&&ss.store_id===x.id)||(!userId&&x.is_primary))?'checked':'')+'> '+h(x.name)+'</span></label>').join('')+'</section>';
+}
 function userRoleModal(id){
-  if(!isAdmin() || id===state.user?.id)return;
-  const target=state.users.find(x=>x.id===id);
-  if(!target)return;
-  formModal('Função · '+target.full_name,
-    '<div class="formgrid">'+selectField('Permissão de acesso','role',Object.entries(roles),target.role)+'</div>'+
-    '<div class="note">Mudanças de função ficam registradas na auditoria.</div>',
-    'user-role','Atualizar função');
-  document.querySelector('.modal form').dataset.id=id;
+ if(!isAdmin()||id===state.user?.id)return;
+ const target=state.users.find(x=>x.id===id);if(!target)return;
+ formModal('Autorizações · '+target.full_name,
+ '<div class="formgrid">'+selectField('Perfil de referência','role',Object.entries(roles),target.role)+permissionFields(id)+'</div>',
+ 'user-permissions','Salvar autorizações');
+ document.querySelector('.modal form').dataset.id=id;
+}
+function storesPage(){
+ const manage=hasPermission('stores.manage');
+ return tabHead('Lojas','Unidades cadastradas e seus saldos de estoque.',manage?button('+ Nova loja','store-new','','primary'):'')+
+ panel('Unidades',state.stores.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Status</th><th></th></tr></thead><tbody>'+
+ state.stores.map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.kind)+(x.is_primary?' · Principal':'')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.</td><td>'+
+ (manage?button('Editar','store-edit','data-id="'+h(x.id)+'"','small')+(x.is_primary?'':button(x.active?'Desativar':'Ativar','store-toggle','data-id="'+h(x.id)+'"','small')+button('Excluir','store-delete','data-id="'+h(x.id)+'"','small')):'')+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhuma loja cadastrada.</p>')+
+ '<div class="note">A exclusão é bloqueada quando existem vínculos ou saldos. Estoques individuais serão ativados somente após a migração das operações.</div>';
+}
+function assignedStore(storeId){
+ return state.profile?.role==='admin'||state.staffStores.some(x=>x.user_id===state.user?.id&&x.store_id===storeId);
+}
+function storeOrdersPage(){
+ const canRequest=hasPermission('orders.central')||hasPermission('orders.franchise');
+ const create=canRequest?button('+ Solicitar mercadorias','store-order-new','','primary'):'';
+ const status={solicitado:'Aguardando separação',separado:'Em transporte · receber',recebido:'Recebido',cancelado:'Cancelado'};
+ const rows=state.storeOrders.map(o=>{
+  const from=state.stores.find(x=>x.id===o.from_store_id);
+  const to=state.stores.find(x=>x.id===o.to_store_id);
+  const lines=state.storeOrderItems.filter(x=>x.order_id===o.id);
+  const products=lines.map(x=>h(product(x.product_id)?.name||'Produto')+' · '+x.quantity+' un.').join(' | ');
+  const actions=(o.status==='solicitado'&&hasPermission('orders.separate')&&assignedStore(o.from_store_id)?
+    button('Confirmar separação','store-order-separate','data-id="'+h(o.id)+'"','small primary'):'')+
+    (o.status==='separado'&&hasPermission('orders.receive')&&assignedStore(o.to_store_id)?
+    button('Confirmar recebimento','store-order-receive','data-id="'+h(o.id)+'"','small primary'):'')+
+    (o.status==='solicitado'&&(o.created_by===state.user?.id||(hasPermission('orders.cancel')&&assignedStore(o.to_store_id)))?
+    button('Cancelar','store-order-cancel','data-id="'+h(o.id)+'"','small'):'');
+  return '<article class="store-order-card"><header><strong>'+h(from?.name||'Origem')+' → '+h(to?.name||'Destino')+
+    '</strong><span class="pill '+(o.status==='recebido'?'ativo':'')+'">'+h(status[o.status]||o.status)+'</span></header>'+
+    '<small>'+h(niceTime(o.created_at))+'</small><p>'+products+'</p><div class="inline">'+actions+'</div></article>';
+ });
+ return tabHead('Pedidos entre lojas','Solicite, separe e confirme a chegada das mercadorias.',create)+
+  panel('Solicitações',rows.length?'<div class="store-order-list">'+rows.join('')+'</div>':'<div class="panelbody"><p class="muted">Ainda não há pedidos entre lojas.</p></div>')+
+  '<div class="note">A quantidade sai da origem quando a separação é confirmada e entra no destino somente após o recebimento.</div>';
+}
+function storeOrderModal(){
+ const main=state.stores.find(x=>x.is_primary&&x.active);
+ if(!main)return toast('Cadastre a loja principal antes de solicitar.',true);
+ const targets=state.stores.filter(x=>x.active&&!x.is_primary&&assignedStore(x.id));
+ const types=[...(hasPermission('orders.central')?[['central','Pedido à loja central']]:[]),
+  ...(hasPermission('orders.franchise')?[['franquia','Pedido para franquia']]:[])];
+ if(!types.length||!targets.length)return toast('Associe o funcionário à loja de destino para solicitar.',true);
+ const list=state.items.filter(x=>x.active).slice(0,1500);
+ const rows=list.map(p=>'<div class="store-order-product" data-store-row data-filter="'+h([p.name,p.ean,p.sku,p.apparel_color,p.apparel_size].join(' ').toLocaleLowerCase('pt-BR'))+'">'+
+  '<div><strong>'+h(p.name)+'</strong><small>'+h([p.apparel_color,p.apparel_size,p.sku,p.ean].filter(Boolean).join(' · '))+
+  ' · Central: '+qtyStore(p.id)+' un.</small></div>'+
+  '<input type="number" inputmode="numeric" min="0" max="1000000" step="1" value="0" data-store-order-qty data-id="'+h(p.id)+'" aria-label="Quantidade de '+h(p.name)+'"></div>').join('');
+ formModal('Solicitar mercadorias','<div class="formgrid">'+
+  selectField('Tipo de pedido','request_type',types)+
+  selectField('Loja solicitante','to_store_id',targets.map(x=>[x.id,x.name]))+
+  '<div class="field wide"><span>Pesquisar por nome, SKU ou EAN</span><input type="search" data-store-order-search placeholder="Buscar mercadorias…"></div>'+
+  '<section class="wide store-order-products">'+rows+'</section>'+
+  textareaField('Observação','note')+'</div><div class="note">Somente produtos com quantidade maior que zero serão incluídos.</div>',
+  'store-order-create','Criar solicitação');
+}
+function storeModal(item=null){
+ if(!hasPermission('stores.manage'))return;
+ formModal(item?'Editar loja':'Nova loja','<div class="formgrid">'+
+ field('Código','code','text',item?.code||'','required maxlength="30"')+
+ field('Nome','name','text',item?.name||'','required maxlength="120"')+
+ selectField('Tipo','kind',[['central','Loja central'],['filial','Filial'],['franquia','Franquia']],item?.kind||'filial')+
+ field('CNPJ','document','text',item?.document||'')+
+ field('Telefone','phone','text',item?.phone||'')+
+ field('Responsável','manager_name','text',item?.manager_name||'')+
+ textareaField('Endereço','address',item?.address||'')+'</div>','store-save','Salvar loja');
+ document.querySelector('.modal form').dataset.id=item?.id||'';
 }
 function userModal(){
   if(!isAdmin())return;
@@ -1138,6 +1261,7 @@ function userModal(){
     field('Nome completo','full_name','text','','required minlength="2" maxlength="120" autocomplete="name"')+
     field('Usuário','username','text','','required minlength="3" maxlength="32" autocapitalize="none"')+
     selectField('Função','role',Object.entries(roles),'evento')+
+    permissionFields('')+
     field('Senha inicial','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"',
       'Mínimo de 6 caracteres. A senha não será enviada por email.')+
     field('Confirmar senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
@@ -1232,7 +1356,7 @@ function closeMobileNavigation(restoreFocus=true){
 }
 function switchView(view) {
   if(view==='roupas')view='produtos';
-  if(!permittedView(view)||(['entrada','saida'].includes(view)&&!isManager()))return;
+  if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;
   if(view!=='eventos'){state.activeEvent=null;state.eventWorkflow=null;state.eventReturnQuery='';}
   render();window.scrollTo(0,0);
@@ -1272,7 +1396,7 @@ async function handleClick(event){
         }
         return;
       }
-      if((state.view==='entrada'||state.view==='saida')&&isManager()){
+      if((state.view==='entrada'||state.view==='saida')&&permittedView(state.view)){
         handleOperationScanCode(code);return;
       }
       if(state.view==='balanco'){
@@ -1310,9 +1434,7 @@ async function handleClick(event){
     closeMobileNavigation(false);
     const overlay=document.createElement('div');
     overlay.className='mobile-more-overlay';
-    const options=nav.filter(item=>permittedView(item.id)&&
-      (item.id!=='usuarios'||isAdmin())&&
-      (!['categorias','tags','pedidos','entrada','saida'].includes(item.id)||isManager()));
+    const options=nav.filter(item=>permittedView(item.id));
     const controls=options.map(item=>'<button type="button" class="'+(state.view===item.id?'active':'')+
       '" data-action="view" data-view="'+h(item.id)+'"'+(state.view===item.id?' aria-current="page"':'')+'>'+
       uiIcon(item.ico,21)+'<span>'+h(item.label)+'</span>'+
@@ -1518,7 +1640,7 @@ async function handleClick(event){
   }
   if(action==='size-scan')return scanInto('input[name="size_ean"]',target.closest('[data-size-variant]'));
   if(action==='product-delete'){
-    if(!isManager())return;
+    if(!hasPermission('products.delete'))return;
     const item=product(id);if(!item)return;
     if(!window.confirm('Excluir o produto "'+item.name+'"?\nSe existir histórico, ele será desativado para preservar as movimentações. O estoque deve estar zerado.'))return;
     return exec(async()=>{
@@ -1561,7 +1683,7 @@ async function handleClick(event){
     return;
   }
   if(action==='stock-create-product'){
-    if(state.view!=='entrada'||!isManager())return;
+    if(state.view!=='entrada'||!hasPermission('products.create'))return;
     const ean=state.stockQuery.entrada.trim();
     productModal();
     if(/^[0-9]{8,14}$/.test(ean)){
@@ -1576,7 +1698,7 @@ async function handleClick(event){
     return;
   }
   if(action==='stock-destination-new'||action==='stock-destination-edit'){
-    if(!isManager())return;
+    if(!hasPermission('stock.destinations'))return;
     const dest=action==='stock-destination-edit'?state.stockDestinations.find(d=>d.id===id):null;
     formModal(dest?'Editar destino':'Novo destino',
       '<div class="formgrid">'+field('Nome do destino *','name','text',dest?.name||'','required minlength="2" maxlength="90"')+
@@ -1589,7 +1711,7 @@ async function handleClick(event){
   }
   if(action==='stock-destination-disable'){
     const dest=state.stockDestinations.find(d=>d.id===id);
-    if(!isManager()||!dest||!window.confirm('Desativar o destino "'+dest.name+'"? Os históricos de saída serão preservados.'))return;
+    if(!hasPermission('stock.destinations')||!dest||!window.confirm('Desativar o destino "'+dest.name+'"? Os históricos de saída serão preservados.'))return;
     if(state.stockSelectedDestination===id)state.stockSelectedDestination='';
     return exec(async()=>assertOk(await db.rpc('deactivate_stock_destination',{p_id:id})),'Destino desativado; histórico preservado.');
   }
@@ -1598,7 +1720,7 @@ async function handleClick(event){
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
   if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
   if(action==='event-transfer'){
-    if(!isManager()||eventStatus(state.activeEvent)!=='ativo')return;
+    if(!hasPermission('events.separate')||eventStatus(state.activeEvent)!=='ativo')return;
     const eligible=state.items.filter(p=>p.active&&qtyStore(p.id)>0);
     if(!eligible.length)return toast('Nenhum produto com saldo na loja.',true);
     formModal('Separação para o evento',eventBatchContent(eligible,state.apparelModels,qtyStore,photoButton),
@@ -1637,7 +1759,7 @@ async function handleClick(event){
   if(action==='category-edit')return categoryModal(null,false,state.categories.find(c=>c.id===id));
   if(action==='category-delete'){
     const cat=state.categories.find(c=>c.id===id);
-    if(!isManager()||!cat)return;
+    if(!hasPermission('categories.manage')||!cat)return;
     const categoryIds=new Set(state.categories.filter(c=>
       c.id===id||categoryChain(c.id).some(ancestor=>ancestor.id===id)
     ).map(c=>c.id));
@@ -1662,7 +1784,7 @@ async function handleClick(event){
   if(action==='tag-new')return tagModal();
   if(action==='tag-delete'){
     const tag=state.tags.find(t=>t.id===id);
-    if(!isManager()||!tag||!window.confirm('Excluir a tag "'+tag.name+'"?\nEla também será desvinculada de todos os produtos, sem afetar estoques.'))return;
+    if(!hasPermission('tags.manage')||!tag||!window.confirm('Excluir a tag "'+tag.name+'"?\nEla também será desvinculada de todos os produtos, sem afetar estoques.'))return;
     return exec(async()=>assertOk(await db.rpc('remove_tag_safely',{p_tag_id:id})),'Tag excluída e removida dos produtos.');
   }
   if(action==='quick-category')return categoryModal(chosenCategory(target.closest('form')),true);
@@ -1672,24 +1794,24 @@ async function handleClick(event){
     form?.querySelector(action==='take-photo'?'input[name="camera_file"]':'input[name="gallery_file"]')?.click();return;
   }
   if(action==='order-new'){
-    if(!isManager())return;
+    if(!hasPermission('orders.internal'))return;
     formModal('Criar Pedido Avulso',createInternalOrderForm({
       products:state.items,models:state.apparelModels,events:state.events,groupInventory
     }),'order-create','Salvar pedido');
     return;
   }
   if(action==='order-assign-event'){
-    if(!isManager())return;return orderEventModal(id);
+    if(!hasPermission('orders.assign'))return;return orderEventModal(id);
   }
   if(action==='customer-link-new'){
-    if(!isManager())return;
+    if(!hasPermission('catalog.manage'))return;
     return formModal('Criar acesso para cliente',
       '<div class="formgrid">'+field('Identificação do acesso','label','text','','required minlength="2" maxlength="100" placeholder="Ex.: Cliente Maria ou Feira de Outubro"')+'</div>'+
       '<p class="help">Gera um link de catálogo, válido por 30 dias, sem acesso ao estoque nem ao sistema administrativo. O cliente informa nome e telefone ao fazer o pedido.</p>',
       'customer-link-create','Gerar acesso');
   }
   if(action==='customer-link-revoke'){
-    if(!isManager()||!window.confirm('Revogar este acesso? O cliente não conseguirá abrir o catálogo nem enviar novos pedidos por esse link.'))return;
+    if(!hasPermission('catalog.manage')||!window.confirm('Revogar este acesso? O cliente não conseguirá abrir o catálogo nem enviar novos pedidos por esse link.'))return;
     return exec(async()=>assertOk(await db.rpc('revoke_customer_catalog_access',{p_id:id})),'Acesso revogado.');
   }
   if(action==='customer-link-close'){
@@ -1706,6 +1828,28 @@ async function handleClick(event){
     const wa='https://wa.me/?text='+encodeURIComponent('Ame+ Store — acesso ao catálogo para montar pedidos:\n'+url+
       '\nEste catálogo não informa saldos de estoque.');
     const w=window.open(wa,'_blank','noopener,noreferrer');if(!w)window.location.assign(wa);return;
+  }
+  if(action==='store-order-new')return storeOrderModal();
+  if(['store-order-separate','store-order-receive','store-order-cancel'].includes(action)){
+    const order=state.storeOrders.find(x=>x.id===id);if(!order)return;
+    const actionMap={'store-order-separate':['separate_store_order','Separação concluída.'],
+      'store-order-receive':['receive_store_order','Recebimento confirmado.'],
+      'store-order-cancel':['cancel_store_order','Pedido cancelado.']};
+    if(!window.confirm(action==='store-order-separate'?'Confirmar retirada das unidades do estoque de origem?':
+      action==='store-order-receive'?'Confirmar que todas as unidades chegaram?':'Cancelar este pedido ainda não separado?'))return;
+    const [rpc,msg]=actionMap[action];
+    await exec(async()=>assertOk(await db.rpc(rpc,{p_order:id})),msg);return;
+  }
+  if(action==='store-new')return storeModal();
+  if(action==='store-edit')return storeModal(state.stores.find(x=>x.id===id));
+  if(action==='store-toggle'){
+    if(!hasPermission('stores.manage'))return;
+    const store=state.stores.find(x=>x.id===id);if(!store)return;
+    await exec(async()=>assertOk(await db.from('stores').update({active:!store.active}).eq('id',id)),'Loja atualizada.');return;
+  }
+  if(action==='store-delete'){
+    if(!hasPermission('stores.manage')||!window.confirm('Excluir esta loja sem histórico?'))return;
+    await exec(async()=>assertOk(await db.from('stores').delete().eq('id',id)),'Loja excluída.');return;
   }
   if(action==='user-new')return userModal();
   if(action==='user-role')return userRoleModal(id);
@@ -1866,7 +2010,7 @@ async function handleSubmit(event){
     return;
   }
   if(type==='event-batch'){
-    if(!isManager()||eventStatus(form.dataset.event)!=='ativo')return;
+    if(!hasPermission('events.separate')||eventStatus(form.dataset.event)!=='ativo')return;
     let items;
     try{items=collectEventBatch(form);}catch(error){fail(error);return;}
     const sum=items.reduce((acc,item)=>acc+item.quantity,0);
@@ -1927,7 +2071,7 @@ async function handleSubmit(event){
     return saveStockOperation(form);
   }
   if(type==='stock-destination-save'){
-    if(!isManager())return;
+    if(!hasPermission('stock.destinations'))return;
     const name=String(values.name||'').trim();
     if(name.length<2)return toast('Informe o nome do destino.',true);
     return exec(async()=>{
@@ -1938,7 +2082,7 @@ async function handleSubmit(event){
     },'Destino salvo e disponível nas próximas saídas.');
   }
   if(type==='stock-choose-direction'){
-    if(!isManager())return;
+    if(!hasPermission(values.operation_kind==='entrada'?'stock.entry':'stock.exit'))return;
     const kind=values.operation_kind;
     if(!['entrada','saida'].includes(kind))return toast('Escolha Entrada ou Saída.',true);
     const id=form.dataset.id;
@@ -1946,7 +2090,7 @@ async function handleSubmit(event){
     return;
   }
   if(type==='order-create'){
-    if(!isManager())return;
+    if(!hasPermission('orders.internal'))return;
     let items;
     try{items=collectInternalOrder(form);}catch(error){toast(error.message,true);return;}
     const name=String(values.customer_name||'').trim(),phone=String(values.customer_phone||'').trim();
@@ -1958,14 +2102,14 @@ async function handleSubmit(event){
     return;
   }
   if(type==='order-associate'){
-    if(!isManager())return;
+    if(!hasPermission('orders.assign'))return;
     await exec(async()=>assertOk(await db.rpc('assign_avulso_order_event',{
       p_order_id:form.dataset.id,p_event_id:values.event_id||null
     })),'Vínculo de evento atualizado; estoque inalterado.');
     return;
   }
   if(type==='customer-link-create'){
-    if(!isManager())return;
+    if(!hasPermission('catalog.manage'))return;
     const label=String(values.label||'').trim();if(label.length<2||label.length>100)return toast('Informe um nome para o acesso.',true);
     state.loading=true;
     try{
@@ -1980,7 +2124,7 @@ async function handleSubmit(event){
     return;
   }
   if(type==='event-create'){
-    if(!isManager())return;
+    if(!hasPermission('events.manage'))return;
     if(values.ends_at&&values.ends_at<values.starts_at){toast('A data final não pode ser anterior ao início.',true);return;}
     await exec(async()=>assertOk(await db.from('events').insert({
       name:String(values.name).trim(),starts_at:values.starts_at,ends_at:values.ends_at||null,
@@ -1998,7 +2142,7 @@ async function handleSubmit(event){
     return;
   }
   if(type==='member-add'){
-    if(!isManager())return;
+    if(!hasPermission('events.manage'))return;
     await exec(async()=>assertOk(await db.from('event_members').insert({
       event_id:form.dataset.event,user_id:values.user_id,role:values.role
     })),'Equipe atualizada.');
@@ -2006,7 +2150,7 @@ async function handleSubmit(event){
   }
 
   if(type==='category-new'||type==='category-edit'){
-    if(!isManager())return;
+    if(!hasPermission('categories.manage'))return;
     const name=String(values.name||'').trim(), parent=form.dataset.fromProduct==='1'?(form.dataset.parent||null):(values.parent_id||null);
     if(name.length<2||name.length>90){toast('Nome entre 2 e 90 caracteres.',true);return;}
     if(form.dataset.fromProduct==='1'){
@@ -2020,7 +2164,7 @@ async function handleSubmit(event){
     return;
   }
   if(type==='tag-new'){
-    if(!isManager())return;
+    if(!hasPermission('tags.manage'))return;
     const name=String(values.name||'').trim();
     if(name.length<2||name.length>40||name.includes(',')){toast('Nome de tag inválido.',true);return;}
     if(form.dataset.fromProduct==='1'){
@@ -2031,6 +2175,43 @@ async function handleSubmit(event){
     return;
   }
 
+  if(type==='store-order-create'){
+    if(!canUseStoreOrders())return;
+    const lines=[...form.querySelectorAll('[data-store-order-qty]')].map(el=>({
+      product_id:el.dataset.id,quantity:Number(el.value||0)}));
+    if(lines.some(x=>!Number.isInteger(x.quantity)||x.quantity<0||x.quantity>1000000))
+      return toast('Informe quantidades válidas.',true);
+    const items=lines.filter(x=>x.quantity>0);
+    if(!items.length)return toast('Selecione ao menos um produto.',true);
+    if(items.length>100)return toast('Limite de 100 produtos por pedido.',true);
+    const main=state.stores.find(x=>x.is_primary);
+    await exec(async()=>assertOk(await db.rpc('create_store_order',{
+      p_from_store:main.id,p_to_store:values.to_store_id,p_type:values.request_type,
+      p_items:items,p_note:values.note||null
+    })),'Solicitação criada. A separação ainda não movimentou estoque.');return;
+  }
+  if(type==='store-save'){
+    if(!hasPermission('stores.manage'))return;
+    const payload={code:String(values.code||'').trim(),name:String(values.name||'').trim(),kind:values.kind,
+      document:String(values.document||'').trim()||null,phone:String(values.phone||'').trim()||null,
+      manager_name:String(values.manager_name||'').trim()||null,address:String(values.address||'').trim()||null};
+    await exec(async()=>{
+      const req=form.dataset.id?db.from('stores').update(payload).eq('id',form.dataset.id):db.from('stores').insert(payload);
+      assertOk(await req);
+    },'Loja salva.');return;
+  }
+  if(type==='user-permissions'){
+    if(!isAdmin()||form.dataset.id===state.user?.id)return;
+    const uid=form.dataset.id,perms=[...form.querySelectorAll('[name="perm"]:checked')].map(x=>x.value);
+    const stores=[...form.querySelectorAll('[name="store"]:checked')].map(x=>x.value);
+    if(!perms.every(p=>permissionCatalog.some(([key])=>p===key)))throw Error('Permissão inválida.');
+    if(!perms.length)throw Error('Selecione ao menos uma autorização.');
+    await exec(async()=>{
+      assertOk(await db.rpc('set_staff_access',{
+        p_user_id:uid,p_role:values.role,p_permissions:perms,p_store_ids:stores
+      }));
+    },'Autorizações atualizadas.');return;
+  }
   if(type==='user-role'){
     if(!isAdmin() || form.dataset.id===state.user.id)return;
     if(!Object.hasOwn(roles,values.role))throw new Error('Função inválida.');
@@ -2042,10 +2223,13 @@ async function handleSubmit(event){
     let password;
     try{password=passwordsValid(values);}catch(e){fail(e);return;}
     await exec(async()=>{
+      const permissions=[...form.querySelectorAll('[name="perm"]:checked')].map(x=>x.value);
+      const store_ids=[...form.querySelectorAll('[name="store"]:checked')].map(x=>x.value);
+      if(!permissions.length)throw new Error('Selecione ao menos uma permissão.');
       await invokeUserAdmin('create',{
         full_name:String(values.full_name||'').trim(),
         username:String(values.username||'').trim(),
-        role:values.role,password
+        role:values.role,password,permissions,store_ids
       });
     },'Usuário cadastrado. Entregue a senha ao colaborador por um canal seguro.');
     return;
@@ -2184,6 +2368,12 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-store-order-search]')){
+    const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
+    event.target.closest('form')?.querySelectorAll('[data-store-row]').forEach(el=>{
+      el.hidden=Boolean(q)&&!el.dataset.filter.includes(q);
+    });
+  }
   if(event.target.id==='stock-op-search'){
     const kind=state.view;
     if(['entrada','saida'].includes(kind)){
@@ -2260,6 +2450,10 @@ document.addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('form[data-form="user-new"] select[name="role"]')){
+    const defaults=permissionDefaults[event.target.value]||[];
+    event.target.closest('form').querySelectorAll('[name="perm"]').forEach(el=>el.checked=defaults.includes(el.value));
+  }
   if(event.target.matches('.stock-destination-field select')){
     state.stockSelectedDestination=event.target.value;
     updateStockOperationBasket(false);
