@@ -1,0 +1,44 @@
+/* Marca oficial Ame+ Store: fundo branco, sem coração e sem linhas inferiores. */
+.ame-brand-logo{display:block;object-fit:contain;object-position:center;background:#fff;max-width:100%;height:auto}
+.mobile-c-app .brand-lockup{
+  display:flex!important;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;background:#fff;border:1px solid #e4efe9;border-radius:15px;
+  padding:11px 8px 13px!important;min-height:130px
+}
+.brand-lockup .ame-brand-logo{width:191px;height:auto;aspect-ratio:900/474;flex:none}
+.mobile-c-app .brand-lockup>small{
+  display:block;color:#397a63;letter-spacing:.16em;font-size:.58rem;
+  font-weight:750;text-align:center
+}
+.mobile-c-app .topbar{background:#fff}
+.mobile-c-app .topbar-brand{display:flex;align-items:center;gap:6px;min-width:0}
+.mobile-c-app .topbar-brand>.ame-brand-logo{
+  width:111px;height:auto;aspect-ratio:900/474;flex:none;border:0;border-radius:0;background:#fff
+}
+.mobile-c-app .topbar-brand>.ame-header-title{
+  font-weight:800;font-size:.68rem;letter-spacing:.14em;color:#3f8a70;
+  border-left:1px solid #d7e8de;padding-left:11px;white-space:nowrap
+}
+.brand-login{
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:10px 8px 22px;background:white;border-radius:15px;
+}
+.brand-login img{
+  display:block;width:min(100%,245px);height:auto;aspect-ratio:900/474;
+  object-fit:contain;background:#fff
+}
+.brand-login small{
+  font-size:.66rem;font-weight:760;color:#43806b;letter-spacing:.19em;text-align:center
+}
+.login-wrap,.login{background-color:white}
+@media(max-width:760px){
+ .mobile-c-app .topbar .topbar-brand>.ame-brand-logo{
+   width:96px;height:51px;flex:0 0 96px;border-radius:0
+ }
+ .mobile-c-app .topbar-brand>.ame-header-title{font-size:.62rem;padding-left:9px}
+ .mobile-c-app .topbar-right{margin-left:auto}
+ .brand-login img{width:min(100%,210px)}
+}
+@media(max-width:355px){
+ .mobile-c-app .topbar-brand>.ame-header-title{display:none}
+}
