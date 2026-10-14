@@ -60,11 +60,21 @@ async function exec(work,success='Operação registrada.'){
   catch(error){fail(error);}
   finally {state.loading=false;}
 }
+async function fetchAllCategories(){
+  const limit=1000, all=[];
+  for(let offset=0;;offset+=limit){
+    const response=await db.from('categories').select('*').order('id').range(offset,offset+limit-1);
+    const batch=assertOk(response)||[];
+    all.push(...batch);
+    if(batch.length<limit)break;
+  }
+  return {data:all,error:null};
+}
 async function loadData(){
   if(!state.user)return;
   const resources=[
     ['items',db.from('products').select('*').order('name').limit(2500)],
-    ['categories',db.from('categories').select('*').order('name').limit(1000)],
+    ['categories',fetchAllCategories()],
     ['tags',db.from('tags').select('*').order('name').limit(1000)],
     ['events',db.from('events').select('*').order('starts_at',{ascending:false}).limit(1000)],
     ['members',db.from('event_members').select('*').limit(2000)],
