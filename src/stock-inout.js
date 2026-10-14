@@ -88,53 +88,69 @@ export function operationCartLines(cart,products,qtyStore,kind){
   return arr;
 }
 export function stockOperationPage({kind,query,cart,items,models,destinations,batches,batchLines=[],selectedDestination='',qtyStore,groupInventory,photoButton,h=esc,button}){
-  const entry=kind==='entrada',groups=stockOperationResults(items,models,query,groupInventory);
-  const active=destinations.filter(d=>d.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
-  const total=[...cart.values()].reduce((a,x)=>a+(Number(x.quantity)||0),0);
-  return '<header class="pagehead"><div><h1>'+ (entry?'Entrada de estoque':'Saída de estoque')+
-    '</h1><p>'+(entry?'Receba novas remessas da fábrica ou reposições.':
-      'Retire mercadorias do estoque e registre para onde foram enviadas.')+
-    '</p></div><div class="actions">'+
-    button(entry?'Ir para Saída':'Ir para Entrada','view','data-view="'+(entry?'saida':'entrada')+'"','small')+'</div></header>'+
-    '<div class="stock-operation-layout"><section class="panel stock-operation-catalog">'+
-      '<div class="stock-section-head"><h2>1. Localizar produto</h2><span>Nome, código interno ou EAN</span></div>'+
-      '<div class="stock-search-controls"><input id="stock-op-search" class="search" type="search" autocomplete="off" inputmode="search" value="'+h(query||'')+'" placeholder="Busque ou leia o EAN…">'+
-       button('📷 Ler EAN','stock-scan','','primary')+'</div>'+
-      '<div class="stock-scan-hint">Leia o mesmo EAN novamente para adicionar mais uma unidade. Você pode alterar a quantidade antes de salvar.</div>'+
-      '<div class="stock-search-results" data-stock-search-results>'+
-        (query.trim()?stockOperationSearchHTML({groups,h,qtyStore}):
-         '<p class="stock-search-welcome">Digite um nome, SKU ou EAN para encontrar o produto e escolher a variação.</p>')+
-      '</div>'+
-      (entry?'<div class="stock-register-new"><span>Produto ainda não cadastrado?</span>'+
-        button('+ Cadastrar produto','stock-create-product','','primary')+'</div>':'')+
-    '</section>'+
-    '<section class="panel stock-operation-basket">'+
-     '<div class="stock-section-head"><h2>2. '+(entry?'Itens recebidos':'Itens retirados')+'</h2>'+
-       '<span data-stock-basket-count>'+cart.size+' tipo(s) · '+total+' un.</span></div>'+
-     '<div class="stock-cart-list" data-stock-cart>'+stockCartHTML({cart,items,models,qtyStore,groupInventory,kind,photoButton,h})+'</div>'+
-     '<form data-form="stock-operation" class="stock-operation-final" novalidate>'+
-      (!entry?'<label class="stock-destination-field"><span>Destino da saída *</span>'+
-        '<select name="destination_id" required><option value="">Selecione o destino…</option>'+
-          active.map(d=>'<option value="'+h(d.id)+'" '+(d.id===selectedDestination?'selected':'')+'>'+h(d.name)+'</option>').join('')+'</select></label>'+
-        '<div class="stock-destination-tools">'+button('+ Criar destino','stock-destination-new','','small')+
-        button('Gerenciar destinos','stock-destinations-toggle','','small')+'</div>'+
-        '<div class="stock-destination-list" data-stock-destinations hidden>'+
-          (destinations.length?destinations.map(d=>'<div class="stock-destination-row">'+
-            '<div><strong>'+h(d.name)+'</strong><small>'+(d.active?'Ativo':'Inativo')+
-             (d.description?' · '+h(d.description):'')+'</small></div>'+
-            (d.active?button('Editar','stock-destination-edit','data-id="'+h(d.id)+'"','small')+
-                 button('Desativar','stock-destination-disable','data-id="'+h(d.id)+'"','small danger'):'')+
-            '</div>').join(''):'<p>Nenhum destino cadastrado.</p>')+'</div>':'')+
-       '<label class="stock-note-field"><span>'+(entry?'Identificação da remessa (opcional)':'Observação (opcional)')+
-          '</span><textarea name="note" maxlength="400" rows="2" placeholder="'+
-          (entry?'Ex.: Fábrica, nota fiscal ou fornecedor':'Ex.: Quem recebeu, motivo ou referência')+'"></textarea></label>'+
-       '<div class="stock-operation-summary" data-stock-summary>'+cart.size+' tipo(s) de produto · '+total+' unidade(s)</div>'+
-       '<div class="stock-form-error" data-stock-error role="alert" hidden></div>'+
-       '<button class="button primary stock-save-batch" type="submit" '+(!cart.size?'disabled':'')+'>'+
-         (entry?'Confirmar entrada':'Confirmar saída')+'</button>'+
-       '<small class="stock-operation-safety">Salvamento único e auditado. '+(entry?'Soma ao estoque da loja.':
-         'Subtrai da loja; não cria venda nem transferência para evento.')+'</small>'+
-     '</form></section></div>'+
-     '<section class="panel stock-operation-history"><div class="stock-section-head"><h2>Últimas operações</h2><span>Registro com data e destino</span></div>'+
-       '<div data-stock-operation-history>'+stockOperationHistoryHTML({batches,destinations,lines:batchLines,items})+'</div></section>';
+ const entry=kind==='entrada';
+ const groups=stockOperationResults(items,models,query,groupInventory);
+ const active=destinations.filter(d=>d.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+ const total=[...cart.values()].reduce((n,x)=>n+(Number(x.quantity)||0),0);
+ const destination=entry?'':'<section class="stock-step stock-destination-first">'+
+   '<div class="stock-compact-heading"><span class="stock-step-number">1</span><div><strong>Para onde vai?</strong><small>Escolha o destino antes de separar os produtos</small></div></div>'+
+   '<div class="stock-destination-inline"><label class="stock-destination-field"><span>Destino da saída *</span>'+
+   '<select name="destination_id" required><option value="">Selecione um destino…</option>'+
+    active.map(d=>'<option value="'+h(d.id)+'" '+(d.id===selectedDestination?'selected':'')+'>'+h(d.name)+'</option>').join('')+
+   '</select></label>'+button('+ Novo destino','stock-destination-new','','small')+'</div>'+
+   '<details class="stock-destination-management"><summary>Gerenciar destinos</summary>'+
+   '<div class="stock-destination-list">'+
+   (destinations.length?destinations.map(d=>'<div class="stock-destination-row">'+
+     '<div><strong>'+h(d.name)+'</strong><small>'+(d.active?'Ativo':'Inativo')+
+       (d.description?' · '+h(d.description):'')+'</small></div>'+
+     (d.active?button('Editar','stock-destination-edit','data-id="'+h(d.id)+'"','small')+
+       button('Desativar','stock-destination-disable','data-id="'+h(d.id)+'"','small danger'):'')+
+   '</div>').join(''):'<p>Nenhum destino cadastrado.</p>')+'</div></details></section>';
+ const rows=stockCartHTML({cart,items,models,qtyStore,groupInventory,kind,photoButton,h});
+ const search=query.trim()?stockOperationSearchHTML({groups,h,qtyStore}):
+    '<p class="stock-search-welcome">Pesquise pelo nome, SKU ou leia um código EAN.</p>';
+ const stepSearch=entry?'1':'2',stepCart=entry?'2':'3';
+ return '<div class="stock-op-v2 '+(entry?'stock-entry':'stock-exit')+'">'+
+  '<header class="stock-op-heading"><div><h1>'+(entry?'Entrada de estoque':'Saída de estoque')+'</h1>'+
+  '<p>'+(entry?'Receber produtos e acrescentar quantidades à loja.':'Retirar produtos com registro do destino.')+'</p></div>'+
+  '<div class="stock-op-tabs" role="group" aria-label="Tipo de movimentação">'+
+   '<button type="button" data-action="view" data-view="entrada" class="'+(entry?'is-active':'')+'"'+(entry?' aria-current="page"':'')+'>↓ Entrada</button>'+
+   '<button type="button" data-action="view" data-view="saida" class="'+(!entry?'is-active':'')+'"'+(!entry?' aria-current="page"':'')+'>↑ Saída</button>'+
+  '</div></header>'+
+  '<form data-form="stock-operation" id="stock-operation-form" class="stock-operation-layout" novalidate>'+
+   destination+
+   '<section class="panel stock-operation-catalog stock-step">'+
+     '<div class="stock-compact-heading"><span class="stock-step-number">'+stepSearch+'</span>'+
+       '<div><strong>Buscar e adicionar</strong><small>Nome, EAN ou código interno</small></div></div>'+
+     '<div class="stock-search-controls"><input id="stock-op-search" class="search" type="search" autocomplete="off" inputmode="search" value="'+h(query||'')+'" placeholder="Buscar produto ou EAN…" aria-label="Buscar produto">'+
+     '<button type="button" class="stock-scan-button" data-action="stock-scan" aria-label="Ler código EAN" title="Ler EAN">▣ <span>Ler EAN</span></button></div>'+
+     '<div class="stock-search-results" data-stock-search-results>'+search+'</div>'+
+     (entry?'<div class="stock-register-new"><span>Não encontrou?</span>'+
+       button('+ Cadastrar produto','stock-create-product','','small')+'</div>':'')+
+   '</section>'+
+   '<section class="panel stock-operation-basket stock-step">'+
+     '<div class="stock-compact-heading"><span class="stock-step-number">'+stepCart+'</span>'+
+      '<div><strong>'+(entry?'Itens para entrada':'Itens para saída')+'</strong>'+
+      '<small data-stock-basket-count>'+cart.size+' variação(ões) · '+total+' un.</small></div>'+
+      '<button type="button" class="stock-jump-search" data-action="stock-focus-search">+ Produto</button>'+
+     '</div>'+
+     '<div class="stock-cart-list" data-stock-cart>'+rows+'</div>'+
+     '<div class="stock-operation-final">'+
+      '<details class="stock-note-expand"><summary>'+(entry?'Remessa / fornecedor (opcional)':'Observação (opcional)')+'</summary>'+
+        '<label class="stock-note-field"><span>Detalhes para o histórico</span>'+
+        '<textarea name="note" maxlength="400" rows="2" placeholder="'+(entry?'Ex.: Fábrica, NF ou fornecedor':'Ex.: Motivo, quem recebeu')+'"></textarea></label></details>'+
+      '<div class="stock-form-error" data-stock-error role="alert" hidden></div>'+
+     '</div>'+
+   '</section>'+
+  '</form>'+
+  '<div class="stock-confirm-dock"><div class="stock-confirm-summary"><strong data-stock-summary>'+
+    cart.size+' variação(ões) · '+total+' un.</strong>'+
+    (!entry?'<small data-stock-destination-preview>'+h(active.find(d=>d.id===selectedDestination)?.name||'Escolha um destino')+'</small>':
+      '<small>Adicionar ao estoque</small>')+
+    '</div><button class="button primary stock-save-batch" form="stock-operation-form" type="submit"'+
+    (!cart.size||(!entry&&!active.some(d=>d.id===selectedDestination))?' disabled':'')+'>'+
+    (entry?'Confirmar entrada':'Confirmar saída')+'</button></div>'+
+  '<section class="panel stock-operation-history"><div class="stock-section-head"><h2>Histórico recente</h2><span>Consulte os detalhes</span></div>'+
+    '<div data-stock-operation-history>'+stockOperationHistoryHTML({batches,destinations,lines:batchLines,items})+'</div></section>'+
+  '</div>';
 }
