@@ -39,6 +39,7 @@ export function apparelPage(state,{h,tabHead,button,qtyStore,photoButton}){
        '<div><strong>'+h(p.apparel_color)+' · '+h(p.apparel_size)+'</strong>'+
        '<small>'+h(p.sku||'Sem SKU')+' · '+h(p.ean||'Sem EAN')+'</small></div>'+
        '<div class="apparel-detail-right"><span>'+qtyStore(p.id)+' un.</span>'+
+       button('Editar','apparel-variant-edit','data-id="'+h(p.id)+'"','small')+
        button('Abrir produto','apparel-product','data-id="'+h(p.id)+'"','small')+'</div></div>').join(''):
        '<div class="muteblock">Nenhuma variação encontrada.</div>')+
       '</div>':'';
@@ -47,7 +48,8 @@ export function apparelPage(state,{h,tabHead,button,qtyStore,photoButton}){
       '<div class="apparel-model-info"><strong>'+h(m.name)+'</strong>'+
       '<small>'+h(m.garment_type)+' · '+h(m.age_group)+' · '+h(m.audience)+'</small>'+
       '<div class="apparel-model-meta"><span>'+vars.length+' variação(ões)</span><span>'+total+' unidades na loja</span></div></div>'+
-      button(open?'Recolher':'Ver tamanhos','apparel-expand','data-id="'+h(m.id)+'"','small')+
+      '<div class="apparel-card-actions">'+button('Foto','apparel-photo','data-id="'+h(m.id)+'"','small')+
+      button(open?'Recolher':'Ver tamanhos','apparel-expand','data-id="'+h(m.id)+'"','small')+'</div>'+
       '</div>'+body+'</article>';
   }).join('');
   return tabHead('Roupas','Cadastre um modelo e controle cada tamanho e cor separadamente.',
@@ -75,7 +77,7 @@ export function apparelModal(state,{h,formModal,photoChooser,categorySelector,pr
     '<section class="form-section wide"><div class="section-head"><strong>2. Tamanhos, cores e quantidades</strong></div>'+
     '<p class="help">Cada combinação de cor e tamanho é uma variação independente. Comece por uma e toque em Adicionar variação para incluir outras.</p>'+
     '<div data-apparel-rows>'+apparelRowHTML(h,'Branco',true)+'</div>'+
-    '<button type="button" class="button apparel-add" data-action="apparel-add-row">+ Adicionar variação</button>'+
+    '<div class="apparel-add-actions"><button type="button" class="button apparel-add" data-action="apparel-add-row">+ Adicionar variação</button>'+    '<button type="button" class="button" data-action="apparel-fill-sizes">Preencher P, M, G e GG</button></div>'+
     '</section>'+
     '<div class="note">A quantidade inicial será registrada no histórico. As futuras transferências, vendas e devoluções serão controladas por tamanho e cor.</div>'+
     '</div>';
@@ -158,4 +160,87 @@ export async function submitApparel(form,{
   closeTopModal();
   await loadData();
   toast(photoWarning?'Roupa cadastrada. A foto não foi salva; é possível adicioná-la posteriormente.':'Roupa cadastrada com todas as variações.');
+}
+
+
+export function apparelFillSizes(target,{h}){
+  const form=target.closest('form'),rows=form?.querySelector('[data-apparel-rows]');
+  if(!rows)return;
+  const current=[...rows.querySelectorAll('[data-apparel-row]')];
+  const color=current[0]?.querySelector('[name="variant_color"]')?.value?.trim()||'Branco';
+  const existing=new Set();
+  for(const row of current){
+    const rowColor=row.querySelector('[name="variant_color"]')?.value?.trim()?.toLocaleLowerCase('pt-BR');
+    const size=row.querySelector('[name="variant_size"]')?.value;
+    if(rowColor===color.toLocaleLowerCase('pt-BR')&&size)existing.add(size);
+  }
+  for(const size of ['P','M','G','GG']){
+    if(existing.has(size))continue;
+    const empty=current.find(row=>!row.querySelector('[name="variant_size"]')?.value);
+    const row=empty||(()=>{
+      if(rows.querySelectorAll('[data-apparel-row]').length>=40)throw new Error('Limite de 40 variações.');
+      rows.insertAdjacentHTML('beforeend',apparelRowHTML(h,color,false));
+      return rows.lastElementChild;
+    })();
+    row.querySelector('[name="variant_color"]').value=color;
+    row.querySelector('[name="variant_size"]').value=size;
+    existing.add(size);
+    const pos=current.indexOf(row);
+    if(pos>=0)current.splice(pos,1);
+  }
+}
+
+export function apparelVariantEditModal(p,{h,formModal}){
+  if(!p?.apparel_model_id)throw new Error('Variação inválida.');
+  const sizeOptions='<option value="">Tamanho</option>'+
+    sizes.concat(sizes.includes(p.apparel_size)?[]:[p.apparel_size]).map(v=>
+      '<option value="'+h(v)+'" '+(v===p.apparel_size?'selected':'')+'>'+h(v)+'</option>').join('');
+  formModal('Editar variação · '+p.name,
+    '<div class="formgrid">'+
+    '<label class="field"><span>Cor</span><input name="color" required maxlength="40" value="'+h(p.apparel_color)+'"></label>'+
+    '<label class="field"><span>Tamanho</span><select name="size" required>'+sizeOptions+'</select></label>'+
+    '<label class="field"><span>SKU</span><input name="sku" maxlength="80" value="'+h(p.sku||'')+'"></label>'+
+    '<label class="field"><span>EAN</span><div class="inline apparel-ean"><input name="ean" data-variant-ean inputmode="numeric" maxlength="18" value="'+h(p.ean||'')+'">'+
+    '<button type="button" class="button small" data-action="apparel-scan">📷</button></div></label>'+
+    '<label class="field"><span>Situação</span><select name="active"><option value="true" '+(p.active?'selected':'')+'>Ativa</option>'+
+    '<option value="false" '+(!p.active?'selected':'')+'>Inativa</option></select></label>'+
+    '</div><div class="note">Esta edição não altera saldos. Use Balanço rápido ou Estoque para ajustar quantidades.</div>',
+    'apparel-edit-variant','Salvar variação');
+  const form=document.querySelector('.modalback form[data-form="apparel-edit-variant"]');
+  if(form)form.dataset.productId=p.id;
+}
+
+export async function saveApparelVariant(form,{db,assertOk,loadData,closeTopModal,toast}){
+  const v=name=>form.elements.namedItem(name)?.value?.trim()||'';
+  const color=v('color'),size=v('size'),sku=v('sku'),ean=v('ean').replace(/[\s-]/g,'');
+  if(color.length<2||color.length>40||!size)throw new Error('Cor e tamanho obrigatórios.');
+  if(ean&&!/^[0-9]{8,14}$/.test(ean))throw new Error('EAN precisa de 8 a 14 dígitos.');
+  assertOk(await db.rpc('update_apparel_variant',{
+    p_product_id:form.dataset.productId,p_color:color,p_size:size,
+    p_sku:sku||null,p_ean:ean||null,p_active:v('active')==='true'
+  }));
+  closeTopModal();
+  await loadData();
+  toast('Variação atualizada sem alterar estoque.');
+}
+
+export function apparelPhotoModal(model,state,{formModal,photoChooser,hydrateImages}){
+  if(!model)throw new Error('Modelo de roupa não encontrado.');
+  const variant=state.items.find(p=>p.apparel_model_id===model.id);
+  formModal('Foto · '+model.name,photoChooser(
+    model.image_path&&variant?{id:variant.id,image_path:model.image_path,name:model.name}:null
+  ),'apparel-photo','Salvar foto');
+  const form=document.querySelector('.modalback form[data-form="apparel-photo"]');
+  if(form)form.dataset.modelId=model.id;
+  hydrateImages();
+}
+
+export async function saveApparelPhoto(form,{db,assertOk,loadData,closeTopModal,toast}){
+  const file=form.__photoBlob;
+  if(!file)throw new Error('Tire uma foto ou escolha uma imagem da galeria.');
+  const id=form.dataset.modelId;
+  const path='apparel/'+id+'/'+crypto.randomUUID()+'.'+(file.type==='image/webp'?'webp':'jpg');
+  assertOk(await db.storage.from('ame-produtos').upload(path,file,{contentType:file.type,upsert:false}));
+  assertOk(await db.rpc('set_apparel_photo',{p_model_id:id,p_path:path}));
+  closeTopModal();await loadData();toast('Foto atualizada para todas as variações.');
 }
