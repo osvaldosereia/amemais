@@ -63,7 +63,6 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,button,isMana
         '<span class="group-variant-stock '+(qty===0?'stock-zero':'')+'">'+qty+' <small>un.</small></span>'+
         (isProducts&&canEdit?'<div class="group-variant-actions">'+
           button('Editar','product-edit','data-id="'+h(p.id)+'"','small')+
-          (manage?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
           '</div>':'')+
         '</div>';
     }).join('')+'</div>';
