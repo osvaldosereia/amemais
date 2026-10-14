@@ -7,7 +7,7 @@
 - **Evento:** apenas eventos aos quais foi associado. Responsável pode registrar devolução e encerrar; operador registra vendas.
 - **Consulta:** visualização de produtos, saldos, eventos e movimentações sem alterações.
 
-Cada pessoa entra com seu próprio email e senha. O histórico registra o UUID de quem executou cada movimento e o horário. A interface apresenta o nome do usuário correspondente.
+Cada pessoa entra com seu próprio email usando um link de acesso enviado pelo Supabase, sem senha local. O histórico registra o UUID de quem executou cada movimento e o horário. A interface apresenta o nome do usuário correspondente.
 
 ## Produtos
 
