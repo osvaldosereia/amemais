@@ -91,6 +91,17 @@ Deno.serve(async (request) => {
         return respond({error:'Uma ou mais lojas selecionadas não estão ativas.'},400);
       }
     }
+    // Compatibilidade com verificações de perfil das rotinas legadas.
+    // O acesso real é restringido pelas permissões individuais e pelos gatilhos SQL.
+    const legacyManagerActions = new Set([
+      'stock.entry','stock.exit','stock.destinations','events.manage','events.separate',
+      'orders.internal','orders.assign','products.delete','categories.manage',
+      'tags.manage','catalog.manage','products.share'
+    ]);
+    const technicalRole = role === 'admin' ? 'admin'
+      : permissions.some(p => legacyManagerActions.has(p)) ? 'gerente'
+      : permissions.some(p => ['products.create','products.edit','stock.balance'].includes(p)) ? 'estoquista'
+      : role;
     const {data: duplicate,error: duplicateError} = await admin.from('staff_profiles')
       .select('id').ilike('username',username).limit(2);
     if (duplicateError) return respond({error:'Não foi possível verificar o cadastro.'},500);
@@ -109,7 +120,7 @@ Deno.serve(async (request) => {
 
     const userId=created.user.id;
     const {error: profileError} = await admin.from('staff_profiles').insert({
-      id:userId,full_name:fullName,email,username,role,active:true,permissions_customized:true
+      id:userId,full_name:fullName,email,username,role:technicalRole,active:true,permissions_customized:true
     });
     if(profileError){
       await admin.auth.admin.deleteUser(userId);
