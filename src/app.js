@@ -347,8 +347,8 @@ function productsPage(){
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="filter" aria-haspopup="dialog"><span>'+h(state.categoryFilter?categoryFull(state.categoryFilter):'Todas as categorias')+'</span><span aria-hidden="true">⌄</span></button>'+
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="tag" aria-haspopup="dialog"><span>'+h(state.tagFilter||'Todas as tags')+'</span><span aria-hidden="true">⌄</span></button>'+
     button('Ler EAN','search-scan','','small')+button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+'</div>'+
-    (list.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Produto</th><th>Categoria</th><th>Tags</th><th>Loja</th><th>Situação</th><th></th></tr></thead><tbody>'+
-      list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+(isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
+    (list.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Produto</th><th>Categoria</th><th>Localização</th><th>Tags</th><th>Loja</th><th>Situação</th><th></th></tr></thead><tbody>'+
+      list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+h([p.gondola,p.prateleira].filter(Boolean).join(' · ')||'—')+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+(isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
       '<div class="muteblock">Nenhum produto encontrado.</div>')+
     '<div class="mobile-products">'+list.map(mobileProductCard).join('')+'</div>'+
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+filtered.length+' produto(s) · página '+(state.page+1)+' de '+totalPages+'</small><div class="actions">'+
@@ -358,13 +358,13 @@ function quickBalancePage(){
   if(!canQuickBalance())return '<div class="muteblock">Sem acesso.</div>';
   const q=state.search.trim().toLocaleLowerCase('pt-BR');
   const results=state.items.filter(p=>p.active&&(!q||
-    [p.name,p.sku,p.ean,categoryFull(p.category_id)].join(' ').toLocaleLowerCase('pt-BR').includes(q)));
+    [p.name,p.sku,p.ean,p.gondola,p.prateleira,categoryFull(p.category_id)].join(' ').toLocaleLowerCase('pt-BR').includes(q)));
   // Nenhum campo vem previamente preenchido para evitar zerar produtos por engano.
   const rows=results.slice(0,50).map(p=>{
     const balance=qtyStore(p.id);
     return '<form class="quick-count-card" data-form="quick-count" data-count-product="'+h(p.id)+'">'+
       '<div class="quick-count-main">'+photoButton(p)+
-      '<div class="quick-count-name"><strong>'+h(p.name)+'</strong><small>'+h(p.ean||p.sku||'Sem código')+'</small>'+
+      '<div class="quick-count-name"><strong>'+h(p.name)+'</strong><small>'+h(p.ean||p.sku||'Sem código')+'</small>'+(p.gondola||p.prateleira?'<small><strong>Local:</strong> '+h([p.gondola,p.prateleira].filter(Boolean).join(' · '))+'</small>':'')+
       '<span class="quick-count-balance">No sistema: <b>'+balance+'</b></span></div></div>'+
       '<div class="quick-count-fields"><label><span>Quantidade contada</span>'+
       '<input type="number" name="counted" inputmode="numeric" min="0" max="1000000" step="1" required placeholder="Digite a contagem" autocomplete="off"></label>'+
