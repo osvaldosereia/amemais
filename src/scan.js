@@ -1,44 +1,206 @@
-let cleanup = null;
+// Leitor EAN: câmera nativa quando possível e ZXing no iPhone/outros navegadores.
+const formats=['ean_13','ean_8','upc_a','upc_e','itf','code_128','code_39'];
+let cleanup=null;
+let zxingPromise=null;
+const validEAN=value=>/^[0-9]{8,14}$/.test(String(value??'').trim())?String(value).trim():null;
 
-export async function scanEAN(onCode) {
-  if (cleanup) cleanup();
-  const overlay = document.createElement('div');
-  overlay.className = 'scan-backdrop';
-  overlay.innerHTML = '<section class="scan-panel" role="dialog" aria-modal="true" aria-label="Ler código de barras"><header><strong>Ler código EAN</strong><button type="button" class="plain" data-close-scan>Fechar ×</button></header><video autoplay muted playsinline aria-label="Câmera para escanear código"></video><p>Aponte a câmera para o código de barras. Se não funcionar, digite o EAN manualmente.</p></section>';
-  document.body.appendChild(overlay);
-  let stopped = false, controls = null, stream = null, timer = null;
-  const video = overlay.querySelector('video');
-  const stop = () => {
-    if (stopped) return;
-    stopped = true;
-    if (timer) clearTimeout(timer);
-    controls?.stop?.();
-    stream?.getTracks()?.forEach(track => track.stop());
-    video.srcObject?.getTracks()?.forEach(track => track.stop());
-    overlay.remove();
-    cleanup = null;
+async function zxing(){
+  if(!zxingPromise){
+    zxingPromise=import('https://esm.sh/@zxing/browser@0.1.5')
+      .catch(()=>import('https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm'))
+      .catch(error=>{zxingPromise=null;throw error;});
+  }
+  const lib=await zxingPromise;
+  if(typeof lib.BrowserMultiFormatReader!=='function')throw new Error('Leitor indisponível');
+  return new lib.BrowserMultiFormatReader();
+}
+
+function explain(error){
+  if(['NotAllowedError','PermissionDeniedError','SecurityError'].includes(error?.name))
+    return 'Permita a câmera nas configurações do navegador e tente novamente.';
+  if(['NotFoundError','DevicesNotFoundError'].includes(error?.name))
+    return 'Nenhuma câmera encontrada. Use uma foto ou digite o EAN.';
+  if(['NotReadableError','TrackStartError'].includes(error?.name))
+    return 'Câmera ocupada por outro aplicativo. Feche-o e tente novamente.';
+  if(error?.message==='https')
+    return 'A câmera precisa de HTTPS. Abra o site oficial pelo navegador.';
+  return 'Não foi possível iniciar a leitura. Tente novamente ou use uma foto.';
+}
+
+async function detector(){
+  if(!window.BarcodeDetector?.getSupportedFormats)return null;
+  try{
+    const supported=await window.BarcodeDetector.getSupportedFormats();
+    const kinds=formats.filter(f=>supported.includes(f));
+    if(!kinds.some(f=>['ean_13','ean_8','upc_a'].includes(f)))return null;
+    return new window.BarcodeDetector({formats:kinds});
+  }catch{return null;}
+}
+
+export function scanEAN(onCode){
+  cleanup?.();
+  const backdrop=document.createElement('div');
+  backdrop.className='scan-backdrop';
+  backdrop.innerHTML=[
+    '<section class="scan-panel" role="dialog" aria-modal="true" aria-label="Leitor de EAN">',
+    '<header><strong>Ler EAN</strong><button type="button" class="plain" data-close>Fechar ✕</button></header>',
+    '<div class="scan-video-wrap"><video autoplay muted playsinline aria-label="Câmera"></video>',
+    '<div class="scan-guide" aria-hidden="true"></div></div>',
+    '<p data-status role="status" aria-live="polite">Abrindo câmera…</p>',
+    '<div class="scan-actions"><button class="button" type="button" data-retry>Tentar câmera novamente</button>',
+    '<label class="button scan-file-button">Ler foto do código<input type="file" accept="image/*" data-photo aria-label="Escolher foto do EAN"></label></div>',
+    '<form class="scan-manual" autocomplete="off"><label for="scan-manual-input">Ou digite o EAN</label>',
+    '<div class="scan-manual-row"><input id="scan-manual-input" inputmode="numeric" pattern="[0-9]{8,14}" maxlength="14" required placeholder="8 a 14 dígitos">',
+    '<button class="button primary" type="submit">Usar código</button></div></form></section>'
+  ].join('');
+  document.body.appendChild(backdrop);
+
+  const video=backdrop.querySelector('video');
+  const message=backdrop.querySelector('[data-status]');
+  const retry=backdrop.querySelector('[data-retry]');
+  const photo=backdrop.querySelector('[data-photo]');
+  let disposed=false,stream=null,controls=null,animation=0,sequence=0,starting=false;
+
+  const status=(text,error=false)=>{
+    if(disposed)return;
+    message.textContent=text;message.classList.toggle('scan-error',error);
   };
-  cleanup = stop;
-  overlay.querySelector('[data-close-scan]').onclick = stop;
-  const found = value => {
-    if (stopped || !value) return;
-    stop();
-    onCode(String(value).trim());
+  const stopCamera=()=>{
+    ++sequence;
+    if(animation)cancelAnimationFrame(animation);
+    animation=0;
+    controls?.stop?.();controls=null;
+    stream?.getTracks().forEach(t=>t.stop());
+    video.srcObject?.getTracks?.().forEach(t=>t.stop());
+    stream=null;video.srcObject=null;
   };
-  try {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Câmera indisponível. Use HTTPS e permita o acesso.');
-    // ZXing amplia a compatibilidade onde BarcodeDetector nativo não é suportado.
-    const { BrowserMultiFormatReader } = await import('https://esm.sh/@zxing/browser@0.1.5');
-    if (stopped) return;
-    const reader = new BrowserMultiFormatReader();
-    controls = await reader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } }, audio: false }, video, (result, err) => {
-      if (result) found(result.getText());
-    });
-    if (stopped) controls?.stop?.();
-  } catch (error) {
-    if (!stopped) {
-      stop();
-      throw new Error('Não foi possível iniciar o leitor: ' + error.message);
+  const close=()=>{
+    if(disposed)return;
+    disposed=true;stopCamera();backdrop.remove();
+    if(cleanup===close)cleanup=null;
+  };
+  cleanup=close;
+  const detected=code=>{
+    const normalized=validEAN(code);
+    if(!normalized){
+      status('Código não aceito. EAN deve ter de 8 a 14 dígitos.',true);return;
+    }
+    if(disposed)return;
+    close();try{navigator.vibrate?.(50);}catch{}
+    onCode(normalized);
+  };
+  backdrop.querySelector('[data-close]').addEventListener('click',close);
+  backdrop.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){event.stopPropagation();close();}
+  },true);
+  backdrop.querySelector('.scan-manual').addEventListener('submit',event=>{
+    event.preventDefault();event.stopPropagation();
+    detected(backdrop.querySelector('#scan-manual-input').value);
+  });
+
+  async function begin(){
+    if(disposed||starting)return;
+    starting=true;stopCamera();
+    const generation=sequence;
+    retry.disabled=true;
+    status('Solicitando permissão da câmera…');
+    try{
+      if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('https');
+      // Abre a câmera antes de carregar bibliotecas externas (importante no celular).
+      let feed;
+      try{
+        feed=await navigator.mediaDevices.getUserMedia({
+          audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
+        });
+      }catch(e){
+        if(!['OverconstrainedError','NotFoundError'].includes(e.name))throw e;
+        feed=await navigator.mediaDevices.getUserMedia({audio:false,video:true});
+      }
+      if(disposed||generation!==sequence){
+        feed.getTracks().forEach(t=>t.stop());return;
+      }
+      stream=feed;video.srcObject=feed;
+      await video.play();
+      if(disposed||generation!==sequence)return;
+      status('Aponte para as barras do EAN, com boa luz e sem reflexos.');
+      const native=await detector();
+      if(disposed||generation!==sequence)return;
+
+      const startZXing=async()=>{
+        const reader=await zxing();
+        if(disposed||generation!==sequence)return;
+        controls=await reader.decodeFromStream(feed,video,(decoded,_error,readerControls)=>{
+          if(disposed||generation!==sequence){readerControls?.stop?.();return;}
+          if(decoded)detected(decoded.getText());
+        });
+        if(disposed||generation!==sequence)controls?.stop?.();
+      };
+
+      if(native){
+        let last=0;
+        const tick=async time=>{
+          if(disposed||generation!==sequence)return;
+          if(time-last>=170&&video.readyState>=2){
+            last=time;
+            try{
+              const results=await native.detect(video);
+              if(disposed||generation!==sequence)return;
+              const result=results.map(x=>validEAN(x.rawValue)).find(Boolean);
+              if(result){detected(result);return;}
+            }catch{
+              try{await startZXing();}
+              catch{status('Leitor indisponível. Selecione uma foto ou digite o EAN.',true);}
+              return;
+            }
+          }
+          if(!disposed&&generation===sequence)animation=requestAnimationFrame(tick);
+        };
+        animation=requestAnimationFrame(tick);
+      }else await startZXing();
+    }catch(error){
+      if(!disposed&&generation===sequence){
+        status(explain(error),true);
+        stopCamera();
+      }
+    }finally{
+      starting=false;
+      if(!disposed)retry.disabled=false;
     }
   }
+  retry.addEventListener('click',()=>{void begin();});
+  photo.addEventListener('change',async()=>{
+    const file=photo.files?.[0];
+    if(!file||disposed)return;
+    if(!file.type.startsWith('image/')||file.size>15*1024*1024){
+      status('Selecione uma foto válida de até 15 MB.',true);return;
+    }
+    status('Procurando código na foto…');
+    const url=URL.createObjectURL(file);
+    try{
+      const image=new Image();
+      image.src=url;
+      await new Promise((resolve,reject)=>{
+        image.onload=resolve;
+        image.onerror=()=>reject(new Error('Foto inválida'));
+      });
+      if(disposed)return;
+      let result=null;
+      const native=await detector();
+      if(native)result=(await native.detect(image)).map(x=>validEAN(x.rawValue)).find(Boolean);
+      if(!result){
+        const reader=await zxing();
+        const decoded=await reader.decodeFromImageElement(image);
+        result=validEAN(decoded.getText());
+      }
+      if(result)detected(result);
+      else status('Não foi possível identificar o EAN. Tente uma foto mais nítida.',true);
+    }catch{
+      status('Código não encontrado na foto. Use outra foto ou digite o EAN.',true);
+    }finally{
+      URL.revokeObjectURL(url);
+      photo.value='';
+    }
+  });
+  // Falha de câmera não fecha o leitor: foto e entrada manual ficam disponíveis.
+  void begin();
 }
