@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import { scanEAN } from './scan.js?v=20261014w2';
-import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014b';
+import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261014b';
@@ -143,7 +143,7 @@ async function loadProfile(){
 function loginScreen(message=''){
   const legacy=false;
   root.innerHTML='<div class="login-wrap"><section class="login">'+
-  '<div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
+  '<div class="brand-login"><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="225" height="120"><small>CONTROLE DE ESTOQUE</small></div>'+
   '<h1>Entrar no sistema</h1><p class="muted">'+
   (legacy?'Acesso por email para contas antigas que ainda não definiram senha.':
     'Entre com seu usuário e senha.')+'</p>'+
@@ -160,12 +160,12 @@ function loginScreen(message=''){
 }
 
 function pendingAccessScreen(){
-  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
+  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand-login"><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="225" height="120"><small>CONTROLE DE ESTOQUE</small></div>'+
   '<h1>Acesso pendente</h1><p>O email <strong>'+h(state.user?.email)+'</strong> já foi identificado, mas precisa ser liberado por um administrador.</p>'+
   '<button class="button" data-action="logout">Sair</button></section></div>';
 }
 function initialAdminScreen(){
-  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
+  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand-login"><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="225" height="120"><small>CONTROLE DE ESTOQUE</small></div>'+
   '<h1>Ativar administrador</h1><p>Email confirmado: <strong>'+h(state.user?.email)+'</strong>. Informe o código de ativação de uso único.</p>'+
   '<form data-form="admin-bootstrap">'+
   field('Nome do administrador','full_name','text','','required minlength="2" maxlength="120"')+
@@ -282,17 +282,17 @@ function button(label,action,extra='',kind=''){
 }
 function pill(status){return '<span class="pill '+h(status)+'">'+h({ativo:'Ativo',encerrado:'Encerrado',rascunho:'Rascunho'}[status]||status)+'</span>';}
 function render(){
-  if(!db){root.innerHTML='<div class="login-wrap"><div class="login"><div class="brand">AME MAIS <span>Estoque</span></div><h2>Configuração necessária</h2><p>Verifique o Supabase exclusivo deste sistema em <code>config.js</code>.</p></div></div>';return;}
+  if(!db){root.innerHTML='<div class="login-wrap"><div class="login"><div class="brand-login"><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="225" height="120"><small>CONTROLE DE ESTOQUE</small></div><h2>Configuração necessária</h2><p>Verifique o Supabase exclusivo deste sistema em <code>config.js</code>.</p></div></div>';return;}
   if(!state.user){loginScreen();return;}
   if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
   if(!state.profile.active){pendingAccessScreen();return;}
   if(isStockkeeper()&&!permittedView(state.view))state.view='balanco';
   if((state.view==='usuarios'&&!isAdmin())||(state.view==='categorias'&&!isManager()))state.view='inicio';
-  const mark='<span class="ame-mark" aria-hidden="true">'+uiIcon('cross',21)+'</span>';
+  const mark='<img class="ame-brand-logo" src="./ame-plus-logo.svg" alt="Ame+ Store" width="132" height="70">';
   const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager()))
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'">'+
       uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('');
-  const desktopIdentity='<div class="brand brand-lockup">'+mark+'<div>AME MAIS<span>Controle de estoque</span></div></div>';
+  const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
   const bottomItems=isStockkeeper()?
     [{id:'produtos',label:'Produtos',ico:'package'},{id:'scan',label:'Ler EAN',ico:'scan'},{id:'balanco',label:'Balanço',ico:'clipboard'}]:
     [{id:'inicio',label:'Início',ico:'home'},{id:'produtos',label:'Produtos',ico:'package'},
@@ -304,7 +304,7 @@ function render(){
     '<br><button class="plain" data-action="my-password">Minha senha</button>'+
     '<br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
     '<div class="main"><header class="topbar"><div class="topbar-brand">'+mark+
-    '<div><strong>AME MAIS</strong><small>ESTOQUE</small></div></div>'+
+    '<span class="ame-header-title">ESTOQUE</span></div>'+
     '<div class="topbar-right"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span>'+
     '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir mais opções" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>'+
