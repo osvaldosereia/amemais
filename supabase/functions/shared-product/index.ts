@@ -43,6 +43,28 @@ Deno.serve(async(request:Request)=>{
   if(!url||!key)return json({error:"Serviço temporariamente indisponível"},503,headers);
   const client=createClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
   try{
+    if(payload.action==="place_order"){
+      const name=typeof payload.name==="string"?payload.name:"";
+      const phone=typeof payload.phone==="string"?payload.phone:"";
+      const items=payload.items;
+      const requestId=typeof payload.request_id==="string"?payload.request_id:"";
+      if(name.length>120||phone.length>25||!Array.isArray(items)||items.length>40||
+         !/^[0-9a-fA-F-]{36}$/.test(requestId))
+        return json({error:"Dados do pedido inválidos"},400,headers);
+      const {data:orderId,error:orderError}=await client.rpc("create_avulso_order",{
+        p_name:name,p_phone:phone,p_items:items,p_share_token:token,p_event_id:null,
+        p_request_id:requestId
+      });
+      if(orderError){
+        console.warn("create_avulso_order rejected",orderError.code);
+        const message=String(orderError.message||"");
+        const expected=/nome|telefone|pedido|quantidade|variação|Produto|produto|Link|link|Muitos pedidos/i.test(message);
+        return json({error:expected?message:"Não foi possível registrar o pedido"},expected?400:500,headers);
+      }
+      return json({order_id:orderId,created_at:new Date().toISOString()},200,headers);
+    }
+    if(payload.action!==undefined && payload.action!=="get")
+      return json({error:"Operação não reconhecida"},400,headers);
     const {data,error}=await client.rpc("get_shared_product_for_server",{p_token:token});
     if(error){
       console.error("get_shared_product_for_server error",error.code);
