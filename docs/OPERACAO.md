@@ -7,7 +7,7 @@
 - **Evento:** apenas eventos aos quais foi associado. Responsável pode registrar devolução e encerrar; operador registra vendas.
 - **Consulta:** visualização de produtos, saldos, eventos e movimentações sem alterações.
 
-Cada pessoa entra com seu próprio email usando um link de acesso enviado pelo Supabase, sem senha local. O histórico registra o UUID de quem executou cada movimento e o horário. A interface apresenta o nome do usuário correspondente.
+Cada pessoa entra com email e senha individual cadastrados pelo administrador. Contas antigas sem senha ainda podem usar link de acesso temporariamente para definir a própria senha. O histórico registra o UUID de quem executou cada movimento e o horário. A interface apresenta o nome do usuário correspondente.
 
 ## Produtos
 
@@ -53,3 +53,9 @@ Tags ficam em um catálogo reutilizável, acessível em **Categorias e tags**. N
 Para foto, use **Tirar foto** (câmera) ou **Escolher da galeria**. A imagem é compactada no celular e enviada ao bucket privado. Na lista de produtos, toque na imagem para ampliá-la. O aplicativo requer conexão para consultar estoque e salvar alterações.
 
 Em smartphones, a navegação fica no rodapé e o formulário de produto ocupa a tela, com campos e botões próprios para toque.
+
+## Cadastro e troca de senhas
+
+Em **Usuários > Novo usuário**, informe nome, email de login, função e senha inicial; confirme a senha. Não é necessário confirmar o email para ativar a conta. O usuário já pode fazer login imediatamente. A senha não fica visível após o cadastro e não é armazenada na tabela de usuários.
+
+O administrador pode selecionar **Definir senha** para outro usuário. Para trocar a própria senha, use **Minha senha** no painel. Todas as ações administrativas de senha são registradas na auditoria sem incluir o texto da senha. Bloquear uma conta impede seu acesso ao estoque sem apagar seu histórico.
