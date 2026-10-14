@@ -43,3 +43,13 @@ Os saldos são conferidos dentro de transação SQL com bloqueio de linhas, evit
 - O relatório apresenta histórico recente e exportação CSV; não substitui demonstrações contábeis.
 - O leitor usa biblioteca ZXing quando disponível; câmera pode variar conforme permissões e dispositivo.
 - Atualize políticas, testes e procedimentos de backup antes de uso com grande volume.
+
+## Categorias, tags e fotos (interface móvel)
+
+Em **Categorias e tags**, cadastre níveis sucessivos: categoria → subcategoria → subsubcategoria (limite de três). Em **Produtos > Novo produto** os três campos são encadeados, e os botões de `+` abrem um cadastro separado; ao salvar, o novo nível é selecionado automaticamente.
+
+Tags ficam em um catálogo reutilizável, acessível em **Categorias e tags**. No cadastro do produto, selecione tocando nos chips; **Criar tag** abre um cadastro curto em separado. Tags em uso não podem ser apagadas sem antes desvincular dos produtos.
+
+Para foto, use **Tirar foto** (câmera) ou **Escolher da galeria**. A imagem é compactada no celular e enviada ao bucket privado. Na lista de produtos, toque na imagem para ampliá-la. O aplicativo requer conexão para consultar estoque e salvar alterações.
+
+Em smartphones, a navegação fica no rodapé e o formulário de produto ocupa a tela, com campos e botões próprios para toque.
