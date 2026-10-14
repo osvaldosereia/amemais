@@ -471,6 +471,8 @@ function productsPage(){
   const expanded=state.items.filter(p=>(state.showInactiveProducts||p.active)&&
     groupKeys.has(p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id));
   const groups=groupInventory(expanded,state.apparelModels);
+  const filtersApplied=Boolean(q||state.categoryFilter||state.tagFilter);
+  const available=state.items.filter(p=>p.active).length;
   const pageSize=20,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=groups.slice(state.page*pageSize,(state.page+1)*pageSize);
@@ -480,10 +482,14 @@ function productsPage(){
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="filter" aria-haspopup="dialog"><span>'+h(state.categoryFilter?categoryFull(state.categoryFilter):'Todas as categorias')+'</span><span aria-hidden="true">⌄</span></button>'+
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="tag" aria-haspopup="dialog"><span>'+h(state.tagFilter||'Todas as tags')+'</span><span aria-hidden="true">⌄</span></button>'+
     button('📷 Ler EAN','search-scan','','small')+
-    button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+'</div>'+
+    button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+
+    (filtersApplied?button('Limpar filtros','products-clear-filters','','small primary'):'')+'</div>'+
     '<div class="grouped-inventory-grid">'+(list.length?list.map(g=>groupedCard(g,{
       h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts
-    })).join(''):'<div class="muteblock">Nenhum produto encontrado.</div>')+'</div>'+
+    })).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
+      (filtersApplied?'<p>Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.</p>'+
+      button('Mostrar todos os produtos','products-clear-filters','','primary'):
+      '<p>Cadastre um novo produto ou verifique a opção Mostrar inativos.</p>')+'</div>')+'</div>'+
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+
     groups.length+' modelo(s)/produto(s) · '+matched.length+' variação(ões) · página '+(state.page+1)+' de '+totalPages+
     '</small><div class="actions">'+
@@ -1138,6 +1144,10 @@ async function handleClick(event){
   if(action==='extra-size-toggle')return toggleExtraSize(target.closest('form'),target.dataset.size);
   if(action==='product-new')return productModal();
   if(action==='products-toggle-inactive'){state.showInactiveProducts=!state.showInactiveProducts;state.page=0;render();return;}
+  if(action==='products-clear-filters'){
+    state.search='';state.categoryFilter='';state.tagFilter='';state.page=0;
+    state.showInactiveProducts=false;render();return;
+  }
   if(action==='size-toggle'||action==='size-remove'){
     const form=target.closest('form'),size=target.dataset.size;
     const row=[...form.querySelectorAll('[data-size-variant]')].find(x=>x.dataset.sizeVariant===size);
