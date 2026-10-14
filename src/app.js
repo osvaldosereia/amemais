@@ -391,33 +391,60 @@ function usersPage(){
       (u.id!==state.user.id?'<div class="inline">'+button('Função','user-role','data-id="'+h(u.id)+'"','small')+button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+'</div>':'Sua conta')+'</td></tr>').join('')+'</tbody></table></div>')+
     '<div class="note">Os acessos são individuais. Bloquear um usuário não apaga seu histórico de operações. Senhas não são armazenadas pela aplicação.</div>';
 }
-function formModal(title,contents,formName,submitLabel='Salvar'){
-  document.querySelector('.modalback')?.remove();
+
+function closeTopModal(){
+  const backdrops=[...document.querySelectorAll('.modalback')];
+  const current=backdrops[backdrops.length-1];if(!current)return;
+  const form=current.querySelector('form');
+  if(form?.__previewUrl)URL.revokeObjectURL(form.__previewUrl);
+  current.remove();
+  const previous=backdrops[backdrops.length-2];if(previous)previous.inert=false;
+}
+function formModal(title,contents,formName,submitLabel='Salvar',stack=false){
+  if(!stack){
+    while(document.querySelector('.modalback'))closeTopModal();
+  }else{
+    const previous=[...document.querySelectorAll('.modalback')].at(-1);
+    if(previous)previous.inert=true;
+  }
   const backdrop=document.createElement('div');
-  backdrop.className='modalback';
+  backdrop.className='modalback';backdrop.style.zIndex=String(50+document.querySelectorAll('.modalback').length*5);
   backdrop.innerHTML='<section class="modal" role="dialog" aria-modal="true" aria-label="'+h(title)+'">'+
     '<div class="modalhead"><h2>'+h(title)+'</h2><button class="plain" type="button" data-action="modal-close" aria-label="Fechar">✕</button></div>'+
     '<form data-form="'+h(formName)+'">'+contents+'<div class="modalfooter"><button class="button" type="button" data-action="modal-close">Cancelar</button>'+
     '<button class="button primary" type="submit">'+h(submitLabel)+'</button></div></form></section>';
   document.body.append(backdrop);
-  backdrop.querySelector('[name]')?.focus();
+  backdrop.querySelector('[name]:not([type="file"])')?.focus();
+}
+function photoChooser(item){
+  return '<section class="form-section wide">'+
+    '<div class="section-head"><strong>Foto do produto</strong><small>Imagem compactada automaticamente</small></div>'+
+    '<div class="photo-editor"><button type="button" class="photo-preview" data-action="preview-zoom" aria-label="Ampliar foto">'+
+    (item?.image_path?'<img data-photo-id="'+h(item.id)+'" alt="Foto de '+h(item.name)+'" />':
+      '<span class="photo-empty"><span aria-hidden="true">▧</span> Sem foto</span>')+
+    '</button><div class="photo-editor-actions">'+
+    button('📷 Tirar foto','take-photo','','')+
+    button('▧ Escolher da galeria','choose-photo','','')+
+    '<small data-photo-status>JPG/WEBP · até 450 KB após compressão</small>'+
+    '</div><input hidden type="file" name="camera_file" accept="image/*" capture="environment">'+
+    '<input hidden type="file" name="gallery_file" accept="image/*"></div></section>';
 }
 function productModal(item=null){
   if(!isManager())return;
   const markup='<div class="formgrid">'+
     field('Nome do produto *','name','text',item?.name||'','required maxlength="180"')+
     field('Código interno (SKU)','sku','text',item?.sku||'','maxlength="80"')+
-    '<div class="field"><span>EAN / código de barras</span><div class="inline">'+
-    '<input style="flex:1;min-width:120px" name="ean" type="text" inputmode="numeric" placeholder="8 a 14 dígitos" value="'+h(item?.ean||'')+'">'+
-    button('📷 Ler','form-scan','data-target="ean"','small')+'</div></div>'+
-    selectField('Categoria','category_id',categoriesOptions(),item?.category_id||'')+
-    field('Tags (separadas por vírgula)','tags','text',(item?.tags||[]).join(', '),'','Ex.: Nossa Senhora, presente, adulto')+
-    '<label class="field"><span>Foto do produto</span><input type="file" name="photo" accept="image/*" capture="environment"><span class="help">Fotos compactadas automaticamente; no máximo 450 KB.</span></label>'+
-    (!item?field('Quantidade inicial na loja','initial_quantity','number','0','min="0" max="1000000" step="1"','Entrada de estoque registrada no histórico.'):'')+
+    '<div class="field wide"><span>EAN / código de barras</span><div class="inline">'+
+    '<input style="flex:1;min-width:155px" name="ean" type="text" inputmode="numeric" placeholder="8 a 14 dígitos" value="'+h(item?.ean||'')+'">'+
+    button('Ler câmera','form-scan','data-target="ean"','')+'</div></div>'+
+    photoChooser(item)+categorySelector(item)+productTagChooser(item)+
+    (!item?field('Quantidade inicial na loja','initial_quantity','number','0','min="0" max="1000000" step="1"','Entrada registrada no histórico.'):'')+
     (item?selectField('Situação','active',[['true','Ativo'],['false','Inativo']],String(item.active)):'')+'</div>';
   formModal(item?'Editar produto':'Novo produto',markup,item?'product-edit':'product-new',item?'Salvar alterações':'Cadastrar produto');
-  if(item)document.querySelector('.modal form').dataset.id=item.id;
+  const form=document.querySelector('.modalback form');if(item)form.dataset.id=item.id;
+  if(item?.image_path)hydrateImages();
 }
+
 function stockModal(id){
   if(!isManager())return;
   const p=product(id);if(!p)return;
@@ -464,12 +491,48 @@ function memberModal(eid){
     'member-add','Adicionar');
   document.querySelector('.modal form').dataset.event=eid;
 }
-function categoryModal(){
+
+function categoryModal(parentId=null,fromProduct=false,item=null){
   if(!isManager())return;
-  formModal('Nova categoria','<div class="formgrid">'+field('Nome','name','text','','required maxlength="90"')+
-    selectField('Categoria mãe','parent_id',[['','Nenhuma (categoria principal)'],...state.categories.filter(c=>c.depth<3).map(c=>[c.id,categoryFull(c.id)])])+
-    '</div>','category-new');
+  const editing=Boolean(item),hasChildren=editing&&state.categories.some(c=>c.parent_id===item.id);
+  const parent=editing?(item.parent_id||''):(parentId||'');
+  const depth=parent?(state.categories.find(c=>c.id===parent)?.depth||0)+1:1;
+  if(depth>3){toast('Limite de três níveis.',true);return;}
+  const label=editing?'Editar categoria':['','Nova categoria','Nova subcategoria','Nova subsubcategoria'][depth];
+  const choices=categoryTree().filter(c=>c.depth<3&&(!item||c.id!==item.id)).map(c=>[c.id,categoryFull(c.id)]);
+  const parentField=fromProduct?
+    '<div class="field"><span>Categoria superior</span><div class="readonly-field">'+h(categoryFull(parent)||'—')+'</div></div>':
+    selectField('Categoria superior','parent_id',[['','Nenhuma (principal)'],...choices],parent,hasChildren?'disabled':'');
+  formModal(label,'<div class="formgrid">'+field('Nome','name','text',item?.name||'','required minlength="2" maxlength="90"')+
+    parentField+'</div>'+
+    '<p class="help" style="margin-top:12px">Cadastro separado para não misturar seleção e criação de categorias.</p>',
+    editing?'category-edit':'category-new',editing?'Salvar':'Criar categoria',fromProduct);
+  const form=[...document.querySelectorAll('.modalback form')].at(-1);
+  form.dataset.parent=parent;form.dataset.fromProduct=fromProduct?'1':'0';
+  if(editing)form.dataset.id=item.id;
 }
+function tagModal(fromProduct=false){
+  if(!isManager())return;
+  formModal('Criar tag',
+    '<div class="formgrid">'+field('Nome da tag','name','text','','required minlength="2" maxlength="40"')+'</div>'+
+    '<p class="help" style="margin-top:12px">A tag ficará disponível para todos os produtos.</p>',
+    'tag-new','Criar tag',fromProduct);
+  const form=[...document.querySelectorAll('.modalback form')].at(-1);
+  form.dataset.fromProduct=fromProduct?'1':'0';
+}
+async function saveTaxonomyFromProduct(form,table,data,success){
+  if(state.loading)return;
+  state.loading=true;
+  try{
+    const record=assertOk(await db.from(table).insert(data).select('*').single());
+    if(table==='tags'){state.tags.push(record);state.tags.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));}
+    else state.categories.push(record);
+    closeTopModal();
+    refreshTaxonomyForm(table==='categories'?record.id:null,table==='tags'?record.name:null);
+    toast(success);
+  }catch(e){fail(e);}finally{state.loading=false;}
+}
+
 function userRoleModal(id){
   if(!isAdmin() || id===state.user?.id)return;
   const target=state.users.find(x=>x.id===id);
@@ -539,7 +602,7 @@ async function handleClick(event){
   const {action,id,view,user,event:eventId,target:scanTarget}=target.dataset;
   if(action==='view'){switchView(view);return;}
   if(action==='logout'){await db.auth.signOut();state.user=null;state.profile=null;state.imageCache.clear();render();return;}
-  if(action==='modal-close'){document.querySelector('.modalback')?.remove();return;}
+  if(action==='modal-close'){closeTopModal();return;}
   if(action==='forgot'){
     const email=window.prompt('Informe o email da sua conta:');
     if(!email)return;
@@ -558,6 +621,32 @@ async function handleClick(event){
   if(action==='event-return')return eventMove('devolucao');
   if(action==='member-add')return memberModal(id);
   if(action==='category-new')return categoryModal();
+  if(action==='category-child')return categoryModal(id);
+  if(action==='category-edit')return categoryModal(null,false,state.categories.find(c=>c.id===id));
+  if(action==='category-delete'){
+    const cat=state.categories.find(c=>c.id===id);
+    if(!isManager()||!cat||!window.confirm('Excluir a categoria '+cat.name+'?'))return;
+    return exec(async()=>assertOk(await db.from('categories').delete().eq('id',id)),'Categoria excluída.');
+  }
+  if(action==='tag-new')return tagModal();
+  if(action==='tag-delete'){
+    const tag=state.tags.find(t=>t.id===id);
+    if(!isManager()||!tag||!window.confirm('Excluir a tag '+tag.name+'?'))return;
+    return exec(async()=>assertOk(await db.from('tags').delete().eq('id',id)),'Tag excluída.');
+  }
+  if(action==='quick-category'){
+    const form=target.closest('form');
+    const level=Number(target.dataset.level);
+    const parent=level===2?form?.elements.namedItem('category_main')?.value:
+      level===3?form?.elements.namedItem('category_child')?.value:null;
+    if(level>1&&!parent){toast('Selecione primeiro o nível acima.',true);return;}
+    return categoryModal(parent,true);
+  }
+  if(action==='quick-tag')return tagModal(true);
+  if(action==='take-photo'||action==='choose-photo'){
+    const form=target.closest('form');
+    form?.querySelector(action==='take-photo'?'input[name="camera_file"]':'input[name="gallery_file"]')?.click();return;
+  }
   if(action==='user-new')return userModal();
   if(action==='user-role')return userRoleModal(id);
   if(action==='search-scan')return scanInto('#product-search');
@@ -617,8 +706,8 @@ async function handleSubmit(event){
     if(ean && !/^\d{8,14}$/.test(ean)){toast('O EAN deve conter de 8 a 14 dígitos.',true);return;}
     const payload={
       name:String(values.name).trim(),sku:String(values.sku||'').trim()||null,ean:ean||null,
-      tags:[...new Set(String(values.tags||'').split(',').map(x=>x.trim()).filter(Boolean))].slice(0,30),
-      category_id:values.category_id||null
+      tags:productTagValues(form),
+      category_id:values.category_leaf||values.category_child||values.category_main||null
     };
     if(editing)payload.active=values.active==='true';
     else payload.created_by=state.user.id;
@@ -676,13 +765,33 @@ async function handleSubmit(event){
     })),'Equipe atualizada.');
     return;
   }
-  if(type==='category-new'){
+
+  if(type==='category-new'||type==='category-edit'){
     if(!isManager())return;
-    await exec(async()=>assertOk(await db.from('categories').insert({
-      name:String(values.name).trim(),parent_id:values.parent_id||null
-    })),'Categoria criada.');
+    const name=String(values.name||'').trim(), parent=form.dataset.fromProduct==='1'?(form.dataset.parent||null):(values.parent_id||null);
+    if(name.length<2||name.length>90){toast('Nome entre 2 e 90 caracteres.',true);return;}
+    if(form.dataset.fromProduct==='1'){
+      await saveTaxonomyFromProduct(form,'categories',{name,parent_id:parent},'Categoria criada e selecionada.');
+    }else if(type==='category-edit'){
+      const data={name};if(!form.elements.namedItem('parent_id').disabled)data.parent_id=parent;
+      await exec(async()=>assertOk(await db.from('categories').update(data).eq('id',form.dataset.id)),'Categoria atualizada.');
+    }else{
+      await exec(async()=>assertOk(await db.from('categories').insert({name,parent_id:parent})),'Categoria criada.');
+    }
     return;
   }
+  if(type==='tag-new'){
+    if(!isManager())return;
+    const name=String(values.name||'').trim();
+    if(name.length<2||name.length>40||name.includes(',')){toast('Nome de tag inválido.',true);return;}
+    if(form.dataset.fromProduct==='1'){
+      await saveTaxonomyFromProduct(form,'tags',{name},'Tag criada e selecionada.');
+    }else{
+      await exec(async()=>assertOk(await db.from('tags').insert({name})),'Tag criada.');
+    }
+    return;
+  }
+
   if(type==='user-role'){
     if(!isAdmin() || form.dataset.id===state.user.id)return;
     if(!Object.hasOwn(roles,values.role))throw new Error('Função inválida.');
@@ -716,6 +825,8 @@ document.addEventListener('input',event=>{
 });
 document.addEventListener('change',event=>{
   if(event.target.id==='category-filter'){state.categoryFilter=event.target.value;state.page=0;render();}
+  if(event.target.id==='tag-filter'){state.tagFilter=event.target.value;state.page=0;render();}
+  if(event.target.matches('select[name="category_main"],select[name="category_child"]'))categorySelectorChanged(event.target);
   if(event.target.id==='event-filter'){state.eventFilter=event.target.value;render();}
   if(event.target.id==='movement-filter'){state.movementFilter=event.target.value;render();}
 });
