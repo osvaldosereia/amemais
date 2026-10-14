@@ -708,14 +708,21 @@ function switchView(view) {
   if(view!=='eventos')state.activeEvent=null;
   render();window.scrollTo(0,0);
 }
-async function scanInto(selector){
+async function scanInto(selector, scope=document){
   try {
     await scanEAN(code=>{
-      const el=document.querySelector(selector);
-      if(el){el.value=code;el.dispatchEvent(new Event('input',{bubbles:true}));el.focus();}
-      else {state.search=code;state.page=0;render();}
+      const el=scope?.querySelector(selector);
+      if(el && el.isConnected){
+        el.value=code;
+        el.dispatchEvent(new Event('input',{bubbles:true}));
+        if(el.isConnected)el.dispatchEvent(new Event('change',{bubbles:true}));
+        if(el.isConnected)el.focus();
+        toast('Código EAN lido com sucesso.');
+      } else if(selector==='#product-search'){
+        state.search=code;state.page=0;render();
+      } else toast('O formulário foi fechado. Abra o cadastro novamente.',true);
     });
-  } catch(error){fail(error);}
+  }catch(error){fail(error);}
 }
 async function handleClick(event){
   const target=event.target.closest('[data-action]');if(!target)return;
@@ -806,7 +813,7 @@ async function handleClick(event){
   if(action==='user-new')return userModal();
   if(action==='user-role')return userRoleModal(id);
   if(action==='search-scan')return scanInto('#product-search');
-  if(action==='form-scan')return scanInto('input[name="'+scanTarget+'"]');
+  if(action==='form-scan')return scanInto('input[name="'+scanTarget+'"]',target.closest('form'));
   if(action==='product-prev'){state.page=Math.max(0,state.page-1);render();return;}
   if(action==='product-next'){state.page++;render();return;}
   if(action==='export-csv')return exportCsv();
