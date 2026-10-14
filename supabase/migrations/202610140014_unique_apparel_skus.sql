@@ -1,4 +1,4 @@
--- AME MAIS: SKU automático único por modelo+tamanho e diagnóstico amigável de duplicidade.
+-- AME MAIS: SKU único por modelo e tamanho, conflito explicado em português.
 begin;
 create or replace function public.create_apparel(
  p_name text,p_type text,p_audience text,p_age_group text,
@@ -55,45 +55,17 @@ begin
    if length(v_color) not between 2 and 40 or length(v_size) not between 1 and 16 then
       raise exception 'Informe cor e tamanho válidos';
    end if;
-   -- UUID completo do modelo + tamanho: cada variação recebe SKU único por padrão,
-   -- sem reutilizar o código de outro produto mesmo após tentativas de cadastro.
+   -- Código automático único e estável, sem reaproveitar SKU de outro modelo.
    if v_sku is null then
      v_sku := 'AM-' || replace(v_model::text,'-','') || '-' || v_size;
    end if;
-   if exists(select 1 from public.products where sku = v_sku) then
-     raise exception 'O código interno "%" já está cadastrado. Troque o SKU desse tamanho ou deixe-o vazio para gerar automaticamente.',v_sku;
+   if exists(select 1 from public.products where sku=v_sku) then
+     raise exception 'Código interno "%" já cadastrado. Informe outro SKU ou deixe vazio para gerar automaticamente.',v_sku;
    end if;
-   if v_ean is not null and exists(select 1 from public.products where ean = v_ean) then
-     raise exception 'O EAN "%" já está cadastrado em outro produto. Verifique o código de barras.',v_ean;
+   if v_ean is not null and exists(select 1 from public.products where ean=v_ean) then
+     raise exception 'EAN "%" já cadastrado em outro produto. Confira o código de barras.',v_ean;
    end if;
-   if length(coalesce(v_sku,''))>80 or (v_ean is not null and v_ean !~ '^[0-9]{8,14}
-      raise exception 'SKU ou EAN inválido';
-   end if;
-   if (v_variant->>'quantity') is null or (v_variant->>'quantity') !~ '^[0-9]{1,7}$' then
-      raise exception 'Quantidade inicial inválida';
-   end if;
-   v_qty:=(v_variant->>'quantity')::integer;
-   if v_qty>1000000 then raise exception 'Quantidade inicial muito alta'; end if;
-   v_item_name:=p_name||' · '||v_color||' / '||v_size;
-   insert into public.products(
-     name,sku,ean,category_id,tags,apparel_model_id,apparel_size,apparel_color,created_by
-   ) values (
-     v_item_name,v_sku,v_ean,p_category_id,p_tags,v_model,v_size,v_color,v_actor
-   ) returning id into v_product;
-   insert into public.stock_balances(product_id,event_id,quantity)
-     values(v_product,null,0);
-   if v_qty>0 then
-     if app_private.role_in('estoquista') then
-       perform public.quick_stock_count(v_product,0,v_qty,'Estoque inicial: roupa');
-     else
-       perform public.move_stock(v_product,'entrada',v_qty);
-     end if;
-   end if;
- end loop;
- return v_model;
-end;
-$$;
-) then
+   if length(coalesce(v_sku,''))>80 or (v_ean is not null and v_ean !~ '^[0-9]{8,14}$') then
       raise exception 'SKU ou EAN inválido';
    end if;
    if (v_variant->>'quantity') is null or (v_variant->>'quantity') !~ '^[0-9]{1,7}$' then
