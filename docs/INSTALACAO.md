@@ -2,9 +2,9 @@
 
 ## 1. Banco exclusivo
 
-**Não reutilize um banco Supabase que tenha dados de outros sistemas.** Crie um projeto Supabase exclusivo para este aplicativo (verifique custos e região antes de criar).
+**Projeto já criado:** [AME MAIS Estoque](https://supabase.com/dashboard/project/awcclxehwzvvgajgpnmf), na mesma organização administrativa e com banco independente. Não reutilize os bancos da Dona Antônia ou de outros projetos.
 
-No SQL Editor do novo projeto, execute o arquivo `supabase/migrations/202610140001_initial.sql` integralmente. A migração habilita RLS, movimentações atômicas, papéis, bucket privado e auditoria.
+**Migração já aplicada e verificada em 14/10/2026.** O arquivo `supabase/migrations/202610140001_initial.sql` é a referência versionada para reimplantação, não o execute novamente no projeto já configurado. A migração habilita RLS, movimentações atômicas, papéis, bucket privado e auditoria.
 
 ## 2. Primeiro administrador
 
@@ -19,21 +19,23 @@ Essa etapa é deliberadamente manual, para impedir que alguém se cadastre como 
 
 ## 3. Cadastrar usuários pelo sistema
 
-Implante a Edge Function `supabase/functions/admin-create-user/index.ts` com o nome **admin-create-user**, habilitando a verificação de JWT (`verify_jwt=true`). A Function usa as variáveis internas do Supabase `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. A chave privilegiada **nunca** é utilizada no navegador nem salva no GitHub.
+**Edge Function já implantada e ativa** com o nome `admin-create-user` e verificação JWT habilitada (`verify_jwt=true`). O código fica em `supabase/functions/admin-create-user/index.ts`. A Function usa as variáveis internas do Supabase `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. A chave privilegiada **nunca** é utilizada no navegador nem salva no GitHub.
 
 O administrador poderá registrar colaboradores com senhas individuais e funções pelo menu **Usuários**. Remova acessos desativando o usuário, não apagando o histórico.
 
 ## 4. Aplicação web
 
-Edite `config.js` com:
-- `supabaseUrl`: URL pública da API do projeto novo.
-- `supabasePublishableKey`: chave **publishable**, ou a chave legada `anon` quando necessário.
+**`config.js` já está conectado ao projeto Supabase exclusivo da AME MAIS**, contendo somente:
+- `supabaseUrl`: URL pública da API do projeto AME MAIS.
+- `supabasePublishableKey`: chave pública **publishable** do projeto AME MAIS.
 
 Essas duas configurações são públicas e podem ser enviadas ao navegador; nenhuma outra chave deve entrar no repositório.
 
 É um site estático sem etapa de compilação. Publique por HTTPS em GitHub Pages, Cloudflare Pages, Netlify ou hospedagem similar, mantendo os arquivos e pastas. Para testes locais, use um servidor HTTP local: `python3 -m http.server 8000` e abra `http://localhost:8000`. Abrir `index.html` por `file://` não é suportado.
 
-Para GitHub Pages, publique o branch `main` na raiz. A URL será `https://osvaldosereia.github.io/amemais/`, **somente após ativar Pages**. O app depende da CDN `esm.sh` para o cliente Supabase e o leitor de código, fixados por versão; recomenda-se empacotar dependências localmente quando houver pipeline de produção.
+O workflow `.github/workflows/pages.yml` publica automaticamente o site a cada atualização da branch `main` e já teve execução bem-sucedida. Em GitHub > Settings > Pages, confira que a origem esteja configurada para **GitHub Actions**. Endereço esperado: `https://osvaldosereia.github.io/amemais/`. Também configure no Supabase Authentication > URL Configuration o endereço definitivo como Site URL e Redirect URL para links de redefinição de senha.
+
+O app depende da CDN `esm.sh` para o cliente Supabase e o leitor de código, fixados por versão; recomenda-se empacotar dependências localmente quando houver pipeline de produção.
 
 ## 5. Conferência antes do uso
 
