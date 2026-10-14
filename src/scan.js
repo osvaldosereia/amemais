@@ -11,8 +11,8 @@ async function zxing(){
       .catch(error=>{zxingPromise=null;throw error;});
   }
   const lib=await zxingPromise;
-  if(typeof lib.BrowserMultiFormatReader!=='function')throw new Error('Leitor indisponível');
   const Reader=lib.BrowserMultiFormatOneDReader || lib.BrowserMultiFormatReader;
+  if(typeof Reader!=='function')throw new Error('Leitor de códigos de barras indisponível');
   return new Reader();
 }
 
@@ -138,26 +138,43 @@ export function scanEAN(onCode){
       };
 
       if(native){
-        let last=0;
+        let last=0,startedAt=null,switched=false;
+        const fallback=async()=>{
+          if(switched||disposed||generation!==sequence)return;
+          switched=true;
+          if(animation)cancelAnimationFrame(animation);
+          animation=0;
+          status('Ajustando foco e tentando outro método de leitura…');
+          try{
+            await startZXing();
+            if(!disposed&&generation===sequence)
+              status('Leitor alternativo ativo. Aproxime o EAN do centro da câmera.');
+          }catch(error){
+            status('Não foi possível ler pela câmera. Use foto ou digite o código.',true);
+          }
+        };
         const tick=async time=>{
-          if(disposed||generation!==sequence)return;
+          if(disposed||generation!==sequence||switched)return;
+          if(startedAt===null)startedAt=time;
+          if(time-startedAt>=3500){await fallback();return;}
           if(time-last>=170&&video.readyState>=2){
             last=time;
             try{
               const results=await native.detect(video);
-              if(disposed||generation!==sequence)return;
+              if(disposed||generation!==sequence||switched)return;
               const result=results.map(x=>validEAN(x.rawValue)).find(Boolean);
               if(result){detected(result);return;}
-            }catch{
-              try{await startZXing();}
-              catch{status('Leitor indisponível. Selecione uma foto ou digite o EAN.',true);}
-              return;
-            }
+            }catch{await fallback();return;}
           }
-          if(!disposed&&generation===sequence)animation=requestAnimationFrame(tick);
+          if(!disposed&&generation===sequence&&!switched)animation=requestAnimationFrame(tick);
         };
         animation=requestAnimationFrame(tick);
-      }else await startZXing();
+      }else{
+        status('Iniciando leitura de código de barras…');
+        await startZXing();
+        if(!disposed&&generation===sequence)
+          status('Leitor ativo. Centralize as barras, ajuste a distância e a iluminação.');
+      }
     }catch(error){
       if(!disposed&&generation===sequence){
         status(explain(error),true);
