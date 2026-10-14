@@ -57,7 +57,7 @@ declare
   v_variants jsonb;
 begin
   if p_token is null or p_token !~ '^[0-9a-f]{64}$' then return null; end if;
-  select p into v_product
+  select p.* into v_product
     from public.product_shares s
     join public.products p on p.id=s.product_id
     where s.token_hash=extensions.digest(p_token,'sha256')
