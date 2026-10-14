@@ -234,7 +234,13 @@ function render(){
     '<button data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'"><span aria-hidden="true">'+x.ico+'</span> '+h(x.label)+'</button>').join('');
   root.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand">AME MAIS <span>Estoque</span></div><nav class="nav" aria-label="Menu principal">'+menu+'</nav><div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+'<br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
     '<div class="main"><header class="topbar"><strong>Gestão de estoque</strong><div class="inline"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span><button class="plain only-mobile" data-action="logout">Sair</button></div></header>'+
-    '<main class="content">'+pageContent()+'</main></div></div>';
+    '<main class="content">'+pageContent()+'</main></div></div>'+
+    '<nav class="bottom-nav" aria-label="Navegação do aplicativo">'+[
+      ['inicio','⌂','Início'],['produtos','▦','Produtos'],['eventos','▣','Eventos'],['movimentacoes','⇄','Histórico']
+    ].map(([id,ico,label])=>'<button type="button" data-action="view" data-view="'+id+'" class="'+(state.view===id?'active':'')+'">'+
+      '<span aria-hidden="true">'+ico+'</span><small>'+label+'</small></button>').join('')+
+    '<button type="button" data-action="mobile-more" class="'+(['categorias','usuarios'].includes(state.view)?'active':'')+'">'+
+      '<span aria-hidden="true">≡</span><small>Mais</small></button></nav>';
   hydrateImages();
 }
 function pageContent(){
@@ -266,11 +272,27 @@ function dashboard(){
       button('Ver eventos','view','data-view="eventos"','small'))+
     panel('Últimas movimentações',movementTable(latest),button('Ver histórico','view','data-view="movimentacoes"','small'));
 }
+
 function imgMarkup(p){
   return p.image_path?'<img class="thumb" data-photo-id="'+h(p.id)+'" alt="Foto: '+h(p.name)+'" loading="lazy" />':
-    '<div class="thumb placeholder" aria-hidden="true">□</div>';
+    '<div class="thumb placeholder" aria-hidden="true">▧</div>';
 }
-function productCell(p){return '<div class="cell-product">'+imgMarkup(p)+'<div><strong>'+h(p.name)+'</strong><small>'+h(p.sku||p.ean||'Sem código')+'</small></div></div>';}
+function photoButton(p){
+  return '<button type="button" class="product-photo" data-action="photo-view" data-id="'+h(p.id)+'" aria-label="Ampliar a foto de '+h(p.name)+'">'+imgMarkup(p)+'</button>';
+}
+function productCell(p){
+  return '<div class="cell-product">'+photoButton(p)+'<div><strong>'+h(p.name)+'</strong><small>'+h(p.sku||p.ean||'Sem código')+'</small></div></div>';
+}
+function mobileProductCard(p){
+  return '<article class="mobile-product-card">'+photoButton(p)+
+    '<div class="mobile-product-info"><strong>'+h(p.name)+'</strong><small>'+h(categoryFull(p.category_id))+'</small>'+
+    '<small>'+h(p.sku||p.ean||'Sem código')+'</small>'+
+    '<div class="product-tags">'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</div>'+
+    '<div class="mobile-product-actions"><span class="qty">Loja: '+qtyStore(p.id)+'</span>'+
+    (isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small')+
+      button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+'</div></div></article>';
+}
+
 function categoryFull(id){
   const bits=[],seen=new Set();let cat=state.categories.find(c=>c.id===id);
   while(cat&&!seen.has(cat.id)){seen.add(cat.id);bits.unshift(cat.name);cat=state.categories.find(c=>c.id===cat.parent_id);}
@@ -294,6 +316,7 @@ function productsPage(){
     (list.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Produto</th><th>Categoria</th><th>Tags</th><th>Loja</th><th>Situação</th><th></th></tr></thead><tbody>'+
       list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(isManager()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
       '<div class="muteblock">Nenhum produto encontrado.</div>')+
+    '<div class="mobile-products">'+list.map(mobileProductCard).join('')+'</div>'+
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+filtered.length+' produto(s) · página '+(state.page+1)+' de '+totalPages+'</small><div class="actions">'+
     button('Anterior','product-prev',state.page===0?'disabled':'','small')+button('Próxima','product-next',state.page+1>=totalPages?'disabled':'','small')+'</div></div></section>';
 }
@@ -415,6 +438,42 @@ function formModal(title,contents,formName,submitLabel='Salvar',stack=false){
     '<button class="button primary" type="submit">'+h(submitLabel)+'</button></div></form></section>';
   document.body.append(backdrop);
   backdrop.querySelector('[name]:not([type="file"])')?.focus();
+}
+function photoLightbox(url,caption){
+  document.querySelector('.photo-lightbox')?.remove();
+  const layer=document.createElement('div');layer.className='photo-lightbox';
+  layer.setAttribute('role','dialog');layer.setAttribute('aria-modal','true');
+  const btn=document.createElement('button');btn.className='lightbox-close';btn.type='button';
+  btn.textContent='Fechar ✕';btn.setAttribute('data-action','photo-close');
+  const img=document.createElement('img');img.src=url;img.alt=caption;
+  const title=document.createElement('div');title.className='lightbox-title';title.textContent=caption;
+  layer.append(btn,img,title);document.body.append(layer);btn.focus();
+}
+function bindPhotoPreview(form,photoBlob){
+  const previous=form.__previewUrl;
+  if(previous)URL.revokeObjectURL(previous);
+  form.__photoBlob=photoBlob;
+  const url=URL.createObjectURL(photoBlob);form.__previewUrl=url;
+  const target=form.querySelector('.photo-preview');
+  target.replaceChildren();
+  const img=document.createElement('img');img.alt='Prévia da nova foto';img.src=url;
+  target.append(img);
+  form.querySelector('[data-photo-status]').textContent='Pronta para salvar · '+Math.ceil(photoBlob.size/1024)+' KB';
+}
+async function handlePhotoInput(input){
+  const form=input.closest('form');
+  const file=input.files?.[0];
+  if(!form||!file)return;
+  if(file.size>20*1024*1024){toast('Escolha uma foto de até 20 MB.',true);return;}
+  const status=form.querySelector('[data-photo-status]');if(status)status.textContent='Compactando a foto…';
+  try{
+    const compressed=await compressPhoto(file);
+    if(!form.isConnected)return;
+    bindPhotoPreview(form,compressed);
+  }catch(error){
+    if(status)status.textContent='Não foi possível processar esta imagem.';
+    fail(error);
+  }
 }
 function photoChooser(item){
   return '<section class="form-section wide">'+
@@ -600,7 +659,40 @@ async function scanInto(selector){
 async function handleClick(event){
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id,view,user,event:eventId,target:scanTarget}=target.dataset;
-  if(action==='view'){switchView(view);return;}
+  if(action==='view'){document.querySelector('.mobile-more-overlay')?.remove();switchView(view);return;}
+  if(action==='mobile-more'){
+    document.querySelector('.mobile-more-overlay')?.remove();
+    const sheet=document.createElement('div');sheet.className='mobile-more-overlay';
+    const opts=[['inicio','Início'],['categorias','Categorias e tags'],['usuarios','Usuários']];
+    sheet.innerHTML='<div class="mobile-more-sheet" role="dialog" aria-modal="true" aria-label="Mais opções">'+
+      '<div class="section-head"><strong>Mais opções</strong><button type="button" data-action="mobile-more-close" class="plain">Fechar ✕</button></div>'+
+      opts.filter(([id])=>id==='inicio'||(id==='categorias'&&isManager())||(id==='usuarios'&&isAdmin()))
+        .map(([id,name])=>button(name,'view','data-view="'+id+'"','')).join('')+
+      button('Sair da conta','logout','','danger')+'</div>';
+    document.body.append(sheet);return;
+  }
+  if(action==='mobile-more-close'){document.querySelector('.mobile-more-overlay')?.remove();return;}
+  if(action==='photo-close'){document.querySelector('.photo-lightbox')?.remove();return;}
+  if(action==='photo-view'){
+    const item=product(id);if(!item?.image_path){toast('Este produto ainda não possui foto.',true);return;}
+    try{
+      const cached=state.imageCache.get(item.image_path);
+      let url=cached?.expires>Date.now()?cached.url:null;
+      if(!url){
+        const r=await db.storage.from('ame-produtos').createSignedUrl(item.image_path,600);
+        url=assertOk(r)?.signedUrl;
+        state.imageCache.set(item.image_path,{url,expires:Date.now()+570000});
+      }
+      photoLightbox(url,item.name);
+    }catch(e){fail(e);}
+    return;
+  }
+  if(action==='preview-zoom'){
+    const preview=target.querySelector('img');
+    if(!preview?.src){toast('Escolha ou tire uma foto primeiro.');return;}
+    photoLightbox(preview.src,'Foto do produto');
+    return;
+  }
   if(action==='logout'){await db.auth.signOut();state.user=null;state.profile=null;state.imageCache.clear();render();return;}
   if(action==='modal-close'){closeTopModal();return;}
   if(action==='forgot'){
@@ -718,8 +810,8 @@ async function handleSubmit(event){
         const created=assertOk(await db.from('products').insert(payload).select('id').single());
         productId=created.id;
       }
-      if(values.photo instanceof File && values.photo.size){
-        const compressed=await compressPhoto(values.photo);
+      if(form.__photoBlob){
+        const compressed=form.__photoBlob;
         const path=productId+'/'+crypto.randomUUID()+'.'+(compressed.type==='image/webp'?'webp':'jpg');
         assertOk(await db.storage.from('ame-produtos').upload(path,compressed,{contentType:compressed.type,upsert:false}));
         assertOk(await db.from('products').update({image_path:path}).eq('id',productId));
@@ -835,12 +927,30 @@ function updateFiltered(id,value){
   const field=document.getElementById(id);
   if(field&&selection!==null){field.focus();field.setSelectionRange(selection,selection);}
 }
-document.addEventListener('click',event=>{handleClick(event).catch(fail);});
+document.addEventListener('click',event=>{
+  if(event.target.classList?.contains('photo-lightbox')){document.querySelector('.photo-lightbox')?.remove();return;}
+  if(event.target.classList?.contains('mobile-more-overlay')){event.target.remove();return;}
+  handleClick(event).catch(fail);
+});
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){
+    if(document.querySelector('.photo-lightbox'))document.querySelector('.photo-lightbox').remove();
+    else if(document.querySelector('.mobile-more-overlay'))document.querySelector('.mobile-more-overlay').remove();
+    else if(document.querySelector('.modalback'))closeTopModal();
+  }
+});
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
   if(event.target.id==='product-search'||event.target.id==='movement-search')updateFiltered(event.target.id,event.target.value);
+  if(event.target.matches('[data-tag-search]')){
+    const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
+    event.target.closest('.form-section')?.querySelectorAll('.tag-choice').forEach(el=>{
+      el.hidden=!!q&&!el.textContent.toLocaleLowerCase('pt-BR').includes(q);
+    });
+  }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('input[name="camera_file"],input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
   if(event.target.id==='category-filter'){state.categoryFilter=event.target.value;state.page=0;render();}
   if(event.target.id==='tag-filter'){state.tagFilter=event.target.value;state.page=0;render();}
   if(event.target.matches('select[name="category_main"],select[name="category_child"]'))categorySelectorChanged(event.target);
