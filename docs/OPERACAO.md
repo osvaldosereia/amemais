@@ -136,3 +136,15 @@ Quando um produto for **excluído/desativado**, ele continua disponível no banc
 No cadastro de produtos simples, **produto e quantidade inicial** são gravados em uma única operação no Supabase. Se ocorrer erro, a transação é revertida integralmente. O envio da foto acontece depois; se a foto falhar, o produto **continua salvo** e o aviso será *Produto cadastrado; foto pendente de envio*, evitando recadastramentos acidentais.
 
 Na lista de Produtos, caso uma pesquisa ou filtro oculte mercadorias cadastradas, use **Limpar filtros** ou **Mostrar todos os produtos**. Registros excluídos não aparecem normalmente, mas podem ser consultados em **Mostrar inativos**.
+
+## Cards de produtos e compartilhamento por WhatsApp
+
+Na lista **Produtos**, o computador mostra cards horizontais com fotos ampliadas e saldos por tamanho à direita. No celular, a foto é grande e as variações ficam recolhidas sob **Ver estoque por tamanho**; toque para abrir ou fechar sem sair da lista.
+
+Na versão mobile, profissionais com permissão de cadastro de produtos encontram **Compartilhar no WhatsApp** em cada card. O sistema gera um link individual de visualização, válido por **7 dias**, e oferece **Enviar pelo WhatsApp** ou **Copiar link**. O destinatário não precisa entrar no AME MAIS: o visualizador somente de leitura mostra a foto, nome, saldos na loja por tamanho/cor, SKU e EAN. As quantidades são consultadas no Supabase a cada acesso e com **Atualizar estoque**. Não são mostrados movimentos, valores, usuários nem outros produtos. A fotografia mantém-se privada no armazenamento, sendo enviada por URL assinada temporária. Evite compartilhar links em grupos públicos, pois qualquer pessoa com o link pode consultar aquele produto até a validade terminar.
+
+## Balanço rápido agrupado
+
+Em **Balanço rápido**, cada modelo tem **um cartão** com foto, saldos no sistema e campo **Contado** de cada tamanho. Campos vazios são ignorados. Digitar **0** indica contagem física zero.
+
+Há duas maneiras de salvar: o botão **Salvar** da própria variação ou **Salvar contagens do card**, que grava de uma vez apenas os tamanhos preenchidos. Todas as contagens do card são confirmadas em uma transação no Supabase; conflito de saldo cancela a operação inteira. Cada lançamento fica no histórico de contagens e ajustes por usuário. Depois da confirmação, somente os valores do card são atualizados na tela, sem renderização da página, preservando rolagem, foco e outras contagens que ainda não foram salvas. A busca por EAN também localiza produtos além dos primeiros cartões visíveis sem descartar os campos digitados.
