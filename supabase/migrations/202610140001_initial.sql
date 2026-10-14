@@ -190,7 +190,7 @@ begin
   return coalesce(new,old);
 end $$;
 create trigger audit_event_members after insert or update or delete on public.event_members for each row execute function app_private.audit_members();
-create trigger audit_staff after update on public.staff_profiles for each row execute function app_private.audit_changes();
+create trigger audit_staff after insert or update on public.staff_profiles for each row execute function app_private.audit_changes();
 
 -- Movimentações auditáveis nunca podem ser alteradas nem excluídas.
 create function app_private.prevent_mutation() returns trigger language plpgsql set search_path = ''
@@ -216,7 +216,7 @@ begin
   if v_actor is null or not app_private.is_active() then raise exception 'Acesso negado'; end if;
   if p_quantity is null or p_quantity = 0 or abs(p_quantity::bigint) > 1000000 then raise exception 'Quantidade inválida'; end if;
   if p_action not in ('entrada','venda_loja','transferencia','venda_evento','devolucao','ajuste_loja') then raise exception 'Operação inválida'; end if;
-  if not exists (select 1 from public.products where id = p_product_id and active) then raise exception 'Produto não encontrado ou inativo'; end if;
+  if not exists (select 1 from public.products where id = p_product_id and (active or p_action in ('devolucao','venda_evento'))) then raise exception 'Produto não encontrado ou inativo'; end if;
 
   if p_action in ('transferencia','venda_evento','devolucao') then
     if p_event_id is null then raise exception 'Selecione um evento'; end if;
@@ -320,8 +320,19 @@ alter table public.stock_balances enable row level security;
 alter table public.stock_movements enable row level security;
 alter table public.audit_log enable row level security;
 
+create function app_private.shares_event(p_other_user uuid)
+returns boolean language sql stable security definer set search_path = ''
+as $ select exists(
+  select 1 from public.event_members mine
+  join public.event_members theirs on mine.event_id = theirs.event_id
+  where mine.user_id = (select auth.uid()) and theirs.user_id = p_other_user
+); $;
+revoke all on function app_private.shares_event(uuid) from public;
+grant execute on function app_private.shares_event(uuid) to authenticated;
+
 create policy staff_read on public.staff_profiles for select to authenticated using (
-  id=(select auth.uid()) or app_private.role_in('admin','gerente'));
+  id=(select auth.uid()) or app_private.role_in('admin','gerente') or
+  (app_private.is_active() and app_private.shares_event(id)));
 create policy staff_edit on public.staff_profiles for update to authenticated
   using(app_private.role_in('admin')) with check(app_private.role_in('admin'));
 
