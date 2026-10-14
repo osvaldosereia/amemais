@@ -1,0 +1,122 @@
+/* Cards produto v2 — desktop horizontal, foto grande e estoque retrátil no mobile. */
+.products-panel .grouped-inventory-grid{
+  display:flex!important;flex-direction:column;gap:16px;padding:18px;
+  background:#f6f9f7
+}
+.products-panel .grouped-inventory-card{
+  display:grid;grid-template-columns:minmax(0,1.16fr) minmax(340px,1fr);
+  border-radius:18px;background:#fff;box-shadow:0 4px 18px #183d2d0b;
+  overflow:hidden;min-width:0;align-items:stretch
+}
+.products-panel .grouped-inventory-top{
+  display:grid;grid-template-columns:minmax(190px,49%) minmax(150px,1fr);
+  gap:20px;padding:17px;align-items:start;min-width:0
+}
+.products-panel .grouped-inventory-photo{
+  width:100%;height:auto;aspect-ratio:4/5;max-height:330px;flex:none;
+  background:#f8faf7;border-radius:13px;overflow:hidden;
+  border:1px solid #ebf0ec;
+}
+.products-panel .grouped-inventory-photo .product-photo{
+  display:grid;place-items:center;width:100%;height:100%;background:transparent;border:0;
+}
+.products-panel .grouped-inventory-photo .thumb{
+  display:block;width:100%;height:100%;object-fit:contain;border-radius:0
+}
+.products-panel .grouped-inventory-photo .thumb.placeholder{
+  display:grid;place-items:center;color:#a0b9aa;font-size:3rem
+}
+.products-panel .grouped-inventory-info{
+  display:flex;flex-direction:column;gap:13px;align-items:flex-start;min-width:0;
+}
+.products-panel .grouped-inventory-info>strong{
+  font-size:clamp(1.03rem,1.5vw,1.3rem);font-weight:840;color:#204330;line-height:1.3;
+}
+.products-panel .grouped-inventory-info>small{font-size:.8rem;color:#718979}
+.products-panel .grouped-total{font-size:.85rem;line-height:1.5}
+.products-panel .grouped-variants-desktop{
+  display:flex;flex-direction:column;border-left:1px solid #e1ebe4;
+  background:#fbfdfb;min-width:0
+}
+.products-panel .group-variants-heading{
+  padding:17px 17px 12px;font-size:.88rem;font-weight:830;color:#2b6142;
+  border-bottom:1px solid #e3eee7
+}
+.products-panel .grouped-variants-desktop .group-variant-list{border:0;min-width:0}
+.products-panel .grouped-variants-desktop .group-variant-row{
+  padding:12px 15px;gap:12px;align-items:center
+}
+.products-panel .grouped-variants-mobile{display:none}
+.products-panel .group-whatsapp{display:none}
+.products-panel .group-variant-description small{font-size:.75rem}
+.products-panel .group-variant-stock{min-width:72px}
+.products-panel .group-variant-actions{justify-content:flex-end}
+@media(min-width:761px) and (max-width:1150px){
+  .products-panel .grouped-inventory-card{grid-template-columns:minmax(0,1fr) minmax(290px,.95fr)}
+  .products-panel .grouped-inventory-top{grid-template-columns:minmax(140px,44%) minmax(130px,1fr);gap:13px}
+  .products-panel .grouped-inventory-photo{aspect-ratio:4/5}
+}
+@media(max-width:760px){
+  .products-panel .grouped-inventory-grid{gap:16px;padding:11px}
+  .products-panel .grouped-inventory-card{display:flex;flex-direction:column;border-radius:17px}
+  .products-panel .grouped-inventory-top{
+    display:flex;flex-direction:column;padding:12px;gap:12px;align-items:stretch;
+  }
+  .products-panel .grouped-inventory-photo{
+    width:100%;max-height:410px;height:auto;aspect-ratio:4/3;flex:none;border-radius:13px;
+  }
+  .products-panel .grouped-inventory-photo .product-photo{width:100%;height:100%}
+  .products-panel .grouped-inventory-photo .thumb{width:100%;height:100%;object-fit:contain}
+  .products-panel .grouped-inventory-info{
+    width:100%;gap:8px;padding:2px 4px 4px;align-items:flex-start
+  }
+  .products-panel .grouped-inventory-info>strong{font-size:1.16rem}
+  .products-panel .grouped-total{font-size:.88rem;margin:4px 0}
+  .products-panel .grouped-inventory-info>.button{min-height:43px}
+  .products-panel .grouped-variants-desktop{display:none}
+  .products-panel .grouped-variants-mobile{
+    display:block;border-top:1px solid #dfebe1;background:#fff;
+  }
+  .products-panel .grouped-variants-mobile summary{
+    cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+    gap:12px;padding:17px 16px;list-style:none;color:#20593b;
+    font-size:.95rem;font-weight:790;min-height:59px;background:#f2f8f4
+  }
+  .products-panel .grouped-variants-mobile summary::-webkit-details-marker{display:none}
+  .products-panel .group-mobile-total{
+    white-space:nowrap;color:#1e6a42;font-variant-numeric:tabular-nums;
+  }
+  .products-panel .group-mobile-total span{display:inline-block;font-size:1.12rem;transition:transform .15s}
+  .products-panel .grouped-variants-mobile[open] .group-mobile-total span{transform:rotate(180deg)}
+  .products-panel .grouped-variants-mobile .group-variant-list{border:0}
+  .products-panel .group-variant-row{padding:12px 14px}
+  .products-panel .group-whatsapp{
+    display:flex;justify-content:center;align-items:center;gap:10px;
+    width:100%;min-height:51px;border:1px solid #15804a;border-radius:11px;
+    background:#188c53;color:#fff;font-weight:790;font-size:.89rem;
+    margin-top:7px;cursor:pointer
+  }
+  .products-panel .group-whatsapp:hover{background:#126d42}
+}
+@media(max-width:380px){
+  .products-panel .grouped-inventory-photo{aspect-ratio:1/1}
+  .products-panel .grouped-variants-mobile summary{font-size:.85rem}
+}
+@media(prefers-reduced-motion:reduce){.group-mobile-total span{transition:none!important}}
+
+/* Compartilhamento confirmado somente ao tocar no link do WhatsApp. */
+.share-product-modal{position:fixed;inset:0;z-index:210;display:grid;place-items:center;
+  background:#10281ec2;padding:18px}
+.share-product-sheet{width:min(520px,100%);max-height:90dvh;overflow:auto;
+  background:#fff;border-radius:20px;padding:23px;box-shadow:0 20px 45px #0003}
+.share-product-sheet header{display:flex;gap:10px;align-items:start;justify-content:space-between}
+.share-product-sheet h2{font-size:1.3rem;margin:0;color:#214a33}
+.share-product-sheet header button{background:#f3f7f4;border:0;border-radius:8px;min-width:40px;min-height:40px}
+.share-product-sheet p{color:#526e5a;font-size:.87rem;line-height:1.6}
+.share-product-sheet .share-link{word-break:break-all;padding:11px 12px;background:#f4f8f5;
+  border:1px solid #d9e9de;border-radius:9px;font-size:.76rem;color:#2e6646}
+.share-product-sheet .share-actions{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.share-product-sheet .share-actions button{min-height:48px;cursor:pointer;border-radius:10px;font-weight:750}
+.share-product-sheet .share-whatsapp-send{background:#168c54;color:#fff;border:0}
+.share-product-sheet .share-copy{background:#fff;color:#246546;border:1px solid #9ec9ad}
+.share-product-sheet .share-expiry{font-size:.75rem;color:#837961}
