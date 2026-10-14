@@ -10,7 +10,7 @@ import { groupInventory, groupedCard, addSizesContent, updateExtraSizeButtons, t
   eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261014cards2';
 import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014q2';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014orders2';
-import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261014inout1';
+import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261014inout2';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -27,6 +27,8 @@ const iconPaths = {
   alert:'<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3v.2"/>',
   trend:'<path d="m3 17 6-6 4 4 8-9M15 6h6v6"/>',
   arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',
+  'arrow-down-to-line':'<path d="M12 3v12m-5-5 5 5 5-5M4 19v2h16v-2"/>',
+  'arrow-up-from-line':'<path d="M12 17V5m-5 5 5-5 5 5M4 19v2h16v-2"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   search:'<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
