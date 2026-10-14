@@ -3,7 +3,7 @@ import { compressPhoto } from './photos.js';
 import { scanEAN } from './scan.js';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
-  apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto } from './apparel.js';
+  apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
 
 const cfg = window.AME_CONFIG || {};
 const root = document.querySelector('#app');
@@ -1213,6 +1213,7 @@ document.addEventListener('input',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('select[name="apparel_type"]'))apparelSyncCategory(event.target,state,{categoryFull});
   if(event.target.matches('input[name="camera_file"],input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
   if(event.target.id==='event-filter'){state.eventFilter=event.target.value;render();}
   if(event.target.id==='movement-filter'){state.movementFilter=event.target.value;render();}
