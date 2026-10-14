@@ -10,7 +10,7 @@ import { groupInventory, groupedCard, addSizesContent, updateExtraSizeButtons, t
   eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261014cards3';
 import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014q2';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014orders2';
-import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261014inout2';
+import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261014inout3';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -916,8 +916,12 @@ function updateStockOperationBasket(redraw=true,clearError=true){
   if(counter)counter.textContent=cart.size+' tipo(s) · '+total+' un.';
   const summary=document.querySelector('[data-stock-summary]');
   if(summary)summary.textContent=cart.size+' tipo(s) de produto · '+total+' unidade(s)';
-  const submit=document.querySelector('[data-form="stock-operation"] button[type="submit"]');
-  if(submit)submit.disabled=!cart.size||state.loading;
+  const submit=document.querySelector('.stock-confirm-dock button[type="submit"]');
+  const dest=state.stockSelectedDestination;
+  const allowed=kind==='entrada'||state.stockDestinations.some(d=>d.active&&d.id===dest);
+  if(submit)submit.disabled=!cart.size||state.loading||!allowed;
+  const preview=document.querySelector('[data-stock-destination-preview]');
+  if(preview)preview.textContent=state.stockDestinations.find(d=>d.id===dest)?.name||'Escolha um destino';
   const error=document.querySelector('[data-stock-error]');
   if(error&&clearError)error.hidden=true;
 }
@@ -966,7 +970,7 @@ async function saveStockOperation(form){
   const requestId=state.stockRequestIds[kind]||crypto.randomUUID();
   state.stockRequestIds[kind]=requestId;
   state.loading=true;
-  const submit=form.querySelector('button[type="submit"]');
+  const submit=document.querySelector('.stock-confirm-dock button[type="submit"]');
   if(submit){submit.disabled=true;submit.textContent='Registrando operação…';}
   try{
     const response=assertOk(await db.rpc('stock_operation_batch',{
@@ -979,7 +983,8 @@ async function saveStockOperation(form){
       else state.balances.push({product_id:row.product_id,event_id:null,quantity:Number(row.new_stock)});
     }
     cart.clear();state.stockRequestIds[kind]=null;
-    form.querySelector('[name="note"]').value='';
+    const note=form.querySelector('[name="note"]');
+    if(note)note.value='';
     try{
       state.stockBatches=assertOk(await db.from('stock_operation_batches')
         .select('id,operation,destination_id,note,created_at')
@@ -1537,6 +1542,10 @@ async function handleClick(event){
     const item=product(id);
     if(item?.apparel_model_id)return apparelVariantEditModal(item,{h,formModal});
     return productModal(item);
+  }
+  if(action==='stock-focus-search'){
+    const field=document.getElementById('stock-op-search');
+    field?.focus({preventScroll:false});return;
   }
   if(action==='stock-scan'){
     try{return scanEAN(code=>handleOperationScanCode(code));}catch(error){fail(error);return;}
@@ -2253,6 +2262,7 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('change',event=>{
   if(event.target.matches('.stock-destination-field select')){
     state.stockSelectedDestination=event.target.value;
+    updateStockOperationBasket(false);
   }
   if(event.target.matches('[data-stock-qty]')){
     const kind=state.view,record=state.stockCarts[kind]?.get(event.target.dataset.id);
