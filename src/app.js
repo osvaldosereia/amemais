@@ -507,7 +507,7 @@ function productModelManager(modelId){
 function productsPage(){
   const q=state.search.toLocaleLowerCase('pt-BR').trim();
   const matched=state.items.filter(p=>(state.showInactiveProducts||p.active)&&
-    (!q||[p.name,p.sku,p.ean,p.gondola,p.prateleira,...(p.tags||[])].join(' ').toLocaleLowerCase('pt-BR').includes(q))&&
+    (!q||[p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira,...(p.tags||[])].join(' ').toLocaleLowerCase('pt-BR').includes(q))&&
     (!state.categoryFilter||categoryChain(p.category_id).some(c=>c.id===state.categoryFilter))&&
     (!state.tagFilter||(p.tags||[]).includes(state.tagFilter)));
   const groupKeys=new Set(matched.map(p=>p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id));
@@ -515,19 +515,34 @@ function productsPage(){
   const expanded=state.items.filter(p=>(state.showInactiveProducts||p.active)&&
     groupKeys.has(p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id));
   const groups=groupInventory(expanded,state.apparelModels);
-  const filtersApplied=Boolean(q||state.categoryFilter||state.tagFilter);
+  const filtersApplied=Boolean(q||state.categoryFilter||state.tagFilter||state.showInactiveProducts);
   const available=state.items.filter(p=>p.active).length;
   const pageSize=20,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=groups.slice(state.page*pageSize,(state.page+1)*pageSize);
   const add=canRegisterProducts()?button('+ Novo produto','product-new','','primary'):'';
-  return tabHead('Produtos','Um cartão por modelo, com quantidade individual de cada tamanho.',add)+
-    '<section class="panel products-panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, tamanho ou SKU…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
-    '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="filter" aria-haspopup="dialog"><span>'+h(state.categoryFilter?categoryFull(state.categoryFilter):'Todas as categorias')+'</span><span aria-hidden="true">⌄</span></button>'+
-    '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="tag" aria-haspopup="dialog"><span>'+h(state.tagFilter||'Todas as tags')+'</span><span aria-hidden="true">⌄</span></button>'+
-    button('📷 Ler EAN','search-scan','','small')+
-    button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+
-    (filtersApplied?button('Limpar filtros','products-clear-filters','','small primary'):'')+'</div>'+
+  return '<header class="pagehead products-pagehead"><div><h1>Produtos</h1>'+
+    '<p>Catálogo e estoque</p></div><div class="actions">'+add+'</div></header>'+
+    '<section class="panel products-panel"><div class="product-toolbar-v3">'+
+      '<div class="product-search-row">'+
+        '<input id="product-search" type="search" class="search" autocomplete="off"'+
+        ' placeholder="Nome, EAN, tamanho ou SKU…" aria-label="Buscar produtos" value="'+h(state.search)+'">'+
+        '<button type="button" class="product-scan-btn" data-action="search-scan" aria-label="Ler EAN pela câmera" title="Ler EAN">'+
+          uiIcon('scan',23)+'</button></div>'+
+      '<div class="product-filter-row">'+
+        '<button type="button" class="taxonomy-filter-button product-filter-chip" data-action="taxonomy-open" data-mode="filter" aria-haspopup="dialog">'+
+          '<span>'+h(state.categoryFilter?categoryFull(state.categoryFilter):'Todas as categorias')+'</span><span aria-hidden="true">⌄</span></button>'+
+        '<button type="button" class="taxonomy-filter-button product-filter-chip" data-action="taxonomy-open" data-mode="tag" aria-haspopup="dialog">'+
+          '<span>'+h(state.tagFilter||'Tags')+'</span><span aria-hidden="true">⌄</span></button>'+
+      '</div>'+
+      '<div class="product-filter-tools">'+
+        '<details class="product-extra-filters"><summary>☷ '+(state.showInactiveProducts?'Inativos visíveis':'Mais filtros')+
+          ' <span aria-hidden="true">⌄</span></summary><div>'+
+          button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+
+          '</div></details>'+
+        (filtersApplied?button('Limpar filtros','products-clear-filters','','small'):'')+
+      '</div>'+
+    '</div>'+
     '<div class="grouped-inventory-grid">'+(list.length?list.map(g=>groupedCard(g,{
       h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts,
       canShare:canRegisterProducts()
