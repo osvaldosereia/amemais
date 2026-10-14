@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import { scanEAN } from './scan.js';
+import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js';
 
 const cfg = window.AME_CONFIG || {};
 const root = document.querySelector('#app');
@@ -20,7 +21,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],events:[],members:[],
   balances:[],movements:[],users:[],audits:[],search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
-  imageCache:new Map(),loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
+  imageCache:new Map(),collapsedCategories:new Set(),loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
 let notifyTimer;
@@ -183,52 +184,18 @@ function categoryChildren(parentId){
   return state.categories.filter(c=>c.parent_id===parentId)
     .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
 }
-function categoryLevelRow(parentId,selectedId='',level=1){
-  const options=categoryChildren(parentId);
-  const label=level===1?'Categoria principal':level===2?'Subcategoria':'Subcategoria · nível '+level;
-  const placeholder=level===1?'Selecione uma categoria':options.length?'Nenhuma (manter nível anterior)':'Nenhuma cadastrada neste nível';
-  const choices='<option value="">'+h(placeholder)+'</option>'+
-    options.map(c=>'<option value="'+h(c.id)+'" '+(selectedId===c.id?'selected':'')+'>'+h(c.name)+'</option>').join('');
-  return '<div class="cat-field" data-category-level="'+level+'">'+
-    '<label class="field"><span>'+h(label)+'</span>'+
-    '<select name="category_level_'+level+'" data-category-select aria-label="'+h(label)+'" '+(options.length?'':'disabled')+'>'+
-    choices+'</select></label>'+
-    button('+','quick-category','aria-label="Criar categoria neste nível" title="Criar neste nível"','square')+'</div>';
-}
-function categoryPathMarkup(selectedPath=[]){
-  let markup=categoryLevelRow(null,selectedPath[0]?.id||'',1);
-  for(let index=1;index<selectedPath.length;index++){
-    markup+=categoryLevelRow(selectedPath[index-1].id,selectedPath[index].id,index+1);
-  }
-  if(selectedPath.length)markup+=categoryLevelRow(selectedPath[selectedPath.length-1].id,'',selectedPath.length+1);
-  return markup;
-}
 function categorySelector(item=null){
+  const id=item?.category_id||'';
   return '<section class="form-section wide"><div class="section-head"><strong>Categoria do produto</strong>'+
-    '<small>Escolha quantos níveis precisar</small></div>'+
-    '<div class="cat-levels" data-category-steps>'+categoryPathMarkup(categoryChain(item?.category_id))+'</div>'+
-    '<p class="help">Os botões + abrem um cadastro separado. Sua seleção não será perdida.</p></section>';
+    '<small>Qualquer nível</small></div>'+
+    '<div class="taxonomy-control"><input name="category_id" type="hidden" value="'+h(id)+'">'+
+    '<button type="button" class="taxonomy-trigger" data-action="taxonomy-open" data-mode="product" aria-haspopup="dialog">'+
+    '<span class="taxonomy-icon">▤</span><span class="taxonomy-text"><small>Categoria selecionada</small><strong data-category-label>'+h(id?categoryFull(id):'Escolher categoria')+'</strong></span>'+
+    '<span aria-hidden="true" class="taxonomy-arrow">⌄</span></button>'+
+    button(id?'+ Subcategoria':'+ Categoria','quick-category','','small')+'</div>'+
+    '<p class="help">Busque ou navegue pela hierarquia. Criar categoria abre um cadastro separado.</p></section>';
 }
-function categorySelectorChanged(select){
-  const row=select.closest('[data-category-level]');
-  const container=row?.parentElement;
-  if(!row||!container)return;
-  let following=row.nextElementSibling;
-  while(following){
-    const next=following.nextElementSibling;following.remove();following=next;
-  }
-  if(select.value){
-    const current=Number(row.dataset.categoryLevel);
-    container.insertAdjacentHTML('beforeend',categoryLevelRow(select.value,'',current+1));
-  }
-}
-function chosenCategory(form){
-  const selects=[...form.querySelectorAll('[data-category-select]')];
-  for(let index=selects.length-1;index>=0;index--){
-    if(selects[index].value)return selects[index].value;
-  }
-  return null;
-}
+function chosenCategory(form){return form?.querySelector('input[name="category_id"]')?.value||null;}
 
 function tagChipsHTML(selected=[]){
   const values=new Set(selected.map(t=>t.toLocaleLowerCase('pt-BR')));
@@ -245,14 +212,18 @@ function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
   const form=document.querySelector('form[data-form="product-new"],form[data-form="product-edit"]');
   if(!form)return;
   if(selectedCategory){
-    const categoryContainer=form.querySelector('[data-category-steps]');
-    if(categoryContainer)categoryContainer.innerHTML=categoryPathMarkup(categoryChain(selectedCategory));
+    const input=form.querySelector('input[name="category_id"]');
+    if(input)input.value=selectedCategory;
+    const label=form.querySelector('[data-category-label]');
+    if(label)label.textContent=categoryFull(selectedCategory);
+    const add=form.querySelector('[data-action="quick-category"]');
+    if(add)add.textContent='+ Subcategoria';
   }
-  const checkContainer=form.querySelector('[data-tag-choices]');
-  if(checkContainer){
-    const chosen=[...form.querySelectorAll('input[name="chosen_tags"]:checked')].map(i=>i.value);
-    if(selectedTag)chosen.push(selectedTag);
-    checkContainer.innerHTML=tagChipsHTML(chosen);
+  const checks=form.querySelector('[data-tag-choices]');
+  if(checks){
+    const selected=[...form.querySelectorAll('input[name="chosen_tags"]:checked')].map(el=>el.value);
+    if(selectedTag)selected.push(selectedTag);
+    checks.innerHTML=tagChipsHTML(selected);
   }
 }
 
@@ -357,9 +328,8 @@ function productsPage(){
   const add=isManager()?button('+ Novo produto','product-new','','primary'):'';
   return tabHead('Produtos','Pesquise por nome, código, EAN ou tags.',add)+
     '<section class="panel products-panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, SKU ou tag…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
-    '<select id="category-filter" class="filter" style="width:auto;max-width:240px" aria-label="Filtrar categoria">'+[['','Todas as categorias'],...categoriesOptions(false)].map(([id,n])=>'<option value="'+h(id)+'" '+(id===state.categoryFilter?'selected':'')+'>'+h(n)+'</option>').join('')+'</select>'+
-    '<select id="tag-filter" class="filter" style="width:auto;max-width:190px" aria-label="Filtrar tag">'+
-    [['','Todas as tags'],...state.tags.map(t=>[t.name,t.name])].map(([id,name])=>'<option value="'+h(id)+'" '+(id===state.tagFilter?'selected':'')+'>'+h(name)+'</option>').join('')+'</select>'+
+    '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="filter" aria-haspopup="dialog"><span>'+h(state.categoryFilter?categoryFull(state.categoryFilter):'Todas as categorias')+'</span><span aria-hidden="true">⌄</span></button>'+
+    '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="tag" aria-haspopup="dialog"><span>'+h(state.tagFilter||'Todas as tags')+'</span><span aria-hidden="true">⌄</span></button>'+
     button('Ler EAN','search-scan','','small')+'</div>'+
     (list.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Produto</th><th>Categoria</th><th>Tags</th><th>Loja</th><th>Situação</th><th></th></tr></thead><tbody>'+
       list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(isManager()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
@@ -612,18 +582,20 @@ function categoryModal(parentId=null,fromProduct=false,item=null){
   if(parent&&!parentCat){toast('Categoria superior não encontrada.',true);return;}
   const depth=parentCat?parentCat.depth+1:1;
   const label=editing?'Editar categoria':depth===1?'Nova categoria':'Nova subcategoria · nível '+depth;
-  // Escondemos a própria categoria e descendentes do menu de categoria superior.
-  const choices=categoryTree().filter(c=>!item||!categoryChain(c.id).some(x=>x.id===item.id))
-    .map(c=>[c.id,categoryFull(c.id)]);
-  const parentField=fromProduct?
-    '<div class="field"><span>Categoria superior</span><div class="readonly-field">'+h(parentCat?categoryFull(parent):'Categoria principal')+'</div></div>':
-    selectField('Categoria superior','parent_id',[['','Nenhuma (principal)'],...choices],parent,hasChildren?'disabled':'');
+  const parentField=fromProduct||hasChildren?
+    '<div class="field"><span>Categoria superior</span><div class="readonly-field">'+h(parentCat?categoryFull(parent):'Categoria principal')+'</div>'+
+    '<input type="hidden" name="parent_id" value="'+h(parent)+'"></div>':
+    '<div class="field"><span>Categoria superior</span><input type="hidden" name="parent_id" value="'+h(parent)+'">'+
+    '<button type="button" class="taxonomy-trigger" data-action="taxonomy-open" data-mode="parent" aria-haspopup="dialog">'+
+    '<span class="taxonomy-icon">▤</span><span class="taxonomy-text"><small>Organização da categoria</small>'+
+    '<strong data-category-label>'+h(parentCat?categoryFull(parent):'Nenhuma (principal)')+'</strong></span><span class="taxonomy-arrow">⌄</span></button></div>';
   formModal(label,'<div class="formgrid">'+field('Nome','name','text',item?.name||'','required minlength="2" maxlength="90"')+
-    parentField+'</div>'+
-    '<p class="help" style="margin-top:12px">Criação separada da seleção do produto para manter o cadastro rápido.</p>',
+    parentField+'</div><p class="help" style="margin-top:12px">A criação fica separada da seleção.</p>',
     editing?'category-edit':'category-new',editing?'Salvar':'Criar categoria',fromProduct);
   const form=[...document.querySelectorAll('.modalback form')].at(-1);
-  form.dataset.parent=parent;form.dataset.fromProduct=fromProduct?'1':'0';
+  form.dataset.parent=parent;
+  form.dataset.fromProduct=fromProduct?'1':'0';
+  form.dataset.lockParent=hasChildren||fromProduct?'1':'0';
   if(editing)form.dataset.id=item.id;
 }
 
@@ -807,6 +779,33 @@ async function handleClick(event){
     return;
   }
   if(action==='logout'){await db.auth.signOut();state.user=null;state.profile=null;state.imageCache.clear();render();return;}
+  if(action==='taxonomy-open'){
+    const mode=target.dataset.mode,form=target.closest('form');
+    const selected=mode==='product'?chosenCategory(form):
+      mode==='parent'?form?.querySelector('input[name="parent_id"]')?.value:
+      mode==='tag'?state.tagFilter:state.categoryFilter;
+    openTaxonomyPicker({
+      trigger:target,categories:mode==='tag'?state.tags:state.categories,selected: selected||'',mode,
+      excludeId:mode==='parent'?form?.dataset.id:null,
+      onSelect:value=>{
+        if(mode==='filter'){state.categoryFilter=value;state.page=0;render();return;}
+        if(mode==='tag'){state.tagFilter=value;state.page=0;render();return;}
+        const input=form?.querySelector('input[name="'+(mode==='parent'?'parent_id':'category_id')+'"]');
+        if(input)input.value=value;
+        const label=target.querySelector('[data-category-label]');
+        if(label)label.textContent=value?categoryFull(value):(mode==='parent'?'Nenhuma (principal)':'Escolher categoria');
+        if(mode==='product'){
+          const add=form.querySelector('[data-action="quick-category"]');
+          if(add)add.textContent=value?'+ Subcategoria':'+ Categoria';
+        }
+      }
+    });return;
+  }
+  if(action==='category-toggle'){
+    if(state.collapsedCategories.has(id))state.collapsedCategories.delete(id);
+    else state.collapsedCategories.add(id);
+    render();return;
+  }
   if(action==='modal-close'){closeTopModal();return;}
   if(action==='login-mode'){state.loginMode=state.loginMode==='link'?'password':'link';state.loginNotice='';render();return;}
   if(action==='my-password')return myPasswordModal();
@@ -842,14 +841,7 @@ async function handleClick(event){
     if(!isManager()||!tag||!window.confirm('Excluir a tag '+tag.name+'?'))return;
     return exec(async()=>assertOk(await db.from('tags').delete().eq('id',id)),'Tag excluída.');
   }
-  if(action==='quick-category'){
-    const row=target.closest('[data-category-level]');
-    const form=target.closest('form');
-    const level=Number(row?.dataset.categoryLevel);
-    const parent=level===1?null:form?.querySelector('[data-category-level="'+(level-1)+'"] [data-category-select]')?.value;
-    if(!level||(level>1&&!parent)){toast('Selecione primeiro a categoria superior.',true);return;}
-    return categoryModal(parent,true);
-  }
+  if(action==='quick-category')return categoryModal(chosenCategory(target.closest('form')),true);
   if(action==='quick-tag')return tagModal(true);
   if(action==='take-photo'||action==='choose-photo'){
     const form=target.closest('form');
@@ -995,7 +987,7 @@ async function handleSubmit(event){
     if(form.dataset.fromProduct==='1'){
       await saveTaxonomyFromProduct(form,'categories',{name,parent_id:parent},'Categoria criada e selecionada.');
     }else if(type==='category-edit'){
-      const data={name};if(!form.elements.namedItem('parent_id').disabled)data.parent_id=parent;
+      const data={name};if(form.dataset.lockParent!=='1')data.parent_id=parent;
       await exec(async()=>assertOk(await db.from('categories').update(data).eq('id',form.dataset.id)),'Categoria atualizada.');
     }else{
       await exec(async()=>assertOk(await db.from('categories').insert({name,parent_id:parent})),'Categoria criada.');
@@ -1064,7 +1056,8 @@ document.addEventListener('click',event=>{
 });
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
-    if(document.querySelector('.photo-lightbox'))document.querySelector('.photo-lightbox').remove();
+    if(document.querySelector('.tax-backdrop'))closeTaxonomyPicker();
+    else if(document.querySelector('.photo-lightbox'))document.querySelector('.photo-lightbox').remove();
     else if(document.querySelector('.mobile-more-overlay'))document.querySelector('.mobile-more-overlay').remove();
     else if(document.querySelector('.modalback'))closeTopModal();
   }
@@ -1081,9 +1074,6 @@ document.addEventListener('input',event=>{
 });
 document.addEventListener('change',event=>{
   if(event.target.matches('input[name="camera_file"],input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
-  if(event.target.id==='category-filter'){state.categoryFilter=event.target.value;state.page=0;render();}
-  if(event.target.id==='tag-filter'){state.tagFilter=event.target.value;state.page=0;render();}
-  if(event.target.matches('[data-category-select]'))categorySelectorChanged(event.target);
   if(event.target.id==='event-filter'){state.eventFilter=event.target.value;render();}
   if(event.target.id==='movement-filter'){state.movementFilter=event.target.value;render();}
 });
