@@ -422,3 +422,52 @@ button, select, input, textarea { touch-action: manipulation; }
  .apparel-detail-right{flex-wrap:wrap;justify-content:flex-end}
  .apparel-detail-right>span{width:100%;text-align:right}
 }
+
+/* Cadastro unificado de produtos: localização e grade de tamanhos legível */
+.single-fields,.location-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;width:100%}
+.single-fields .field,.location-fields .field{min-width:0}
+.variation-switch-section{background:#f2f7f3;border-color:#c7ddd0}
+.variation-switch{display:flex;align-items:center;gap:13px;cursor:pointer;margin:0;min-height:58px}
+.variation-switch input{width:23px;height:23px;flex:0 0 23px;accent-color:#1c5348}
+.variation-switch>span:last-child{display:flex;flex:1;flex-direction:column;gap:5px}
+.variation-switch strong{font-size:.96rem;color:#234834}
+.variation-switch small{color:#657669;font-size:.82rem;line-height:1.45}
+.variation-switch-indicator{display:none}
+[data-variant-panel]{padding-top:13px;border-top:1px solid #dce8df;margin-top:3px}
+[data-variant-panel][hidden],[data-size-variant][hidden],[data-single-fields][hidden],[data-single-stock][hidden]{display:none!important}
+.size-common-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.size-common-fields .field{min-width:0}
+.size-selector-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 10px}
+.size-selector-title strong{font-size:.9rem}
+.size-selector-title .button{min-height:44px}
+.size-chip-group{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin-bottom:12px}
+.size-chip{border:1px solid #b9cbbf;background:#fff;color:#2f5b45;border-radius:9px;min-height:49px;padding:9px 4px;font-size:.8rem;font-weight:750;cursor:pointer}
+.size-chip.selected{color:#fff;border-color:#1c5348;background:#1c5348}
+.size-chip:focus-visible{outline:3px solid #81b39d;outline-offset:2px}
+.size-variant-list{display:flex;flex-direction:column;gap:11px}
+.size-variant-card{border:1px solid #d5e3d9;border-radius:11px;background:#fff;padding:13px}
+.size-variant-card:nth-child(even){background:#f4f7fb;border-color:#d7e2e9}
+.size-variant-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.size-variant-heading strong{font-size:.94rem}
+.size-variant-heading .button{min-height:40px}
+.size-fields{display:grid;grid-template-columns:1fr 1fr 120px;gap:10px}
+.size-fields .field{min-width:0}
+.size-fields .field input{width:100%;min-width:0;font-size:16px;min-height:48px}
+.size-fields .inline{display:flex;flex-wrap:nowrap}
+.size-fields .inline input{min-width:0;flex:1}
+.size-fields .inline .button{flex:0 0 auto;min-height:48px}
+.location-section{background:#f6f8fb;border-color:#dce5ed}
+@media(max-width:900px){
+ .size-chip-group{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .size-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ .single-fields,.location-fields,.size-common-fields,.size-fields{grid-template-columns:1fr;gap:13px}
+ .variation-switch{align-items:flex-start}
+ .variation-switch input{margin-top:3px}
+ .size-selector-title{align-items:stretch;flex-direction:column}
+ .size-selector-title .button{width:100%}
+ .size-chip-group{grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+ .size-chip{min-height:54px}
+ .size-variant-card{padding:12px}
+}
