@@ -60,3 +60,5 @@ A seleção rápida de categoria, subcategoria e subsubcategoria fica separada d
 O administrador preenche nome, email de login, função, senha inicial e confirmação da senha no painel **Usuários**. O backend valida o JWT do administrador, usa o Supabase Auth Admin API com `email_confirm: true` (sem envio de link) e vincula a conta a `staff_profiles`. A senha não é salva no banco da aplicação nem nos logs. É possível redefinir senhas por **Usuários > Definir senha**. Cada usuário pode trocar a própria senha pelo menu **Minha senha**.
 
 As contas preexistentes criadas por link continuam preservadas. Para entrar pela primeira vez após a atualização e estabelecer senha, existe a opção **Ainda não tenho senha (acesso antigo)** no login. Não use links de confirmação para criar novas contas.
+
+O sistema aceita senhas a partir de **6 caracteres** na interface e no serviço de cadastro. Senhas mais longas continuam recomendadas para administradores. A política de senhas do Supabase Auth deve permitir esse mínimo.
