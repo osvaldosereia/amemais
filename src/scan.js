@@ -49,7 +49,8 @@ export function scanEAN(onCode){
     '<div class="scan-guide" aria-hidden="true"></div></div>',
     '<p data-status role="status" aria-live="polite">Abrindo câmera…</p>',
     '<div class="scan-actions"><button class="button" type="button" data-retry>Tentar câmera novamente</button>',
-    '<label class="button scan-file-button">Ler foto do código<input type="file" accept="image/*" data-photo aria-label="Escolher foto do EAN"></label></div>',
+    '<label class="button scan-file-button">Ler foto do código<input type="file" accept="image/*" data-photo aria-label="Escolher foto do EAN"></label>',
+    '<button type="button" class="button scan-torch" data-torch hidden>Ligar luz da câmera</button></div>',
     '<form class="scan-manual" autocomplete="off"><label for="scan-manual-input">Ou digite o EAN</label>',
     '<div class="scan-manual-row"><input id="scan-manual-input" inputmode="numeric" pattern="[0-9]{8,14}" maxlength="14" required placeholder="8 a 14 dígitos">',
     '<button class="button primary" type="submit">Usar código</button></div></form></section>'
@@ -60,6 +61,8 @@ export function scanEAN(onCode){
   const message=backdrop.querySelector('[data-status]');
   const retry=backdrop.querySelector('[data-retry]');
   const photo=backdrop.querySelector('[data-photo]');
+  const torchButton=backdrop.querySelector('[data-torch]');
+  let torchOn=false;
   let disposed=false,stream=null,controls=null,animation=0,sequence=0,starting=false;
 
   const status=(text,error=false)=>{
@@ -74,6 +77,8 @@ export function scanEAN(onCode){
     stream?.getTracks().forEach(t=>t.stop());
     video.srcObject?.getTracks?.().forEach(t=>t.stop());
     stream=null;video.srcObject=null;
+    torchOn=false;
+    if(torchButton){torchButton.hidden=true;torchButton.textContent='Ligar luz da câmera';}
   };
   const close=()=>{
     if(disposed)return;
@@ -121,6 +126,13 @@ export function scanEAN(onCode){
         feed.getTracks().forEach(t=>t.stop());return;
       }
       stream=feed;video.srcObject=feed;
+      try{
+        const track=feed.getVideoTracks?.()[0];
+        const capabilities=track?.getCapabilities?.()||{};
+        if(capabilities.torch)torchButton.hidden=false;
+        if(capabilities.focusMode?.includes?.('continuous'))
+          await track.applyConstraints({advanced:[{focusMode:'continuous'}]});
+      }catch{/* Foco/flash opcionais; a câmera continua funcionando. */}
       await video.play();
       if(disposed||generation!==sequence)return;
       status('Aponte para as barras do EAN, com boa luz e sem reflexos.');
@@ -185,6 +197,15 @@ export function scanEAN(onCode){
       if(!disposed)retry.disabled=false;
     }
   }
+  torchButton.addEventListener('click',async()=>{
+    const track=stream?.getVideoTracks?.()[0];
+    if(!track?.applyConstraints)return;
+    try{
+      await track.applyConstraints({advanced:[{torch:!torchOn}]});
+      torchOn=!torchOn;
+      torchButton.textContent=torchOn?'Desligar luz':'Ligar luz da câmera';
+    }catch{status('Este aparelho não permite controlar o flash pelo navegador.',true);}
+  });
   retry.addEventListener('click',()=>{void begin();});
   photo.addEventListener('change',async()=>{
     const file=photo.files?.[0];
