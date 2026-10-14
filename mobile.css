@@ -471,3 +471,70 @@ button, select, input, textarea { touch-action: manipulation; }
  .size-chip{min-height:54px}
  .size-variant-card{padding:12px}
 }
+
+
+/* Seletor hierárquico v2 — categorias antigas e novas, sem aparência nativa. */
+.tax-helper{
+  margin:0;padding:0 20px 10px;font-size:.82rem;line-height:1.45;
+  color:#647a6e;flex:0 0 auto
+}
+.tax-trail{background:#f8fbf8;min-height:43px;gap:7px}
+.tax-trail button{background:#e7f0e9;border:1px solid #d8e6da;border-radius:8px}
+.tax-trail button:focus-visible{outline:2px solid #7ba68d;outline-offset:2px}
+.tax-category-entry,.tax-tag-choice,.tax-current-choice{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;min-width:0;gap:12px;text-align:left;
+  border:1px solid #d9e4dc;border-radius:12px;
+  padding:14px 15px;min-height:72px;
+  color:#27473a;background:#fff;cursor:pointer;
+}
+.tax-category-entry.tax-level-1{background:#eaf3ed}
+.tax-category-entry.tax-level-2{background:#f4f7ec}
+.tax-category-entry.tax-level-3{background:#edf4f9}
+.tax-category-entry.tax-level-4{background:#fcf5e9}
+.tax-category-entry.tax-level-5{background:#f7eff8}
+.tax-category-entry.tax-level-6{background:#eef5f2}
+.tax-category-entry.tax-selected{border:2px solid #6eab88}
+.tax-category-entry:hover,.tax-category-entry:focus-visible,
+.tax-current-choice:hover,.tax-current-choice:focus-visible,
+.tax-tag-choice:hover,.tax-tag-choice:focus-visible{
+  border-color:#93b9a1;background:#e5f2e8;outline:none;
+}
+.tax-category-entry-text,.tax-current-choice>span:first-child{
+  display:flex;flex-direction:column;gap:5px;min-width:0;flex:1;
+}
+.tax-category-entry-text strong,.tax-current-choice strong,.tax-tag-choice strong{
+  font-size:.96rem;line-height:1.35;overflow-wrap:anywhere
+}
+.tax-category-entry-text small,.tax-current-choice small{
+  font-size:.78rem;color:#60776b;line-height:1.35
+}
+.tax-category-entry-action,.tax-tag-choice>span:last-child,.tax-current-choice>span:last-child{
+  display:inline-flex;align-items:center;flex:0 0 auto;gap:3px;
+  font-size:.82rem;font-weight:700;color:#2a6448;
+  padding:8px;border-radius:8px;background:#ffffffa6;
+}
+.tax-category-entry-action span{font-size:1.35rem;line-height:.8}
+.tax-current-choice{
+  border:1px solid #78ab8d;background:#dceee2;
+  min-height:67px;
+}
+.tax-current-choice strong{font-size:1rem}
+.tax-tag-choice{min-height:62px;background:#f6faf7}
+.tax-sheet{max-height:calc(100dvh - 32px)}
+@media(max-width:760px){
+ .tax-sheet{
+  height:87dvh;max-height:87dvh;min-height:0;
+  border-radius:20px 20px 0 0
+ }
+ .tax-header{padding:15px 17px 9px}
+ .tax-header h2{font-size:1.09rem}
+ .tax-header .tax-close{height:43px;width:43px}
+ .tax-search{margin:0 15px 8px;min-height:46px}
+ .tax-helper{padding:0 16px 9px;font-size:.78rem}
+ .tax-trail{padding:5px 14px 9px}
+ .tax-results{gap:8px;padding:10px 12px}
+ .tax-category-entry{min-height:69px;padding:13px 12px}
+ .tax-category-entry-action{font-size:.77rem;padding:7px 6px}
+ .tax-footer{padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+}
