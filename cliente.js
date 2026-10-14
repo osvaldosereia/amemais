@@ -3,6 +3,7 @@ const endpoint="https://awcclxehwzvvgajgpnmf.supabase.co/functions/v1/shared-pro
 const token=new URLSearchParams(location.hash.slice(1)).get("t");
 const $=id=>document.getElementById(id);
 let catalog=[],requestId=null,submitting=false;
+const selections=new Map();
 const make=(tag,text,klass)=>{const el=document.createElement(tag);if(text!==undefined&&text!==null)el.textContent=String(text);if(klass)el.className=klass;return el};
 async function api(payload){
  const r=await fetch(endpoint,{method:"POST",mode:"cors",cache:"no-store",credentials:"omit",
@@ -12,11 +13,17 @@ async function api(payload){
 const groups=()=>{const map=new Map();for(const p of catalog){const key=p.model_id||p.id;if(!map.has(key))map.set(key,{key,title:p.title,photo:p.image_url,variants:[]});map.get(key).variants.push(p)}return [...map.values()].sort((a,b)=>a.title.localeCompare(b.title,"pt-BR"))};
 function qtyEditor(p){
  const qty=make("div",null,"client-qty"),minus=make("button","−"),plus=make("button","+"),input=document.createElement("input");
- minus.type=plus.type="button";input.type="number";input.inputMode="numeric";input.min="0";input.max="1000";input.step="1";input.value="0";input.dataset.item=p.id;input.setAttribute("aria-label","Quantidade de "+p.title+" "+(p.size||""));
+ minus.type=plus.type="button";input.type="number";input.inputMode="numeric";input.min="0";input.max="1000";input.step="1";input.value=String(selections.get(p.id)??0);input.dataset.item=p.id;input.setAttribute("aria-label","Quantidade de "+p.title+" "+(p.size||""));
  minus.setAttribute("aria-label","Diminuir");plus.setAttribute("aria-label","Aumentar");
- minus.addEventListener("click",()=>{input.value=String(Math.max(0,(Number(input.value)||0)-1));updateSummary()});
- plus.addEventListener("click",()=>{input.value=String(Math.min(1000,(Number(input.value)||0)+1));updateSummary()});
- input.addEventListener("input",updateSummary);qty.append(minus,input,plus);return qty;
+ const sync=()=>{
+   const raw=input.value.trim();
+   if(raw==="")selections.delete(p.id);
+   else selections.set(p.id,/^[0-9]{1,4}$/.test(raw)?Number(raw):NaN);
+   updateSummary();
+ };
+ minus.addEventListener("click",()=>{input.value=String(Math.max(0,(Number(input.value)||0)-1));sync()});
+ plus.addEventListener("click",()=>{input.value=String(Math.min(1000,(Number(input.value)||0)+1));sync()});
+ input.addEventListener("input",sync);qty.append(minus,input,plus);return qty;
 }
 function render(query=""){
  const q=query.trim().toLocaleLowerCase("pt-BR"),container=$("client-products");container.replaceChildren();
@@ -39,15 +46,18 @@ function render(query=""){
  updateSummary();
 }
 function selected(){
- const items=[];for(const input of document.querySelectorAll("[data-item]")){
-  const raw=input.value.trim(),n=Number(raw);
-  if(!/^[0-9]{1,4}$/.test(raw)||!Number.isInteger(n)||n<0||n>1000)throw Error("Quantidade inválida.");
-  if(n)items.push({product_id:input.dataset.item,quantity:n});
- }return items;
+ const items=[];
+ for(const [id,n] of selections){
+  if(!Number.isInteger(n)||n<0||n>1000)throw Error("Quantidade inválida.");
+  if(n>0)items.push({product_id:id,quantity:n});
+ }
+ return items;
 }
 function updateSummary(){
- let count=0,total=0;for(const input of document.querySelectorAll("[data-item]")){const n=Number(input.value)||0;if(n>0){count++;total+=n;}}
- $("client-order-summary").textContent=count?count+" variação(ões), "+total+" unidade(s) no pedido.":"Nenhum item selecionado.";
+ let count=0,total=0;
+ for(const n of selections.values()){if(n>0){count++;total+=n;}}
+ $("client-order-summary").textContent=count?
+   count+" variação(ões), "+total+" unidade(s) no pedido.":"Nenhum item selecionado.";
 }
 function feedback(msg){$("client-feedback").textContent=msg;$("client-feedback").hidden=false;}
 function showSaved(receipt){
