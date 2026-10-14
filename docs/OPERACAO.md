@@ -148,3 +148,20 @@ Na versão mobile, profissionais com permissão de cadastro de produtos encontra
 Em **Balanço rápido**, cada modelo tem **um cartão** com foto, saldos no sistema e campo **Contado** de cada tamanho. Campos vazios são ignorados. Digitar **0** indica contagem física zero.
 
 Há duas maneiras de salvar: o botão **Salvar** da própria variação ou **Salvar contagens do card**, que grava de uma vez apenas os tamanhos preenchidos. Todas as contagens do card são confirmadas em uma transação no Supabase; conflito de saldo cancela a operação inteira. Cada lançamento fica no histórico de contagens e ajustes por usuário. Depois da confirmação, somente os valores do card são atualizados na tela, sem renderização da página, preservando rolagem, foco e outras contagens que ainda não foram salvas. A busca por EAN também localiza produtos além dos primeiros cartões visíveis sem descartar os campos digitados.
+
+
+## Eventos: fluxo exclusivamente logístico
+
+O gerenciador de eventos mostra **unidades separadas, devolvidas, não retornadas e pendentes**. Não é necessário classificar produtos como vendidos ou doados. A separação retira unidades da loja e registra-as no estoque do evento; a **Devolução rápida por EAN** repõe somente o que voltou fisicamente. Quando o evento for encerrado, as unidades que não retornaram recebem **baixa neutra** do estoque do evento, sem voltar para a loja. Essa baixa fica auditada por usuário. Movimentações antigas originalmente classificadas como venda em evento continuam intactas no histórico, mas aparecem na categoria de unidades **não retornadas**.
+
+O histórico detalhado do evento é apresentado em **um card por produto/modelo** com foto e todas as variações (cor/tamanho) no mesmo card, mostrando enviado, voltou, pendente e não voltou para cada tamanho.
+
+## Pedidos Avulsos (sem alterar estoque)
+
+Em **Pedidos Avulsos**, administradores e gerentes podem criar um pedido com **nome e telefone com DDD**, selecionar produtos/variações e quantidades e, opcionalmente, associá-lo a um evento. A data e hora são geradas automaticamente. Também podem vincular, alterar ou retirar a associação a um evento **depois da criação do pedido**. Essa associação é apenas organizacional: nem o pedido nem a associação movimentam, reservam ou descontam estoque.
+
+**Pedidos pelo link de um produto:** o destinatário usa **Fazer Pedido** no visualizador compartilhado, escolhe tamanhos e quantidades com controles +/−, informa nome e telefone e salva. Após confirmação do Supabase, pode compartilhar no WhatsApp o **link do comprovante já salvo**, somente para leitura. Os pedidos aparecem no painel administrativo junto dos demais.
+
+**Acesso de cliente ao catálogo completo:** em Pedidos Avulsos, use **+ Acesso para cliente**, dê uma identificação ao acesso e copie ou envie por WhatsApp o link individual de cliente.html. O link dura **30 dias** e pode ser **revogado** pelo administrador ou gerente. Essa página permite pesquisar produtos, ver fotos e variações e informar quantidades desejadas, mas **não revela estoques reais**, não exige conta administrativa e não dá acesso a outras telas do sistema. O cliente informa nome e telefone com DDD e salva o pedido; o sistema gera um link de pedido.html que mostra o pedido registrado e **não permite edição**. Todos os pedidos ficam na seção Pedidos Avulsos. Qualquer pessoa com o link de catálogo poderá montar pedidos até o acesso expirar ou ser revogado; compartilhe-o somente com clientes pretendidos.
+
+**Privacidade:** o comprovante apresenta nome e telefone do solicitante. Qualquer pessoa que tenha o link do comprovante pode consultá-lo. Evite publicar comprovantes com dados pessoais em grupos públicos.
