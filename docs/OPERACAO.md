@@ -75,3 +75,29 @@ Na administração, a hierarquia mostra tons de fundo distintos conforme o níve
 **Balanço rápido (loja):** encontre o produto pelo nome, EAN, SKU ou câmera. O cartão apresenta nome, foto, saldo da loja e campo vazio **Quantidade contada**. Digite o total físico e pressione **Conferir**. Quando há diferença, o sistema pede confirmação, ajusta a quantidade pelo RPC `quick_stock_count` e registra a movimentação e o usuário responsável. Quando os valores são iguais, a conferência é registrada sem movimentar estoque.
 
 As contagens são transacionais: um saldo modificado depois que a tela foi aberta bloqueia a correção e pede atualização, evitando substituir alterações concorrentes. Estoques de eventos não são incluídos no balanço da loja. O saldo não pode ficar negativo. Os registros de contagem ficam em `stock_counts` e alterações de quantidade em `stock_movements`.
+
+## Roupas: modelos e variações
+
+Abra **Roupas** (ou **Produtos → Roupas e tamanhos**) e selecione **Nova roupa**. A tela foi preparada para uso direto:
+
+1. **Modelo** — nome (ex.: Camiseta Nossa Senhora Aparecida), tipo de roupa, público (Unissex/Feminino/Masculino), faixa etária (Adulto/Infantil/Bebê) e categoria. O tipo Camiseta sugere a categoria Roupas / Camisetas, mas é possível escolher uma subcategoria específica.
+2. **Imagem e tags** — foto única opcional tirada no celular ou da galeria (compactada antes do envio); escolha as tags cadastradas.
+3. **Variações** — informe cor, tamanho, SKU (opcional), EAN (opcional) e **quantidade inicial**. Toque em **Preencher P, M, G e GG** para criar tamanhos comuns, ou em **+ Adicionar variação** para outras cores/tamanhos.
+4. Toque em **Cadastrar roupa**. A operação cria um único modelo e uma linha de produto independente para cada combinação tamanho + cor.
+
+**Atenção:** não cadastre tamanhos como categorias. A categoria é, por exemplo, Roupas / Camisetas; **M, G, GG e XXG são variações** do modelo. SKU e EAN, quando informados, devem ser exclusivos de cada variação. Se um produto não possuir EAN, deixe vazio.
+
+No agrupamento de roupas, **Ver tamanhos** mostra SKU/EAN e saldo de cada variante. **Editar** permite corrigir tamanho, cor, EAN e SKU sem mexer no estoque, enquanto **Foto** troca a imagem compartilhada. Para alterar quantidades, use **Balanço rápido** ou as movimentações permitidas ao seu perfil.
+
+Cada variação integra automaticamente os módulos existentes: balanço, pesquisa por código, transferência para eventos, venda, devolução e histórico. Assim, 3 camisetas tamanho M e 2 tamanho GG são movimentadas separadamente. Não existem estoques duplicados.
+
+As categorias básicas Roupas / Camisetas, Camisas, Polos, Blusas, Vestidos, Casacos, Calças e Outras roupas foram criadas sem excluir as pastas antigas. Faça a reorganização das categorias legadas gradualmente, quando conveniente.
+
+**Exemplo orientativo (não cadastrado no banco)**:
+- Modelo: Camiseta Nossa Senhora Aparecida
+- Tipo: Camiseta; público: Unissex; faixa etária: Adulto; categoria: Roupas / Camisetas
+- Branco / P — quantidade 4
+- Branco / M — quantidade 8
+- Branco / G — quantidade 5
+
+Não é obrigatório ter todos os tamanhos ou todas as cores. O sistema aceita até 40 variações por modelo no cadastro inicial.
