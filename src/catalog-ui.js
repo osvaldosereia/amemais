@@ -97,8 +97,11 @@ export function catalogCategoryRows({categories,items,expanded,query,h,button,ca
       (hasChildren?'<button type="button" class="catalog-expand" data-action="category-toggle" data-id="'+h(c.id)+
         '" aria-label="'+(opened?'Recolher':'Expandir')+' '+h(c.name)+'" aria-expanded="'+opened+'">'+(q||opened?'▾':'▸')+'</button>':
         '<span class="catalog-expand catalog-expand-placeholder" aria-hidden="true">•</span>')+
-      '<div class="catalog-node-info"><strong>'+h(c.name)+'</strong>'+
-      '<small>'+h(depth===1?'Categoria principal':categoryFull(c.parent_id))+'</small></div>'+
+      (hasChildren?'<button type="button" class="catalog-node-info catalog-node-open" data-action="category-toggle" data-id="'+h(c.id)+'" aria-expanded="'+opened+'">':
+        '<div class="catalog-node-info">')+
+      '<strong>'+h(c.name)+'</strong>'+
+      '<small>'+h(depth===1?'Categoria principal':categoryFull(c.parent_id))+'</small>'+
+      (hasChildren?'</button>':'</div>')+
       '<div class="catalog-node-count"><strong>'+stat.directActive+'</strong><span>ativo(s) aqui</span>'+
       (archived?'<small>'+archived+' inativo(s) no histórico</small>':'')+
       (hasChildren&&stat.branchActive>stat.directActive?'<small>'+stat.branchActive+' ativo(s) no ramo</small>':'')+'</div>'+
