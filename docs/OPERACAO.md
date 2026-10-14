@@ -193,3 +193,8 @@ Na seção **Produtos**, o título e **+ Novo produto** ficam na mesma linha, e 
 Cada modelo/produto aparece em **um único card**. No celular, a foto fica à esquerda e nome, cor, estoque total e localização à direita. Toque na foto para ampliar. O botão **Tamanhos** abre e fecha a lista de variações, que mostra para cada tamanho a quantidade, SKU, EAN e localização específica. Produtos sem estoque são sinalizados de forma discreta. No desktop, o mesmo card fica horizontal e a lista de variações aparece aberta ao lado direito.
 
 **Editar** abre o cadastro simples ou, nas roupas, um gerenciador de todas as variações. O gerenciador permite editar um tamanho específico, atualizar a foto, adicionar tamanhos ou excluir uma variação autorizada. O menu **⋯** mantém as ações secundárias, incluindo compartilhamento pelo WhatsApp e movimentação de estoque (conforme a permissão). Nenhuma alteração visual modifica saldos ou movimentações armazenadas no Supabase.
+
+
+## Entrada/Saída simplificadas
+
+No topo das duas páginas, use as abas **Entrada | Saída**. Em **Saída**, escolha primeiro um destino cadastrado (obrigatório); **+ Novo destino** permite criar um local sem perder a seleção. Depois busque produto pelo nome, SKU ou EAN, ou utilize **Ler EAN**. Cada variação adicionada entra no carrinho, onde são exibidos a foto, o saldo atual e os botões de quantidade. O botão **+ Produto** retorna à busca. O resumo fixo na parte inferior mostra tipos, unidades e destino, com **Confirmar entrada/saída**. O campo de observação fica recolhido, e o histórico expandido aparece após a operação. A confirmação permanece única e transacional; pedidos e eventos continuam separados.
