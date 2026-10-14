@@ -1,0 +1,95 @@
+/* AME MAIS — logística agrupada e Pedidos Avulsos (responsivo) */
+.event-logistics-cards{display:flex;flex-direction:column;gap:16px;padding:17px;background:#f6f9f7}
+.event-logistics-card{display:grid;grid-template-columns:minmax(285px,.76fr) minmax(0,1.24fr);
+  background:#fff;border:1px solid #dae8dc;border-radius:16px;overflow:hidden;box-shadow:0 3px 14px #173d260c}
+.event-logistics-head{grid-column:1;grid-row:1/3;display:flex;flex-direction:column;gap:14px;padding:16px;background:#fff;border-right:1px solid #e5eee7}
+.event-logistics-photo{width:100%;height:auto;aspect-ratio:4/3;background:#f8fbf9;border-radius:12px;display:grid;place-items:center;overflow:hidden;border:1px solid #e8f0e9}
+.event-logistics-photo .product-photo{width:100%;height:100%;display:grid;place-items:center;border:0;padding:0;background:transparent}
+.event-logistics-photo .thumb{width:100%;height:100%;object-fit:contain}
+.event-logistics-info{display:flex;flex-direction:column;gap:7px;min-width:0}
+.event-logistics-info>strong{font-size:1.07rem;font-weight:840;line-height:1.4;color:#214c34;overflow-wrap:anywhere}
+.event-logistics-info>small{color:#789383;font-size:.78rem}
+.event-logistics-summary{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:5px}
+.event-logistics-summary span{display:flex;justify-content:space-between;align-items:center;gap:5px;padding:10px 11px;background:#f0f7f2;color:#376248;border-radius:9px;font-size:.75rem}
+.event-logistics-summary b{font-size:.9rem;color:#1c7344;font-variant-numeric:tabular-nums}
+.event-logistics-row-heading{grid-column:2;grid-row:1;background:#eaf4ee;padding:15px;font-weight:790;color:#205d40;border-bottom:1px solid #dce9df}
+.event-logistics-rows{grid-column:2;grid-row:2;background:#fff;display:flex;flex-direction:column;min-width:0}
+.event-logistics-row{padding:14px;border-bottom:1px solid #e5eee7}
+.event-logistics-row:last-child{border:0}
+.event-logistics-variant{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.event-logistics-variant strong{font-size:.86rem;color:#2b4935}
+.event-logistics-variant small{font-size:.71rem;color:#85958a;overflow-wrap:anywhere}
+.event-logistics-quantities{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.event-logistics-quantities>div{display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center;padding:9px 4px;background:#f3f8f5;border-radius:8px}
+.event-logistics-quantities span{font-size:.68rem;color:#647b6a;text-align:center}
+.event-logistics-quantities strong{font-size:1rem;color:#285c3b;font-variant-numeric:tabular-nums}
+.event-logistics-quantities .qty-green{color:#12854b}
+.event-logistics-quantities .qty-orange{color:#b26e25}
+
+/* Pedidos, feitos no site ou pelo cliente. */
+.orders-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin:0 0 17px}
+.orders-overview>div{display:flex;flex-direction:column;gap:7px;border-radius:13px;background:#fff;border:1px solid #dfeae2;padding:16px 18px}
+.orders-overview strong{font-size:1.6rem;color:#1d6541;font-variant-numeric:tabular-nums}
+.orders-overview span{color:#6d8773;font-size:.81rem}
+.avulso-order-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:15px;background:#f6f9f7}
+.avulso-order-card{background:#fff;border:1px solid #dce8df;border-radius:15px;overflow:hidden;min-width:0;box-shadow:0 2px 12px #1b45280b}
+.avulso-order-head{display:flex;justify-content:space-between;gap:12px;padding:16px}
+.avulso-order-head>div:first-child{display:flex;flex-direction:column;gap:5px;min-width:0}
+.avulso-order-head>div:first-child small{font-weight:780;color:#85948a;font-size:.7rem}
+.avulso-order-head h3{margin:0;color:#244d36;font-size:1.02rem;overflow-wrap:anywhere}
+.avulso-order-head a{font-size:.85rem;color:#1d7e4b;text-decoration:none;overflow-wrap:anywhere}
+.avulso-order-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;color:#667e6d;font-size:.75rem;text-align:right}
+.avulso-order-lines{border-top:1px solid #e9f0ea;max-height:360px;overflow:auto}
+.avulso-order-line{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:12px 15px;border-bottom:1px solid #edf1ed}
+.avulso-order-line:nth-child(even){background:#f9fcfa}
+.avulso-order-line>div{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.avulso-order-line strong{font-size:.84rem;overflow-wrap:anywhere}
+.avulso-order-line small{font-size:.71rem;color:#84968a}
+.avulso-order-line>b{white-space:nowrap;color:#1d6541;font-size:.86rem}
+.avulso-order-foot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px;background:#edf6f0}
+.avulso-order-foot>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.avulso-order-foot strong{font-size:.85rem;color:#27573c}
+.avulso-order-foot small{font-size:.76rem;color:#63816c}
+.avulso-order-foot>.button{min-height:43px}
+.orders-empty{padding:32px 18px;text-align:center;color:#728774}
+.avulso-access-list{display:flex;flex-direction:column;gap:9px;margin-top:15px}
+.avulso-access-row{display:flex;align-items:center;gap:14px;justify-content:space-between;flex-wrap:wrap;
+  border:1px solid #e0eee5;background:#f9fcfa;border-radius:11px;padding:13px}
+.avulso-access-row>div{display:flex;flex:1;flex-direction:column;gap:5px;min-width:170px}
+.avulso-access-row strong{font-size:.86rem}
+.avulso-access-row small{font-size:.74rem;color:#768d7c}
+.avulso-create-list{display:flex;flex-direction:column;gap:11px;max-height:40dvh;overflow-y:auto;overscroll-behavior:contain;padding:6px 2px 12px}
+.avulso-create-group{display:flex;flex-direction:column;gap:8px;padding:11px;background:#f7faf7;border:1px solid #dfebe2;border-radius:12px}
+.avulso-create-group[hidden]{display:none!important}
+.avulso-create-group>strong{font-size:.9rem;color:#1e6240}
+.avulso-create-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #e4ede4;padding-top:8px}
+.avulso-create-row>span{display:flex;flex-direction:column;gap:5px;font-size:.83rem;font-weight:680}
+.avulso-create-row small{font-size:.7rem;color:#84968a;font-weight:400;overflow-wrap:anywhere}
+.avulso-create-row input{width:83px;flex:none;min-height:43px;padding:8px;font-size:17px;border:1px solid #c8dbcd;border-radius:9px;text-align:center;font-weight:720}
+.avulso-order-selected{background:#e9f5ed;padding:11px;border-radius:10px;color:#276746;font-size:.85rem;font-weight:740;margin-top:10px}
+@media(max-width:1100px){.event-logistics-card{grid-template-columns:minmax(245px,.8fr) minmax(0,1.2fr)}.avulso-order-list{grid-template-columns:1fr}}
+@media(max-width:760px){
+ .event-logistics-cards{padding:10px;gap:12px}
+ .event-logistics-card{display:flex;flex-direction:column;border-radius:14px}
+ .event-logistics-head{border-right:0;padding:12px;gap:10px}
+ .event-logistics-photo{aspect-ratio:4/3;max-height:360px}
+ .event-logistics-info>strong{font-size:1.05rem}
+ .event-logistics-row-heading{padding:12px}
+ .event-logistics-row{padding:13px 10px}
+ .event-logistics-quantities{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+ .event-logistics-quantities>div{padding:8px 3px}
+ .event-logistics-quantities span{font-size:.64rem}
+ .event-logistics-quantities strong{font-size:.92rem}
+ .orders-overview{gap:7px}
+ .orders-overview>div{padding:11px 8px}
+ .orders-overview strong{font-size:1.3rem}
+ .orders-overview span{font-size:.69rem}
+ .avulso-order-list{padding:10px}
+ .avulso-order-head{flex-direction:column;gap:9px;padding:12px}
+ .avulso-order-meta{align-items:flex-start;text-align:left;flex-direction:row;flex-wrap:wrap}
+ .avulso-order-foot{flex-wrap:wrap}
+ .avulso-order-foot .button{width:100%}
+ .avulso-access-row{gap:9px}
+ .avulso-access-row .button{width:100%}
+}
+@media(max-width:360px){.event-logistics-quantities span{font-size:.6rem}.event-logistics-summary{gap:5px}}
