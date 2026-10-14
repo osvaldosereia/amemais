@@ -42,7 +42,7 @@ Deno.serve(async (request) => {
       userId = existingUserId;
     } else {
       const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: 'https://osvaldosereia.github.io/amemais/',
+        redirectTo: 'https://cdsb.net.br/',
         data: { full_name: fullName }
       });
       if (inviteError || !created.user) {
