@@ -6,6 +6,33 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261014b';
 
+// Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
+const iconPaths = {
+  home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
+  package:'<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v9l9 5 9-5V8M12 13v9"/>',
+  scan:'<path d="M5 3H3v5M19 3h2v5M3 16v5h5M21 16v5h-5M7 10v4M10 9v6M14 9v6M17 10v4"/>',
+  clipboard:'<rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4.5V3h6v1.5M9 13l2 2 4-4"/>',
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/>',
+  arrows:'<path d="M4 7h16l-4-4M20 7l-4 4M20 17H4l4-4M4 17l4 4"/>',
+  layers:'<path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/>',
+  users:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5"/>',
+  more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+  alert:'<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3v.2"/>',
+  trend:'<path d="m3 17 6-6 4 4 8-9M15 6h6v6"/>',
+  arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  search:'<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  pin:'<path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+  cross:'<path d="M12 2v20M6 8h12"/>',
+  exit:'<path d="M10 17l5-5-5-5m5 5H3M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/>',
+  chevron:'<path d="m9 6 6 6-6 6"/>'
+};
+const uiIcon=(name,size=21)=>'<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="'+size+'" height="'+size+
+  '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">'+
+  (iconPaths[name]||iconPaths.package)+'</svg>';
+
 const cfg = window.AME_CONFIG || {};
 const root = document.querySelector('#app');
 const h = v => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
@@ -14,13 +41,13 @@ const niceTime = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle:'
 const actionNames = {entrada:'Entrada',venda_loja:'Venda (loja)',transferencia:'Transferência',venda_evento:'Venda (evento)',devolucao:'Devolução',ajuste_loja:'Ajuste'};
 const roles = {admin:'Administrador',gerente:'Gerente',estoquista:'Estoquista',evento:'Equipe de evento',consulta:'Consulta'};
 const nav = [
-  {id:'inicio',label:'Visão geral',ico:'▦'},
-  {id:'produtos',label:'Produtos',ico:'□'},
-  {id:'balanco',label:'Balanço rápido',ico:'☑'},
-  {id:'eventos',label:'Eventos',ico:'▣'},
-  {id:'movimentacoes',label:'Movimentações',ico:'⇄'},
-  {id:'categorias',label:'Categorias e tags',ico:'≡'},
-  {id:'usuarios',label:'Usuários',ico:'♙'}
+  {id:'inicio',label:'Início',ico:'home'},
+  {id:'produtos',label:'Produtos',ico:'package'},
+  {id:'balanco',label:'Balanço rápido',ico:'clipboard'},
+  {id:'eventos',label:'Eventos',ico:'calendar'},
+  {id:'movimentacoes',label:'Movimentações',ico:'arrows'},
+  {id:'categorias',label:'Categorias e tags',ico:'layers'},
+  {id:'usuarios',label:'Usuários',ico:'users'}
 ];
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,events:[],members:[],
@@ -253,28 +280,44 @@ function button(label,action,extra='',kind=''){
 }
 function pill(status){return '<span class="pill '+h(status)+'">'+h({ativo:'Ativo',encerrado:'Encerrado',rascunho:'Rascunho'}[status]||status)+'</span>';}
 function render(){
-  if(!db){root.innerHTML='<div class="login-wrap"><div class="login"><div class="brand">AME MAIS <span>Estoque</span></div><h2>Configuração necessária</h2><p>Informe URL e chave pública do novo projeto Supabase em <code>config.js</code>. Não utilize o banco de outras empresas.</p><p class="muted">Veja docs/INSTALACAO.md no repositório.</p></div></div>';return;}
+  if(!db){root.innerHTML='<div class="login-wrap"><div class="login"><div class="brand">AME MAIS <span>Estoque</span></div><h2>Configuração necessária</h2><p>Verifique o Supabase exclusivo deste sistema em <code>config.js</code>.</p></div></div>';return;}
   if(!state.user){loginScreen();return;}
   if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
   if(!state.profile.active){pendingAccessScreen();return;}
   if(isStockkeeper()&&!permittedView(state.view))state.view='balanco';
-  if(state.view==='usuarios'&&!isAdmin() || state.view==='categorias'&&!isManager())state.view='inicio';
-  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager())).map(x=>
-    '<button data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'"><span aria-hidden="true">'+x.ico+'</span> '+h(x.label)+'</button>').join('');
-  root.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand">AME MAIS <span>Estoque</span></div><nav class="nav" aria-label="Menu principal">'+menu+'</nav><div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+'<br><button class="plain" data-action="my-password">Minha senha</button><br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
-    '<div class="main"><header class="topbar"><strong>Gestão de estoque</strong><div class="inline"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span><button class="plain only-mobile" data-action="logout">Sair</button></div></header>'+
+  if((state.view==='usuarios'&&!isAdmin())||(state.view==='categorias'&&!isManager()))state.view='inicio';
+  const mark='<span class="ame-mark" aria-hidden="true">'+uiIcon('cross',21)+'</span>';
+  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager()))
+    .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'">'+
+      uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('');
+  const desktopIdentity='<div class="brand brand-lockup">'+mark+'<div>AME MAIS<span>Controle de estoque</span></div></div>';
+  const bottomItems=isStockkeeper()?
+    [{id:'produtos',label:'Produtos',ico:'package'},{id:'scan',label:'Ler EAN',ico:'scan'},{id:'balanco',label:'Balanço',ico:'clipboard'}]:
+    [{id:'inicio',label:'Início',ico:'home'},{id:'produtos',label:'Produtos',ico:'package'},
+     {id:'scan',label:'Ler EAN',ico:'scan'},{id:'balanco',label:'Balanço',ico:'clipboard'},
+     {id:'more',label:'Mais',ico:'menu'}];
+  root.innerHTML='<div class="app-shell mobile-c-app"><aside class="sidebar">'+desktopIdentity+
+    '<nav class="nav" aria-label="Menu principal">'+menu+'</nav>'+
+    '<div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+
+    '<br><button class="plain" data-action="my-password">Minha senha</button>'+
+    '<br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
+    '<div class="main"><header class="topbar"><div class="topbar-brand">'+mark+
+    '<div><strong>AME MAIS</strong><small>ESTOQUE</small></div></div>'+
+    '<div class="topbar-right"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span>'+
+    '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir mais opções" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>'+
-    '<nav class="bottom-nav '+(isStockkeeper()?'bottom-nav-two':'')+'" aria-label="Navegação do aplicativo">'+
-    (isStockkeeper()?[
-      ['balanco','☑','Balanço'],['produtos','▦','Produtos']
-    ]:[
-      ['inicio','⌂','Início'],['produtos','▦','Produtos'],['balanco','☑','Balanço'],['eventos','▣','Eventos'],['movimentacoes','⇄','Histórico']
-    ]).map(([id,ico,label])=>'<button type="button" data-action="view" data-view="'+id+'" class="'+(state.view===id?'active':'')+'">'+
-      '<span aria-hidden="true">'+ico+'</span><small>'+label+'</small></button>').join('')+
-    (isStockkeeper()?'':'<button type="button" data-action="mobile-more" class="'+(['categorias','usuarios'].includes(state.view)?'active':'')+'">'+
-      '<span aria-hidden="true">≡</span><small>Mais</small></button>')+'</nav>';
+    '<nav class="bottom-nav '+(isStockkeeper()?'bottom-nav-stockkeeper':'bottom-nav-five')+
+    '" aria-label="Navegação do aplicativo">'+bottomItems.map(item=>{
+      const primary=item.id==='scan';
+      const on=item.id===state.view||item.id==='more'&&['eventos','movimentacoes','categorias','usuarios'].includes(state.view);
+      return '<button type="button" class="'+(primary?'bottom-scan ':'')+(on?'active':'')+
+        '" data-action="'+(primary?'global-scan':item.id==='more'?'mobile-more':'view')+'"'+
+        (primary?'':' data-view="'+item.id+'"')+' aria-label="'+h(item.label)+'"'+(on?' aria-current="page"':'')+'>'+
+        '<span class="nav-icon">'+uiIcon(item.ico,primary?27:22)+'</span><small>'+h(item.label)+'</small></button>';
+    }).join('')+'</nav>';
   hydrateImages();
 }
+
 function pageContent(){
   if(state.view==='balanco')return quickBalancePage();
   if(state.view==='produtos')return productsPage();
@@ -288,22 +331,63 @@ function panel(title,content,buttonMarkup=''){
   return '<section class="panel"><div class="panelhead"><h2>'+h(title)+'</h2>'+buttonMarkup+'</div>'+content+'</section>';
 }
 function dashboard(){
-  const active=state.events.filter(e=>e.status==='ativo'), total=state.balances.filter(b=>!b.event_id).reduce((s,b)=>s+b.quantity,0),
-    away=state.balances.filter(b=>b.event_id).reduce((s,b)=>s+b.quantity,0),
-    latest=state.movements.slice(0,8);
-  return tabHead('Visão geral','Resumo do estoque e dos eventos')+
-    '<div class="cards">'+[
-      ['Produtos cadastrados',state.items.filter(p=>p.active).length],
-      ['Unidades na loja',total],
-      ['Unidades em eventos',away],
-      ['Eventos ativos',active.length]
-    ].map(([label,n])=>'<div class="card"><div class="metric-label">'+h(label)+'</div><div class="metric">'+n.toLocaleString('pt-BR')+'</div></div>').join('')+'</div>'+
-    panel('Eventos em andamento',active.length?
-      '<div class="tablewrap"><table class="table"><thead><tr><th>Evento</th><th>Data</th><th>Itens restantes</th><th></th></tr></thead><tbody>'+
-      active.map(e=>'<tr><td><strong>'+h(e.name)+'</strong></td><td>'+niceDate(e.starts_at)+'</td><td class="qty">'+state.balances.filter(b=>b.event_id===e.id).reduce((s,b)=>s+b.quantity,0)+'</td><td>'+button('Abrir','event-detail','data-id="'+h(e.id)+'"','small')+'</td></tr>').join('')+'</tbody></table></div>'
-      :'<div class="muteblock">Nenhum evento em andamento.</div>',
-      button('Ver eventos','view','data-view="eventos"','small'))+
-    panel('Últimas movimentações',movementTable(latest),button('Ver histórico','view','data-view="movimentacoes"','small'));
+  const all=state.items.filter(p=>p.active);
+  const total=state.balances.filter(b=>!b.event_id).reduce((sum,b)=>sum+b.quantity,0);
+  const eventTotal=state.balances.filter(b=>b.event_id).reduce((sum,b)=>sum+b.quantity,0);
+  const zero=all.filter(p=>qtyStore(p.id)===0).length;
+  const activeEvents=state.events.filter(e=>e.status==='ativo').length;
+  const movementsToday=state.movements.filter(m=>m.created_at&&new Intl.DateTimeFormat('en-CA',{
+    timeZone:'America/Cuiaba',year:'numeric',month:'2-digit',day:'2-digit'
+  }).format(new Date(m.created_at))===dateToday()).length;
+  const firstName=(state.profile.full_name||'').trim().split(/\s+/)[0]||'Olá';
+  const recent=[...all].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).slice(0,6);
+  const roots=state.categories.filter(c=>!c.parent_id).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+  const categoryCards=roots.slice(0,8).map(c=>{
+    const count=all.filter(p=>categoryChain(p.category_id).some(path=>path.id===c.id)).length;
+    return '<button type="button" class="c-category-card" data-action="home-category" data-id="'+h(c.id)+'">'+
+      '<span class="c-category-icon">'+uiIcon('layers',21)+'</span>'+
+      '<strong>'+h(c.name)+'</strong><small>'+count+' produto(s)</small></button>';
+  }).join('');
+  const productCards=recent.map(p=>'<article class="c-feature-product">'+
+    '<div class="c-feature-image">'+photoButton(p)+'</div>'+
+    '<div class="c-feature-body"><strong>'+h(p.name)+'</strong><small>'+h(categoryFull(p.category_id))+'</small>'+
+    '<span class="c-feature-qty">Loja: <b>'+qtyStore(p.id)+'</b> un.</span>'+
+    '<button type="button" class="c-feature-open" data-action="home-product" data-id="'+h(p.id)+'">Ver produto '+uiIcon('arrow',14)+'</button></div></article>').join('');
+  const cards=[
+    {label:'Produtos ativos',value:all.length,icon:'package',tone:'green',hint:'Cadastrados'},
+    {label:'Sem estoque',value:zero,icon:'alert',tone:'red',hint:'Na loja'},
+    {label:'Movimentações',value:movementsToday,icon:'arrows',tone:'blue',hint:'Hoje'},
+    {label:'Eventos ativos',value:activeEvents,icon:'calendar',tone:'orange',hint:'Em andamento'}
+  ];
+  return '<div class="c-dashboard">'+
+    '<div class="c-welcome"><span class="c-eyebrow">PAINEL DO ESTOQUE</span>'+
+    '<h1>Olá, '+h(firstName)+'!</h1><p>Acompanhe seu estoque em um só lugar.</p></div>'+
+    '<section class="c-hero" aria-label="Resumo das unidades na loja"><div class="c-hero-main">'+
+    '<span class="c-hero-label">'+uiIcon('package',19)+' Unidades na loja</span>'+
+    '<strong class="c-hero-number">'+total.toLocaleString('pt-BR')+'</strong>'+
+    '<span class="c-hero-sub">'+eventTotal.toLocaleString('pt-BR')+' unidade(s) em eventos</span></div>'+
+    '<div class="c-hero-art" aria-hidden="true"><span></span><span></span><span></span><span></span></div></section>'+
+    '<div class="c-metric-grid">'+cards.map(c=>'<div class="c-metric c-metric-'+c.tone+'">'+
+      '<div class="c-metric-icon">'+uiIcon(c.icon,21)+'</div>'+
+      '<div class="c-metric-data"><span>'+h(c.label)+'</span><strong>'+c.value.toLocaleString('pt-BR')+'</strong>'+
+      '<small>'+h(c.hint)+'</small></div></div>').join('')+'</div>'+
+    '<div class="c-dashboard-actions">'+
+      (canRegisterProducts()?'<button type="button" class="c-action-primary" data-action="product-new">'+
+        uiIcon('plus',20)+' Novo produto</button>':'')+
+      '<button type="button" class="c-action-outline" data-action="global-scan">'+uiIcon('scan',20)+' Ler EAN</button></div>'+
+    '<section class="c-dashboard-section"><div class="c-section-heading"><h2>Categorias</h2>'+
+    '<button type="button" data-action="view" data-view="produtos">Ver produtos '+uiIcon('chevron',17)+'</button></div>'+
+    (categoryCards?'<div class="c-category-grid">'+categoryCards+'</div>':
+      '<p class="c-dash-empty">Cadastre categorias para organizar os produtos.</p>')+'</section>'+
+    '<section class="c-dashboard-section"><div class="c-section-heading"><h2>Produtos recentes</h2>'+
+    '<button type="button" data-action="view" data-view="produtos">Ver todos '+uiIcon('chevron',17)+'</button></div>'+
+    (productCards?'<div class="c-feature-grid">'+productCards+'</div>':
+      '<div class="c-dash-empty">'+uiIcon('package',28)+'<span>Nenhum produto cadastrado ainda.</span>'+
+      (canRegisterProducts()?button('Cadastrar primeiro produto','product-new','','primary'):'')+'</div>')+'</section>'+
+    (activeEvents?'<section class="c-dashboard-section c-event-shortcut"><div>'+
+      uiIcon('calendar',21)+' <strong>'+activeEvents+' evento(s) em andamento</strong></div>'+
+      '<button type="button" data-action="view" data-view="eventos">Ver eventos '+uiIcon('arrow',16)+'</button></section>':'')+
+    '</div>';
 }
 
 function imgMarkup(p){
@@ -814,17 +898,46 @@ async function handleClick(event){
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id,view,user,event:eventId,target:scanTarget}=target.dataset;
   if(action==='view'){document.querySelector('.mobile-more-overlay')?.remove();switchView(view);return;}
+  if(action==='global-scan'){
+    document.querySelector('.mobile-more-overlay')?.remove();
+    return scanEAN(code=>{
+      if(isStockkeeper()&&state.view==='balanco'){
+        state.search=code;state.page=0;render();return;
+      }
+      state.view='produtos';state.search=code;state.page=0;state.categoryFilter='';state.tagFilter='';
+      render();
+      if(!state.items.some(p=>p.ean===code))toast('Leitura concluída. Nenhum produto encontrado para este EAN.',true);
+    }).catch(fail);
+  }
+  if(action==='home-category'){
+    state.categoryFilter=id;state.tagFilter='';switchView('produtos');return;
+  }
+  if(action==='home-product'){
+    const item=product(id);if(!item)return;
+    state.categoryFilter='';state.tagFilter='';switchView('produtos');state.search=item.sku||item.ean||item.name;
+    render();return;
+  }
   if(action==='count-focus')return document.querySelector('[data-count-product="'+id+'"] input[name="counted"]')?.focus();
   if(action==='quick-scan')return scanInto('#quick-search');
   if(action==='mobile-more'){
     document.querySelector('.mobile-more-overlay')?.remove();
     const sheet=document.createElement('div');sheet.className='mobile-more-overlay';
-    const opts=[['inicio','Início'],['categorias','Categorias e tags'],['usuarios','Usuários']];
+    const opts=[
+      ['inicio','Início','home'],['produtos','Produtos','package'],['balanco','Balanço rápido','clipboard'],
+      ['eventos','Eventos','calendar'],['movimentacoes','Movimentações','arrows'],
+      ['categorias','Categorias e tags','layers'],['usuarios','Usuários','users']
+    ];
     sheet.innerHTML='<div class="mobile-more-sheet" role="dialog" aria-modal="true" aria-label="Mais opções">'+
-      '<div class="section-head"><strong>Mais opções</strong><button type="button" data-action="mobile-more-close" class="plain">Fechar ✕</button></div>'+
-      opts.filter(([id])=>id==='inicio'||(id==='categorias'&&isManager())||(id==='usuarios'&&isAdmin()))
-        .map(([id,name])=>button(name,'view','data-view="'+id+'"','')).join('')+
-      button('Minha senha','my-password')+button('Sair da conta','logout','','danger')+'</div>';
+      '<div class="c-sheet-handle" aria-hidden="true"></div>'+
+      '<div class="section-head"><strong>Menu do sistema</strong><button type="button" data-action="mobile-more-close" class="plain" aria-label="Fechar">✕</button></div>'+
+      '<div class="c-more-items">'+opts.filter(([id])=>permittedView(id)&&
+        (id!=='categorias'||isManager())&&(id!=='usuarios'||isAdmin()))
+        .map(([id,name,ico])=>'<button type="button" class="'+(state.view===id?'active':'')+
+          '" data-action="view" data-view="'+id+'">'+uiIcon(ico,21)+'<span>'+h(name)+'</span>'+uiIcon('chevron',17)+'</button>').join('')+
+      '</div><div class="c-more-account"><strong>'+h(state.profile.full_name)+'</strong><small>'+
+      h(roles[state.profile.role]||state.profile.role)+'</small>'+
+      '<button type="button" data-action="my-password">'+uiIcon('users',18)+' Minha senha</button>'+
+      '<button type="button" data-action="logout">'+uiIcon('exit',18)+' Sair da conta</button></div></div>';
     document.body.append(sheet);return;
   }
   if(action==='mobile-more-close'){document.querySelector('.mobile-more-overlay')?.remove();return;}
