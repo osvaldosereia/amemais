@@ -20,7 +20,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],events:[],members:[],
   balances:[],movements:[],users:[],audits:[],search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
-  imageCache:new Map(),loading:false,toastTimer:0,passwordRecovery:false,loginNotice:'',setupPending:false
+  imageCache:new Map(),loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
 let notifyTimer;
@@ -92,15 +92,24 @@ async function loadProfile(){
   try {await loadData();}catch(err){fail(err);render();}
 }
 function loginScreen(message=''){
+  const legacy=state.loginMode==='link';
   root.innerHTML='<div class="login-wrap"><section class="login">'+
   '<div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
-  '<h1>Entrar no sistema</h1><p class="muted">Informe seu email para receber um link de acesso. Não é preciso criar outra senha.</p>'+
+  '<h1>Entrar no sistema</h1><p class="muted">'+
+  (legacy?'Acesso por email para contas antigas que ainda não definiram senha.':
+    'Entre com seu email de acesso e a senha definida pelo administrador.')+'</p>'+
   (message?'<div class="alert">'+h(message)+'</div>':'')+
   (state.loginNotice?'<div class="note" role="status">'+h(state.loginNotice)+'</div>':'')+
-  '<form data-form="login">'+field('Seu email','email','email','','required autocomplete="email"')+
-  '<button class="button primary" type="submit">Receber link de acesso</button></form>'+
-  '<p class="help" style="margin-top:16px">Somente pessoas autorizadas conseguem acessar o estoque.</p></section></div>';
+  '<form data-form="'+(legacy?'login-link':'login-password')+'">'+
+  field('Email de acesso','email','email','','required autocomplete="username"')+
+  (legacy?'':field('Senha','password','password','','required autocomplete="current-password"'))+
+  '<button class="button primary" type="submit">'+(legacy?'Enviar link para meu email':'Entrar')+'</button></form>'+
+  '<button type="button" class="plain" style="margin-top:12px" data-action="login-mode">'+
+  (legacy?'Voltar ao login por senha':'Ainda não tenho senha (acesso antigo)')+'</button>'+
+  '<p class="help" style="margin-top:12px">Novas contas são criadas pelo administrador. Não existe cadastro público.</p>'+
+  '</section></div>';
 }
+
 function pendingAccessScreen(){
   root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand">AME MAIS <span>Controle de estoque</span></div>'+
   '<h1>Acesso pendente</h1><p>O email <strong>'+h(state.user?.email)+'</strong> já foi identificado, mas precisa ser liberado por um administrador.</p>'+
@@ -232,7 +241,7 @@ function render(){
   if(state.view==='usuarios'&&!isAdmin() || state.view==='categorias'&&!isManager())state.view='inicio';
   const menu=nav.filter(x=>(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager())).map(x=>
     '<button data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'"><span aria-hidden="true">'+x.ico+'</span> '+h(x.label)+'</button>').join('');
-  root.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand">AME MAIS <span>Estoque</span></div><nav class="nav" aria-label="Menu principal">'+menu+'</nav><div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+'<br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
+  root.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand">AME MAIS <span>Estoque</span></div><nav class="nav" aria-label="Menu principal">'+menu+'</nav><div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+'<br><button class="plain" data-action="my-password">Minha senha</button><br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
     '<div class="main"><header class="topbar"><strong>Gestão de estoque</strong><div class="inline"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span><button class="plain only-mobile" data-action="logout">Sair</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>'+
     '<nav class="bottom-nav" aria-label="Navegação do aplicativo">'+[
@@ -411,7 +420,10 @@ function usersPage(){
   return tabHead('Usuários','Cada pessoa utiliza sua própria senha e permissões.',button('+ Novo usuário','user-new','','primary'))+
     panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Email</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
     state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.email)+'</td><td>'+h(roles[u.role]||u.role)+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
-      (u.id!==state.user.id?'<div class="inline">'+button('Função','user-role','data-id="'+h(u.id)+'"','small')+button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+'</div>':'Sua conta')+'</td></tr>').join('')+'</tbody></table></div>')+
+      (u.id!==state.user.id?'<div class="inline">'+button('Função','user-role','data-id="'+h(u.id)+'"','small')+
+      button('Definir senha','set-user-password','data-id="'+h(u.id)+'"','small')+
+      button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+'</div>':
+      button('Minha senha','my-password','','small'))+'</td></tr>').join('')+'</tbody></table></div>')+
     '<div class="note">Os acessos são individuais. Bloquear um usuário não apaga seu histórico de operações. Senhas não são armazenadas pela aplicação.</div>';
 }
 
@@ -605,12 +617,61 @@ function userRoleModal(id){
 function userModal(){
   if(!isAdmin())return;
   formModal('Cadastrar usuário','<div class="formgrid">'+
-    field('Nome completo','full_name','text','','required minlength="2" maxlength="120"')+
-    field('Email','email','email','','required')+
-    selectField('Função','role',Object.entries(roles),'evento')+'</div>'+
-    '<div class="note">O funcionário receberá um convite por email, sem senha inicial.</div>',
-    'user-new','Convidar usuário');
+    field('Nome completo','full_name','text','','required minlength="2" maxlength="120" autocomplete="name"')+
+    field('Email de acesso','email','email','','required autocomplete="off"')+
+    selectField('Função','role',Object.entries(roles),'evento')+
+    field('Senha inicial','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"',
+      'Mínimo de 12 caracteres. A senha não será enviada por email.')+
+    field('Confirmar senha','password_confirm','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    '</div><div class="note">O administrador entrega a senha ao funcionário por um canal seguro. O acesso é liberado imediatamente, sem confirmação por email.</div>',
+    'user-new','Cadastrar usuário');
 }
+function adminPasswordModal(id){
+  if(!isAdmin()||id===state.user?.id)return;
+  const target=state.users.find(x=>x.id===id);if(!target)return;
+  formModal('Definir senha · '+target.full_name,'<div class="formgrid">'+
+    field('Nova senha','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    field('Confirmar nova senha','password_confirm','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    '</div><p class="help">Não será enviado email de confirmação. Informe a nova senha diretamente ao colaborador.</p>',
+    'user-password','Salvar senha');
+  document.querySelector('.modalback form').dataset.id=id;
+}
+function myPasswordModal(){
+  if(!state.user||!state.profile?.active)return;
+  formModal('Minha senha','<div class="formgrid">'+
+    field('Nova senha','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    field('Confirmar nova senha','password_confirm','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    '</div><p class="help">Sua senha é armazenada com segurança no Supabase Auth.</p>',
+    'my-password','Atualizar minha senha');
+}
+function passwordsValid(values){
+  const p=String(values.password||''),repeat=String(values.password_confirm||'');
+  if(p.length<12||p.length>128)throw new Error('Utilize uma senha de 12 a 128 caracteres.');
+  if(p!==repeat)throw new Error('As senhas digitadas são diferentes.');
+  return p;
+}
+async function invokeUserAdmin(action,body){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session?.access_token)throw new Error('Sessão expirada. Entre novamente.');
+  const response=await db.functions.invoke('admin-create-user',{body:{action,...body}});
+  if(response.error){
+    let message='Não foi possível salvar o usuário.';
+    const context=response.error.context;
+    if(context&&typeof context.json==='function'){
+      try{const json=await context.json();message=json?.error||json?.message||message;}catch{}
+    }
+    if(message==='Não foi possível salvar o usuário.'){
+      if(response.error.name==='FunctionsFetchError')message='Não foi possível conectar ao serviço. Recarregue a página e tente novamente.';
+      else if(context?.status===401)message='Sessão expirada. Faça login novamente.';
+      else if(context?.status===403)message='Acesso negado. Somente administradores podem alterar usuários.';
+      else message=response.error.message||message;
+    }
+    throw new Error(message);
+  }
+  if(!response.data?.success)throw new Error(response.data?.error||'Não foi possível salvar o usuário.');
+  return response.data;
+}
+
 function csvCell(value){
   let text=String(value??'');
   if(/^[\s]*[=+\-@\t\r]/.test(text))text="'"+text;
@@ -668,7 +729,7 @@ async function handleClick(event){
       '<div class="section-head"><strong>Mais opções</strong><button type="button" data-action="mobile-more-close" class="plain">Fechar ✕</button></div>'+
       opts.filter(([id])=>id==='inicio'||(id==='categorias'&&isManager())||(id==='usuarios'&&isAdmin()))
         .map(([id,name])=>button(name,'view','data-view="'+id+'"','')).join('')+
-      button('Sair da conta','logout','','danger')+'</div>';
+      button('Minha senha','my-password')+button('Sair da conta','logout','','danger')+'</div>';
     document.body.append(sheet);return;
   }
   if(action==='mobile-more-close'){document.querySelector('.mobile-more-overlay')?.remove();return;}
@@ -695,6 +756,9 @@ async function handleClick(event){
   }
   if(action==='logout'){await db.auth.signOut();state.user=null;state.profile=null;state.imageCache.clear();render();return;}
   if(action==='modal-close'){closeTopModal();return;}
+  if(action==='login-mode'){state.loginMode=state.loginMode==='link'?'password':'link';state.loginNotice='';render();return;}
+  if(action==='my-password')return myPasswordModal();
+  if(action==='set-user-password')return adminPasswordModal(id);
   if(action==='forgot'){
     const email=window.prompt('Informe o email da sua conta:');
     if(!email)return;
@@ -770,18 +834,30 @@ async function handleSubmit(event){
   event.preventDefault();if(state.loading)return;
   const values=Object.fromEntries(new FormData(form).entries());
   const type=form.dataset.form;
-  if(type==='login'){
+  if(type==='login-password'){
     state.loading=true;
-    try {
-      const email=String(values.email).trim().toLowerCase();
+    try{
+      assertOk(await db.auth.signInWithPassword({
+        email:String(values.email||'').trim().toLowerCase(),password:String(values.password||'')
+      }));
+      state.loginNotice='';
+      await loadProfile();
+    }catch(error){fail(error);}finally{state.loading=false;}
+    return;
+  }
+  if(type==='login-link'){
+    state.loading=true;
+    try{
+      const email=String(values.email||'').trim().toLowerCase();
       assertOk(await db.auth.signInWithOtp({email,options:{
-        emailRedirectTo:location.origin+location.pathname,shouldCreateUser:true
+        shouldCreateUser:false,emailRedirectTo:location.origin+location.pathname
       }}));
-      state.loginNotice='Verifique seu email ('+email+') e abra o link recebido para acessar.';
+      state.loginNotice='Confira seu email para acessar sua conta antiga e definir uma senha.';
       render();
     }catch(error){fail(error);}finally{state.loading=false;}
     return;
   }
+
   if(type==='admin-bootstrap'){
     const code=String(values.activation_code||'').trim(),name=String(values.full_name||'').trim();
     if(!code||name.length<2){toast('Informe nome e código de ativação.',true);return;}
@@ -892,33 +968,33 @@ async function handleSubmit(event){
   }
   if(type==='user-new'){
     if(!isAdmin())return;
+    let password;
+    try{password=passwordsValid(values);}catch(e){fail(e);return;}
     await exec(async()=>{
-      const {data:{session}}=await db.auth.getSession();
-      if(!session)throw new Error('Sessão expirada.');
-      const response=await db.functions.invoke('admin-create-user',{
-        body:{full_name:String(values.full_name).trim(),email:String(values.email).trim(),role:values.role}
+      await invokeUserAdmin('create',{
+        full_name:String(values.full_name||'').trim(),
+        email:String(values.email||'').trim().toLowerCase(),
+        role:values.role,password
       });
-      if(response.error){
-        let message='Não foi possível convidar este usuário.';
-        const context=response.error.context;
-        if(context && typeof context.json==='function'){
-          try{
-            const detail=await context.json();
-            message=detail?.error||detail?.message||message;
-          }catch{}
-        }
-        if(message==='Não foi possível convidar este usuário.'){
-          if(response.error.name==='FunctionsFetchError')message='Falha na comunicação com o serviço de convites. Recarregue a página e tente novamente.';
-          else if(context?.status===401)message='Sua sessão expirou. Saia do sistema e entre novamente.';
-          else if(context?.status===403)message='Seu usuário não possui permissão para cadastrar colaboradores.';
-          else message=response.error.message||message;
-        }
-        throw new Error(message);
-      }
-      if(!response.data?.success)throw new Error(response.data?.error||'Erro ao criar usuário.');
-      if(response.data?.warning)toast(response.data.warning,true);
-    },'Colaborador autorizado. Se a conta era nova, o convite foi enviado por email.');
+    },'Usuário cadastrado. Entregue a senha ao colaborador por um canal seguro.');
+    return;
   }
+  if(type==='user-password'){
+    if(!isAdmin()||form.dataset.id===state.user?.id)return;
+    let password;
+    try{password=passwordsValid(values);}catch(e){fail(e);return;}
+    await exec(async()=>{
+      await invokeUserAdmin('set-password',{user_id:form.dataset.id,password});
+    },'Senha atualizada. Informe a nova senha ao colaborador.');
+    return;
+  }
+  if(type==='my-password'){
+    let password;
+    try{password=passwordsValid(values);}catch(e){fail(e);return;}
+    await exec(async()=>assertOk(await db.auth.updateUser({password})),'Sua senha foi atualizada.');
+    return;
+  }
+
 }
 function updateFiltered(id,value){
   const active=document.activeElement;
