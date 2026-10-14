@@ -2106,6 +2106,7 @@ async function handleSubmit(event){
     const uid=form.dataset.id,perms=[...form.querySelectorAll('[name="perm"]:checked')].map(x=>x.value);
     const stores=[...form.querySelectorAll('[name="store"]:checked')].map(x=>x.value);
     if(!perms.every(p=>permissionCatalog.some(([key])=>p===key)))throw Error('Permissão inválida.');
+    if(!perms.length)throw Error('Selecione ao menos uma autorização.');
     await exec(async()=>{
       assertOk(await db.from('staff_profiles').update({role:values.role}).eq('id',uid));
       assertOk(await db.from('staff_permissions').delete().eq('user_id',uid));
