@@ -91,7 +91,17 @@ function assertOk(response){
 }
 function fail(err){
   console.error(err);
-  toast(err?.message || 'Não foi possível concluir a operação.',true);
+  let message=err?.message || 'Não foi possível concluir a operação.';
+  if(err?.code==='23505'){
+    const detail=String(err.message||'')+' '+String(err.details||'');
+    if(/products_(active_sku_unique|sku_key)/i.test(detail))
+      message='Este código interno já pertence a um produto ativo. Escolha outro SKU. Códigos de produtos excluídos podem ser reutilizados.';
+    else if(/products_(active_ean_unique|ean_key)/i.test(detail))
+      message='Este EAN já pertence a um produto ativo. Confira o código de barras. EANs de produtos excluídos podem ser reutilizados.';
+    else if(/apparel_variant_unique/i.test(detail))
+      message='Esta cor e este tamanho já estão cadastrados como variação ativa deste produto.';
+  }
+  toast(message,true);
 }
 async function exec(work,success='Operação registrada.'){
   if(state.loading)return;
@@ -715,6 +725,7 @@ function productModal(item=null){
     '</div></section>';
   const markup='<div class="formgrid">'+
     '<div class="wide">'+field('Nome do produto *','name','text',item?.name||'','required maxlength="180"')+'</div>'+
+    (!item?'<p class="help wide">SKU e EAN de produtos excluídos podem ser reutilizados. O sistema impede duplicações somente com produtos ativos.</p>':'')+
     (!item?sizesSection():'')+
     single+photoChooser(item)+categorySelector(item)+productTagChooser(item)+locations+
     (!item?'<div class="wide" data-single-stock>'+
