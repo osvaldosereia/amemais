@@ -67,3 +67,11 @@ Na lista de produtos, o filtro **Todas as categorias** abre um painel do AME MAI
 O botão **+ Categoria / + Subcategoria** abre um formulário separado do seletor e mantém os dados já digitados no produto. Ao criar, a categoria nova é selecionada automaticamente.
 
 Na administração, a hierarquia mostra tons de fundo distintos conforme o nível, com grupos principais mais destacados. Toque na pequena seta ao lado do nome para recolher ou expandir as subcategorias. O visual foi adaptado para cartões em telas pequenas. Não há mudança na estrutura do Supabase nem migração de produtos.
+
+## Perfil Estoquista e Balanço rápido
+
+**Estoquista:** acessa somente **Produtos** e **Balanço rápido**. Pode cadastrar e editar produtos, ler EAN e enviar fotos compactadas. Utiliza as categorias e tags existentes, mas não administra seus cadastros. Não pode usar movimentações livres, eventos, administração de usuários ou relatórios gerais. Os controles também são aplicados via políticas RLS e RPC no Supabase, não apenas pela interface.
+
+**Balanço rápido (loja):** encontre o produto pelo nome, EAN, SKU ou câmera. O cartão apresenta nome, foto, saldo da loja e campo vazio **Quantidade contada**. Digite o total físico e pressione **Conferir**. Quando há diferença, o sistema pede confirmação, ajusta a quantidade pelo RPC `quick_stock_count` e registra a movimentação e o usuário responsável. Quando os valores são iguais, a conferência é registrada sem movimentar estoque.
+
+As contagens são transacionais: um saldo modificado depois que a tela foi aberta bloqueia a correção e pede atualização, evitando substituir alterações concorrentes. Estoques de eventos não são incluídos no balanço da loja. O saldo não pode ficar negativo. Os registros de contagem ficam em `stock_counts` e alterações de quantidade em `stock_movements`.
