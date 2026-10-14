@@ -900,14 +900,14 @@ async function handleClick(event){
   if(action==='view'){document.querySelector('.mobile-more-overlay')?.remove();switchView(view);return;}
   if(action==='global-scan'){
     document.querySelector('.mobile-more-overlay')?.remove();
-    return scanEAN(code=>{
-      if(isStockkeeper()&&state.view==='balanco'){
+    try {return scanEAN(code=>{
+      if(state.view==='balanco'){
         state.search=code;state.page=0;render();return;
       }
       state.view='produtos';state.search=code;state.page=0;state.categoryFilter='';state.tagFilter='';
       render();
       if(!state.items.some(p=>p.ean===code))toast('Leitura concluída. Nenhum produto encontrado para este EAN.',true);
-    }).catch(fail);
+    });}catch(error){fail(error);return;}
   }
   if(action==='home-category'){
     state.categoryFilter=id;state.tagFilter='';switchView('produtos');return;
