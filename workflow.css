@@ -98,3 +98,19 @@
   .return-variant-entry input{width:58px}
   .return-variant-entry .button{font-size:.8rem;padding:8px}
 }
+
+/* Conferência de devolução: atalho para retornar todo o saldo da variação. */
+.return-variant-entry .return-all{
+  min-height:43px;border:1px solid #c4d9c9;border-radius:9px;
+  background:#f0f7f1;color:#236a41;padding:7px 9px;
+  font-size:.77rem;font-weight:750;
+}
+.return-variant-entry .return-all:hover{background:#e2f1e6}
+.scan-torch{grid-column:1/-1}
+.scan-torch[hidden]{display:none!important}
+@media(max-width:760px){
+  .return-variant-entry{gap:5px}
+  .return-variant-entry .return-all{padding:7px;min-height:45px}
+  .return-variant-entry input{width:53px;min-height:45px}
+  .return-variant-entry .button.primary{min-height:45px;padding:7px 9px}
+}
