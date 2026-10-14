@@ -220,3 +220,102 @@ button, select, input, textarea { touch-action: manipulation; }
     flex-basis:52px;
   }
 }
+
+
+/* AME MAIS — seletor visual de categorias, busca e árvore com cores discretas */
+.tax-backdrop{position:fixed;inset:0;z-index:140;background:rgba(18,37,31,.58);display:flex;align-items:center;justify-content:center;padding:16px}
+.tax-sheet{display:flex;flex-direction:column;width:min(620px,100%);max-height:min(90dvh,820px);min-height:350px;background:#fff;border:1px solid #dbe5df;border-radius:18px;box-shadow:0 22px 70px #0c231f4d;overflow:hidden}
+.tax-header{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 14px;gap:12px;flex:0 0 auto}
+.tax-header small{font-size:.72rem;color:#6b8177;font-weight:700;letter-spacing:.04em}
+.tax-header h2{font-size:1.15rem;margin:4px 0 0;color:#223b31}
+.tax-close{width:44px;height:44px;flex:0 0 44px;border:0;border-radius:10px;background:#f0f4f2;color:#39594d;font-size:1.2rem}
+.tax-search{margin:0 20px 12px;display:flex;align-items:center;gap:9px;border:1px solid #cbdcd2;border-radius:11px;background:#fafcfb;padding:0 12px;min-height:49px;flex:0 0 auto}
+.tax-search:focus-within{outline:2px solid #8ebbae;outline-offset:1px}
+.tax-search>span{font-size:1.35rem;color:#627f71}
+.tax-search input{width:100%;min-width:0;padding:12px 0;min-height:47px;border:0;outline:0!important;background:transparent;font-size:16px;color:#263e35}
+.tax-trail{display:flex;align-items:center;gap:6px;flex:0 0 auto;max-width:100%;overflow-x:auto;white-space:nowrap;padding:3px 20px 12px;color:#52675e;font-size:.81rem;border-bottom:1px solid #e9efea;scrollbar-width:thin}
+.tax-trail button{flex:none;border:0;border-radius:7px;padding:6px 8px;color:#2a6150;background:#eaf2ed;font-weight:600;min-height:35px;font-size:.78rem}
+.tax-trail>span{flex:none}
+.tax-results{overflow-y:auto;overscroll-behavior:contain;flex:1 1 auto;min-height:90px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.tax-item-row{display:flex;align-items:stretch;gap:0;border:1px solid #e0e8e2;border-radius:11px;overflow:hidden;background:#fff}
+.tax-item-row.tax-level-1{background:#eaf3ee}
+.tax-item-row.tax-level-2{background:#f3f7ec}
+.tax-item-row.tax-level-3{background:#edf4f9}
+.tax-item-row.tax-level-4{background:#fcf5e9}
+.tax-item-row.tax-level-5{background:#f7f0f8}
+.tax-item-row.tax-level-6{background:#eff5f2}
+.tax-item{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;border:0;background:transparent;padding:13px 15px;min-height:60px;min-width:0;flex:1;color:#2f4a3f}
+.tax-item-name{display:flex;flex-direction:column;gap:5px;overflow-wrap:anywhere;min-width:0}
+.tax-item-name strong{font-size:.94rem;line-height:1.35}
+.tax-item-name small{font-size:.76rem;color:#61746a}
+.tax-item>span:last-child{color:#508c72;font-size:1.05rem}
+.tax-item:hover,.tax-drill:hover,.tax-item:focus-visible,.tax-drill:focus-visible{background:#dcece2}
+.tax-drill{flex:0 0 55px;width:55px;min-height:60px;border:0;border-left:1px solid #d8e3dc;background:#ffffff80;color:#215c47;font-size:2rem;line-height:1}
+.tax-current{display:block;background:#e2f0e8;border:1px solid #91bc9f;color:#245943;border-radius:9px;min-height:50px;padding:12px;text-align:left;font-weight:750}
+.tax-item-tag{border:1px solid #dee8e0;border-radius:10px;background:#f5f9f6;width:100%;min-height:54px}
+.tax-empty{padding:23px;text-align:center;color:#6b7d74;margin:0}
+.tax-footer{display:flex;gap:9px;justify-content:space-between;border-top:1px solid #e5ece7;background:#fafcfb;padding:13px 18px;flex:0 0 auto}
+.tax-footer .button{min-height:46px;flex:1}
+.taxonomy-control{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.taxonomy-trigger{display:flex;align-items:center;text-align:left;gap:12px;background:white;border:1px solid #cdded4;min-height:62px;padding:10px 12px;border-radius:10px;color:#27473b;flex:1;min-width:200px;max-width:100%;width:100%}
+.taxonomy-trigger:hover,.taxonomy-filter-button:hover{background:#f0f7f3;border-color:#87b29f}
+.taxonomy-trigger:focus-visible,.taxonomy-filter-button:focus-visible{outline:3px solid #80b19e;outline-offset:2px}
+.taxonomy-icon{display:grid;place-items:center;background:#e8f3ec;border-radius:9px;width:39px;height:39px;flex:0 0 39px;font-size:1.22rem;color:#285a45}
+.taxonomy-text{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.taxonomy-text small{font-size:.7rem;color:#71867b}
+.taxonomy-text strong{font-size:.9rem;line-height:1.35;overflow-wrap:anywhere}
+.taxonomy-arrow{font-size:1.2rem;color:#587365}
+.taxonomy-control>.button{white-space:nowrap}
+.taxonomy-filter-button{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:47px;max-width:250px;min-width:168px;text-align:left;background:#fff;border:1px solid #d5e2da;border-radius:9px;padding:9px 12px;color:#36594a;font-size:.87rem}
+.taxonomy-filter-button>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.category-tree-table{border-collapse:separate;border-spacing:0;width:100%}
+.category-tree-table tr[class*="category-tone-"] td{border-bottom:1px solid #fff;padding-top:14px;padding-bottom:14px}
+.category-tone-1{background:#e8f2ec!important}
+.category-tone-2{background:#f3f7eb!important}
+.category-tone-3{background:#edf4f9!important}
+.category-tone-4{background:#fcf5ea!important}
+.category-tone-5{background:#f7eff9!important}
+.category-tone-6{background:#eef5f2!important}
+.category-tree-table tr.category-root td{border-top:2px solid #cadfd3;font-weight:650}
+.category-tree-table tr[class*="category-tone-"]:hover td{box-shadow:inset 0 0 0 999px #ffffff27}
+.category-hierarchy-name{display:flex;align-items:center;gap:8px;min-width:170px;margin-left:var(--category-indent,0px)}
+.category-hierarchy-name>span:last-child{display:flex;flex-direction:column;gap:4px;min-width:0}
+.category-hierarchy-name strong{font-size:.91rem;line-height:1.3;color:#2a4639;overflow-wrap:anywhere}
+.category-hierarchy-name small{font-size:.7rem;color:#65796f;font-weight:400;max-width:370px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.category-fold,.category-fold-spacer{display:flex;align-items:center;justify-content:center;flex:0 0 30px;width:30px;height:34px;border:0;border-radius:7px;color:#436d5b}
+.category-fold{background:#ffffffaa;font-size:1.05rem}
+.category-fold:hover{background:#fff}
+.category-fold-spacer{opacity:.55}
+.category-level-chip{display:inline-flex;padding:5px 9px;border:1px solid #d6e3d9;background:#ffffffa6;border-radius:999px;font-size:.71rem;font-weight:700;color:#475d50;white-space:nowrap}
+.category-tree-table td .inline{gap:6px}
+.category-mobile-tree{display:none}
+
+@media(max-width:760px){
+ .tax-backdrop{padding:0;align-items:flex-end}
+ .tax-sheet{width:100%;height:92dvh;max-height:92dvh;min-height:0;border-radius:22px 22px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+ .tax-header{padding:18px 17px 12px}
+ .tax-search{margin:0 16px 10px}
+ .tax-trail{padding:3px 16px 11px}
+ .tax-results{padding:10px 12px;gap:9px}
+ .tax-item,.tax-drill{min-height:62px}
+ .tax-drill{flex-basis:62px;width:62px}
+ .tax-footer{padding:12px 13px}
+ .taxonomy-control{flex-direction:column;align-items:stretch}
+ .taxonomy-control .taxonomy-trigger{width:100%;flex:none}
+ .taxonomy-control>.button{min-height:46px;align-self:flex-start}
+ .products-panel .toolbar .taxonomy-filter-button{grid-column:auto;min-width:0;max-width:none;width:100%;height:48px}
+ .products-panel .toolbar .taxonomy-filter-button>span:first-child{font-size:.83rem}
+ .category-table-wrap{display:none}
+ .category-mobile-tree{display:flex;flex-direction:column}
+ .category-mobile-row{padding:14px 13px 16px;border-bottom:2px solid #fff}
+ .category-mobile-row.category-root{border-top:3px solid #c9e0d2}
+ .category-mobile-row .category-hierarchy-name{margin-left:min(var(--category-indent,0px),65px)}
+ .category-mobile-row .category-hierarchy-name small{white-space:normal;max-width:none}
+ .category-mobile-details{display:flex;align-items:center;gap:9px;margin:10px 0 10px 38px}
+ .category-mobile-details small{color:#617267}
+ .category-mobile-actions{display:flex;gap:7px;flex-wrap:wrap;margin-left:38px}
+ .category-mobile-actions .button{min-height:43px}
+}
+@media(prefers-reduced-motion:reduce){
+ .tax-sheet,.tax-backdrop{animation:none;transition:none}
+}
