@@ -354,11 +354,6 @@ function render(){
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'">'+
       uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('');
   const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
-  const bottomItems=isStockkeeper()?
-    [{id:'produtos',label:'Produtos',ico:'package'},{id:'scan',label:'Ler EAN',ico:'scan'},{id:'balanco',label:'Balanço',ico:'clipboard'}]:
-    [{id:'inicio',label:'Início',ico:'home'},{id:'produtos',label:'Produtos',ico:'package'},
-     {id:'scan',label:'Ler EAN',ico:'scan'},{id:'balanco',label:'Balanço',ico:'clipboard'},
-     {id:'more',label:'Mais',ico:'menu'}];
   root.innerHTML='<div class="app-shell mobile-c-app"><aside class="sidebar">'+desktopIdentity+
     '<nav class="nav" aria-label="Menu principal">'+menu+'</nav>'+
     '<div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+
@@ -367,17 +362,8 @@ function render(){
     '<div class="main"><header class="topbar"><div class="topbar-brand">'+mark+
     '<span class="ame-header-title">ESTOQUE</span></div>'+
     '<div class="topbar-right"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span>'+
-    '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir mais opções" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
-    '<main class="content">'+pageContent()+'</main></div></div>'+
-    '<nav class="bottom-nav '+(isStockkeeper()?'bottom-nav-stockkeeper':'bottom-nav-five')+
-    '" aria-label="Navegação do aplicativo">'+bottomItems.map(item=>{
-      const primary=item.id==='scan';
-      const on=item.id===state.view||item.id==='more'&&['eventos','movimentacoes','categorias','tags','pedidos','entrada','saida','usuarios'].includes(state.view);
-      return '<button type="button" class="'+(primary?'bottom-scan ':'')+(on?'active':'')+
-        '" data-action="'+(primary?'global-scan':item.id==='more'?'mobile-more':'view')+'"'+
-        (primary?'':' data-view="'+item.id+'"')+' aria-label="'+h(item.label)+'"'+(on?' aria-current="page"':'')+'>'+
-        '<span class="nav-icon">'+uiIcon(item.ico,primary?27:22)+'</span><small>'+h(item.label)+'</small></button>';
-    }).join('')+'</nav>';
+    '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-expanded="false" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
+    '<main class="content">'+pageContent()+'</main></div></div>';
   hydrateImages();
 }
 
@@ -1184,6 +1170,13 @@ async function hydrateImages(){
     if(node.isConnected)node.src=url;
   }));
 }
+function closeMobileNavigation(restoreFocus=true){
+  document.querySelector('.mobile-more-overlay')?.remove();
+  document.body.classList.remove('mobile-menu-open');
+  const trigger=document.querySelector('[data-action="mobile-more"]');
+  trigger?.setAttribute('aria-expanded','false');
+  if(restoreFocus)trigger?.focus({preventScroll:true});
+}
 function switchView(view) {
   if(view==='roupas')view='produtos';
   if(!permittedView(view)||(['entrada','saida'].includes(view)&&!isManager()))return;
@@ -1210,9 +1203,9 @@ async function scanInto(selector, scope=document){
 async function handleClick(event){
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id,view,user,event:eventId,target:scanTarget}=target.dataset;
-  if(action==='view'){document.querySelector('.mobile-more-overlay')?.remove();switchView(view);return;}
+  if(action==='view'){closeMobileNavigation(false);switchView(view);return;}
   if(action==='global-scan'){
-    document.querySelector('.mobile-more-overlay')?.remove();
+    closeMobileNavigation(false);
     try {return scanEAN(code=>{
       if(state.view==='eventos'&&state.eventWorkflow==='return'){
         state.eventReturnQuery=code;
@@ -1261,27 +1254,42 @@ async function handleClick(event){
   }
   if(action==='quick-scan')return scanInto('#quick-search');
   if(action==='mobile-more'){
-    document.querySelector('.mobile-more-overlay')?.remove();
-    const sheet=document.createElement('div');sheet.className='mobile-more-overlay';
-    const opts=[
-      ['inicio','Início','home'],['produtos','Produtos','package'],['entrada','Entrada','arrow-down-to-line'],['saida','Saída','arrow-up-from-line'],['balanco','Balanço rápido','clipboard'],
-      ['eventos','Eventos','calendar'],['pedidos','Pedidos Avulsos','clipboard'],['movimentacoes','Movimentações','arrows'],
-      ['categorias','Categorias','layers'],['tags','Tags','more'],['usuarios','Usuários','users']
-    ];
-    sheet.innerHTML='<div class="mobile-more-sheet" role="dialog" aria-modal="true" aria-label="Mais opções">'+
-      '<div class="c-sheet-handle" aria-hidden="true"></div>'+
-      '<div class="section-head"><strong>Menu do sistema</strong><button type="button" data-action="mobile-more-close" class="plain" aria-label="Fechar">✕</button></div>'+
-      '<div class="c-more-items">'+opts.filter(([id])=>permittedView(id)&&
-        (!['categorias','tags','pedidos','entrada','saida'].includes(id)||isManager())&&(id!=='usuarios'||isAdmin()))
-        .map(([id,name,ico])=>'<button type="button" class="'+(state.view===id?'active':'')+
-          '" data-action="view" data-view="'+id+'">'+uiIcon(ico,21)+'<span>'+h(name)+'</span>'+uiIcon('chevron',17)+'</button>').join('')+
-      '</div><div class="c-more-account"><strong>'+h(state.profile.full_name)+'</strong><small>'+
-      h(roles[state.profile.role]||state.profile.role)+'</small>'+
-      '<button type="button" data-action="my-password">'+uiIcon('users',18)+' Minha senha</button>'+
-      '<button type="button" data-action="logout">'+uiIcon('exit',18)+' Sair da conta</button></div></div>';
-    document.body.append(sheet);return;
+    closeMobileNavigation(false);
+    const overlay=document.createElement('div');
+    overlay.className='mobile-more-overlay';
+    const options=nav.filter(item=>permittedView(item.id)&&
+      (item.id!=='usuarios'||isAdmin())&&
+      (!['categorias','tags','pedidos','entrada','saida'].includes(item.id)||isManager()));
+    const controls=options.map(item=>'<button type="button" class="'+(state.view===item.id?'active':'')+
+      '" data-action="view" data-view="'+h(item.id)+'"'+(state.view===item.id?' aria-current="page"':'')+'>'+
+      uiIcon(item.ico,21)+'<span>'+h(item.label)+'</span>'+
+      (state.view===item.id?'<span class="mobile-menu-current">Atual</span>':uiIcon('chevron',17))+
+      '</button>').join('');
+    overlay.innerHTML='<section class="mobile-more-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-navigation-title">'+
+      '<header class="mobile-navigation-head">'+
+        '<div><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="84" height="45">'+
+          '<strong id="mobile-navigation-title">Menu do sistema</strong></div>'+
+        '<button type="button" data-action="mobile-more-close" class="mobile-navigation-close" aria-label="Fechar menu">✕</button>'+
+      '</header>'+
+      '<div class="mobile-navigation-scroll">'+
+        '<div class="mobile-menu-label">NAVEGAÇÃO</div>'+
+        '<nav class="c-more-items" aria-label="Seções do AME MAIS">'+controls+'</nav>'+
+        '<div class="mobile-menu-label">ACESSO RÁPIDO</div>'+
+        '<button type="button" class="mobile-menu-scan" data-action="global-scan">'+
+          uiIcon('scan',22)+'<span>Ler EAN pela câmera</span>'+uiIcon('chevron',17)+'</button>'+
+        '<div class="c-more-account"><strong>'+h(state.profile.full_name)+'</strong>'+
+          '<small>'+h(roles[state.profile.role]||state.profile.role)+'</small>'+
+          '<button type="button" data-action="my-password">'+uiIcon('users',18)+' Minha senha</button>'+
+          '<button type="button" data-action="logout">'+uiIcon('exit',18)+' Sair da conta</button>'+
+        '</div>'+
+      '</div></section>';
+    document.body.append(overlay);
+    document.body.classList.add('mobile-menu-open');
+    target.setAttribute('aria-expanded','true');
+    overlay.querySelector('[data-action="mobile-more-close"]')?.focus({preventScroll:true});
+    return;
   }
-  if(action==='mobile-more-close'){document.querySelector('.mobile-more-overlay')?.remove();return;}
+  if(action==='mobile-more-close'){closeMobileNavigation();return;}
   if(action==='photo-close'){document.querySelector('.photo-lightbox')?.remove();return;}
   if(action==='photo-view'){
     const item=product(id);if(!item?.image_path){toast('Este produto ainda não possui foto.',true);return;}
@@ -1303,7 +1311,7 @@ async function handleClick(event){
     photoLightbox(preview.src,'Foto do produto');
     return;
   }
-  if(action==='logout'){await db.auth.signOut();state.user=null;state.profile=null;state.imageCache.clear();render();return;}
+  if(action==='logout'){closeMobileNavigation(false);await db.auth.signOut();state.user=null;state.profile=null;state.imageCache.clear();render();return;}
   if(action==='taxonomy-open'){
     const mode=target.dataset.mode,form=target.closest('form');
     const selected=mode==='product'?chosenCategory(form):
@@ -1351,7 +1359,7 @@ async function handleClick(event){
   }
   if(action==='modal-close'){closeTopModal();return;}
   if(action==='login-mode'){state.loginMode=state.loginMode==='link'?'password':'link';state.loginNotice='';render();return;}
-  if(action==='my-password')return myPasswordModal();
+  if(action==='my-password'){closeMobileNavigation(false);return myPasswordModal();}
   if(action==='set-user-password')return adminPasswordModal(id);
   if(action==='forgot'){
     const email=window.prompt('Informe o email da sua conta:');
@@ -2091,7 +2099,7 @@ function updateFiltered(id,value){
 }
 document.addEventListener('click',event=>{
   if(event.target.classList?.contains('photo-lightbox')){document.querySelector('.photo-lightbox')?.remove();return;}
-  if(event.target.classList?.contains('mobile-more-overlay')){event.target.remove();return;}
+  if(event.target.classList?.contains('mobile-more-overlay')){closeMobileNavigation();return;}
   handleClick(event).catch(fail);
 });
 document.addEventListener('keydown',event=>{
@@ -2099,7 +2107,7 @@ document.addEventListener('keydown',event=>{
     if(document.querySelector('.share-product-modal'))document.querySelector('.share-product-modal').remove();
     else if(document.querySelector('.tax-backdrop'))closeTaxonomyPicker();
     else if(document.querySelector('.photo-lightbox'))document.querySelector('.photo-lightbox').remove();
-    else if(document.querySelector('.mobile-more-overlay'))document.querySelector('.mobile-more-overlay').remove();
+    else if(document.querySelector('.mobile-more-overlay'))closeMobileNavigation();
     else if(document.querySelector('.modalback'))closeTopModal();
   }
 });
