@@ -1,0 +1,118 @@
+// Cadastro único de produtos: variações de roupas sem outra seção de navegação.
+export const STANDARD_SIZES=['P','M','G','GG','XGG','XXGG','EXGG'];
+const safe=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+function sizeCard(size){
+  return '<div class="size-variant-card" data-size-variant="'+size+'" hidden>'+
+    '<div class="size-variant-heading"><strong>Tamanho '+size+'</strong>'+
+    '<button type="button" class="button small" data-action="size-remove" data-size="'+size+'">Remover</button></div>'+
+    '<div class="size-fields">'+
+    '<label class="field"><span>Código interno (SKU) *</span><input name="size_sku" maxlength="80" disabled required autocomplete="off" placeholder="Ex.: CAM-M"></label>'+
+    '<label class="field"><span>EAN (se houver)</span><div class="inline apparel-ean"><input name="size_ean" maxlength="14" inputmode="numeric" disabled placeholder="Código de barras">'+
+    '<button class="button small" type="button" data-action="size-scan" aria-label="Ler EAN do tamanho '+size+'">📷</button></div></label>'+
+    '<label class="field"><span>Estoque inicial *</span><input name="size_qty" type="number" step="1" min="0" max="1000000" value="0" disabled required inputmode="numeric"></label>'+
+    '</div></div>';
+}
+export function sizesSection(){
+  return '<section class="form-section wide variant-switch-section">'+
+    '<label class="variation-switch"><input type="checkbox" name="use_sizes" data-use-sizes>'+
+    '<span class="variation-switch-indicator"></span><span><strong>Este produto tem tamanhos?</strong>'+
+    '<small>Para camisetas e outras roupas: cada tamanho com SKU, EAN e estoque independentes.</small></span></label>'+
+    '<div data-variant-panel hidden>'+
+    '<div class="size-common-fields">'+
+    '<label class="field"><span>Tipo de roupa</span><select name="apparel_type" disabled>'+
+    ['Camiseta','Camisa','Polo','Blusa','Vestido','Casaco','Outro'].map(x=>'<option>'+x+'</option>').join('')+'</select></label>'+
+    '<label class="field"><span>Público</span><select name="apparel_audience" disabled>'+
+    ['Unissex','Feminino','Masculino'].map(x=>'<option>'+x+'</option>').join('')+'</select></label>'+
+    '<label class="field"><span>Faixa etária</span><select name="apparel_age" disabled>'+
+    ['Adulto','Infantil','Bebê'].map(x=>'<option>'+x+'</option>').join('')+'</select></label>'+
+    '<label class="field"><span>Cor das variações *</span><input name="apparel_color" value="Branco" maxlength="40" disabled required></label></div>'+
+    '<div class="size-selector-title"><strong>Escolha os tamanhos disponíveis</strong>'+
+    '<button type="button" class="button small" data-action="size-common">Selecionar P, M, G, GG</button></div>'+
+    '<div class="size-chip-group" role="group" aria-label="Tamanhos para cadastrar">'+
+    STANDARD_SIZES.map(size=>'<button type="button" class="size-chip" aria-pressed="false" data-action="size-toggle" data-size="'+size+'">'+size+'</button>').join('')+
+    '</div><div class="size-variant-list">'+STANDARD_SIZES.map(sizeCard).join('')+'</div>'+
+    '<p class="help">O código interno é obrigatório para cada tamanho. Preencha EAN apenas quando existir. Cada quantidade pertence ao tamanho correspondente.</p>'+
+    '</div></section>';
+}
+export function setSizesMode(form,checked){
+  const panel=form?.querySelector('[data-variant-panel]');
+  if(!panel)return;
+  panel.hidden=!checked;
+  panel.querySelectorAll('[name="apparel_type"],[name="apparel_audience"],[name="apparel_age"],[name="apparel_color"]')
+    .forEach(input=>input.disabled=!checked);
+  for(const row of panel.querySelectorAll('[data-size-variant]')){
+    const enabled=checked&&!row.hidden;
+    row.querySelectorAll('input').forEach(input=>input.disabled=!enabled);
+  }
+  const single=form.querySelector('[data-single-fields]');
+  if(single){
+    single.hidden=checked;
+    single.querySelectorAll('input').forEach(input=>input.disabled=checked);
+  }
+  const amount=form.querySelector('[data-single-stock]');
+  if(amount){amount.hidden=checked;amount.querySelectorAll('input').forEach(input=>input.disabled=checked);}
+  const submit=form.querySelector('.modalfooter [type="submit"]');
+  if(submit)submit.textContent=checked?'Cadastrar tamanhos':'Cadastrar produto';
+}
+export function setSizeSelected(form,size,enabled){
+  const row=[...form.querySelectorAll('[data-size-variant]')].find(el=>el.dataset.sizeVariant===size);
+  const chip=[...form.querySelectorAll('[data-action="size-toggle"]')].find(el=>el.dataset.size===size);
+  if(!row||!chip)return;
+  row.hidden=!enabled;
+  chip.classList.toggle('selected',enabled);
+  chip.setAttribute('aria-pressed',String(enabled));
+  row.querySelectorAll('input').forEach(input=>input.disabled=!enabled);
+  if(enabled){
+    const sku=row.querySelector('[name="size_sku"]');
+    if(!sku.value){
+      const random=crypto.randomUUID().replaceAll('-','').slice(0,8).toUpperCase();
+      sku.value='AM-'+random+'-'+size;
+    }
+  }
+}
+export function collectSizeVariants(form){
+  const color=form.querySelector('[name="apparel_color"]')?.value?.trim()||'';
+  if(color.length<2||color.length>40)throw new Error('Informe uma cor com 2 a 40 caracteres.');
+  const rows=[...form.querySelectorAll('[data-size-variant]')].filter(x=>!x.hidden);
+  if(!rows.length)throw new Error('Selecione pelo menos um tamanho.');
+  return rows.map(row=>{
+    const get=n=>row.querySelector('[name="'+n+'"]')?.value?.trim()||'';
+    const size=row.dataset.sizeVariant;
+    const sku=get('size_sku'),ean=get('size_ean').replace(/[\s-]/g,'');
+    const text=get('size_qty'),quantity=Number(text);
+    if(!sku||sku.length>80)throw new Error('Informe o código interno do tamanho '+size+'.');
+    if(ean&&!/^[0-9]{8,14}$/.test(ean))throw new Error('EAN inválido no tamanho '+size+'.');
+    if(text===''||!Number.isInteger(quantity)||quantity<0||quantity>1000000)
+      throw new Error('Estoque inválido no tamanho '+size+'.');
+    return {size,color,sku,ean:ean||null,quantity};
+  });
+}
+export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast}){
+  const name=form.elements.namedItem('name')?.value?.trim()||'';
+  if(name.length<2||name.length>110)throw new Error('Informe o nome do produto (2 a 110 caracteres).');
+  const category=chosenCategory(form);
+  if(!category)throw new Error('Selecione a categoria Roupas ou uma de suas subcategorias.');
+  const ancestry=categoryChain(category);
+  if(!ancestry.some(c=>!c.parent_id&&c.name.toLocaleLowerCase('pt-BR')==='roupas'))
+    throw new Error('Produtos com tamanhos devem usar uma categoria dentro de Roupas.');
+  const variants=collectSizeVariants(form);
+  const v=n=>form.elements.namedItem(n)?.value?.trim()||'';
+  const photo=form.__photoBlob||null;
+  const id=assertOk(await db.rpc('create_apparel_with_location',{
+    p_name:name,p_type:v('apparel_type'),p_audience:v('apparel_audience'),
+    p_age_group:v('apparel_age'),p_category_id:category,p_tags:productTagValues(form),
+    p_variants:variants,p_gondola:v('gondola'),p_prateleira:v('prateleira')
+  }));
+  let photoWarning=false;
+  if(photo){
+    try{
+      const path='apparel/'+id+'/'+crypto.randomUUID()+'.'+(photo.type==='image/webp'?'webp':'jpg');
+      assertOk(await db.storage.from('ame-produtos').upload(path,photo,{contentType:photo.type,upsert:false}));
+      assertOk(await db.rpc('set_apparel_photo',{p_model_id:id,p_path:path}));
+    }catch(error){photoWarning=true;console.error('Falha ao vincular foto da variação',error);}
+  }
+  state.view='produtos';state.search=name;state.page=0;
+  closeTopModal();
+  await loadData();
+  toast(photoWarning?'Tamanhos cadastrados. Foto pendente.':'Produto com '+variants.length+' tamanho(s) cadastrado.');
+}
