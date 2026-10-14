@@ -54,16 +54,15 @@ Salve as alterações. Isso permite retornar ao aplicativo depois de clicar no l
 
 Após ativar, faça login apenas com seu email. Se o link de email não retornar ao site, reveja a configuração de URLs acima.
 
-## 3. Convidar equipe
+## 3. Cadastrar equipe sem confirmação de email
 
-Em **Usuários > Novo usuário**, o administrador informa nome, email e perfil, sem definir senha. A Edge Function protegida `admin-create-user` foi implantada com `verify_jwt=true` e só permite administração ativa.
+Em **Usuários > Novo usuário**, o administrador informa nome, email de login, perfil e senha inicial (12 a 128 caracteres), com confirmação. A Edge Function **admin-create-user** (versão 5 ou superior) verifica a sessão e a função de administrador e usa `auth.admin.createUser({ email, password, email_confirm: true })`, sem enviar convites. O novo usuário pode entrar imediatamente.
 
-- Conta nova: o Supabase envia convite pelo email.
-- Conta que já entrou antes: a administração associa a identidade existente e a pessoa acessa com o próximo link de login.
-- Eventos usam associação adicional de responsabilidade/operador; a conta sozinha não dá acesso a eventos alheios.
-- Remover acesso significa bloquear colaborador, sem excluir histórico de operações.
+Para colaboradores já cadastrados, use **Definir senha** na tabela de usuários. Para definir a própria senha, use **Minha senha**, disponível na navegação. Contas antigas sem senha podem usar o acesso por link **somente para recuperar a sessão e cadastrar uma senha**.
 
-**Depois de ativar o primeiro administrador e verificar os convites**, pode-se desabilitar inscrição pública em Authentication > Providers > Email, evitando novas contas sem convite. Os convites administrativos devem continuar funcionando.
+Nunca armazene ou envie senhas em planilhas públicas, tickets, emails coletivos ou no GitHub. Distribua a senha inicial por canal seguro e incentive sua troca após o primeiro acesso.
+
+Mantenha inscrições públicas desabilitadas no Supabase; a aplicação não oferece cadastro aberto.
 
 ## 4. Aplicação
 
