@@ -1,6 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
 
-const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Content-Type': 'application/json' };
+const headers = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Content-Type': 'application/json'
+};
 const respond = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 
 Deno.serve(async (request) => {
@@ -18,6 +23,13 @@ Deno.serve(async (request) => {
     const admin = createClient(url, service, { auth: { autoRefreshToken: false, persistSession: false } });
     const { data: operator, error: operatorError } = await admin.from('staff_profiles').select('role,active').eq('id', user.id).single();
     if (operatorError || !operator?.active || operator.role !== 'admin') return respond({ error: 'Somente administradores' }, 403);
+    const origin = request.headers.get('Origin') || '';
+    const allowedRedirects: Record<string, string> = {
+      'https://osvaldosereia.github.io': 'https://osvaldosereia.github.io/amemais/',
+      'https://cdsb.net.br': 'https://cdsb.net.br/'
+    };
+    const redirectTo = allowedRedirects[origin];
+    if (!redirectTo) return respond({ error: 'Origem do aplicativo não autorizada.' }, 403);
     const payload = await request.json();
     const email = String(payload.email || '').trim().toLowerCase();
     const fullName = String(payload.full_name || '').trim();
@@ -42,7 +54,7 @@ Deno.serve(async (request) => {
       userId = existingUserId;
     } else {
       const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: 'https://cdsb.net.br/',
+        redirectTo,
         data: { full_name: fullName }
       });
       if (inviteError || !created.user) {
