@@ -51,7 +51,7 @@ export function ordersPageMarkup({orders,items,events,photoButton,button,niceTim
      '<h3>'+esc(order.customer_name)+'</h3>'+
      '<a href="tel:'+esc(order.customer_phone)+'">'+esc(order.customer_phone)+'</a></div>'+
      '<div class="avulso-order-meta"><span>'+esc(niceTime(order.created_at))+'</span>'+
-       '<span class="pill">'+(order.source==='compartilhado'?'Link compartilhado':'Cadastro interno')+'</span></div></div>'+
+       '<span class="pill">'+(order.source==='compartilhado'?'Link de produto':order.source==='cliente'?'Acesso de cliente':'Cadastro interno')+'</span></div></div>'+
      '<div class="avulso-order-lines">'+variants.map(item=>
        '<div class="avulso-order-line"><div><strong>'+esc(item.product_name)+'</strong>'+
        '<small>'+esc([item.color,item.size].filter(Boolean).join(' · '))+'</small>'+
