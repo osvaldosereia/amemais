@@ -1,146 +1,172 @@
-// AME MAIS | Seletor próprio: um toque navega no grupo, um toque escolhe a folha.
-// Compatível com categorias profundas, busca por caminho e tags; não abre o teclado sozinho.
+// AME MAIS: seleção progressiva de categorias com confirmação explícita.
+// Desktop: colunas por nível. Celular: uma etapa por vez. A seleção só muda ao confirmar.
 let active=null;
-const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const byName=items=>[...items].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
-const lineage=(list,id)=>{
-  const map=new Map(list.map(item=>[item.id,item])),out=[],seen=new Set();
-  let item=map.get(id);
-  while(item&&!seen.has(item.id)){
-    seen.add(item.id);out.unshift(item);item=map.get(item.parent_id);
-  }
-  return out;
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sort=items=>[...items].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+const parents=(list,id)=>{
+  const byId=new Map(list.map(item=>[item.id,item])),path=[],seen=new Set();
+  let item=byId.get(id);
+  while(item&&!seen.has(item.id)){seen.add(item.id);path.unshift(item);item=byId.get(item.parent_id);}
+  return path;
 };
-const pathName=(list,id)=>lineage(list,id).map(item=>item.name).join(' / ');
+const titlePath=(list,id)=>parents(list,id).map(item=>item.name).join(' / ');
+const currentItem=()=>active.list.find(c=>c.id===active.pending);
+const children=(items,id)=>sort(items.filter(c=>(c.parent_id||null)===(id||null)));
 
-export function closeTaxonomyPicker(restoreFocus=true){
+export function closeTaxonomyPicker(focus=true){
   if(!active)return;
-  const previous=active;active=null;
-  previous.layer.remove();
-  if(previous.backdrop?.isConnected)previous.backdrop.inert=false;
-  if(restoreFocus&&previous.trigger?.isConnected)previous.trigger.focus({preventScroll:true});
+  const prev=active;active=null;
+  prev.layer.remove();
+  if(prev.backdrop?.isConnected)prev.backdrop.inert=false;
+  if(focus&&prev.trigger?.isConnected)prev.trigger.focus({preventScroll:true});
 }
-
-function allowedCategories(){
-  const {list,excludeId}=active;
-  if(!excludeId)return list;
-  return list.filter(c=>!lineage(list,c.id).some(node=>node.id===excludeId));
+function available(){
+  if(!active.excludeId)return active.list;
+  return active.list.filter(item=>!parents(active.list,item.id).some(p=>p.id===active.excludeId));
 }
-function categoryEntry(category,list,{search=false}={}){
-  const subcategories=list.filter(child=>child.parent_id===category.id).length;
-  const selected=active.selected===category.id;
-  const depth=category.depth||lineage(list,category.id).length;
-  const label=search?pathName(list,category.id):category.name;
-  const action=search||!subcategories?'data-tax-select':'data-tax-parent';
-  const buttonText=search?'Selecionar':subcategories?'Abrir':'Selecionar';
-  return '<button type="button" class="tax-category-entry tax-level-'+((depth-1)%6+1)+
-    (selected?' tax-selected':'')+'" '+action+'="'+esc(category.id)+'"'+
-    ' aria-label="'+esc(buttonText+' '+label)+'">'+
-    '<span class="tax-category-entry-text"><strong>'+esc(label)+'</strong>'+
-    '<small>'+esc(search?'Nível '+depth+(subcategories?' · '+subcategories+' subcategoria(s)':''):
-      subcategories?subcategories+' subcategoria(s)':'Categoria final')+'</small></span>'+
-    '<span class="tax-category-entry-action">'+(selected?'✓ ': '')+buttonText+
-      '<span aria-hidden="true">'+(subcategories&&!search?' ›':'')+'</span></span>'+
-    '</button>';
+function choiceLabel(){
+  if(!active.pending)return active.mode==='tag'?'Todas as tags':
+    active.mode==='filter'?'Todas as categorias':
+    active.mode==='parent'?'Categoria principal':'Nenhuma categoria';
+  return active.mode==='tag'?active.pending:titlePath(active.list,active.pending);
+}
+function row(category,list,flat=false){
+  const count=list.filter(c=>c.parent_id===category.id).length;
+  const chosen=active.pending===category.id;
+  const depth=parents(list,category.id).length||1;
+  const parentPath=parents(list,category.id).slice(0,-1).map(p=>p.name).join(' / ');
+  return '<button type="button" class="tax-v3-option '+(chosen?'selected ':'')+
+    '" data-tax-pick="'+esc(category.id)+'" aria-pressed="'+chosen+'">'+
+    '<span class="tax-v3-radio" aria-hidden="true">'+(chosen?'✓':'')+'</span>'+
+    '<span class="tax-v3-option-text"><strong>'+esc(category.name)+'</strong>'+
+    (flat?'<small>'+esc(parentPath||'Categoria principal')+'</small>':
+      '<small>'+esc(count?count+' subcategoria'+(count===1?'':'s'):'Último nível')+'</small>')+
+    '</span>'+(count?'<span class="tax-v3-next">›</span>':'')+'</button>';
 }
 function render(){
   if(!active)return;
   const {layer,mode,list}=active;
-  const searchField=layer.querySelector('[data-taxonomy-query]');
-  const query=searchField.value.trim().toLocaleLowerCase('pt-BR');
-  const trail=layer.querySelector('[data-taxonomy-trail]');
-  const results=layer.querySelector('[data-taxonomy-results]');
-  const helper=layer.querySelector('[data-taxonomy-helper]');
-
+  const search=layer.querySelector('[data-taxonomy-query]');
+  const query=(search?.value||'').trim().toLocaleLowerCase('pt-BR');
+  const heading=layer.querySelector('[data-taxonomy-current]');
+  const confirm=layer.querySelector('[data-tax-confirm]');
+  const content=layer.querySelector('[data-taxonomy-results]');
+  const preview=layer.querySelector('[data-taxonomy-selection]');
+  const goBack=layer.querySelector('[data-tax-back]');
+  preview.textContent=choiceLabel();
+  confirm.textContent=mode==='filter'?'Aplicar filtro':mode==='tag'?'Aplicar tag':mode==='parent'?'Confirmar superior':'Confirmar categoria';
   if(mode==='tag'){
-    helper.textContent='Toque na tag desejada.';
-    trail.innerHTML='<span>Tags cadastradas</span>';
-    const filtered=byName(list).filter(tag=>!query||tag.name.toLocaleLowerCase('pt-BR').includes(query));
-    results.innerHTML=filtered.map(tag=>'<button type="button" class="tax-tag-choice" data-tax-select="'+esc(tag.name)+'">'+
-      '<strong>'+esc(tag.name)+'</strong><span>Selecionar ›</span></button>').join('')||
-      '<p class="tax-empty">Nenhuma tag encontrada.</p>';
+    const filtered=sort(list).filter(t=>!query||t.name.toLocaleLowerCase('pt-BR').includes(query));
+    heading.textContent='Tags cadastradas';
+    goBack.hidden=true;
+    content.innerHTML='<div class="tax-v3-columns"><section class="tax-v3-level">'+
+      '<div class="tax-v3-level-title">Selecione uma tag</div>'+
+      filtered.map(t=>'<button class="tax-v3-option '+(active.pending===t.name?'selected':'')+
+        '" type="button" data-tax-pick="'+esc(t.name)+'" aria-pressed="'+(active.pending===t.name)+'">'+
+        '<span class="tax-v3-radio">'+(active.pending===t.name?'✓':'')+'</span><strong>'+esc(t.name)+'</strong></button>').join('')+
+      (!filtered.length?'<p class="tax-v3-empty">Nenhuma tag encontrada.</p>':'')+'</section></div>';
     return;
   }
-  const valid=allowedCategories();
+  const usable=available();
   if(query){
-    helper.textContent='Resultados: toque na categoria para selecioná-la.';
-    trail.innerHTML='<span>Busca por nome ou caminho completo</span>';
-    const found=byName(valid.filter(cat=>pathName(valid,cat.id).toLocaleLowerCase('pt-BR').includes(query)));
-    results.innerHTML=found.map(cat=>categoryEntry(cat,valid,{search:true})).join('')||
-      '<p class="tax-empty">Nenhuma categoria encontrada. Experimente outro termo.</p>';
+    heading.textContent='Resultados da busca';
+    goBack.hidden=true;
+    const found=sort(usable.filter(c=>titlePath(usable,c.id).toLocaleLowerCase('pt-BR').includes(query)));
+    content.innerHTML='<div class="tax-v3-columns"><section class="tax-v3-level">'+
+      '<div class="tax-v3-level-title">'+found.length+' categoria(s) encontrada(s)</div>'+
+      found.map(c=>row(c,usable,true)).join('')+
+      (!found.length?'<p class="tax-v3-empty">Nenhuma categoria encontrada.</p>':'')+'</section></div>';
     return;
   }
-  const parent=active.parent;
-  const chain=lineage(valid,parent);
-  helper.textContent='Toque em um grupo para ver suas subcategorias, ou em uma categoria final para selecioná-la.';
-  trail.innerHTML='<button type="button" data-tax-parent="">Todas</button>'+
-    chain.map(cat=>'<span class="tax-crumb-separator">›</span>'+
-      '<button type="button" data-tax-parent="'+esc(cat.id)+'">'+esc(cat.name)+'</button>').join('');
-  const current=parent?valid.find(c=>c.id===parent):null;
-  const all=byName(valid.filter(c=>(c.parent_id||null)===(parent||null)));
-  results.innerHTML=(current?'<button type="button" class="tax-current-choice" data-tax-select="'+esc(current.id)+'">'+
-    '<span><small>Categoria deste nível</small><strong>✓ Usar '+esc(current.name)+'</strong></span><span>Selecionar ›</span></button>':'')+
-    (all.length?all.map(cat=>categoryEntry(cat,valid)).join(''):
-      '<p class="tax-empty">'+(current?'Sem outras subcategorias. Use a categoria acima ou volte.':'Não há categorias cadastradas.')+'</p>');
+  const lineage=parents(usable,active.parent);
+  const paneIds=[null,...lineage.map(c=>c.id)];
+  // No desktop, até três níveis lado a lado; no celular, aparece apenas a etapa atual.
+  const visiblePaneIds=paneIds.slice(-3);
+  const focusItem=usable.find(c=>c.id===active.parent);
+  heading.textContent=focusItem?'Dentro de '+focusItem.name:'Categorias principais';
+  goBack.hidden=!active.parent;
+  content.innerHTML='<div class="tax-v3-columns">'+visiblePaneIds.map((id,i)=>{
+    const options=children(usable,id);
+    const cat=id?usable.find(c=>c.id===id):null;
+    const title=cat?'Dentro de '+cat.name:'Categorias principais';
+    const isLast=i===visiblePaneIds.length-1;
+    return '<section class="tax-v3-level '+(isLast?'tax-v3-active-level':'')+'" aria-label="'+esc(title)+'">'+
+      '<div class="tax-v3-level-title"><span>Nível '+(id?parents(usable,id).length+1:1)+'</span><strong>'+esc(title)+'</strong></div>'+
+      options.map(c=>row(c,usable)).join('')+
+      (!options.length?'<p class="tax-v3-empty">Sem outras subcategorias.</p>':'')+'</section>';
+  }).join('')+'</div>';
 }
-
 export function openTaxonomyPicker({trigger,categories,selected='',mode='product',excludeId=null,onSelect}){
   closeTaxonomyPicker(false);
   if(!trigger||typeof onSelect!=='function')return;
-  const backdrop=trigger.closest('.modalback');
   const layer=document.createElement('div');
-  layer.className='tax-backdrop';
-  layer.innerHTML='<section class="tax-sheet" role="dialog" aria-modal="true" aria-label="'+
+  layer.className='tax-backdrop tax-v3-backdrop';
+  layer.innerHTML='<section class="tax-sheet tax-v3-sheet" role="dialog" aria-modal="true" aria-label="'+
     esc(mode==='tag'?'Selecionar tag':'Selecionar categoria')+'">'+
-    '<header class="tax-header"><div><small>AME MAIS · Organização</small><h2>'+
-    esc(mode==='tag'?'Selecionar tag':mode==='parent'?'Categoria superior':'Selecionar categoria')+
-    '</h2></div><button class="tax-close" type="button" data-tax-close aria-label="Fechar">✕</button></header>'+
-    '<div class="tax-search"><span aria-hidden="true">⌕</span><input type="search" data-taxonomy-query '+
-    'autocomplete="off" placeholder="'+esc(mode==='tag'?'Buscar tag…':'Buscar categoria ou subcategoria…')+
-    '" aria-label="Pesquisar opções"></div>'+
-    '<p class="tax-helper" data-taxonomy-helper></p>'+
-    '<nav class="tax-trail" data-taxonomy-trail aria-label="Caminho da categoria"></nav>'+
-    '<div class="tax-results" data-taxonomy-results></div>'+
-    '<footer class="tax-footer"><button type="button" class="button" data-tax-clear>'+
-    esc(mode==='filter'?'Todas as categorias':mode==='tag'?'Todas as tags':mode==='parent'?'Sem categoria superior':'Sem categoria')+
-    '</button><button type="button" class="button" data-tax-close>Cancelar</button></footer></section>';
-
+    '<header class="tax-header tax-v3-header"><div><small>AME MAIS · ORGANIZAÇÃO</small>'+
+    '<h2>'+esc(mode==='tag'?'Selecionar tag':mode==='parent'?'Categoria superior':'Escolher categoria')+
+    '</h2></div><button type="button" class="tax-close" data-tax-close aria-label="Fechar">✕</button></header>'+
+    '<div class="tax-v3-intro">Escolha uma categoria em cada nível. Confirme no botão inferior.</div>'+
+    '<div class="tax-search tax-v3-search"><span aria-hidden="true">⌕</span><input type="search" data-taxonomy-query '+
+    'autocomplete="off" placeholder="Buscar pelo nome ou caminho…" aria-label="Buscar categorias"></div>'+
+    '<div class="tax-v3-stage"><button type="button" data-tax-back class="tax-v3-back">← Voltar um nível</button>'+
+    '<strong data-taxonomy-current>Categoria principal</strong></div>'+
+    '<div class="tax-results tax-v3-results" data-taxonomy-results></div>'+
+    '<footer class="tax-v3-footer"><div class="tax-v3-selected"><small>ESCOLHA ATUAL</small>'+
+    '<strong data-taxonomy-selection></strong></div><div class="tax-v3-footer-actions">'+
+    '<button type="button" class="button tax-v3-clear" data-tax-clear>'+
+    (mode==='filter'?'Todas':mode==='tag'?'Todas':mode==='parent'?'Sem superior':'Sem categoria')+'</button>'+
+    '<button type="button" class="button primary tax-v3-confirm" data-tax-confirm></button></div></footer></section>';
+  const backdrop=trigger.closest('.modalback');
   if(backdrop)backdrop.inert=true;
   document.body.append(layer);
   const list=mode==='tag'?categories:[...categories];
-  const selectedParent=lineage(list,selected);
-  active={layer,backdrop,trigger,mode,list,excludeId,onSelect,
-    selected,parent:mode==='tag'?null:(selectedParent.length>1?selectedParent.at(-2).id:null)};
-  // Eventos delegados: o toque no nome da categoria com filhos agora abre o grupo,
-  // nunca seleciona sem intenção. Folhas e resultados da busca selecionam.
+  const lineage=parents(list,selected);
+  const selectedCat=list.find(c=>c.id===selected);
+  const hasChildren=selectedCat&&list.some(c=>c.parent_id===selected);
+  active={trigger,backdrop,layer,list,excludeId,mode,onSelect,pending:selected,
+    parent:mode==='tag'?null:
+      hasChildren?selected:(lineage.length>1?lineage.at(-2).id:null)};
   layer.addEventListener('click',event=>{
-    if(event.target===layer||event.target.closest('[data-tax-close]')){
-      closeTaxonomyPicker();return;
+    if(event.target===layer||event.target.closest('[data-tax-close]')){closeTaxonomyPicker();return;}
+    if(event.target.closest('[data-tax-confirm]')){
+      const callback=active.onSelect, value=active.pending;closeTaxonomyPicker();callback(value);return;
     }
-    const selection=event.target.closest('[data-tax-select]');
-    const clear=event.target.closest('[data-tax-clear]');
-    if(selection||clear){
-      const value=clear?'':selection.dataset.taxSelect;
-      const cb=active.onSelect;
-      closeTaxonomyPicker();
-      cb(value);return;
+    if(event.target.closest('[data-tax-clear]')){
+      active.pending='';active.parent=null;
+      const input=layer.querySelector('[data-taxonomy-query]');
+      if(input){input.value='';input.blur();}
+      render();return;
     }
-    const enter=event.target.closest('[data-tax-parent]');
-    if(enter){
-      active.parent=enter.dataset.taxParent||null;
-      const search=layer.querySelector('[data-taxonomy-query]');
-      search.value='';
-      // No teclado aberto, devolva o espaço para a lista de categorias.
-      if(document.activeElement===search)search.blur();
-      render();
-      layer.querySelector('[data-taxonomy-results]').scrollTop=0;
+    const back=event.target.closest('[data-tax-back]');
+    if(back&&!back.hidden){
+      const chain=parents(active.list,active.parent);
+      active.parent=chain.length>1?chain.at(-2).id:null;
+      active.pending=active.parent||'';
+      render();return;
+    }
+    const choice=event.target.closest('[data-tax-pick]');
+    if(choice){
+      const id=choice.dataset.taxPick;
+      active.pending=id;
+      if(active.mode!=='tag'){
+        const chosen=available().find(c=>c.id===id);
+        if(chosen){
+          const child=available().some(c=>c.parent_id===id);
+          active.parent=child?id:(chosen.parent_id||null);
+        }
+        const input=layer.querySelector('[data-taxonomy-query]');
+        if(input&&input.value){input.value='';input.blur();}
+      }
+      render();return;
     }
   });
-  layer.querySelector('[data-taxonomy-query]').addEventListener('input',render);
+  const input=layer.querySelector('[data-taxonomy-query]');
+  input.addEventListener('input',render);
   layer.addEventListener('keydown',event=>{
     if(event.key==='Escape'){event.stopPropagation();closeTaxonomyPicker();}
   });
   render();
-  // Foca o botão fechar (acessibilidade), jamais a busca: Android não abre teclado.
+  // Android não abre teclado automaticamente: teclado somente ao tocar na busca.
   layer.querySelector('[data-tax-close]')?.focus({preventScroll:true});
 }
