@@ -57,11 +57,16 @@ declare
   v_variants jsonb;
 begin
   if p_token is null or p_token !~ '^[0-9a-f]{64}$' then return null; end if;
-  select p.*,s.expires_at into v_product,v_expires
+  select p into v_product
     from public.product_shares s
     join public.products p on p.id=s.product_id
     where s.token_hash=extensions.digest(p_token,'sha256')
       and s.expires_at>now() and s.revoked_at is null and p.active
+    limit 1;
+  select s.expires_at into v_expires
+    from public.product_shares s
+    where s.token_hash=extensions.digest(p_token,'sha256')
+      and s.expires_at>now() and s.revoked_at is null
     limit 1;
   if v_product.id is null then return null; end if;
   if v_product.apparel_model_id is not null then
