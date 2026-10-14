@@ -28,7 +28,8 @@ O projeto Supabase **AME MAIS Estoque** já foi criado dentro da mesma organiza�
 
 **As migrações já foram aplicadas**:
 - `202610140001_initial.sql`: tabelas, RLS, inventário, categorias, eventos, auditoria e fotos privadas;
-- `202610140002_initial_admin_activation.sql`: ativação do primeiro administrador por código secreto único.
+- `202610140002_initial_admin_activation.sql`: ativação do primeiro administrador por código secreto único;
+- `202610140006_unlimited_categories.sql`: hierarquia de categorias com profundidade variável e prevenção de ciclos.
 
 Não reaplique as migrações no banco atual.
 
