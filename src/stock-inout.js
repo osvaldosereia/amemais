@@ -47,15 +47,29 @@ export function stockCartHTML({cart,items,models,qtyStore,groupInventory,kind,ph
         '</div></div>';
     }).join('')+'</div></article>').join('');
 }
-export function stockOperationHistoryHTML({batches,destinations}){
+export function stockOperationHistoryHTML({batches,destinations,lines=[],items=[]}){
   if(!batches.length)return '<p class="stock-history-empty">Nenhuma operação em lote registrada ainda.</p>';
-  const map=new Map(destinations.map(x=>[x.id,x.name]));
+  const locations=new Map(destinations.map(x=>[x.id,x.name]));
+  const products=new Map(items.map(x=>[x.id,x]));
   return batches.slice(0,12).map(b=>{
     const when=new Date(b.created_at).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
-    return '<div class="stock-history-row"><span class="stock-history-type '+(b.operation==='entrada'?'is-entry':'is-exit')+'">'+
-      (b.operation==='entrada'?'Entrada':'Saída')+'</span><div><strong>'+
-      esc(b.operation==='saida'?map.get(b.destination_id)||'Destino arquivado':'Recebimento')+
-      '</strong><small>'+esc(when)+(b.note?' · '+esc(b.note):'')+'</small></div></div>';
+    const entries=lines.filter(x=>x.operation_batch_id===b.id);
+    const total=entries.reduce((sum,x)=>sum+x.quantity,0);
+    const prefix=b.operation==='entrada'?'Entrada':'Saída';
+    return '<details class="stock-history-row"><summary><span class="stock-history-type '+
+      (b.operation==='entrada'?'is-entry':'is-exit')+'">'+prefix+'</span>'+
+      '<span class="stock-history-description"><strong>'+
+      esc(b.operation==='saida'?locations.get(b.destination_id)||'Destino arquivado':'Recebimento')+
+      '</strong><small>'+esc(when)+(b.note?' · '+esc(b.note):'')+'</small>'+
+      (entries.length?'<small>'+entries.length+' variação(ões) · '+total+' unidade(s)</small>':'')+
+      '</span><span class="stock-history-arrow" aria-hidden="true">▾</span></summary>'+
+      (entries.length?'<div class="stock-history-details">'+entries.map(line=>{
+        const product=products.get(line.product_id);
+        return '<div><span>'+esc(product?.name||'Produto do histórico')+
+          '<small>SKU '+esc(product?.sku||'—')+'</small></span>'+
+          '<strong>'+line.quantity+' un.</strong></div>';
+      }).join('')+'</div>':'<p class="stock-history-empty">Os itens desta operação não estão nesta consulta recente.</p>')+
+      '</details>';
   }).join('');
 }
 export function operationCartLines(cart,products,qtyStore,kind){
@@ -73,7 +87,7 @@ export function operationCartLines(cart,products,qtyStore,kind){
   if(arr.length>100)throw Error('Limite de 100 variações por operação.');
   return arr;
 }
-export function stockOperationPage({kind,query,cart,items,models,destinations,batches,selectedDestination='',qtyStore,groupInventory,photoButton,h=esc,button}){
+export function stockOperationPage({kind,query,cart,items,models,destinations,batches,batchLines=[],selectedDestination='',qtyStore,groupInventory,photoButton,h=esc,button}){
   const entry=kind==='entrada',groups=stockOperationResults(items,models,query,groupInventory);
   const active=destinations.filter(d=>d.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
   const total=[...cart.values()].reduce((a,x)=>a+(Number(x.quantity)||0),0);
@@ -122,5 +136,5 @@ export function stockOperationPage({kind,query,cart,items,models,destinations,ba
          'Subtrai da loja; não cria venda nem transferência para evento.')+'</small>'+
      '</form></section></div>'+
      '<section class="panel stock-operation-history"><div class="stock-section-head"><h2>Últimas operações</h2><span>Registro com data e destino</span></div>'+
-       '<div data-stock-operation-history>'+stockOperationHistoryHTML({batches,destinations})+'</div></section>';
+       '<div data-stock-operation-history>'+stockOperationHistoryHTML({batches,destinations,lines:batchLines,items})+'</div></section>';
 }
