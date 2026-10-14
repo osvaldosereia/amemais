@@ -12,7 +12,8 @@ async function zxing(){
   }
   const lib=await zxingPromise;
   if(typeof lib.BrowserMultiFormatReader!=='function')throw new Error('Leitor indisponível');
-  return new lib.BrowserMultiFormatReader();
+  const Reader=lib.BrowserMultiFormatOneDReader || lib.BrowserMultiFormatReader;
+  return new Reader();
 }
 
 function explain(error){
@@ -186,7 +187,10 @@ export function scanEAN(onCode){
       if(disposed)return;
       let result=null;
       const native=await detector();
-      if(native)result=(await native.detect(image)).map(x=>validEAN(x.rawValue)).find(Boolean);
+      if(native){
+        try{result=(await native.detect(image)).map(x=>validEAN(x.rawValue)).find(Boolean);}
+        catch{/* Alguns navegadores não permitem imagem estática; usar ZXing. */}
+      }
       if(!result){
         const reader=await zxing();
         const decoded=await reader.decodeFromImageElement(image);
