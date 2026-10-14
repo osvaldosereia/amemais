@@ -97,7 +97,13 @@ const isStockkeeper = () => state.profile?.role === 'estoquista';
 const canRegisterProducts = () => hasPermission('products.create') || hasPermission('products.edit');
 const canQuickBalance = () => hasPermission('stock.balance');
 const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',balanco:'stock.balance',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
-const permittedView = v => v==='inicio'||(v==='pedidos-lojas'&&canUseStoreOrders())||hasPermission(viewPermission[v]||'products.read')||(v==='lojas'&&hasPermission('stores.manage'))||(v==='eventos'&&(hasPermission('events.manage')||hasPermission('events.separate')));
+const permittedView = v => {
+ if(v==='inicio')return true;
+ if(v==='pedidos-lojas')return canUseStoreOrders();
+ if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
+ if(v==='eventos')return hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.separate');
+ return Boolean(viewPermission[v]&&hasPermission(viewPermission[v]));
+};
 const isAdmin = () => state.profile?.role === 'admin';
 const isReader = () => state.profile?.role === 'consulta';
 const product = id => state.items.find(x => x.id === id);
@@ -304,7 +310,7 @@ function categorySelector(item=null){
     '<button type="button" class="taxonomy-trigger" data-action="taxonomy-open" data-mode="product" aria-haspopup="dialog">'+
     '<span class="taxonomy-icon">▤</span><span class="taxonomy-text"><small>Categoria selecionada</small><strong data-category-label>'+h(id?categoryFull(id):'Escolher categoria')+'</strong></span>'+
     '<span aria-hidden="true" class="taxonomy-arrow">⌄</span></button>'+
-    (isManager()?button(id?'+ Subcategoria':'+ Categoria','quick-category','','small'):'')+'</div>'+
+    (hasPermission('categories.manage')?button(id?'+ Subcategoria':'+ Categoria','quick-category','','small'):'')+'</div>'+
     '<p class="help">Busque ou navegue pela hierarquia. Criar categoria abre um cadastro separado.</p></section>';
 }
 function chosenCategory(form){return form?.querySelector('input[name="category_id"]')?.value||null;}
@@ -343,7 +349,7 @@ function refreshProductTagChoices(form){
 }
 function productTagChooser(item=null){
   return '<section class="form-section wide"><div class="section-head"><strong>Tags</strong>'+
-    (isManager()?button('+ Criar tag','quick-tag','','small'):'')+
+    (hasPermission('tags.manage')?button('+ Criar tag','quick-tag','','small'):'')+
     '</div><p class="help">Primeiro, as tags já utilizadas em produtos da mesma categoria. As demais continuam disponíveis.</p>'+
     '<div class="tag-choices" data-tag-choices>'+tagChipsHTML(item?.tags||[],item?.category_id||null)+'</div></section>';
 }
@@ -505,9 +511,9 @@ function mobileProductCard(p){
     '<small>'+h([p.gondola,p.prateleira].filter(Boolean).join(' · '))+'</small>'+
     '<div class="product-tags">'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</div>'+
     '<div class="mobile-product-actions"><span class="qty">Loja: '+qtyStore(p.id)+'</span>'+
-    (isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
-    (canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+
-    (isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></div></article>';
+    ((hasPermission('stock.entry')||hasPermission('stock.exit'))?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
+    (hasPermission('products.edit')?button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+
+    (hasPermission('products.delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></div></article>';
 }
 
 function categoryFull(id){
@@ -529,7 +535,7 @@ function productModelManager(modelId){
       '<small>SKU: '+h(p.sku||'—')+' · EAN: '+h(p.ean||'—')+'</small>'+
       (!p.active?'<small>Variação inativa</small>':'')+'</div>'+
     '<div class="actions">'+button('Editar','product-edit','data-id="'+h(p.id)+'"','small')+
-      (isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
+      (hasPermission('products.delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
     '</div></div>').join('');
   overlay.innerHTML='<section class="modal" role="dialog" aria-modal="true" aria-label="Editar '+h(model.name)+'">'+
     '<div class="modalhead"><h2>Editar · '+h(model.name)+'</h2>'+
@@ -562,7 +568,7 @@ function productsPage(){
   const pageSize=20,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=groups.slice(state.page*pageSize,(state.page+1)*pageSize);
-  const add=canRegisterProducts()?button('+ Novo produto','product-new','','primary'):'';
+  const add=hasPermission('products.create')?button('+ Novo produto','product-new','','primary'):'';
   return '<header class="pagehead products-pagehead"><div><h1>Produtos</h1>'+
     '<p>Catálogo e estoque</p></div><div class="actions">'+add+'</div></header>'+
     '<section class="panel products-panel"><div class="product-toolbar-v3">'+
@@ -618,7 +624,7 @@ function quickBalancePage(){
 }
 
 function eventsPage(){
-  const add=isManager()?button('+ Criar evento','event-new','','primary'):'';
+  const add=hasPermission('events.manage')?button('+ Criar evento','event-new','','primary'):'';
   return tabHead('Eventos','Controle de mercadorias enviadas, devolvidas e não retornadas.',add)+
     '<div class="eventgrid">'+state.events.map(e=>{
       const remaining=state.balances.filter(b=>b.event_id===e.id).reduce((s,b)=>s+b.quantity,0);
@@ -646,10 +652,10 @@ function eventDetails(){
   const unreturned=entries.filter(m=>['baixa_evento','venda_evento'].includes(m.action)).reduce((n,m)=>n+m.quantity,0);
   const pending=state.balances.filter(b=>b.event_id===e.id).reduce((n,b)=>n+b.quantity,0);
   const canModify=e.status==='ativo';
-  const actions=(isManager()&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
-    (isManager()&&canModify?button('Separar produtos para o evento','event-transfer','','primary'):'')+
+  const actions=(hasPermission('events.manage')&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
+    (hasPermission('events.separate')&&canModify?button('Separar produtos para o evento','event-transfer','','primary'):'')+
     (canModify&&canReturn(e.id)?button('Devolução rápida por EAN','event-return','','primary'):'')+
-    (canModify&&canReturn(e.id)?button('Encerrar evento','event-close','data-id="'+h(e.id)+'"'):'');
+    (canModify&&hasPermission('events.close')?button('Encerrar evento','event-close','data-id="'+h(e.id)+'"'):'');
   const history=eventHistoryCards({
     movements:entries,products:state.items,models:state.apparelModels,
     balances:state.balances.filter(b=>b.event_id===e.id),
@@ -667,7 +673,7 @@ function eventDetails(){
       '<div class="inline" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid #edf1ee">'+
       '<div><strong>'+h(username(m.user_id))+'</strong> <span class="pill">'+
       (m.role==='responsavel'?'Responsável':'Operador')+'</span></div>'+
-      (isManager()?button('Remover','member-remove','data-user="'+h(m.user_id)+'" data-event="'+h(e.id)+'"','small'):'')+
+      (hasPermission('events.manage')?button('Remover','member-remove','data-user="'+h(m.user_id)+'" data-event="'+h(e.id)+'"','small'):'')+
       '</div>').join(''):'<p class="muted">Nenhum usuário associado.</p>')+
       (isManager()&&e.status!=='encerrado'?'<div style="margin-top:13px">'+
         button('+ Adicionar usuário','member-add','data-id="'+h(e.id)+'"','small')+'</div>':'')+'</div>');
@@ -689,7 +695,7 @@ function movementsPage(){
     '<select id="event-filter" class="filter" style="max-width:210px" aria-label="Filtrar por evento">'+eventOptions().map(([v,t])=>'<option value="'+h(v)+'" '+(v===state.eventFilter?'selected':'')+'>'+h(t)+'</option>').join('')+'</select>'+
     '<select id="movement-filter" class="filter" style="max-width:185px" aria-label="Filtrar operação">'+[['','Todas as operações'],...Object.entries(actionNames)].map(([v,t])=>'<option value="'+h(v)+'" '+(v===state.movementFilter?'selected':'')+'>'+h(t)+'</option>').join('')+'</select></div>'+
     movementTable(list)+'<div class="panelbody"><small>Mostrando até 1.000 lançamentos recentes. O banco preserva todo o histórico.</small></div></section>'+
-    (isManager()?panel('Auditoria de cadastros','<div class="panelbody"><p class="muted">Últimas alterações de produtos, categorias, eventos, acessos e responsáveis.</p>'+
+    (hasPermission('movements.read')?panel('Auditoria de cadastros','<div class="panelbody"><p class="muted">Últimas alterações de produtos, categorias, eventos, acessos e responsáveis.</p>'+
       '<div class="tablewrap"><table class="table"><thead><tr><th>Data</th><th>Área</th><th>Ação</th><th>Autor</th></tr></thead><tbody>'+
       state.audits.map(a=>'<tr><td>'+niceTime(a.created_at)+'</td><td>'+h(a.entity)+'</td><td>'+h(a.action)+'</td><td>'+h(username(a.actor_id))+'</td></tr>').join('')+'</tbody></table></div></div>'):'');
 }
