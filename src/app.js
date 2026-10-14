@@ -62,7 +62,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],
-  stockDestinations:[],stockBatches:[],stockQuery:{entrada:'',saida:''},
+  stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -149,6 +149,9 @@ async function loadData(){
     resources.push(['customerAccess',db.from('customer_catalog_access').select('id,label,created_at,expires_at,revoked_at').order('created_at',{ascending:false}).limit(250)]);
     resources.push(['stockDestinations',db.from('stock_destinations').select('id,name,description,active,created_at').order('name').limit(1000)]);
     resources.push(['stockBatches',db.from('stock_operation_batches').select('id,operation,destination_id,note,created_at').order('created_at',{ascending:false}).limit(100)]);
+    resources.push(['stockBatchLines',db.from('stock_movements')
+      .select('product_id,operation_batch_id,quantity').not('operation_batch_id','is',null)
+      .order('created_at',{ascending:false}).limit(2500)]);
   }
   const results=await Promise.all(resources.map(async ([key,request])=>[key,await request]));
   for(const [key,result] of results) state[key]=assertOk(result)||[];
@@ -847,6 +850,7 @@ function renderStockOperationPage(){
     kind,query:state.stockQuery[kind],cart:state.stockCarts[kind],
     items:state.items,models:state.apparelModels,destinations:state.stockDestinations,
     batches:state.stockBatches.filter(b=>b.operation===kind),
+    batchLines:state.stockBatchLines,
     selectedDestination:state.stockSelectedDestination,
     qtyStore,groupInventory,photoButton,h,button
   });
@@ -946,10 +950,15 @@ async function saveStockOperation(form){
       state.stockBatches=assertOk(await db.from('stock_operation_batches')
         .select('id,operation,destination_id,note,created_at')
         .order('created_at',{ascending:false}).limit(100))||state.stockBatches;
+      state.stockBatchLines=assertOk(await db.from('stock_movements')
+        .select('product_id,operation_batch_id,quantity')
+        .not('operation_batch_id','is',null)
+        .order('created_at',{ascending:false}).limit(2500))||state.stockBatchLines;
     }catch(historyError){console.warn('Operação salva; histórico disponível depois',historyError);}
     const recent=document.querySelector('[data-stock-operation-history]');
     if(recent)recent.innerHTML=stockOperationHistoryHTML({
-      batches:state.stockBatches.filter(b=>b.operation===kind),destinations:state.stockDestinations
+      batches:state.stockBatches.filter(b=>b.operation===kind),
+      destinations:state.stockDestinations,lines:state.stockBatchLines,items:state.items
     });
     refreshStockOperationSearch();
     updateStockOperationBasket();
@@ -968,6 +977,10 @@ async function saveStockOperation(form){
       for(const b of balances){
         const cached=state.balances.find(x=>x.product_id===b.product_id&&!x.event_id);
         if(cached)cached.quantity=b.quantity;
+        if(/Saldo atualizado por outro operador|Estoque insuficiente|quantidade inválida/i.test(message)){
+          const row=cart.get(b.product_id);if(row)row.expected=b.quantity;
+          state.stockRequestIds[kind]=null;
+        }
       }
     }catch(refreshError){console.warn('Não foi possível sincronizar saldos',refreshError);}
   }finally{
@@ -2153,6 +2166,16 @@ document.addEventListener('input',event=>{
     event.target.closest('.form-section')?.querySelectorAll('.tag-choice').forEach(el=>{
       el.hidden=!!q&&!el.textContent.toLocaleLowerCase('pt-BR').includes(q);
     });
+  }
+});
+document.addEventListener('keydown',event=>{
+  if(event.target.id==='stock-op-search'&&event.key==='Enter'){
+    event.preventDefault();
+    const q=event.target.value.trim();
+    const candidates=state.items.filter(p=>p.active&&(p.ean===q||p.sku===q));
+    if(candidates.length===1)handleOperationScanCode(q);
+    else if(candidates.length>1)toast('Há mais de uma variação para esse código. Selecione na lista.',true);
+    else if(q)toast(state.view==='entrada'?'Produto não localizado. Use + Cadastrar produto.':'Produto não localizado entre os produtos ativos.',true);
   }
 });
 document.addEventListener('change',event=>{
