@@ -401,32 +401,47 @@ function movementsPage(){
 }
 function categoriesPage(){
   const sorted=categoryTree();
-  const rows=sorted.map(c=>{
-    const children=state.categories.some(x=>x.parent_id===c.id),
-      used=state.items.filter(p=>p.category_id===c.id).length;
-    const depthLabel=c.depth===1?'Principal':'Nível '+c.depth;
-    const indent=Math.min(Math.max(c.depth-1,0),4);
-    return '<tr><td><div class="category-name" style="padding-left:'+(indent*13)+'px" title="'+h(categoryFull(c.id))+'">'+
-      (c.depth>1?'↳ ':'')+'<strong>'+h(c.name)+'</strong></div></td>'+
-      '<td><span class="pill">'+h(depthLabel)+'</span></td><td>'+used+'</td>'+
-      '<td><div class="inline">'+button('+ Subcategoria','category-child','data-id="'+h(c.id)+'"','small')+
+  const visible=sorted.filter(c=>!categoryChain(c.id).slice(0,-1).some(parent=>state.collapsedCategories.has(parent.id)));
+  const rowData=visible.map(c=>{
+    const childCount=state.categories.filter(x=>x.parent_id===c.id).length;
+    const used=state.items.filter(p=>p.category_id===c.id).length;
+    const folded=state.collapsedCategories.has(c.id);
+    const tone=(c.depth-1)%6+1;
+    const level=c.depth===1?'Principal':'Nível '+c.depth;
+    const indent=Math.min(c.depth-1,5)*17;
+    const name='<div class="category-hierarchy-name" style="--category-indent:'+indent+'px">'+
+      (childCount?'<button type="button" class="category-fold" data-action="category-toggle" data-id="'+h(c.id)+'"'+
+        ' aria-label="'+(folded?'Mostrar':'Ocultar')+' subcategorias de '+h(c.name)+'"'+
+        ' aria-expanded="'+(!folded)+'">'+(folded?'▸':'▾')+'</button>':
+        '<span class="category-fold-spacer">·</span>')+
+      '<span><strong>'+h(c.name)+'</strong>'+
+      (c.depth>1?'<small>'+h(categoryFull(c.parent_id))+'</small>':'')+'</span></div>';
+    const actions=button('+ Subcategoria','category-child','data-id="'+h(c.id)+'"','small')+
       button('Editar','category-edit','data-id="'+h(c.id)+'"','small')+
-      (!children&&!used?button('Excluir','category-delete','data-id="'+h(c.id)+'"','small'):'')+'</div></td></tr>';
-  }).join('');
+      (!childCount&&!used?button('Excluir','category-delete','data-id="'+h(c.id)+'"','small'):'');
+    return {c,tone,level,name,used,actions};
+  });
+  const rows=rowData.map(v=>'<tr class="category-tone-'+v.tone+(v.c.depth===1?' category-root':'')+'">'+
+    '<td>'+v.name+'</td><td><span class="category-level-chip">'+h(v.level)+'</span></td>'+
+    '<td class="qty">'+v.used+'</td><td><div class="inline">'+v.actions+'</div></td></tr>').join('');
+  const mobile=rowData.map(v=>'<article class="category-mobile-row category-tone-'+v.tone+(v.c.depth===1?' category-root':'')+'">'+
+    v.name+'<div class="category-mobile-details"><span class="category-level-chip">'+h(v.level)+'</span>'+
+    '<small>'+v.used+' produto(s)</small></div><div class="category-mobile-actions">'+v.actions+'</div></article>').join('');
   const tags=state.tags.map(t=>{
     const used=state.items.filter(p=>(p.tags||[]).includes(t.name)).length;
     return '<div class="tag-row"><span class="tag">'+h(t.name)+'</span><small>'+used+' produto(s)</small>'+
       (used===0?button('Excluir','tag-delete','data-id="'+h(t.id)+'"','small'):'')+'</div>';
   }).join('');
-  return tabHead('Categorias e tags','Crie categorias e subcategorias sem limite de níveis.',
+  return tabHead('Categorias e tags','Categorias organizadas em árvore, com quantos níveis forem necessários.',
     button('+ Nova categoria','category-new','','primary'))+
-    panel('Categorias organizadas','<div class="panelbody"><p class="muted">Crie uma categoria principal ou toque em “+ Subcategoria” em qualquer nível para adicionar outro.</p></div>'+
-    (sorted.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Nível</th><th>Produtos</th><th>Ações</th></tr></thead><tbody>'+
-    rows+'</tbody></table></div>':'<div class="muteblock">Nenhuma categoria cadastrada.</div>'))+
+    panel('Árvore de categorias','<div class="panelbody"><p class="muted">Cada nível tem um fundo suave diferente. Toque na seta para recolher ou abrir um grupo, ou use + Subcategoria para acrescentar outro nível.</p></div>'+
+    (visible.length?'<div class="category-table-wrap tablewrap"><table class="table category-tree-table">'+
+    '<thead><tr><th>Categoria / caminho</th><th>Nível</th><th>Produtos</th><th>Ações</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div><div class="category-mobile-tree">'+mobile+'</div>':
+    '<div class="muteblock">Nenhuma categoria cadastrada.</div>'))+
     panel('Tags reutilizáveis','<div class="panelbody"><p class="muted">Exemplos: Nossa Senhora, Primeira Comunhão, Infantil, Presente.</p>'+
     (tags||'<p class="muted">Nenhuma tag cadastrada.</p>')+'</div>',button('+ Nova tag','tag-new','','small'));
 }
-
 function usersPage(){
   return tabHead('Usuários','Cada pessoa utiliza sua própria senha e permissões.',button('+ Novo usuário','user-new','','primary'))+
     panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Usuário</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
