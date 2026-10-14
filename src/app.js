@@ -9,10 +9,11 @@ const h = v => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&l
 const niceDate = value => value ? new Intl.DateTimeFormat('pt-BR', { timeZone:'America/Cuiaba' }).format(new Date(value.length === 10 ? value + 'T12:00:00' : value)) : '—';
 const niceTime = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short', timeZone:'America/Cuiaba' }).format(new Date(value)) : '—';
 const actionNames = {entrada:'Entrada',venda_loja:'Venda (loja)',transferencia:'Transferência',venda_evento:'Venda (evento)',devolucao:'Devolução',ajuste_loja:'Ajuste'};
-const roles = {admin:'Administrador',gerente:'Gerente',evento:'Equipe de evento',consulta:'Consulta'};
+const roles = {admin:'Administrador',gerente:'Gerente',estoquista:'Estoquista',evento:'Equipe de evento',consulta:'Consulta'};
 const nav = [
   {id:'inicio',label:'Visão geral',ico:'▦'},
   {id:'produtos',label:'Produtos',ico:'□'},
+  {id:'balanco',label:'Balanço rápido',ico:'☑'},
   {id:'eventos',label:'Eventos',ico:'▣'},
   {id:'movimentacoes',label:'Movimentações',ico:'⇄'},
   {id:'categorias',label:'Categorias e tags',ico:'≡'},
@@ -26,6 +27,10 @@ const state = {
 let db = null;
 let notifyTimer;
 const isManager = () => ['admin','gerente'].includes(state.profile?.role);
+const isStockkeeper = () => state.profile?.role === 'estoquista';
+const canRegisterProducts = () => isManager() || isStockkeeper();
+const canQuickBalance = () => canRegisterProducts();
+const permittedView = v => !isStockkeeper() || ['produtos','balanco'].includes(v);
 const isAdmin = () => state.profile?.role === 'admin';
 const isReader = () => state.profile?.role === 'consulta';
 const product = id => state.items.find(x => x.id === id);
@@ -192,7 +197,7 @@ function categorySelector(item=null){
     '<button type="button" class="taxonomy-trigger" data-action="taxonomy-open" data-mode="product" aria-haspopup="dialog">'+
     '<span class="taxonomy-icon">▤</span><span class="taxonomy-text"><small>Categoria selecionada</small><strong data-category-label>'+h(id?categoryFull(id):'Escolher categoria')+'</strong></span>'+
     '<span aria-hidden="true" class="taxonomy-arrow">⌄</span></button>'+
-    button(id?'+ Subcategoria':'+ Categoria','quick-category','','small')+'</div>'+
+    (isManager()?button(id?'+ Subcategoria':'+ Categoria','quick-category','','small'):'')+'</div>'+
     '<p class="help">Busque ou navegue pela hierarquia. Criar categoria abre um cadastro separado.</p></section>';
 }
 function chosenCategory(form){return form?.querySelector('input[name="category_id"]')?.value||null;}
@@ -205,7 +210,7 @@ function tagChipsHTML(selected=[]){
 }
 function productTagChooser(item=null){
   return '<section class="form-section wide"><div class="section-head"><strong>Tags</strong>'+
-    button('+ Criar tag','quick-tag','','small')+'</div><p class="help">Toque nas características que identificam o produto.</p>'+
+    (isManager()?button('+ Criar tag','quick-tag','','small'):'')+'</div><p class="help">Toque nas características que identificam o produto.</p>'+
     '<div class="tag-choices" data-tag-choices>'+tagChipsHTML(item?.tags||[])+'</div></section>';
 }
 function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
@@ -248,21 +253,26 @@ function render(){
   if(!state.user){loginScreen();return;}
   if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
   if(!state.profile.active){pendingAccessScreen();return;}
+  if(isStockkeeper()&&!permittedView(state.view))state.view='balanco';
   if(state.view==='usuarios'&&!isAdmin() || state.view==='categorias'&&!isManager())state.view='inicio';
-  const menu=nav.filter(x=>(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager())).map(x=>
+  const menu=nav.filter(x=>permittedView(x.id)&&(x.id!=='usuarios'||isAdmin())&&(x.id!=='categorias'||isManager())).map(x=>
     '<button data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'"><span aria-hidden="true">'+x.ico+'</span> '+h(x.label)+'</button>').join('');
   root.innerHTML='<div class="app-shell"><aside class="sidebar"><div class="brand">AME MAIS <span>Estoque</span></div><nav class="nav" aria-label="Menu principal">'+menu+'</nav><div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+'<br><button class="plain" data-action="my-password">Minha senha</button><br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
     '<div class="main"><header class="topbar"><strong>Gestão de estoque</strong><div class="inline"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span><button class="plain only-mobile" data-action="logout">Sair</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>'+
-    '<nav class="bottom-nav" aria-label="Navegação do aplicativo">'+[
-      ['inicio','⌂','Início'],['produtos','▦','Produtos'],['eventos','▣','Eventos'],['movimentacoes','⇄','Histórico']
-    ].map(([id,ico,label])=>'<button type="button" data-action="view" data-view="'+id+'" class="'+(state.view===id?'active':'')+'">'+
+    '<nav class="bottom-nav '+(isStockkeeper()?'bottom-nav-two':'')+'" aria-label="Navegação do aplicativo">'+
+    (isStockkeeper()?[
+      ['balanco','☑','Balanço'],['produtos','▦','Produtos']
+    ]:[
+      ['inicio','⌂','Início'],['produtos','▦','Produtos'],['balanco','☑','Balanço'],['eventos','▣','Eventos'],['movimentacoes','⇄','Histórico']
+    ]).map(([id,ico,label])=>'<button type="button" data-action="view" data-view="'+id+'" class="'+(state.view===id?'active':'')+'">'+
       '<span aria-hidden="true">'+ico+'</span><small>'+label+'</small></button>').join('')+
-    '<button type="button" data-action="mobile-more" class="'+(['categorias','usuarios'].includes(state.view)?'active':'')+'">'+
-      '<span aria-hidden="true">≡</span><small>Mais</small></button></nav>';
+    (isStockkeeper()?'':'<button type="button" data-action="mobile-more" class="'+(['categorias','usuarios'].includes(state.view)?'active':'')+'">'+
+      '<span aria-hidden="true">≡</span><small>Mais</small></button>')+'</nav>';
   hydrateImages();
 }
 function pageContent(){
+  if(state.view==='balanco')return quickBalancePage();
   if(state.view==='produtos')return productsPage();
   if(state.view==='eventos')return state.activeEvent?eventDetails():eventsPage();
   if(state.view==='movimentacoes')return movementsPage();
@@ -308,8 +318,8 @@ function mobileProductCard(p){
     '<small>'+h(p.sku||p.ean||'Sem código')+'</small>'+
     '<div class="product-tags">'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</div>'+
     '<div class="mobile-product-actions"><span class="qty">Loja: '+qtyStore(p.id)+'</span>'+
-    (isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small')+
-      button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+'</div></div></article>';
+    (isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
+    (canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+'</div></div></article>';
 }
 
 function categoryFull(id){
@@ -325,18 +335,43 @@ function productsPage(){
   const pageSize=30,totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=filtered.slice(state.page*pageSize,(state.page+1)*pageSize);
-  const add=isManager()?button('+ Novo produto','product-new','','primary'):'';
+  const add=canRegisterProducts()?button('+ Novo produto','product-new','','primary'):'';
   return tabHead('Produtos','Pesquise por nome, código, EAN ou tags.',add)+
     '<section class="panel products-panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, SKU ou tag…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="filter" aria-haspopup="dialog"><span>'+h(state.categoryFilter?categoryFull(state.categoryFilter):'Todas as categorias')+'</span><span aria-hidden="true">⌄</span></button>'+
     '<button type="button" class="taxonomy-filter-button filter" data-action="taxonomy-open" data-mode="tag" aria-haspopup="dialog"><span>'+h(state.tagFilter||'Todas as tags')+'</span><span aria-hidden="true">⌄</span></button>'+
     button('Ler EAN','search-scan','','small')+'</div>'+
     (list.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Produto</th><th>Categoria</th><th>Tags</th><th>Loja</th><th>Situação</th><th></th></tr></thead><tbody>'+
-      list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(isManager()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
+      list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(canRegisterProducts()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
       '<div class="muteblock">Nenhum produto encontrado.</div>')+
     '<div class="mobile-products">'+list.map(mobileProductCard).join('')+'</div>'+
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+filtered.length+' produto(s) · página '+(state.page+1)+' de '+totalPages+'</small><div class="actions">'+
     button('Anterior','product-prev',state.page===0?'disabled':'','small')+button('Próxima','product-next',state.page+1>=totalPages?'disabled':'','small')+'</div></div></section>';
+}
+function quickBalancePage(){
+  if(!canQuickBalance())return '<div class="muteblock">Sem acesso.</div>';
+  const q=state.search.trim().toLocaleLowerCase('pt-BR');
+  const results=state.items.filter(p=>p.active&&(!q||
+    [p.name,p.sku,p.ean,categoryFull(p.category_id)].join(' ').toLocaleLowerCase('pt-BR').includes(q)));
+  // Nenhum campo vem previamente preenchido para evitar zerar produtos por engano.
+  const rows=results.slice(0,50).map(p=>{
+    const balance=qtyStore(p.id);
+    return '<form class="quick-count-card" data-form="quick-count" data-count-product="'+h(p.id)+'">'+
+      '<div class="quick-count-main">'+photoButton(p)+
+      '<div class="quick-count-name"><strong>'+h(p.name)+'</strong><small>'+h(p.ean||p.sku||'Sem código')+'</small>'+
+      '<span class="quick-count-balance">No sistema: <b>'+balance+'</b></span></div></div>'+
+      '<div class="quick-count-fields"><label><span>Quantidade contada</span>'+
+      '<input type="number" name="counted" inputmode="numeric" min="0" max="1000000" step="1" required placeholder="Digite a contagem" autocomplete="off"></label>'+
+      '<input type="hidden" name="expected" value="'+balance+'">'+
+      '<button class="button primary" type="submit">Conferir</button></div></form>';
+  }).join('');
+  return tabHead('Balanço rápido','Conte o estoque físico da loja. Diferenças serão registradas com seu usuário.')+
+    '<section class="quick-balance-intro"><div class="quick-balance-search">'+
+    '<input id="quick-search" type="search" class="search" placeholder="Nome, EAN ou código do produto…" aria-label="Buscar para contagem" value="'+h(state.search)+'">'+
+    button('📷 Ler EAN','quick-scan','','primary')+'</div>'+
+    '<p class="help">Pesquise ou leia o código. Digite a quantidade física e toque em Conferir. Nunca é necessário preencher todos os produtos.</p></section>'+
+    '<div class="quick-count-list">'+(rows||'<div class="panel muteblock">Nenhum produto encontrado.</div>')+'</div>'+
+    (results.length>50?'<p class="muted">Mostrando 50 resultados. Refine a busca para localizar seu produto.</p>':'');
 }
 function eventsPage(){
   const add=isManager()?button('+ Criar evento','event-new','','primary'):'';
@@ -527,7 +562,7 @@ function photoChooser(item){
     '<input hidden type="file" name="gallery_file" accept="image/*"></div></section>';
 }
 function productModal(item=null){
-  if(!isManager())return;
+  if(!canRegisterProducts())return;
   const markup='<div class="formgrid">'+
     field('Nome do produto *','name','text',item?.name||'','required maxlength="180"')+
     field('Código interno (SKU)','sku','text',item?.sku||'','maxlength="80"')+
@@ -736,6 +771,7 @@ async function hydrateImages(){
   }));
 }
 function switchView(view) {
+  if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;
   if(view!=='eventos')state.activeEvent=null;
   render();window.scrollTo(0,0);
@@ -760,6 +796,8 @@ async function handleClick(event){
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id,view,user,event:eventId,target:scanTarget}=target.dataset;
   if(action==='view'){document.querySelector('.mobile-more-overlay')?.remove();switchView(view);return;}
+  if(action==='count-focus')return document.querySelector('[data-count-product="'+id+'"] input[name="counted"]')?.focus();
+  if(action==='quick-scan')return scanInto('#quick-search');
   if(action==='mobile-more'){
     document.querySelector('.mobile-more-overlay')?.remove();
     const sheet=document.createElement('div');sheet.className='mobile-more-overlay';
@@ -929,7 +967,7 @@ async function handleSubmit(event){
     return;
   }
   if(type==='product-new'||type==='product-edit'){
-    if(!isManager())return;
+    if(!canRegisterProducts())return;
     const editing=type==='product-edit',id=form.dataset.id;
     const ean=String(values.ean||'').replace(/[\s-]/g,'');
     if(ean && !/^\d{8,14}$/.test(ean)){toast('O EAN deve conter de 8 a 14 dígitos.',true);return;}
@@ -956,12 +994,35 @@ async function handleSubmit(event){
       const initial=Number(values.initial_quantity||0);
       if(!editing&&initial>0){
         if(!Number.isInteger(initial)||initial>1000000)throw new Error('Quantidade inicial inválida');
-        assertOk(await db.rpc('move_stock',{p_product_id:productId,p_action:'entrada',p_quantity:initial}));
+        if(isStockkeeper())assertOk(await db.rpc('quick_stock_count',{p_product_id:productId,p_expected:0,p_counted:initial,p_note:'Cadastro inicial'}));
+        else assertOk(await db.rpc('move_stock',{p_product_id:productId,p_action:'entrada',p_quantity:initial}));
       }
     },editing?'Produto atualizado.':'Produto cadastrado.');
     return;
   }
+  if(type==='quick-count'){
+    if(!canQuickBalance())return;
+    const counted=Number(values.counted),expected=Number(values.expected);
+    if(values.counted===''||!Number.isInteger(counted)||counted<0||counted>1000000||
+       !Number.isInteger(expected)||expected<0){toast('Informe a quantidade contada.',true);return;}
+    const id=form.dataset.countProduct,p=product(id);
+    if(!p)return;
+    const delta=counted-expected;
+    if(delta!==0&&!window.confirm('Confirmar balanço de '+p.name+'?\nSistema: '+expected+
+      ' · Contado: '+counted+'\nDiferença: '+(delta>0?'+':'')+delta+' unidade(s).'))return;
+    state.loading=true;
+    try{
+      assertOk(await db.rpc('quick_stock_count',{
+        p_product_id:id,p_expected:expected,p_counted:counted,p_note:'Contagem física'
+      }));
+      await loadData();
+      toast(delta===0?'Contagem conferida, sem diferença.':'Balanço registrado e estoque atualizado.');
+    }catch(error){fail(error);await loadData().catch(()=>{});}
+    finally{state.loading=false;}
+    return;
+  }
   if(type==='stock'){
+    if(!isManager())return;
     const quantity=Number(values.quantity);
     if(!Number.isInteger(quantity)||!quantity||Math.abs(quantity)>1000000){toast('Quantidade inválida.',true);return;}
     await exec(async()=>assertOk(await db.rpc('move_stock',{
@@ -1034,7 +1095,7 @@ async function handleSubmit(event){
     await exec(async()=>{
       await invokeUserAdmin('create',{
         full_name:String(values.full_name||'').trim(),
-        email:String(values.email||'').trim().toLowerCase(),
+        username:String(values.username||'').trim(),
         role:values.role,password
       });
     },'Usuário cadastrado. Entregue a senha ao colaborador por um canal seguro.');
@@ -1079,7 +1140,7 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
-  if(event.target.id==='product-search'||event.target.id==='movement-search')updateFiltered(event.target.id,event.target.value);
+  if(['product-search','movement-search','quick-search'].includes(event.target.id))updateFiltered(event.target.id,event.target.value);
   if(event.target.matches('[data-tag-search]')){
     const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
     event.target.closest('.form-section')?.querySelectorAll('.tag-choice').forEach(el=>{
