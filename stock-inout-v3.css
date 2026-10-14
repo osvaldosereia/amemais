@@ -82,35 +82,88 @@
 }
 @media(max-width:375px){.stock-op-v2 .stock-destination-inline{flex-direction:column}.stock-op-v2 .stock-destination-inline>.button{align-self:stretch}.stock-op-v2 .stock-confirm-summary strong{font-size:.76rem}}
 
-/* Fechamento mobile: confirmação visível durante busca e separação, sem esconder o carrinho. */
+/* Correção mobile: rodapé acompanha o fluxo e nunca cobre busca ou carrinho.
+   Grid com coluna de texto limitada evita quebra letra por letra. */
+.stock-op-v2 .stock-confirm-dock{
+  box-sizing:border-box;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(175px,max-content);
+  width:100%;
+  min-width:0;
+}
+.stock-op-v2 .stock-confirm-summary{
+  min-width:0;
+  overflow:hidden;
+}
+.stock-op-v2 .stock-confirm-summary strong,
+.stock-op-v2 .stock-confirm-summary small{
+  display:block;
+  max-width:100%;
+  white-space:normal;
+  overflow-wrap:normal;
+  word-break:normal;
+}
+.stock-op-v2 .stock-confirm-dock button{
+  width:auto;
+  max-width:100%;
+  white-space:nowrap;
+}
 @media(max-width:760px){
- .stock-op-v2{
-   padding-bottom:calc(130px + env(safe-area-inset-bottom,0px));
- }
- .stock-op-v2 .stock-confirm-dock{
-   position:fixed;
-   z-index:55;
-   left:max(10px,env(safe-area-inset-left,0px));
-   right:max(10px,env(safe-area-inset-right,0px));
-   bottom:calc(9px + env(safe-area-inset-bottom,0px));
-   width:auto;
-   margin:0;
-   border:1px solid #cbded0;
-   border-radius:13px;
-   box-shadow:0 8px 35px rgba(9,42,22,.2);
- }
- .stock-op-v2 .stock-confirm-dock .stock-confirm-summary{
-   flex:1;
-   min-width:0;
- }
- .stock-op-v2 .stock-confirm-dock .stock-confirm-summary strong,
- .stock-op-v2 .stock-confirm-dock .stock-confirm-summary small{
-   display:block;
-   white-space:nowrap;
-   overflow:hidden;
-   text-overflow:ellipsis;
- }
- .stock-op-v2 .stock-confirm-dock button{
-   flex-shrink:0;
- }
+  .stock-op-v2{
+    padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
+  }
+  .stock-op-v2 .stock-confirm-dock{
+    position:relative;
+    left:auto;
+    right:auto;
+    bottom:auto;
+    z-index:auto;
+    width:100%;
+    max-width:100%;
+    min-height:0;
+    margin:12px 0 0;
+    padding:11px;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(145px,48%);
+    align-items:center;
+    gap:10px;
+    border:1px solid #cbded0;
+    border-radius:12px;
+    background:#fff;
+    box-shadow:0 2px 12px rgba(9,42,22,.08);
+    backdrop-filter:none;
+  }
+  .stock-op-v2 .stock-confirm-dock .stock-confirm-summary{
+    min-width:0;
+    width:100%;
+    overflow:hidden;
+  }
+  .stock-op-v2 .stock-confirm-dock .stock-confirm-summary strong{
+    font-size:.82rem;
+    line-height:1.35;
+  }
+  .stock-op-v2 .stock-confirm-dock .stock-confirm-summary small{
+    font-size:.7rem;
+    line-height:1.3;
+  }
+  .stock-op-v2 .stock-confirm-dock button{
+    min-width:0;
+    width:100%;
+    height:auto;
+    min-height:49px;
+    padding:9px 7px;
+    font-size:.78rem;
+    line-height:1.25;
+    white-space:normal;
+    overflow-wrap:normal;
+    word-break:normal;
+  }
+}
+@media(max-width:355px){
+  .stock-op-v2 .stock-confirm-dock{
+    grid-template-columns:1fr;
+  }
+  .stock-op-v2 .stock-confirm-dock button{
+    width:100%;
+  }
 }
