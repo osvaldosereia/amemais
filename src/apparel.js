@@ -64,6 +64,7 @@ export function apparelPage(state,{h,tabHead,button,qtyStore,photoButton}){
 export function apparelModal(state,{h,formModal,photoChooser,categorySelector,productTagChooser}){
   const root=state.categories.find(c=>!c.parent_id&&c.name.toLocaleLowerCase('pt-BR')==='roupas');
   if(!root)throw new Error('Cadastre primeiro a categoria principal Roupas.');
+  const initialCategory=state.categories.find(c=>c.parent_id===root.id&&c.name.toLocaleLowerCase('pt-BR')==='camisetas')||root;
   const inner='<div class="apparel-form">'+
     '<section class="form-section"><div class="section-head"><strong>1. Modelo da roupa</strong></div>'+
     '<div class="formgrid">'+
@@ -72,7 +73,7 @@ export function apparelModal(state,{h,formModal,photoChooser,categorySelector,pr
     select('apparel_age','Faixa etária',ages,'Adulto')+
     select('apparel_audience','Público',audiences,'Unissex')+
     '</div></section>'+
-    categorySelector({category_id:root.id})+
+    categorySelector({category_id:initialCategory.id})+
     photoChooser(null)+productTagChooser(null)+
     '<section class="form-section wide"><div class="section-head"><strong>2. Tamanhos, cores e quantidades</strong></div>'+
     '<p class="help">Cada combinação de cor e tamanho é uma variação independente. Comece por uma e toque em Adicionar variação para incluir outras.</p>'+
@@ -243,4 +244,24 @@ export async function saveApparelPhoto(form,{db,assertOk,loadData,closeTopModal,
   assertOk(await db.storage.from('ame-produtos').upload(path,file,{contentType:file.type,upsert:false}));
   assertOk(await db.rpc('set_apparel_photo',{p_model_id:id,p_path:path}));
   closeTopModal();await loadData();toast('Foto atualizada para todas as variações.');
+}
+
+
+export function apparelSyncCategory(select,state,{categoryFull}){
+  const form=select.closest('form[data-form="apparel-create"]');if(!form)return;
+  const root=state.categories.find(c=>!c.parent_id&&c.name.toLocaleLowerCase('pt-BR')==='roupas');
+  if(!root)return;
+  const map={Camiseta:'Camisetas',Camisa:'Camisas',Polo:'Polos',Blusa:'Blusas',
+    Vestido:'Vestidos',Casaco:'Casacos',Outro:'Outras roupas'};
+  const targetName=map[select.value];
+  const target=state.categories.find(c=>c.parent_id===root.id&&c.name===targetName);
+  const input=form.querySelector('input[name="category_id"]');
+  const current=state.categories.find(c=>c.id===input?.value);
+  // Não substitui uma subcategoria específica escolhida manualmente.
+  const standard=new Set(Object.values(map));
+  if(!target||!input||current?.parent_id!==root.id&&current?.id!==root.id)return;
+  if(current?.id!==root.id&&!standard.has(current.name))return;
+  input.value=target.id;
+  const label=form.querySelector('[data-category-label]');
+  if(label)label.textContent=categoryFull(target.id);
 }
