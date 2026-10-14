@@ -14,12 +14,12 @@ const nav = [
   {id:'produtos',label:'Produtos',ico:'□'},
   {id:'eventos',label:'Eventos',ico:'▣'},
   {id:'movimentacoes',label:'Movimentações',ico:'⇄'},
-  {id:'categorias',label:'Categorias',ico:'≡'},
+  {id:'categorias',label:'Categorias e tags',ico:'≡'},
   {id:'usuarios',label:'Usuários',ico:'♙'}
 ];
 const state = {
-  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],events:[],members:[],
-  balances:[],movements:[],users:[],audits:[],search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',
+  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],events:[],members:[],
+  balances:[],movements:[],users:[],audits:[],search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),loading:false,toastTimer:0,passwordRecovery:false,loginNotice:'',setupPending:false
 };
 let db = null;
@@ -65,6 +65,7 @@ async function loadData(){
   const resources=[
     ['items',db.from('products').select('*').order('name').limit(2500)],
     ['categories',db.from('categories').select('*').order('name').limit(1000)],
+    ['tags',db.from('tags').select('*').order('name').limit(1000)],
     ['events',db.from('events').select('*').order('starts_at',{ascending:false}).limit(1000)],
     ['members',db.from('event_members').select('*').limit(2000)],
     ['balances',db.from('stock_balances').select('*').limit(10000)],
@@ -123,9 +124,94 @@ function selectField(label,name,options,value='',attr=''){
 function textareaField(label,name,value='',required=false){
   return '<label class="field wide"><span>'+h(label)+'</span><textarea name="'+h(name)+'" '+(required?'required':'')+'>'+h(value)+'</textarea></label>';
 }
-function categoriesOptions(blank=true) {
-  return (blank?[['','Sem categoria']]:[]).concat([...state.categories].sort((a,b)=>a.depth-b.depth||a.name.localeCompare(b.name)).map(c=>[c.id, '— '.repeat(c.depth-1)+c.name]));
+function categoryTree(){
+  const ordered=[],visited=new Set();
+  function visit(parent,level){
+    const children=state.categories.filter(c=>c.parent_id===parent).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+    for(const cat of children){
+      if(visited.has(cat.id))continue;
+      visited.add(cat.id);ordered.push({...cat,visualDepth:level});
+      visit(cat.id,level+1);
+    }
+  }
+  visit(null,1);
+  for(const cat of state.categories)if(!visited.has(cat.id))ordered.push({...cat,visualDepth:cat.depth});
+  return ordered;
 }
+function categoryChain(id){
+  const chain=[],seen=new Set();let item=state.categories.find(c=>c.id===id);
+  while(item&&!seen.has(item.id)){
+    seen.add(item.id);chain.unshift(item);item=state.categories.find(c=>c.id===item.parent_id);
+  }
+  return chain;
+}
+function categoriesOptions(blank=true){
+  return (blank?[['','Sem categoria']]:[]).concat(categoryTree().map(c=>[c.id,'— '.repeat(Math.max(0,c.visualDepth-1))+c.name]));
+}
+function categorySelectItems(form,level,parentId,selected=''){
+  const el=form.elements.namedItem('category_'+level);
+  if(!el)return;
+  const opts=state.categories.filter(c=>c.parent_id===parentId).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+  const label=level==='main'?'Sem categoria':'Nenhuma';
+  el.replaceChildren(new Option(label,''),...opts.map(c=>new Option(c.name,c.id)));
+  el.value=selected;
+  el.disabled=level!=='main'&&(!parentId||!opts.length);
+}
+function categorySelector(item=null){
+  const chain=categoryChain(item?.category_id);
+  const id0=chain[0]?.id||'',id1=chain[1]?.id||'',id2=chain[2]?.id||'';
+  const options=(parent,selected,label)=>'<option value="">'+label+'</option>'+
+    state.categories.filter(c=>c.parent_id===parent).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
+    .map(c=>'<option value="'+h(c.id)+'" '+(c.id===selected?'selected':'')+'>'+h(c.name)+'</option>').join('');
+  return '<section class="form-section wide"><div class="section-head"><strong>Organização</strong><small>Escolha o nível desejado</small></div>'+
+    '<div class="cat-three">'+
+    '<div class="cat-field"><label class="field"><span>Categoria</span><select name="category_main">'+options(null,id0,'Selecione')+'</select></label>'+
+    button('+','quick-category','data-level="1" aria-label="Criar categoria" title="Criar categoria"','square')+'</div>'+
+    '<div class="cat-field"><label class="field"><span>Subcategoria</span><select name="category_child" '+(!id0?'disabled':'')+'>'+options(id0,id1,'Nenhuma')+'</select></label>'+
+    button('+','quick-category','data-level="2" aria-label="Criar subcategoria" title="Criar subcategoria"','square')+'</div>'+
+    '<div class="cat-field"><label class="field"><span>Subsubcategoria</span><select name="category_leaf" '+(!id1?'disabled':'')+'>'+options(id1,id2,'Nenhuma')+'</select></label>'+
+    button('+','quick-category','data-level="3" aria-label="Criar subsubcategoria" title="Criar subsubcategoria"','square')+'</div>'+
+    '</div></section>';
+}
+function categorySelectorChanged(select){
+  const form=select.closest('form');if(!form)return;
+  const main=form.elements.namedItem('category_main'),child=form.elements.namedItem('category_child');
+  if(select===main)categorySelectItems(form,'child',main.value);
+  categorySelectItems(form,'leaf',child.value);
+}
+function tagChipsHTML(selected=[]){
+  const values=new Set(selected.map(t=>t.toLocaleLowerCase('pt-BR')));
+  return state.tags.length?state.tags.map(t=>
+    '<label class="tag-choice"><input type="checkbox" name="chosen_tags" value="'+h(t.name)+'" '+(values.has(t.name.toLocaleLowerCase('pt-BR'))?'checked':'')+
+    '><span>'+h(t.name)+'</span></label>').join(''):'<span class="muted">Nenhuma tag cadastrada ainda.</span>';
+}
+function productTagChooser(item=null){
+  return '<section class="form-section wide"><div class="section-head"><strong>Tags</strong>'+
+    button('+ Criar tag','quick-tag','','small')+'</div><p class="help">Toque nas características que identificam o produto.</p>'+
+    '<div class="tag-choices" data-tag-choices>'+tagChipsHTML(item?.tags||[])+'</div></section>';
+}
+function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
+  const form=document.querySelector('form[data-form="product-new"],form[data-form="product-edit"]');
+  if(!form)return;
+  const main=form.elements.namedItem('category_main'),child=form.elements.namedItem('category_child'),leaf=form.elements.namedItem('category_leaf');
+  const current=selectedCategory?categoryChain(selectedCategory):[];
+  const first=main?.value||current[0]?.id||'';
+  const second=selectedCategory?current[1]?.id||'':child?.value||'';
+  const third=selectedCategory?current[2]?.id||'':leaf?.value||'';
+  categorySelectItems(form,'main',null,first);
+  categorySelectItems(form,'child',first,second);
+  categorySelectItems(form,'leaf',second,third);
+  const checkContainer=form.querySelector('[data-tag-choices]');
+  if(checkContainer){
+    const chosen=[...form.querySelectorAll('input[name="chosen_tags"]:checked')].map(i=>i.value);
+    if(selectedTag)chosen.push(selectedTag);
+    checkContainer.innerHTML=tagChipsHTML(chosen);
+  }
+}
+function productTagValues(form){
+  return [...form.querySelectorAll('input[name="chosen_tags"]:checked')].map(x=>x.value);
+}
+
 function productOptions(includeEmpty=false, eventId=null) {
   const arr=state.items.filter(p=>eventId ? qtyEvent(p.id,eventId)>0 : p.active);
   return (includeEmpty?[['','Escolha um produto']]:[]).concat(arr.map(x=>[x.id,x.name+(x.sku?' ('+x.sku+')':'')]));
@@ -193,7 +279,8 @@ function categoryFull(id){
 function productsPage(){
   const q=state.search.toLocaleLowerCase('pt-BR').trim();
   const filtered=state.items.filter(p=>(!q||[p.name,p.sku,p.ean,...(p.tags||[])].join(' ').toLocaleLowerCase('pt-BR').includes(q))
-    &&(!state.categoryFilter||categoryFull(p.category_id).startsWith(categoryFull(state.categoryFilter))));
+    &&(!state.categoryFilter||categoryChain(p.category_id).some(c=>c.id===state.categoryFilter))
+    &&(!state.tagFilter||(p.tags||[]).includes(state.tagFilter)));
   const pageSize=30,totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=filtered.slice(state.page*pageSize,(state.page+1)*pageSize);
@@ -201,6 +288,8 @@ function productsPage(){
   return tabHead('Produtos','Pesquise por nome, código, EAN ou tags.',add)+
     '<section class="panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, SKU ou tag…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
     '<select id="category-filter" class="filter" style="width:auto;max-width:240px" aria-label="Filtrar categoria">'+[['','Todas as categorias'],...categoriesOptions(false)].map(([id,n])=>'<option value="'+h(id)+'" '+(id===state.categoryFilter?'selected':'')+'>'+h(n)+'</option>').join('')+'</select>'+
+    '<select id="tag-filter" class="filter" style="width:auto;max-width:190px" aria-label="Filtrar tag">'+
+    [['','Todas as tags'],...state.tags.map(t=>[t.name,t.name])].map(([id,name])=>'<option value="'+h(id)+'" '+(id===state.tagFilter?'selected':'')+'>'+h(name)+'</option>').join('')+'</select>'+
     button('Ler EAN','search-scan','','small')+'</div>'+
     (list.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Produto</th><th>Categoria</th><th>Tags</th><th>Loja</th><th>Situação</th><th></th></tr></thead><tbody>'+
       list.map(p=>'<tr><td>'+productCell(p)+'</td><td>'+h(categoryFull(p.category_id))+'</td><td>'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</td><td class="qty">'+qtyStore(p.id)+'</td><td><span class="pill">'+(p.active?'Ativo':'Inativo')+'</span></td><td><div class="inline">'+(isManager()?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+(isManager()?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':
@@ -270,11 +359,31 @@ function movementsPage(){
       state.audits.map(a=>'<tr><td>'+niceTime(a.created_at)+'</td><td>'+h(a.entity)+'</td><td>'+h(a.action)+'</td><td>'+h(username(a.actor_id))+'</td></tr>').join('')+'</tbody></table></div></div>'):'');
 }
 function categoriesPage(){
-  const hierarchy=state.categories.map(c=>'<tr><td><div class="indent-'+(c.depth-1)+'">'+(c.depth>1?'↳ ':'')+h(c.name)+'</div></td>'+
-    '<td>'+h(c.depth)+'</td><td>'+h(categoryFull(c.parent_id))+'</td></tr>').join('');
-  return tabHead('Categorias','Organize produtos em até três níveis.',button('+ Nova categoria','category-new','','primary'))+
-    panel('Categorias cadastradas','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Nível</th><th>Categoria mãe</th></tr></thead><tbody>'+hierarchy+'</tbody></table></div>');
+  const sorted=categoryTree();
+  const rows=sorted.map(c=>{
+    const children=state.categories.some(x=>x.parent_id===c.id),
+      used=state.items.filter(p=>p.category_id===c.id).length;
+    const next=c.depth===1?'Subcategoria':'Subsubcategoria';
+    return '<tr><td><div class="category-name tier-'+c.depth+'">'+(c.depth>1?'↳ ':'')+'<strong>'+h(c.name)+'</strong></div></td>'+
+      '<td><span class="pill">'+h(['','Categoria','Subcategoria','Subsubcategoria'][c.depth])+'</span></td><td>'+used+'</td>'+
+      '<td><div class="inline">'+(c.depth<3?button('+ '+next,'category-child','data-id="'+h(c.id)+'"','small'):'')+
+      button('Editar','category-edit','data-id="'+h(c.id)+'"','small')+
+      (!children&&!used?button('Excluir','category-delete','data-id="'+h(c.id)+'"','small'):'')+'</div></td></tr>';
+  }).join('');
+  const tags=state.tags.map(t=>{
+    const used=state.items.filter(p=>(p.tags||[]).includes(t.name)).length;
+    return '<div class="tag-row"><span class="tag">'+h(t.name)+'</span><small>'+used+' produto(s)</small>'+
+      (used===0?button('Excluir','tag-delete','data-id="'+h(t.id)+'"','small'):'')+'</div>';
+  }).join('');
+  return tabHead('Categorias e tags','Crie subcategorias em até três níveis; reutilize tags em vários produtos.',
+    button('+ Nova categoria','category-new','','primary'))+
+    panel('Categorias organizadas','<div class="panelbody"><p class="muted">Exemplo: Roupas → Camisetas → Adulto. Crie um nível clicando em “+ Subcategoria” ou “+ Subsubcategoria”.</p></div>'+
+    (sorted.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Nível</th><th>Produtos</th><th>Ações</th></tr></thead><tbody>'+
+    rows+'</tbody></table></div>':'<div class="muteblock">Nenhuma categoria cadastrada.</div>'))+
+    panel('Tags reutilizáveis','<div class="panelbody"><p class="muted">Exemplos: Nossa Senhora, Primeira Comunhão, Infantil, Presente.</p>'+
+    (tags||'<p class="muted">Nenhuma tag cadastrada.</p>')+'</div>',button('+ Nova tag','tag-new','','small'));
 }
+
 function usersPage(){
   return tabHead('Usuários','Cada pessoa utiliza sua própria senha e permissões.',button('+ Novo usuário','user-new','','primary'))+
     panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Email</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
