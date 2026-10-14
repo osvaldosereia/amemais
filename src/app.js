@@ -1003,7 +1003,7 @@ async function handleClick(event){
         const search=document.getElementById('quick-search'),list=document.querySelector('.quick-group-list');
         if(search&&list){
           search.value=code;
-          const found=filterQuickCountCards(list,code);
+          const found=searchQuickCards(code);
           if(found)list.querySelector('[data-quick-group]:not([hidden])')?.scrollIntoView({behavior:'smooth',block:'nearest'});
           else toast('EAN não encontrado nos produtos exibidos.',true);
         }else render();
@@ -1690,13 +1690,39 @@ async function saveQuickGroupCounts(card,onlyId=null){
   }
 }
 
+function searchQuickCards(query){
+  const container=document.querySelector('.quick-group-list');
+  if(!container)return 0;
+  let found=filterQuickCountCards(container,query);
+  const q=String(query||'').trim().toLocaleLowerCase('pt-BR');
+  if(found>0||q.length<3)return found;
+  // Pesquisa sob demanda fora dos 50 cards iniciais, sem destruir
+  // contagens já digitadas em outros produtos.
+  const existing=new Set([...container.querySelectorAll('[data-quick-group]')].map(el=>el.dataset.quickGroup));
+  const more=groupInventory(state.items.filter(p=>p.active),state.apparelModels).filter(group=>{
+    if(existing.has(group.key))return false;
+    return [group.title,...group.products.flatMap(p=>[
+      p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira
+    ])].join(' ').toLocaleLowerCase('pt-BR').includes(q);
+  }).slice(0,25);
+  if(more.length){
+    const empty=container.querySelector('[data-quick-empty]');
+    const html=more.map(group=>quickBalanceCard(group,{photoButton,qtyStore,h})).join('');
+    if(empty)empty.insertAdjacentHTML('beforebegin',html);
+    else container.insertAdjacentHTML('beforeend',html);
+    hydrateImages();
+    found=filterQuickCountCards(container,query);
+  }
+  return found;
+}
+
 function updateFiltered(id,value){
   const active=document.activeElement;
   const selection=active?.selectionStart??null;
   state.search=value;state.page=0;
   if(id==='quick-search'){
     const area=document.querySelector('.quick-group-list');
-    if(area)filterQuickCountCards(area,value);
+    if(area)searchQuickCards(value);
     return;
   }
   render();
