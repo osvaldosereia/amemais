@@ -11,7 +11,7 @@ Cada pessoa entra com email e senha individual cadastrados pelo administrador. C
 
 ## Produtos
 
-Categorias têm até três níveis: por exemplo, Roupas > Camisetas > Adulto; Terços > Madeira; Imagens > Nossa Senhora. Tags são termos livres separados por vírgula. Produto contém nome, SKU opcional, EAN opcional, categoria, foto e status.
+Categorias e subcategorias podem ter quantos níveis forem necessários, como Roupas > Camisetas > Adulto > Modelos > Estampas. Tags são rótulos reutilizáveis cadastrados em **Categorias e tags**. Produto contém nome, SKU opcional, EAN opcional, categoria, foto e status.
 
 Uma peça de roupa com tamanho/cor diferente deve ter SKU/EAN e saldo próprio (produto distinto). O cadastro de produto não altera o saldo por si só: use **Entrada** para quantidade inicial.
 
@@ -46,7 +46,7 @@ Os saldos são conferidos dentro de transação SQL com bloqueio de linhas, evit
 
 ## Categorias, tags e fotos (interface móvel)
 
-Em **Categorias e tags**, cadastre níveis sucessivos: categoria → subcategoria → subsubcategoria (limite de três). Em **Produtos > Novo produto** os três campos são encadeados, e os botões de `+` abrem um cadastro separado; ao salvar, o novo nível é selecionado automaticamente.
+Em **Categorias e tags**, crie uma categoria principal e depois use **+ Subcategoria** em qualquer nível, sem limite fixo. Em **Produtos > Novo produto**, os campos de categoria surgem conforme você escolhe cada nível. O botão `+` de cada campo abre uma tela de criação separada, sem perder os dados já preenchidos; ao salvar, a nova subcategoria fica selecionada.
 
 Tags ficam em um catálogo reutilizável, acessível em **Categorias e tags**. No cadastro do produto, selecione tocando nos chips; **Criar tag** abre um cadastro curto em separado. Tags em uso não podem ser apagadas sem antes desvincular dos produtos.
 
