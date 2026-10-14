@@ -806,8 +806,25 @@ async function handleSubmit(event){
       const response=await db.functions.invoke('admin-create-user',{
         body:{full_name:String(values.full_name).trim(),email:String(values.email).trim(),role:values.role}
       });
-      if(response.error)throw response.error;
+      if(response.error){
+        let message='Não foi possível convidar este usuário.';
+        const context=response.error.context;
+        if(context && typeof context.json==='function'){
+          try{
+            const detail=await context.json();
+            message=detail?.error||detail?.message||message;
+          }catch{}
+        }
+        if(message==='Não foi possível convidar este usuário.'){
+          if(response.error.name==='FunctionsFetchError')message='Falha na comunicação com o serviço de convites. Recarregue a página e tente novamente.';
+          else if(context?.status===401)message='Sua sessão expirou. Saia do sistema e entre novamente.';
+          else if(context?.status===403)message='Seu usuário não possui permissão para cadastrar colaboradores.';
+          else message=response.error.message||message;
+        }
+        throw new Error(message);
+      }
       if(!response.data?.success)throw new Error(response.data?.error||'Erro ao criar usuário.');
+      if(response.data?.warning)toast(response.data.warning,true);
     },'Colaborador autorizado. Se a conta era nova, o convite foi enviado por email.');
   }
 }
