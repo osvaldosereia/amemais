@@ -48,6 +48,7 @@ const niceDate = value => value ? new Intl.DateTimeFormat('pt-BR', { timeZone:'A
 const niceTime = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short', timeZone:'America/Cuiaba' }).format(new Date(value)) : '—';
 const actionNames = {entrada:'Entrada',venda_loja:'Baixa (loja)',transferencia:'Enviado ao evento',venda_evento:'Baixa antiga (evento)',devolucao:'Retornou à loja',baixa_evento:'Não retornou ao estoque',ajuste_loja:'Ajuste'};
 const roles = {admin:'Administrador',gerente:'Gerente',estoquista:'Estoquista',evento:'Equipe de evento',consulta:'Consulta'};
+const profileLabel = u => u?.role==='admin'?'Administrador':u?.permissions_customized?'Personalizado':(roles[u?.role]||u?.role||'—');
 const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
@@ -100,6 +101,8 @@ const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'st
 const permittedView = v => {
  if(v==='inicio')return true;
  if(v==='pedidos-lojas')return canUseStoreOrders();
+ if(v==='pedidos')return hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
+ if(v==='usuarios')return isAdmin();
  if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
  if(v==='eventos')return hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.separate');
  return Boolean(viewPermission[v]&&hasPermission(viewPermission[v]));
@@ -170,7 +173,7 @@ async function loadData(){
     ['members',db.from('event_members').select('*').limit(2000)],
     ['balances',db.from('stock_balances').select('*').limit(10000)],
     ['movements',db.from('stock_movements').select('*').order('created_at',{ascending:false}).limit(1000)],
-    ['users',db.from('staff_profiles').select('id,full_name,username,role,active,created_at').order('full_name').limit(1000)]
+    ['users',db.from('staff_profiles').select('id,full_name,username,role,active,permissions_customized,created_at').order('full_name').limit(1000)]
   ];
   resources.push(['stores',db.from('stores').select('*').order('name')]);
   resources.push(['storeBalances',db.from('store_stock').select('store_id,product_id,quantity').limit(10000)]);
@@ -209,7 +212,7 @@ async function loadProfile(){
   const {data:{user},error}=await db.auth.getUser();
   if(error||!user){state.user=null;state.profile=null;render();return;}
   state.user=user;
-  const response=await db.from('staff_profiles').select('id,full_name,email,role,active').eq('id',user.id).maybeSingle();
+  const response=await db.from('staff_profiles').select('id,full_name,email,role,active,permissions_customized').eq('id',user.id).maybeSingle();
   if(response.error){fail(response.error);return;}
   state.profile=response.data;
   if(!state.profile){const r=await db.rpc('is_initial_admin_pending');state.setupPending=Boolean(r.data)&&!r.error;}
@@ -402,12 +405,12 @@ function render(){
   const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
   root.innerHTML='<div class="app-shell mobile-c-app"><aside class="sidebar">'+desktopIdentity+
     '<nav class="nav" aria-label="Menu principal">'+menu+'</nav>'+
-    '<div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(roles[state.profile.role]||state.profile.role)+
+    '<div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(profileLabel(state.profile))+
     '<br><button class="plain" data-action="my-password">Minha senha</button>'+
     '<br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
     '<div class="main"><header class="topbar"><div class="topbar-brand">'+mark+
     '<span class="ame-header-title">ESTOQUE</span></div>'+
-    '<div class="topbar-right"><span class="userpill">'+h(state.profile.full_name)+' · '+h(roles[state.profile.role])+'</span>'+
+    '<div class="topbar-right"><span class="userpill">'+h(state.profile.full_name)+' · '+h(profileLabel(state.profile))+'</span>'+
     '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-expanded="false" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>';
   hydrateImages();
@@ -739,7 +742,7 @@ function tagsPage(){
 }
 
 function ordersPage(){
-  if(!hasPermission('orders.read'))return '<div class="muteblock">Sem permissão.</div>';
+  if(!hasPermission('orders.read')&&!hasPermission('orders.internal'))return '<div class="muteblock">Sem permissão.</div>';
   const activeAccess=state.customerAccess.filter(a=>!a.revoked_at&&new Date(a.expires_at)>new Date()).length;
   const links='<div class="avulso-access-list">'+(state.customerAccess.length?
     state.customerAccess.map(access=>{
@@ -747,7 +750,7 @@ function ordersPage(){
       return '<div class="avulso-access-row"><div><strong>'+h(access.label)+'</strong>'+
         '<small>Criado: '+h(niceTime(access.created_at))+' · Válido até '+h(niceTime(access.expires_at))+'</small></div>'+
         '<span class="pill '+(valid?'ativo':'encerrado')+'">'+(valid?'Ativo':'Encerrado')+'</span>'+
-        (valid?button('Revogar link','customer-link-revoke','data-id="'+h(access.id)+'"','small danger'):'')+
+        (valid&&hasPermission('catalog.manage')?button('Revogar link','customer-link-revoke','data-id="'+h(access.id)+'"','small danger'):'')+
         '</div>';
     }).join(''):'<p class="muted">Nenhum acesso para clientes criado ainda.</p>')+'</div>';
   const orders=ordersPageMarkup({
@@ -755,8 +758,8 @@ function ordersPage(){
     photoButton,button,niceTime
   });
   return tabHead('Pedidos Avulsos','Pedidos são independentes do estoque e podem ser vinculados a um evento depois.',
-    button('+ Criar pedido','order-new','','primary')+
-    button('+ Acesso para cliente','customer-link-new','','primary'))+
+    (hasPermission('orders.internal')?button('+ Criar pedido','order-new','','primary'):'')+
+    (hasPermission('catalog.manage')?button('+ Acesso para cliente','customer-link-new','','primary'):''))+
     '<div class="orders-overview"><div><strong>'+state.orders.length+'</strong><span>Pedidos registrados</span></div>'+
     '<div><strong>'+state.orders.filter(o=>!o.event_id).length+'</strong><span>Sem evento</span></div>'+
     '<div><strong>'+activeAccess+'</strong><span>Acessos ativos de clientes</span></div></div>'+
@@ -792,7 +795,7 @@ function orderEventModal(orderId){
 function usersPage(){
   return tabHead('Usuários','Cada pessoa utiliza sua própria senha e permissões.',button('+ Novo usuário','user-new','','primary'))+
     panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Usuário</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
-    state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.username)+'</td><td>'+h(roles[u.role]||u.role)+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
+    state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.username)+'</td><td>'+h(profileLabel(u))+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
       (u.id!==state.user.id?'<div class="inline">'+button('Funções e lojas','user-role','data-id="'+h(u.id)+'"','small')+
       button('Definir senha','set-user-password','data-id="'+h(u.id)+'"','small')+
       button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+'</div>':
@@ -1083,7 +1086,7 @@ function stockModal(id){
   formModal('Movimentar · '+p.name,
     '<div class="note">Saldo atual na loja: <strong>'+qtyStore(id)+' unidade(s)</strong></div>'+
     '<p class="help">Entradas e saídas têm processos independentes, com histórico e destino obrigatório nas saídas.</p>'+
-    selectField('O que deseja fazer?','operation_kind',[['entrada','Entrada · receber mercadoria'],['saida','Saída · encaminhar a um destino']]),
+    selectField('O que deseja fazer?','operation_kind',[...(hasPermission('stock.entry')?[['entrada','Entrada · receber mercadoria']]:[]),...(hasPermission('stock.exit')?[['saida','Saída · encaminhar a um destino']]:[])]),
     'stock-choose-direction','Continuar');
   document.querySelector('.modalback form[data-form="stock-choose-direction"]').dataset.id=id;
 }
@@ -1172,11 +1175,11 @@ async function saveTaxonomyFromProduct(form,table,data,success){
 
 function permissionFields(userId){
  const explicit=state.userPermissions.filter(x=>x.user_id===userId).map(x=>x.permission);
- const chosen=explicit.length?explicit:(permissionDefaults[state.users.find(x=>x.id===userId)?.role||'evento']||[]);
+ const chosen=explicit.length?explicit:(state.users.find(x=>x.id===userId)?.role==='admin'?permissionCatalog.map(([key])=>key):(permissionDefaults[state.users.find(x=>x.id===userId)?.role||'evento']||[]));
  return '<section class="form-section wide"><strong>Autorizações individuais</strong><p class="help">Marque cada operação permitida. As permissões são cumulativas.</p>'+
  permissionCatalog.map(([key,label])=>'<label class="field"><span><input type="checkbox" name="perm" value="'+h(key)+'" '+(chosen.includes(key)?'checked':'')+'> '+h(label)+'</span></label>').join('')+
  '</section><section class="form-section wide"><strong>Lojas autorizadas</strong><p class="help">Sem seleção, o acesso a estoques de outras lojas não é liberado.</p>'+
- state.stores.filter(x=>x.active).map(x=>'<label class="field"><span><input type="checkbox" name="store" value="'+h(x.id)+'" '+(state.staffStores.some(ss=>ss.user_id===userId&&ss.store_id===x.id)?'checked':'')+'> '+h(x.name)+'</span></label>').join('')+'</section>';
+ state.stores.filter(x=>x.active).map(x=>'<label class="field"><span><input type="checkbox" name="store" value="'+h(x.id)+'" '+((state.staffStores.some(ss=>ss.user_id===userId&&ss.store_id===x.id)||(!userId&&x.is_primary))?'checked':'')+'> '+h(x.name)+'</span></label>').join('')+'</section>';
 }
 function userRoleModal(id){
  if(!isAdmin()||id===state.user?.id)return;
