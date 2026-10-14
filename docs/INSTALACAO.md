@@ -56,7 +56,7 @@ Após ativar, faça login apenas com seu email. Se o link de email não retornar
 
 ## 3. Cadastrar equipe sem confirmação de email
 
-Em **Usuários > Novo usuário**, o administrador informa nome, email de login, perfil e senha inicial (12 a 128 caracteres), com confirmação. A Edge Function **admin-create-user** (versão 5 ou superior) verifica a sessão e a função de administrador e usa `auth.admin.createUser({ email, password, email_confirm: true })`, sem enviar convites. O novo usuário pode entrar imediatamente.
+Em **Usuários > Novo usuário**, o administrador informa nome, email de login, perfil e senha inicial (6 a 128 caracteres), com confirmação. A Edge Function **admin-create-user** (versão 5 ou superior) verifica a sessão e a função de administrador e usa `auth.admin.createUser({ email, password, email_confirm: true })`, sem enviar convites. O novo usuário pode entrar imediatamente.
 
 Para colaboradores já cadastrados, use **Definir senha** na tabela de usuários. Para definir a própria senha, use **Minha senha**, disponível na navegação. Contas antigas sem senha podem usar o acesso por link **somente para recuperar a sessão e cadastrar uma senha**.
 
