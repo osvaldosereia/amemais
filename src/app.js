@@ -1173,6 +1173,8 @@ async function hydrateImages(){
 function closeMobileNavigation(restoreFocus=true){
   document.querySelector('.mobile-more-overlay')?.remove();
   document.body.classList.remove('mobile-menu-open');
+  const appShell=document.querySelector('.app-shell');
+  if(appShell)appShell.inert=false;
   const trigger=document.querySelector('[data-action="mobile-more"]');
   trigger?.setAttribute('aria-expanded','false');
   if(restoreFocus)trigger?.focus({preventScroll:true});
@@ -1285,6 +1287,8 @@ async function handleClick(event){
       '</div></section>';
     document.body.append(overlay);
     document.body.classList.add('mobile-menu-open');
+    const appShell=document.querySelector('.app-shell');
+    if(appShell)appShell.inert=true;
     target.setAttribute('aria-expanded','true');
     overlay.querySelector('[data-action="mobile-more-close"]')?.focus({preventScroll:true});
     return;
