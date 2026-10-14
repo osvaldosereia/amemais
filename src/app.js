@@ -435,6 +435,10 @@ function dashboard(){
     '<div class="c-dashboard-actions">'+
       (canRegisterProducts()?'<button type="button" class="c-action-primary" data-action="product-new">'+
         uiIcon('plus',20)+' Novo produto</button>':'')+
+      (isManager()?'<button type="button" class="c-action-outline" data-action="view" data-view="entrada">'+
+        uiIcon('arrow-down-to-line',20)+' Entrada</button>'+
+        '<button type="button" class="c-action-outline" data-action="view" data-view="saida">'+
+        uiIcon('arrow-up-from-line',20)+' Saída</button>':'')+
       '<button type="button" class="c-action-outline" data-action="global-scan">'+uiIcon('scan',20)+' Ler EAN</button></div>'+
     '<section class="c-dashboard-section"><div class="c-section-heading"><h2>Categorias</h2>'+
     '<button type="button" data-action="view" data-view="produtos">Ver produtos '+uiIcon('chevron',17)+'</button></div>'+
@@ -843,6 +847,7 @@ function renderStockOperationPage(){
     kind,query:state.stockQuery[kind],cart:state.stockCarts[kind],
     items:state.items,models:state.apparelModels,destinations:state.stockDestinations,
     batches:state.stockBatches.filter(b=>b.operation===kind),
+    selectedDestination:state.stockSelectedDestination,
     qtyStore,groupInventory,photoButton,h,button
   });
 }
@@ -858,7 +863,7 @@ function refreshStockOperationSearch(){
     h,qtyStore
   }):'<p class="stock-search-welcome">Digite o nome, SKU ou EAN de um produto.</p>';
 }
-function updateStockOperationBasket(redraw=true){
+function updateStockOperationBasket(redraw=true,clearError=true){
   if(!['entrada','saida'].includes(state.view))return;
   const kind=state.view,cart=state.stockCarts[kind];
   if(redraw){
@@ -876,7 +881,7 @@ function updateStockOperationBasket(redraw=true){
   const submit=document.querySelector('[data-form="stock-operation"] button[type="submit"]');
   if(submit)submit.disabled=!cart.size||state.loading;
   const error=document.querySelector('[data-stock-error]');
-  if(error)error.hidden=true;
+  if(error&&clearError)error.hidden=true;
 }
 function addStockOperationItem(id){
   if(!isManager()||!['entrada','saida'].includes(state.view))return;
@@ -937,9 +942,11 @@ async function saveStockOperation(form){
     }
     cart.clear();state.stockRequestIds[kind]=null;
     form.querySelector('[name="note"]').value='';
-    state.stockBatches=assertOk(await db.from('stock_operation_batches')
-      .select('id,operation,destination_id,note,created_at')
-      .order('created_at',{ascending:false}).limit(100))||state.stockBatches;
+    try{
+      state.stockBatches=assertOk(await db.from('stock_operation_batches')
+        .select('id,operation,destination_id,note,created_at')
+        .order('created_at',{ascending:false}).limit(100))||state.stockBatches;
+    }catch(historyError){console.warn('Operação salva; histórico disponível depois',historyError);}
     const recent=document.querySelector('[data-stock-operation-history]');
     if(recent)recent.innerHTML=stockOperationHistoryHTML({
       batches:state.stockBatches.filter(b=>b.operation===kind),destinations:state.stockDestinations
@@ -966,7 +973,7 @@ async function saveStockOperation(form){
   }finally{
     state.loading=false;
     if(submit){submit.textContent=kind==='entrada'?'Confirmar entrada':'Confirmar saída';}
-    updateStockOperationBasket(false);
+    updateStockOperationBasket(false,false);
   }
 }
 
@@ -1842,15 +1849,6 @@ async function handleSubmit(event){
     if(!['entrada','saida'].includes(kind))return toast('Escolha Entrada ou Saída.',true);
     const id=form.dataset.id;
     closeTopModal();switchView(kind);addStockOperationItem(id);
-    return;
-  }
-  if(type==='stock'){
-    if(!isManager())return;
-    const quantity=Number(values.quantity);
-    if(!Number.isInteger(quantity)||!quantity||Math.abs(quantity)>1000000){toast('Quantidade inválida.',true);return;}
-    await exec(async()=>assertOk(await db.rpc('move_stock',{
-      p_product_id:form.dataset.id,p_action:values.action,p_quantity:quantity,p_note:values.note||null
-    })),'Estoque atualizado.');
     return;
   }
   if(type==='order-create'){
