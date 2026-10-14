@@ -308,7 +308,7 @@ function productsPage(){
   const list=filtered.slice(state.page*pageSize,(state.page+1)*pageSize);
   const add=isManager()?button('+ Novo produto','product-new','','primary'):'';
   return tabHead('Produtos','Pesquise por nome, código, EAN ou tags.',add)+
-    '<section class="panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, SKU ou tag…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
+    '<section class="panel products-panel"><div class="toolbar"><input id="product-search" type="search" class="search" placeholder="Buscar produto, EAN, SKU ou tag…" aria-label="Buscar produtos" value="'+h(state.search)+'"/>'+
     '<select id="category-filter" class="filter" style="width:auto;max-width:240px" aria-label="Filtrar categoria">'+[['','Todas as categorias'],...categoriesOptions(false)].map(([id,n])=>'<option value="'+h(id)+'" '+(id===state.categoryFilter?'selected':'')+'>'+h(n)+'</option>').join('')+'</select>'+
     '<select id="tag-filter" class="filter" style="width:auto;max-width:190px" aria-label="Filtrar tag">'+
     [['','Todas as tags'],...state.tags.map(t=>[t.name,t.name])].map(([id,name])=>'<option value="'+h(id)+'" '+(id===state.tagFilter?'selected':'')+'>'+h(name)+'</option>').join('')+'</select>'+
