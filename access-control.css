@@ -1,0 +1,30 @@
+/* Lojas, solicitações e matriz de autorizações */
+.permission-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px;max-width:100%}
+.permission-group-title{grid-column:1/-1;margin:14px 0 2px;font-weight:750;color:var(--text,#173d30);font-size:.9rem;border-bottom:1px solid #d8e5dd;padding-bottom:6px}
+.permission-toggle{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px;min-height:42px;background:#f6faf8;border:1px solid #e0ece6;border-radius:10px;padding:10px 12px;cursor:pointer}
+.permission-toggle input{accent-color:#166448;min-width:18px;width:18px;height:18px;margin:0;flex:none}
+.permission-toggle span{font-size:.9rem;line-height:1.3}
+.store-order-list{display:grid;gap:12px;padding:16px}
+.store-order-card{background:#fff;border:1px solid #dae8e0;border-radius:14px;padding:15px;box-shadow:0 3px 12px #123f2610}
+.store-order-card header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px}
+.store-order-card small{display:block;color:#677b70;margin-top:5px}
+.store-order-card p{font-size:.91rem;color:#334f40;line-height:1.5;margin:12px 0}
+.store-order-card .inline{display:flex;flex-wrap:wrap;gap:8px}
+.store-order-products{display:grid;gap:0;max-height:42vh;overflow:auto;border:1px solid #dce9e0;border-radius:12px;background:#fff}
+.store-order-product{display:grid;grid-template-columns:minmax(0,1fr) 85px;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid #edf2ed}
+.store-order-product:last-child{border-bottom:0}
+.store-order-product[hidden]{display:none}
+.store-order-product strong{font-size:.9rem;display:block;line-height:1.25}
+.store-order-product small{display:block;color:#60756a;font-size:.75rem;margin-top:4px;line-height:1.3}
+.store-order-product input{width:100%;min-height:40px;border:1px solid #bfd0c5;border-radius:8px;padding:8px;text-align:center;font-size:1rem}
+.store-order-products + .field{margin-top:12px}
+@media(max-width:600px){
+ .permission-grid{grid-template-columns:1fr;gap:7px}
+ .permission-group-title{margin-top:11px}
+ .store-order-card{padding:12px}
+ .store-order-card header{align-items:flex-start}
+ .store-order-list{padding:10px}
+ .store-order-products{max-height:40vh}
+ .store-order-product{grid-template-columns:minmax(0,1fr) 70px;padding:9px}
+ .store-order-card .inline .button{flex:1 1 auto;min-width:120px}
+}
