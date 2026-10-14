@@ -473,6 +473,37 @@ function categoryFull(id){
   while(cat&&!seen.has(cat.id)){seen.add(cat.id);bits.unshift(cat.name);cat=state.categories.find(c=>c.id===cat.parent_id);}
   return bits.join(' / ') || '—';
 }
+function productModelManager(modelId){
+  if(!canRegisterProducts())return;
+  const model=state.apparelModels.find(m=>m.id===modelId);
+  if(!model)return toast('Modelo não encontrado.',true);
+  const variants=state.items.filter(p=>p.apparel_model_id===modelId);
+  if(!variants.length)return toast('Não há variações neste modelo.',true);
+  while(document.querySelector('.modalback'))closeTopModal();
+  const overlay=document.createElement('div');
+  overlay.className='modalback';
+  const rows=variants.map(p=>'<div class="product-model-manage-item">'+
+    '<div><strong>'+h([p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||p.name)+'</strong>'+
+      '<small>SKU: '+h(p.sku||'—')+' · EAN: '+h(p.ean||'—')+'</small>'+
+      (!p.active?'<small>Variação inativa</small>':'')+'</div>'+
+    '<div class="actions">'+button('Editar','product-edit','data-id="'+h(p.id)+'"','small')+
+      (isManager()?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
+    '</div></div>').join('');
+  overlay.innerHTML='<section class="modal" role="dialog" aria-modal="true" aria-label="Editar '+h(model.name)+'">'+
+    '<div class="modalhead"><h2>Editar · '+h(model.name)+'</h2>'+
+      '<button type="button" class="plain" data-action="modal-close" aria-label="Fechar">✕</button></div>'+
+    '<div class="product-model-manage">'+
+      '<p>Escolha o tamanho que deseja editar. Cada variação tem EAN, SKU e estoque independentes.</p>'+
+      '<div class="product-model-manage-actions">'+
+        button('Alterar foto','apparel-photo','data-id="'+h(modelId)+'"','small')+
+        button('+ Adicionar tamanhos','add-variants','data-id="'+h(modelId)+'"','small primary')+
+      '</div>'+
+      rows+
+    '</div></section>';
+  document.body.append(overlay);
+  overlay.querySelector('[data-action="modal-close"]')?.focus({preventScroll:true});
+}
+
 function productsPage(){
   const q=state.search.toLocaleLowerCase('pt-BR').trim();
   const matched=state.items.filter(p=>(state.showInactiveProducts||p.active)&&
@@ -1474,6 +1505,18 @@ async function handleClick(event){
       const status=assertOk(await db.rpc('remove_product_safely',{p_product_id:id}));
       if(status==='archived')state.showInactiveProducts=false;
     },'Produto excluído ou desativado para preservar o histórico.');
+  }
+  if(action==='product-card-sizes'){
+    const card=target.closest('[data-product-card]');
+    const details=card?.querySelector('[data-product-details]');
+    if(!details)return;
+    details.open=!details.open;
+    target.setAttribute('aria-expanded',String(details.open));
+    return;
+  }
+  if(action==='product-card-edit'){
+    if(!canRegisterProducts())return;
+    return productModelManager(id);
   }
   if(action==='product-edit'){
     const item=product(id);
