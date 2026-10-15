@@ -14,7 +14,7 @@ export function matchesStoreOrder(order,scope){
  if(scope.type==='central')return true; // fila geral da central: pedidos e remessas.
  if(scope.type==='store')return order.kind==='loja'&&
   (order.raw?.to_store_id===scope.id||order.raw?.from_store_id===scope.id);
- if(scope.type==='event')return order.kind==='evento'&&order.eventId===scope.id;
+ if(scope.type==='event')return (order.kind==='evento'||order.kind==='avulso')&&order.eventId===scope.id;
  return false;
 }
 export function locationOrders(all,scope,mode='all'){
