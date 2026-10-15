@@ -58,7 +58,7 @@ export function eventSettlementForm(groups,balances,draft=null,{h=esc}={}){
 export function eventCompactDetail(data){
  const {event:e,members=[],plan=null,planItems=[],shipments=[],balances=[],movements=[],
   damageItems=[],closure=null,groupInventory,products=[],models=[],photoButton=()=>'',h=esc,
-  button=()=>'',niceDate=x=>x,username=x=>x,canPlan=false,canClose=false,canManage=false}=data;
+  button=()=>'',niceDate=x=>x,username=x=>x,canPlan=false,canClose=false,canManage=false,canDelete=false}=data;
  const active=e.status==='ativo',draft=e.status==='rascunho',closed=e.status==='encerrado';
  const current=balances.filter(b=>b.event_id===e.id&&Number(b.quantity)>0);
  const pending=current.reduce((sum,b)=>sum+Number(b.quantity),0);
@@ -104,7 +104,7 @@ export function eventCompactDetail(data){
  '<span class="'+(closed?'done':'')+'">3. Fechamento</span></div>'+
  '<div class="event-simple-metrics">'+summaries.map(([name,v])=>'<div><small>'+h(name)+'</small><strong>'+format(v)+'</strong></div>').join('')+'</div>'+
  '<div class="event-simple-actions">'+primary+
-  (canManage?button('Excluir evento','event-delete','data-id="'+h(e.id)+'"','small danger'):'')+'</div>'+
+  (canDelete?button('Excluir evento','event-delete','data-id="'+h(e.id)+'"','small danger'):'')+'</div>'+
  (draft?'<p class="event-simple-guidance">Monte sua lista, imprima em A4, confira o que foi encontrado e ajuste as quantidades antes de confirmar a saída física.</p>':
   active&&pending?'<p class="event-simple-guidance">Na volta, informe quantos produtos retornaram bons, foram vendidos, ficaram avariados ou foram perdidos. O sistema só encerra quando tudo estiver conciliado.</p>':'')+
  (active&&pending?'<section class="event-simple-section"><header><h2>Produtos ainda no local</h2><small>'+pending+' unidades pendentes</small></header>'+productsMarkup+'</section>':
