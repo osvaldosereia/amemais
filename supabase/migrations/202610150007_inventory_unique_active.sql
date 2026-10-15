@@ -1,0 +1,2 @@
+create unique index inventory_one_active_central on public.inventory_sessions(location_type) where location_type='central' and status in ('aberta','revisao');
+create unique index inventory_one_active_location on public.inventory_sessions(location_type,location_id) where location_type<>'central' and status in ('aberta','revisao');
