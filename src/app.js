@@ -2036,6 +2036,11 @@ function storePickingModal(orderId){
    'store-order-picking','Confirmar itens conferidos');
  document.querySelector('.modalback form[data-form="store-order-picking"]').dataset.order=orderId;
 }
+function categoryFranchiseMin(p){
+ const category=state.apparelModels.find(m=>m.id===p?.apparel_model_id)?.category_id||p?.category_id;
+ const chain=categoryChain(category).slice().reverse();
+ return Number(chain.find(c=>c.franchise_min_qty!=null)?.franchise_min_qty||0);
+}
 function storeOrderModal(){
  const main=state.stores.find(x=>x.is_primary&&x.active);
  if(!main)return toast('Estoque central não cadastrado.',true);
@@ -2047,7 +2052,8 @@ function storeOrderModal(){
  const rows=state.items.filter(p=>p.active).slice(0,1500).map(p=>
   '<div class="store-order-product" data-store-row data-filter="'+h([p.name,p.ean,p.sku,p.apparel_color,p.apparel_size].join(' ').toLocaleLowerCase('pt-BR'))+'">'+
   '<div><strong>'+h(p.name)+'</strong><small>'+h([p.apparel_color,p.apparel_size,p.sku,p.ean].filter(Boolean).join(' · '))+
-  (portal?'':' · Livre na central: '+qtyAvailable(p.id)+' un.')+'</small></div>'+
+  (portal?'':' · Livre na central: '+qtyAvailable(p.id)+' un.')+'</small>'+ 
+  (categoryFranchiseMin(p)?'<small class="franchise-order-min">Mínimo franquia: '+categoryFranchiseMin(p)+' un. por tamanho/SKU</small>':'')+'</div>'+
   '<input type="number" inputmode="numeric" min="0" max="1000000" step="1" value="0" data-store-order-qty data-id="'+h(p.id)+'" aria-label="Quantidade de '+h(p.name)+'"></div>').join('');
  formModal('Montar solicitação de mercadorias','<div class="formgrid">'+
   selectField('Unidade solicitante','to_store_id',targets.map(x=>[x.id,x.name]))+
@@ -3509,6 +3515,11 @@ async function handleSubmit(event){
     if(!target||!target.active||!assignedStore(target.id)||
       (target.kind==='franquia'&&!hasPermission('orders.franchise'))||
       (target.kind!=='franquia'&&!hasPermission('orders.central')))return toast('Unidade não autorizada.',true);
+    if(target.kind==='franquia'){
+     const invalid=items.find(line=>line.quantity<categoryFranchiseMin(product(line.product_id)));
+     if(invalid){const prod=product(invalid.product_id);
+      return toast('Mínimo para '+(prod?.name||'produto')+' · '+(prod?.apparel_size||'Único')+': '+categoryFranchiseMin(prod)+' unidades por SKU.',true);}
+    }
     const main=state.stores.find(x=>x.is_primary);
     await exec(async()=>assertOk(await db.rpc('create_store_order',{
       p_from_store:main.id,p_to_store:values.to_store_id,
