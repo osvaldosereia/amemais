@@ -21,9 +21,8 @@
 3. Ao salvar, o lote entra em **Separação** e **Pedidos**, identificado pelo
    nome da loja, sequência (01, 02, 03…) e identificador único.
    O sistema reserva automaticamente o que estiver livre.
-4. O separador imprime **Imprimir lote A4** e mantém a folha com os produtos
-   separados. A mesma impressão compacta é usada para pedidos comuns e
-   lotes de eventos.
+4. O separador imprime **Imprimir 80 mm** e mantém a folha com os produtos
+   separados. O cupom térmico agrupa por gôndola e inclui foto, modelo, variação, SKU, EAN, prateleira e quantidade. A mesma impressão é usada para pedidos comuns e lotes de eventos.
 5. É possível **Salvar progresso** sem contar todos os tamanhos, sair e depois
    usar **Continuar separação**. Uma leitura EAN conta uma unidade do tamanho
    correspondente. Quando todos os SKUs estiverem completos, use
