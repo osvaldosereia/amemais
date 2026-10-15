@@ -29,7 +29,7 @@ export function eventPlanForm(groups,{h=esc,additional=false}={}){
          ' data-plan-qty data-id="'+h(p.id)+'" value="'+(additional?0:p.planned||0)+'" aria-label="Quantidade de '+h(p.name)+'"></label>'+
       '</div>').join('')+'</section>').join('')+'</div>'+
  (additional?'<label class="field"><span>Motivo do complemento *</span><textarea name="reason" required maxlength="180" placeholder="Ex.: reposição adicional solicitada"></textarea></label>':'')+
- '<p class="help">Imprima a lista antes de confirmar a saída física. O envio é validado novamente contra o estoque livre.</p>';
+ '<p class="help">Ao salvar, o lote entra na fila de Separação. A impressão em A4 e a saída física são feitas na fila, uma remessa por vez.</p>';
 }
 export function eventSettlementForm(groups,balances,draft=null,{h=esc}={}){
  const counted=new Map((draft?.items||[]).map(x=>[x.product_id,x]));
