@@ -20,6 +20,7 @@ import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,d
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015cdsb3';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015access2';
+import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -63,6 +64,7 @@ const nav = [
   {id:'produtos',label:'Produtos',ico:'package'},
   {id:'lojas',label:'Lojas',ico:'home'},
   {id:'pedidos',label:'Pedidos',ico:'clipboard'},
+  {id:'compras',label:'Compras',ico:'clipboard'},
   {id:'movimentacoes',label:'Atividades',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
   {id:'tags',label:'Tags',ico:'more'},
@@ -72,7 +74,7 @@ const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
-  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -95,7 +97,7 @@ const permissionCatalog=[
  ['movements.read','Consultar movimentações'],['movements.export','Exportar relatórios'],
  ['categories.manage','Gerenciar categorias'],['tags.manage','Gerenciar tags'],
  ['catalog.manage','Gerenciar catálogos de clientes'],['products.share','Compartilhar produtos'],
- ['stores.read','Consultar lojas'],['stores.manage','Administrar lojas'],['users.manage','Administrar usuários']
+ ['stores.read','Consultar lojas'],['stores.manage','Administrar lojas'],['purchases.manage','Fornecedores e pedidos de compra'],['users.manage','Administrar usuários']
 ];
 const hasPermission = p => Boolean(state.profile?.active) && (state.profile?.role==='admin'||state.ownPermissions.includes(p));
 const canUseStoreOrders=()=>['orders.central','orders.franchise','orders.separate','orders.receive','orders.cancel'].some(hasPermission);
@@ -116,6 +118,7 @@ const permittedView = v => {
  if(v==='pedidos-lojas')return false;
  if(v==='pedidos')return canUseStoreOrders()||hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign')||hasPermission('orders.separate')||hasPermission('events.separate');
  if(v==='separacao')return permittedView('pedidos');
+ if(v==='compras')return hasPermission('purchases.manage');
  if(v==='usuarios')return isAdmin();
  if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage')||hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.separate')||canUseStoreOrders()||hasPermission('orders.read');
  if(v==='lojas-admin')return hasPermission('stores.manage');
@@ -198,6 +201,12 @@ async function loadData(){
     ['users',db.from('staff_profiles').select('id,full_name,username,role,active,permissions_customized,created_at').order('full_name').limit(1000)]
   ];
   resources.push(['stores',db.from('stores').select('*').order('name')]);
+  if(hasPermission('products.edit')||hasPermission('purchases.manage'))
+   resources.push(['suppliers',db.from('suppliers').select('*').order('name').limit(1000)]);
+  if(hasPermission('purchases.manage')){
+   resources.push(['purchaseOrders',db.from('purchase_orders').select('*').order('created_at',{ascending:false}).limit(600)]);
+   resources.push(['purchaseItems',db.from('purchase_order_items').select('*').limit(12000)]);
+  }
   if(hasPermission('stock.balance')||hasPermission('stores.manage')||hasPermission('events.manage')){
    resources.push(['inventorySessions',db.from('inventory_sessions').select('*').order('created_at',{ascending:false}).limit(100)]);
    resources.push(['inventoryItems',db.from('inventory_session_items').select('*').limit(10000)]);
@@ -488,6 +497,8 @@ function pageContent(){
   if(state.view==='inventario')return inventoryPage();
   if(state.view==='avarias')return damageStockPage();
   if(state.view==='produtos')return productsPage();
+  if(state.view==='compras')return purchasesPage({products:state.items,suppliers:state.suppliers,balances:state.balances,
+   reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,button,filter:state.purchaseSupplierFilter});
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):storesPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
@@ -1335,6 +1346,25 @@ async function handlePhotoInput(input){
 }
 function photoChooser(item){return galleryMarkup(item);}
 
+function procurementFields(item=null){
+ return '<section class="form-section wide"><div class="section-head"><strong>Reposição e compras</strong>'+
+  '<small>Controle por SKU/variação; não altera o estoque atual</small></div>'+
+  '<div class="formgrid">'+field('Estoque mínimo (unidades)','min_stock','number',item?.min_stock??0,
+    'min="0" max="1000000" step="1"','Ao ficar abaixo desse limite, aparece na sugestão de compras.')+
+  selectField('Fornecedor padrão','supplier_id',[['','Sem fornecedor'],...state.suppliers.filter(s=>s.active||s.id===item?.supplier_id).map(s=>[s.id,s.name])],item?.supplier_id||'')+
+  '</div><p class="help">Cadastre fornecedores na seção Compras. Para modelos com variações, o mínimo vale por tamanho/SKU.</p></section>';
+}
+function procurementValues(form){
+ const raw=form.elements.namedItem('min_stock')?.value??'0',min=Number(raw);
+ if(raw===''||!Number.isInteger(min)||min<0||min>1000000)throw Error('Estoque mínimo deve ser de 0 a 1.000.000 unidades.');
+ const supplier=form.elements.namedItem('supplier_id')?.value||null;
+ if(supplier&&!state.suppliers.some(s=>s.id===supplier&&s.active))throw Error('Fornecedor inválido ou inativo.');
+ return {supplier_id:supplier,min_stock:min};
+}
+async function saveModelProcurement(modelId,form){
+ const v=procurementValues(form);
+ assertOk(await db.rpc('set_apparel_procurement',{p_model:modelId,p_supplier:v.supplier_id,p_min_stock:v.min_stock}));
+}
 function productModal(item=null){
   if(!canRegisterProducts())return;
   const single='<div data-single-fields class="single-fields wide">'+
@@ -1352,7 +1382,7 @@ function productModal(item=null){
     '<div class="wide">'+field('Nome do produto *','name','text',item?.name||'','required maxlength="180"')+'</div>'+
     (!item?'<p class="help wide">SKU e EAN de produtos excluídos podem ser reutilizados. O sistema impede duplicações somente com produtos ativos.</p>':'')+
     (!item?sizesSection():'')+
-    single+photoChooser(item)+categorySelector(item)+productTagChooser(item)+locations+
+    single+photoChooser(item)+categorySelector(item)+productTagChooser(item)+locations+procurementFields(item)+
     (!item?'<div class="wide" data-single-stock>'+
       (state.view==='entrada'?'<p class="help">Ao cadastrar um produto para esta remessa, deixe o estoque inicial em zero e adicione-o à lista abaixo para não contabilizar duas vezes.</p>':'')+
       field('Quantidade inicial na loja','initial_quantity','number','0','min="0" max="1000000" step="1"','Entrada registrada no histórico.')+'</div>':'')+
@@ -3241,7 +3271,7 @@ async function handleSubmit(event){
     if(type==='product-new'&&form.querySelector('[data-use-sizes]')?.checked){
       state.loading=true;
       try{await saveSizedProduct(form,{
-        db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast,saveGallery:savePhotoGallery
+        db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast,saveGallery:savePhotoGallery,saveProcurement:saveModelProcurement
       });}catch(error){fail(error);}finally{state.loading=false;}
       return;
     }
@@ -3249,6 +3279,7 @@ async function handleSubmit(event){
     const ean=String(values.ean||'').replace(/[\s-]/g,'');
     if(ean && !/^\d{8,14}$/.test(ean)){toast('O EAN deve conter de 8 a 14 dígitos.',true);return;}
     const payload={
+      ...procurementValues(form),
       name:String(values.name).trim(),sku:String(values.sku||'').trim()||null,ean:ean||null,
       tags:productTagValues(form),
       category_id:chosenCategory(form),
@@ -3274,6 +3305,7 @@ async function handleSubmit(event){
           p_initial_quantity:initial
         }));
       }
+      if(!editing)assertOk(await db.from('products').update(procurementValues(form)).eq('id',productId));
       if(galleryHasChanges(form)){
         try{
           const existing=editing?product(id):null;
@@ -3296,7 +3328,7 @@ async function handleSubmit(event){
     state.loading=true;
     try{
       await submitApparel(form,{
-        state,db,assertOk,chosenCategory,productTagValues,loadData,closeTopModal,toast,saveGallery:savePhotoGallery
+        state,db,assertOk,chosenCategory,productTagValues,loadData,closeTopModal,toast,saveGallery:savePhotoGallery,saveProcurement:saveModelProcurement
       });
     }catch(error){fail(error);}
     finally{state.loading=false;}
