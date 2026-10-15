@@ -11,7 +11,8 @@ export function galleryMarkup(item){
  '<button type="button" class="button" data-action="take-photo">📷 Câmera</button>'+
  '<small data-photo-status>Selecione até 3 fotos. Você pode trocar, remover ou escolher a principal.</small></div>'+
  '<input hidden type="file" name="gallery_file" accept="image/*" multiple>'+
- '<input hidden type="file" name="camera_file" accept="image/*" capture="environment"></section>';
+ '<input hidden type="file" name="camera_file" accept="image/*" capture="environment">'+
+ '<input hidden type="file" name="gallery_replace_file" accept="image/*"></section>';
 }
 function photoTile(item,i){
  return '<div class="gallery-tile" data-gallery-item data-path="'+esc(item.path||'')+'">'+
@@ -19,6 +20,7 @@ function photoTile(item,i){
  '<img '+(item.url?'src="'+esc(item.url)+'"':'data-photo-path="'+esc(item.path)+'"')+' alt="Foto '+(i+1)+' do produto" loading="lazy"></button>'+
  '<div class="gallery-tile-actions">'+
  '<button type="button" data-action="gallery-primary" data-index="'+i+'" '+(i===0?'disabled':'')+'>'+(i===0?'Principal':'Definir capa')+'</button>'+
+ '<button type="button" data-action="gallery-replace" data-index="'+i+'">Trocar</button>'+
  '<button type="button" data-action="gallery-remove" data-index="'+i+'">Excluir</button></div></div>';
 }
 export function galleryState(form){
@@ -59,6 +61,16 @@ export async function galleryAddFiles(form,files,compress){
   compressed.push({blob,url:URL.createObjectURL(blob)});
  }
  photos.push(...compressed);paint(form);
+}
+export async function galleryReplaceFile(form,index,file,compress){
+ const photos=galleryState(form);
+ if(index<0||index>=photos.length)throw Error('Foto não encontrada.');
+ if(!file?.type?.startsWith('image/')||file.size>20*1024*1024)
+  throw Error('Escolha uma imagem válida de até 20 MB.');
+ const blob=await compress(file);
+ if(photos[index].url)URL.revokeObjectURL(photos[index].url);
+ photos[index]={blob,url:URL.createObjectURL(blob)};
+ paint(form);
 }
 export async function savePhotoGallery(form,{db,assertOk,modelId=null,productId=null}){
  const gallery=galleryState(form);
