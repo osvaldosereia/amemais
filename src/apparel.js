@@ -61,7 +61,7 @@ export function apparelPage(state,{h,tabHead,button,qtyStore,photoButton}){
     '</div>';
 }
 
-export function apparelModal(state,{h,formModal,photoChooser,categorySelector,productTagChooser}){
+export function apparelModal(state,{h,formModal,photoChooser,categorySelector,productTagChooser,procurementFields}){
   const root=state.categories.find(c=>!c.parent_id&&c.name.toLocaleLowerCase('pt-BR')==='roupas');
   if(!root)throw new Error('Cadastre primeiro a categoria principal Roupas.');
   const initialCategory=state.categories.find(c=>c.parent_id===root.id&&c.name.toLocaleLowerCase('pt-BR')==='camisetas')||root;
@@ -74,7 +74,7 @@ export function apparelModal(state,{h,formModal,photoChooser,categorySelector,pr
     select('apparel_audience','Público',audiences,'Unissex')+
     '</div></section>'+
     categorySelector({category_id:initialCategory.id})+
-    photoChooser(null)+productTagChooser(null)+
+    photoChooser(null)+productTagChooser(null)+procurementFields(null)+
     '<section class="form-section wide"><div class="section-head"><strong>2. Tamanhos, cores e quantidades</strong></div>'+
     '<p class="help">Cada combinação de cor e tamanho é uma variação independente. Comece por uma e toque em Adicionar variação para incluir outras.</p>'+
     '<div data-apparel-rows>'+apparelRowHTML(h,'Branco',true)+'</div>'+
@@ -126,7 +126,7 @@ function validatedVariants(form){
 }
 
 export async function submitApparel(form,{
- state,db,assertOk,chosenCategory,productTagValues,loadData,closeTopModal,toast,saveGallery
+ state,db,assertOk,chosenCategory,productTagValues,loadData,closeTopModal,toast,saveGallery,saveProcurement
 }){
   const name=form.elements.namedItem('apparel_name')?.value?.trim()||'';
   if(name.length<2||name.length>110)throw new Error('Informe um nome de 2 a 110 caracteres.');
@@ -144,6 +144,7 @@ export async function submitApparel(form,{
     p_tags:productTagValues(form),
     p_variants:variants
   }));
+  await saveProcurement(created,form);
   let photoWarning=false;
   if(hasGallery){
    try{await saveGallery(form,{db,assertOk,modelId:created});}
@@ -184,7 +185,7 @@ export function apparelFillSizes(target,{h}){
   }
 }
 
-export function apparelVariantEditModal(p,{h,formModal,variationOptions=[]}){
+export function apparelVariantEditModal(p,{h,formModal,variationOptions=[],procurementFields}){
   if(!p?.apparel_model_id)throw new Error('Variação inválida.');
   const configured=variationOptions.length?variationOptions:[p.apparel_size];
   const sizeOptions='<option value="">Variação</option>'+
@@ -199,7 +200,8 @@ export function apparelVariantEditModal(p,{h,formModal,variationOptions=[]}){
     '<button type="button" class="button small" data-action="apparel-scan">📷</button></div></label>'+
     '<label class="field"><span>Gôndola</span><input name="gondola" maxlength="40" value="'+h(p.gondola||'')+'"></label>'+
     '<label class="field"><span>Prateleira</span><input name="prateleira" maxlength="40" value="'+h(p.prateleira||'')+'"></label>'+
-    '<label class="field"><span>Situação</span><select name="active"><option value="true" '+(p.active?'selected':'')+'>Ativa</option>'+
+    procurementFields(p)+
+     '<label class="field"><span>Situação</span><select name="active"><option value="true" '+(p.active?'selected':'')+'>Ativa</option>'+
     '<option value="false" '+(!p.active?'selected':'')+'>Inativa</option></select></label>'+
     '</div><div class="note">Esta edição não altera saldos. Para conferir o estoque livre, abra os tamanhos no card do produto.</div>',
     'apparel-edit-variant','Salvar variação');
@@ -207,7 +209,7 @@ export function apparelVariantEditModal(p,{h,formModal,variationOptions=[]}){
   if(form)form.dataset.productId=p.id;
 }
 
-export async function saveApparelVariant(form,{db,assertOk,loadData,closeTopModal,toast}){
+export async function saveApparelVariant(form,{db,assertOk,loadData,closeTopModal,toast,procurementValues}){
   const v=name=>form.elements.namedItem(name)?.value?.trim()||'';
   const color=v('color'),size=v('size'),sku=v('sku'),ean=v('ean').replace(/[\s-]/g,'');
   if(color.length<2||color.length>40||!size)throw new Error('Variação inválida.');
@@ -217,7 +219,7 @@ export async function saveApparelVariant(form,{db,assertOk,loadData,closeTopModa
     p_sku:sku||null,p_ean:ean||null,p_active:v('active')==='true'
   }));
   assertOk(await db.from('products').update({
-    gondola:v('gondola')||null,prateleira:v('prateleira')||null
+    gondola:v('gondola')||null,prateleira:v('prateleira')||null,...procurementValues(form)
   }).eq('id',form.dataset.productId));
   closeTopModal();
   await loadData();
