@@ -141,3 +141,19 @@
  .event-lot-row{flex-wrap:wrap}
  .event-lot-row>.button{width:100%}
 }
+
+
+/* Identificação visual por modelo: uma foto para todos os SKUs do modelo. */
+.uo-model-identity{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+.uo-model-photo{display:block;flex:none;width:66px;height:66px;object-fit:contain;border:1px solid #d8e6dc;border-radius:9px;background:#fff}
+.uo-photo-empty{display:grid;place-items:center;color:#a7bdb0;font-size:1.4rem}
+.uo-model-head>.uo-model-identity strong{min-width:0;overflow-wrap:anywhere;font-size:.88rem}
+.uo-model-head>span{flex:none}
+.uo-pick-model h3.uo-pick-heading{display:flex;align-items:center;justify-content:flex-start;gap:12px}
+.uo-pick-heading .uo-model-photo{width:70px;height:70px}
+.uo-pick-heading span{display:flex;flex-direction:column;gap:3px}
+@media(max-width:760px){
+ .uo-model-head>.uo-model-identity{width:100%}
+ .uo-model-photo{width:58px;height:58px}
+ .uo-pick-heading .uo-model-photo{width:60px;height:60px}
+}
