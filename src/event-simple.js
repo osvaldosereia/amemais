@@ -34,7 +34,7 @@ export function eventPlanForm(groups,{h=esc,additional=false}={}){
 export function eventSettlementForm(groups,balances,draft=null,{h=esc}={}){
  const counted=new Map((draft?.items||[]).map(x=>[x.product_id,x]));
  const qtyMap=new Map(balances.map(x=>[x.product_id,Number(x.quantity)||0]));
- return '<p class="help">Para cada tamanho, informe o destino de todas as unidades restantes. Avarias ficam em análise; só voltam ao estoque quando recuperadas.</p>'+
+ return '<p class="help">O CDSB controla somente o que enviou e o que retornou. Informe devoluções, avarias e quantidades não devolvidas. Não registramos vendas.</p>'+
  '<div class="event-settle-groups">'+groups.map(g=>'<section class="event-settle-group">'+
  '<h3>'+h(g.title)+'</h3>'+g.products.filter(p=>(qtyMap.get(p.id)||0)>0).map(p=>{
   const expected=qtyMap.get(p.id)||0,prior=counted.get(p.id);
@@ -44,15 +44,15 @@ export function eventSettlementForm(groups,balances,draft=null,{h=esc}={}){
    '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small></div>'+
    '<span class="event-settle-expected">'+expected+' a conferir</span></header>'+
    '<div class="event-settle-fields">'+[
-     ['good','Voltaram boas'],['sold','Vendidas'],['damaged','Avariadas'],['lost','Perdidas']
+     ['good','Devolvidas boas'],['damaged','Avariadas'],['lost','Não devolvidas']
    ].map(([key,label])=>'<label><span>'+label+'</span><input data-settle-field="'+key+
     '" type="number" min="0" max="'+expected+'" step="1" inputmode="numeric" value="'+(values?values[key]||0:0)+'"></label>').join('')+'</div>'+
    '<div class="event-settle-foot"><small data-settle-remaining>Pendente: '+expected+'</small>'+
-   '<button type="button" data-action="event-fill-sold">Marcar restante vendido</button></div>'+
+   '<small>Não devolvidas não são classificadas como vendas.</small></div>'+
   '</article>';
  }).join('')+'</section>').join('')+'</div>'+
- '<label class="field"><span>Justificativa de avarias / perdas (obrigatória quando houver)</span>'+
- '<textarea name="note" maxlength="250" placeholder="Ex.: duas camisetas com costura aberta">'+h(draft?.note||'')+'</textarea></label>'+
+ '<label class="field"><span>Justificativa para avarias ou diferenças não devolvidas (obrigatória)</span>'+
+ '<textarea name="note" maxlength="250" placeholder="Ex.: 2 peças avariadas e 3 não devolvidas pelo evento">'+h(draft?.note||'')+'</textarea></label>'+
  '<div class="event-settle-summary" data-settle-summary aria-live="polite">Preencha a conferência de todos os tamanhos.</div>';
 }
 export function eventCompactDetail(data){
