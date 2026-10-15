@@ -2534,7 +2534,9 @@ async function handleSubmit(event){
       }else{
         assertOk(await db.rpc('record_stock_exception',{
           p_product_id:id,p_quantity:qty,p_expected:expected,
-          p_reason:reason,p_details:details,p_recipient:recipient||null,p_request_id:requestId
+          p_reason:reason,p_details:details,
+          p_recipient:['diretoria','doacao'].includes(reason)?recipient||null:null,
+          p_request_id:requestId
         }));
       }
     },kind==='entrada'?'Entrada de fornecedor registrada.':'Baixa excepcional registrada com motivo e justificativa.');
