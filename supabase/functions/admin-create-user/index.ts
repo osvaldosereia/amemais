@@ -8,7 +8,7 @@ const headers = {
   'Content-Type': 'application/json'
 };
 const respond = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
-const validPassword = (password: string) => password.length >= 6 && password.length <= 128;
+const validPassword = (password: string) => password.length >= 12 && password.length <= 128;
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response(null, { headers });
@@ -39,7 +39,7 @@ Deno.serve(async (request) => {
     const action = String(payload?.action || 'create');
     const password = String(payload?.password || '');
     if (!validPassword(password)) {
-      return respond({ error:'A senha deve ter entre 6 e 128 caracteres.' },400);
+      return respond({ error:'A senha deve ter entre 12 e 128 caracteres.' },400);
     }
 
     if (action === 'set-password') {
@@ -71,9 +71,9 @@ Deno.serve(async (request) => {
     const validPermissionNames = new Set([
       'products.read','products.create','products.edit','products.delete',
       'stock.entry','stock.exit','stock.balance','stock.destinations',
-      'events.read','events.manage','events.separate','events.return','events.sell','events.close',
+      'events.read','events.request','events.manage','events.separate','events.return','events.sell','events.close',
       'orders.read','orders.internal','orders.assign','orders.central','orders.franchise',
-      'orders.separate','orders.receive','orders.cancel','movements.read','movements.export',
+      'orders.separate','orders.dispatch','orders.receive','orders.cancel','movements.read','movements.export',
       'categories.manage','tags.manage','catalog.manage','products.share','stores.read','stores.manage','users.manage'
     ]);
     if (!/^[A-Za-z][A-Za-z0-9._-]{2,31}$/.test(username) ||
