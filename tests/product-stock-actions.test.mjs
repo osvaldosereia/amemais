@@ -22,7 +22,7 @@ test('cada variação tem somente um comando Gerenciar visível no retrátil',()
   isManager:()=>true,canRegisterProducts:()=>true,canMoveStock:()=>true,
   canManageSku:()=>true
  });
- assert.equal((html.match(/data-action="sku-manage"/g)||[]).length,6); // 3 linhas nas duas árvores responsivas, uma só visível
+ assert.equal((html.match(/data-action="sku-manage"/g)||[]).length,3); // um comando real por SKU
  assert.doesNotMatch(html,/data-action="stock-group-modal"/);
  assert.doesNotMatch(html,/data-action="stock-modal"/);
  assert.match(html,/data-product-details/);
