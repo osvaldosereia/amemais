@@ -1474,7 +1474,7 @@ function eventLossModal(){
 function memberModal(eid){
   if(!hasPermission('events.manage'))return;
   const occupied=new Set(state.members.filter(m=>m.event_id===eid).map(m=>m.user_id));
-  const users=state.users.filter(u=>u.active&&!occupied.has(u.id));
+  const users=state.users.filter(u=>u.active&&u.role!=='franquia'&&!occupied.has(u.id));
   if(!users.length){toast('Nenhum usuário ativo disponível. Cadastre usuários primeiro.',true);return;}
   formModal('Adicionar responsável / operador','<div class="formgrid">'+selectField('Usuário','user_id',users.map(u=>[u.id,u.full_name+' · '+u.email]))+
     selectField('Papel neste evento','role',[['responsavel','Responsável'],['operador','Operador']])+'</div>'+
