@@ -39,10 +39,16 @@
 - O antigo fluxo de saída por avaria foi redirecionado à quarentena;
   o endpoint antigo impede registrar avaria como baixa comum.
 
-## Inventário formal
-Não foi apagado: o menu principal não o exibe. Administradores ainda
-podem acessá-lo em **Balanço rápido → Conferência formal**. Dados e
-sessões anteriores permanecem.
+## Simplificação das conferências de estoque (15/10/2026)
+As telas **Inventário formal** e **Balanço rápido** independente foram
+removidas da interface de operação. A conferência e o ajuste diário
+continuam diretamente nos cards da seção **Produtos** (variações e
+quantidade livre/estoque físico), respeitando as permissões e as reservas.
+
+Os dados históricos, as rotinas RPC de inventário, as tabelas
+`inventory_sessions` e `inventory_session_items` foram **preservados**
+no banco por rastreabilidade. A aplicação deixou de consultá-las a cada
+carregamento. Rotas antigas de inventário e balanço levam a Produtos.
 
 ## Compatibilidade
 - Lojas temporárias antigas já ativadas, como o Evento Teste 1, podem usar
