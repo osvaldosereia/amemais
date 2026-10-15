@@ -40,7 +40,8 @@ export function makeUnifiedOrders({avulsoOrders=[],avulsoItems=[],storeOrders=[]
     expires_at:order.expires_at,
     lines:mapped,total:mapped.reduce((s,x)=>s+x.quantity,0),
     reserved:mapped.reduce((s,x)=>s+x.reserved,0),
-    missing:mapped.reduce((s,x)=>s+x.missing,0),
+    missing:['pendente_estoque','reservado','aprovado','separado'].includes(status)?
+      mapped.reduce((s,x)=>s+x.missing,0):0,
     adjustments:adjustments.filter(a=>a.order_kind===kind&&a.order_id===order.id),
     isOwner:order.created_by===userId,
     raw:order};
@@ -77,12 +78,16 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  const badges=o.kind==='avulso'?(o.raw.source==='cliente'?'Cliente catálogo':
   o.raw.source==='compartilhado'?'Cliente link':'Pedido avulso'):
   o.raw.request_type==='franquia'?'Franquia':'Filial';
+ const terminal=['despachado','concluido','recebido','recebido_divergente','cancelado','expirado'].includes(o.status);
+ const unchecked=['legado','solicitado'].includes(o.status);
  const lineRows=o.lines.map(l=>'<div class="uo-sku"><div class="uo-sku-name"><strong>'+
   esc(l.name)+'</strong><small>'+esc([l.color,l.size].filter(Boolean).join(' · '))+
   ' · SKU '+esc(l.sku||'—')+' · EAN '+esc(l.ean||'—')+'</small>'+
   (l.gondola?'<small>Gôndola '+esc(l.gondola)+'</small>':'')+'</div>'+
   '<div class="uo-sku-stats"><span>'+n(l.quantity)+' solicit.</span>'+
-    (portal?'':('<span>'+n(l.reserved)+' reserv.</span><span class="'+(l.missing?'is-short':'')+'">'+
+    (portal?'':terminal?'<span>'+(['cancelado','expirado'].includes(o.status)?'Liberado':'Saída registrada')+'</span>':
+     unchecked?'<span>Reserva não avaliada</span>':
+     ('<span>'+n(l.reserved)+' reserv.</span><span class="'+(l.missing?'is-short':'')+'">'+
       n(l.missing)+' faltam</span>'))+'</div></div>').join('');
  return '<article class="uo-card" data-order-card data-search="'+esc([
     o.id,o.target,o.origin,badges,...o.lines.flatMap(l=>[l.name,l.sku,l.ean])].join(' ').toLocaleLowerCase('pt-BR'))+
@@ -91,7 +96,8 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
     '<h3>Pedido #'+esc(o.id.slice(0,8).toUpperCase())+'</h3>'+
     '<strong>'+esc(o.target)+'</strong></div><span class="uo-pill '+info[1]+'">'+esc(info[0])+'</span></header>'+
    '<div class="uo-metrics"><span>'+n(o.total)+' solicitadas</span>'+
-    (portal?'':('<span>'+n(o.reserved)+' reservadas</span>'+
+    (portal?'':terminal?'<span>Reserva encerrada</span>':unchecked?'<span>Reserva não avaliada</span>':
+     ('<span>'+n(o.reserved)+' reservadas</span>'+
       (o.missing?'<span class="uo-alert">'+n(o.missing)+' em falta</span>':'<span class="uo-ok">Sem faltas</span>')))+
    '</div>'+
    (o.missing&&!portal?'<p class="uo-shortage">Há itens não disponíveis. As unidades livres já foram reservadas; confira os SKUs pendentes abaixo.</p>':'')+
