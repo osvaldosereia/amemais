@@ -40,13 +40,14 @@ export function recentInventoryGroups(items,models,limit=6){
       a.group.key.localeCompare(b.group.key))
     .slice(0,max).map(entry=>entry.group);
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canShare=false,mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canShare=false,mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path)||group.main;
   const active=group.products.filter(p=>p.active);
   const isProducts=mode==='products';
   const canEdit=isProducts&&canRegisterProducts();
   const canMove=isProducts&&canMoveStock();
+  const skuAccess=isProducts&&canManageSku();
   const manage=isProducts&&isManager();
   const quantity=p=>mode==='event'?qtyEvent(p.id,eventId):qtyStore(p.id);
   const count=active.reduce((sum,p)=>sum+quantity(p),0);
@@ -80,19 +81,16 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
           '<small class="variant-ean">EAN '+h(p.ean||'—')+'</small>'+
           (loc?'<small class="group-variant-location">'+h(loc)+'</small>':'')+
           (!p.active?'<small class="product-variant-disabled">Inativo</small>':'')+
-          (isProducts&&qtyReserved(p.id)>0?'<small class="stock-variant-breakdown">'+fmt(qtyReserved(p.id))+' reservadas · '+fmt(qtyAvailable(p.id))+' livres</small>':'')+
+          (isProducts?'<small class="stock-variant-breakdown">'+fmt(qtyReserved(p.id))+' reservadas · '+fmt(qtyAvailable(p.id))+' livres</small>':'')+
           '</div></div>'+
         '<span class="group-variant-stock '+(qty===0?'stock-zero':'')+'"><b>'+fmt(qty)+'</b><small>un.</small></span>'+
-        (isProducts?'<div class="group-variant-actions">'+
-          (canMove&&p.active?button('Movimentar','stock-modal','data-id="'+h(p.id)+'"','small primary'):'')+
-          button('Local','stock-overview','data-id="'+h(p.id)+'"','small')+
-          (canEdit?button('Editar SKU','product-edit','data-id="'+h(p.id)+'"','small'):'')+
+        (skuAccess?'<div class="group-variant-actions">'+
+          button('Gerenciar','sku-manage','data-id="'+h(p.id)+'"','small primary')+
           '</div>':'')+
         '</div>';
     }).join('')+'</div>';
   };
-  // Preservamos a exibição contínua no desktop e a versão retrátil no mobile.
-  // Apenas uma delas fica visível por CSS, para evitar listas visuais duplicadas.
+  // Mesmo retrátil para o desktop e o celular. Nenhum saldo é editado diretamente no card.
   const moreOptions=(canShare?'<button type="button" data-action="share-product" data-id="'+h(main.id)+'">'+
       'Compartilhar no WhatsApp</button>':'')+
 
@@ -102,11 +100,9 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       (group.modelId?'Gerenciar / excluir tamanhos':'Excluir produto')+'</button>':'');
   const actions=isProducts?
     '<div class="grouped-inventory-actions">'+
-      (canMove?'<button type="button" class="product-card-move" data-action="stock-group-modal" data-card-key="'+h(group.key)+'">↕ Movimentar</button>':'')+
-      (canEdit?'<button type="button" class="product-card-edit" data-action="'+groupEdit+
-        '" data-id="'+h(groupEditId)+'">✎ Editar produto</button>':'')+
+      (sizeCount===1&&skuAccess?button('Gerenciar SKU','sku-manage','data-id="'+h(main.id)+'"','primary'):'')+
       '<button type="button" class="product-card-sizes" data-action="product-card-sizes" data-card-key="'+h(group.key)+'"'+
-        ' aria-expanded="false">'+sizeCount+' tamanhos <span aria-hidden="true">⌄</span></button>'+
+      ' aria-expanded="false">'+(sizeCount===1?'Ver detalhes':'Ver '+sizeCount+' tamanhos')+' <span aria-hidden="true">⌄</span></button>'+
       (moreOptions?'<details class="product-card-more"><summary aria-label="Mais opções do produto" title="Mais opções">⋯</summary>'+
         '<div class="product-card-more-menu">'+moreOptions+'</div></details>':'')+
     '</div>':'';
@@ -120,7 +116,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
           '<small>'+stockLabel+'</small>'+
           '<span><b>'+fmt(count)+'</b> un.</span>'+
         '</div>'+
-        (isProducts?'<div class="stock-total-breakdown"><span><b>'+fmt(groupAvailable)+'</b> livres</span>'+(groupReserved?'<span>'+fmt(groupReserved)+' reservadas</span>':'')+'</div>':'')+
+        (isProducts?'<div class="stock-total-breakdown"><span><b>'+fmt(groupReserved)+'</b> reservadas</span><span><b>'+fmt(groupAvailable)+'</b> livres</span></div>':'')+
         '<small class="product-card-location">'+h(location)+'</small>'+
       '</div>'+
     '</div>'+
