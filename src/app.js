@@ -1142,7 +1142,7 @@ function movementsPage(){
    .sort((a,b)=>String(b.time).localeCompare(String(a.time))).slice(0,120);
  const filterUsers=[...new Set([...state.users.map(u=>u.id),...entries.map(e=>e.user)].filter(Boolean))];
  return tabHead('Atividades','Quem fez o quê no sistema, em ordem de data.',
-  button('Exportar estoque CSV','export-csv','','small'))+
+  button('Exportar estoque CSV','export-csv','','small')+button('Imprimir atividades','buy-print-activities','','small'))+
   '<section class="panel activity-panel">'+
   '<div class="activity-filters">'+
    '<input class="search" id="movement-search" type="search" value="'+h(state.search)+'" placeholder="Buscar usuário, produto ou ação…">'+
@@ -1418,6 +1418,21 @@ function printHTML(html){
  const popup=window.open('','_blank');
  if(!popup)return toast('Seu navegador bloqueou a impressão. Permita janelas para este site.',true);
  popup.document.open();popup.document.write(html);popup.document.close();
+}
+function printActivityReport(){
+ if(!hasPermission('movements.read'))return;
+ const rows=[
+  ...state.movements.map(m=>({at:m.created_at,who:m.actor_id,
+    what:actionNames[m.action]||m.action,
+    detail:product(m.product_id)?.name||'Produto',qty:Number(m.quantity||0)})),
+  ...state.audits.map(a=>({at:a.created_at,who:a.actor_id,
+    what:a.action,detail:a.entity,qty:null}))
+ ].sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,180);
+ printHTML(printPage('Relatório de atividades · CDSB','<p>Registro de ações de usuários para conferência administrativa.</p>'+
+  '<table><thead><tr><th>Data / hora</th><th>Usuário</th><th>Ação</th><th>Produto / local</th><th>Qtde</th></tr></thead><tbody>'+
+  rows.map(x=>'<tr><td>'+niceTime(x.at)+'</td><td>'+h(username(x.who))+'</td>'+
+    '<td>'+h(x.what)+'</td><td>'+h(x.detail)+'</td><td class="num">'+(x.qty??'—')+'</td></tr>').join('')+
+  '</tbody></table>'));
 }
 function printStockReport(){
  if(!hasPermission('stock.balance'))return;
@@ -2836,6 +2851,7 @@ async function handleClick(event){
     'Situação da compra atualizada. O saldo físico não foi alterado.');
   }
   if(action==='buy-print-stock')return printStockReport();
+  if(action==='buy-print-activities')return printActivityReport();
   if(action==='commercial-order-print')return printCommercialOrder(id);
   if(action==='event-print-summary')return printEventSummary(id);
   if(action==='product-new')return productModal();
