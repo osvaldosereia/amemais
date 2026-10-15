@@ -11,7 +11,7 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015categorymetadata2';
 import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015categorymetadata2';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015modeldelete2';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015photogallery1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
 import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014stock1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
@@ -2711,7 +2711,7 @@ async function hydrateImages(){
  await Promise.all(nodes.map(async node=>{
   const path=node.dataset.photoPath||product(node.dataset.photoId)?.image_path;
   if(!path)return;
-  try{const url=await signedPhotoUrl(path);if(node.isConnected&&url)node.src=url;}
+  try{const url=await signedPhotoUrl(path);if(node.isConnected&&url&&(node.dataset.photoPath||product(node.dataset.photoId)?.image_path)===path)node.src=url;}
   catch(error){console.warn('Foto indisponível',error);}
  }));
 }
@@ -2849,6 +2849,44 @@ async function handleClick(event){
   }
   if(action==='mobile-more-close'){closeMobileNavigation();return;}
   if(action==='photo-close'){document.querySelector('.photo-lightbox')?.remove();return;}
+  if(action==='product-gallery-prev'||action==='product-gallery-next'){
+    const gallery=target.closest('[data-product-gallery]');
+    const image=gallery?.querySelector('img[data-photo-path]');
+    if(!gallery||!image)return;
+    let paths=[];
+    try{paths=JSON.parse(gallery.dataset.galleryPaths||'[]');}catch{return;}
+    if(!Array.isArray(paths)||paths.length<2)return;
+    const oldIndex=Number(gallery.dataset.galleryIndex||0);
+    const index=(oldIndex+(action==='product-gallery-next'?1:-1)+paths.length)%paths.length;
+    const path=paths[index];if(typeof path!=='string'||!path)return;
+    gallery.dataset.galleryIndex=String(index);
+    image.dataset.photoPath=path;
+    const counter=gallery.querySelector('[data-gallery-count]');
+    if(counter)counter.textContent=(index+1)+' / '+paths.length;
+    try{
+      const url=await signedPhotoUrl(path);
+      if(image.isConnected&&image.dataset.photoPath===path)image.src=url;
+    }catch(error){
+      if(image.isConnected&&image.dataset.photoPath===path){
+        gallery.dataset.galleryIndex=String(oldIndex);
+        image.dataset.photoPath=paths[oldIndex];
+        if(counter)counter.textContent=(oldIndex+1)+' / '+paths.length;
+        toast('Não foi possível carregar esta foto.',true);
+      }
+    }
+    return;
+  }
+  if(action==='product-gallery-zoom'){
+    const gallery=target.closest('[data-product-gallery]');
+    const image=gallery?.querySelector('img[data-photo-path]');
+    const path=image?.dataset.photoPath;
+    if(!path)return;
+    try{
+      const url=await signedPhotoUrl(path);
+      if(url)photoLightbox(url,target.closest('[data-product-card]')?.querySelector('.product-card-name')?.textContent||'Foto do produto');
+    }catch(error){toast('Foto indisponível no momento.',true);}
+    return;
+  }
   if(action==='photo-view'){
     const item=product(id);if(!item?.image_path){toast('Este produto ainda não possui foto.',true);return;}
     try{
