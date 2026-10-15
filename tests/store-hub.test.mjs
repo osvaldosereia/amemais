@@ -106,7 +106,7 @@ test('o cartão Cristo Rei usa apenas pedidos relacionados à loja, nunca a fila
  ],orders:[...sample,ownOrder],context:{...ctx,showEvents:false,showBranches:true}});
  const card=html.match(/<article class="sh-location" data-location="store-cristo">([\s\S]*?)<\/article>/)?.[1];
  assert.ok(card);
- assert.match(card,/crist-order/i);
+ assert.match(card,/cristo-order/i);
  assert.doesNotMatch(card,/avulso-1/);
  assert.doesNotMatch(card,/store-1/);
  assert.doesNotMatch(html,/Filiais próprias<\/h2>/);
