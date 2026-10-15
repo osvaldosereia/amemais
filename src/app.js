@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery1';
+import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015cover1';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
@@ -766,7 +767,7 @@ function eventsPage(){
   return tabHead('Lojas temporárias','Consignação: envio, venda, devolução e conciliação.',add)+
     '<div class="eventgrid">'+state.events.filter(e=>!e.deleted_at).map(e=>{
       const remaining=state.balances.filter(b=>b.event_id===e.id).reduce((s,b)=>s+b.quantity,0);
-      return '<article class="panel event-card">'+pill(e.status)+'<h3>'+h(e.name)+'</h3><p class="muted">'+niceDate(e.starts_at)+(e.ends_at?' até '+niceDate(e.ends_at):'')+'</p>'+
+      return '<article class="panel event-card">'+eventCoverCard(e,true)+pill(e.status)+'<h3>'+h(e.name)+'</h3><p class="muted">'+niceDate(e.starts_at)+(e.ends_at?' até '+niceDate(e.ends_at):'')+'</p>'+
         '<div class="statsline"><div class="statline">Na loja temporária <b>'+remaining+'</b> un.</div></div>'+
         button('Gerenciar local','event-detail','data-id="'+h(e.id)+'"','primary')+
         (isManager()&&hasPermission('events.close')&&hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente')?
@@ -799,7 +800,10 @@ function eventDetails(){
  });
  const lots=eventLotsOverview({event:e,batches:state.eventPickBatches,items:state.eventBatchItems,
   products:state.items,button,canCreate:e.status!=='encerrado'&&isManager()&&hasPermission('events.separate'),time:niceTime});
- return summary.replace('<div class="event-simple-actions">',lots+'<div class="event-simple-actions">');
+ return summary.replace('<header class="event-simple-head">',eventCoverCard(e)+'<header class="event-simple-head">')
+  .replace('<div class="event-simple-actions">',lots+
+    (isManager()?'<div class="event-cover-tools">'+button(e.cover_path?'Trocar / excluir capa':'Adicionar capa','event-cover-edit','data-id="'+h(e.id)+'"','small')+'</div>':'')+
+    '<div class="event-simple-actions">');
 }
 function damageStockPage(){
  if(!permittedView('avarias'))return '<div class="muteblock">Sem autorização.</div>';
@@ -1674,6 +1678,21 @@ function stockModal(id=null,groupKey=null){
     form.querySelector('[name="'+name+'"]')?.addEventListener('change',sync));
   sync();
 }
+function eventCoverCard(e,compact=false){
+ if(!e?.cover_path)return compact?'':'<div class="event-cover-placeholder">▧ <span>Sem capa</span></div>';
+ return '<div class="event-cover'+(compact?' compact':'')+'"><img data-event-cover="'+h(e.cover_path)+'" alt="Capa do evento '+h(e.name)+'" loading="lazy"></div>';
+}
+function eventCoverModal(id){
+ if(!hasPermission('events.manage'))return;
+ const e=eventById(id);if(!e||e.deleted_at)return;
+ formModal('Capa · '+e.name,
+  eventCoverCard(e)+'<p class="help">Capa horizontal de 1600 × 900 pixels. Envie uma foto, gere com IA ou remova a atual.</p>'+
+  selectField('O que deseja fazer','cover_mode',[['upload','Enviar nova imagem'],['generate','Gerar com OpenAI (econômico)'],['remove','Remover capa']])+
+  '<label class="field"><span>Selecionar imagem (caso escolha envio)</span><input type="file" name="event_cover_file" accept="image/*"></label>',
+  'event-cover-update','Aplicar');
+ const f=document.querySelector('.modalback form[data-form="event-cover-update"]');if(f)f.dataset.eventId=id;
+ hydrateImages();
+}
 function eventModal(){
  if(!hasPermission('events.manage'))return;
  const people=state.users.filter(u=>u.active&&u.role!=='franquia');
@@ -1685,6 +1704,8 @@ function eventModal(){
   field('Data de término (opcional)','ends_at','date')+
   selectField('Responsável','responsible_id',people.map(u=>[u.id,u.full_name]),state.user.id,'required')+
   textareaField('Local, observações e informações básicas','notes')+
+  selectField('Imagem de capa','cover_mode',[['none','Criar sem capa'],['upload','Enviar imagem'],['generate','Gerar imagem com OpenAI (low)']])+
+  '<label class="field"><span>Arquivo de imagem (caso escolha Enviar)</span><input type="file" name="event_cover_file" accept="image/*"></label>'+
   '</div><p class="help">Após criar, monte a lista de separação, imprima em A4 e confirme o envio físico.</p>',
   'event-create','Criar e preparar');
 }
@@ -2142,6 +2163,19 @@ async function signedPhotoUrls(paths){
  return urls;
 }
 async function hydrateImages(){
+ const eventNodes=[...document.querySelectorAll('img[data-event-cover]')];
+ await Promise.all(eventNodes.map(async node=>{
+  const path=node.dataset.eventCover;if(!path)return;
+  const key='event:'+path;let item=state.imageCache.get(key);
+  try{
+   if(!item||item.expires<Date.now()){
+    const response=await db.storage.from('ame-eventos').createSignedUrl(path,600);
+    if(response.error)throw response.error;
+    item={url:response.data.signedUrl,expires:Date.now()+570000};state.imageCache.set(key,item);
+   }
+   if(node.isConnected)node.src=item.url;
+  }catch(error){console.warn('Capa indisponível',error);}
+ }));
  const nodes=[...document.querySelectorAll('img[data-photo-id],img[data-photo-path]')];
  await Promise.all(nodes.map(async node=>{
   const path=node.dataset.photoPath||product(node.dataset.photoId)?.image_path;
@@ -2668,6 +2702,7 @@ async function handleClick(event){
    if(form)form.dataset.eventId=id;
    return;
   }
+  if(action==='event-cover-edit')return eventCoverModal(id);
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
   if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
@@ -3308,9 +3343,22 @@ async function handleSubmit(event){
     state.activeEvent=null;state.eventWorkflow=null;state.view='eventos';
    },()=> 'Loja excluída. '+returned+' unidade(s) devolvida(s) à central. Histórico preservado.');
   }
+  if(type==='event-cover-update'){
+   const e=eventById(form.dataset.eventId);
+   if(!e||e.deleted_at||!hasPermission('events.manage'))return;
+   const mode=values.cover_mode,file=values.event_cover_file;
+   return exec(async()=>{
+    if(mode==='upload'){
+     if(!(file instanceof File)||!file.size)throw Error('Selecione uma imagem para enviar.');
+     await uploadEventCover(db,e.id,file);
+    }else if(mode==='generate')await generateEventCover(db,e.id);
+    else if(mode==='remove')assertOk(await db.from('events').update({cover_path:null}).eq('id',e.id));
+   },'Capa do evento atualizada.');
+  }
   if(type==='event-create'){
     if(!hasPermission('events.manage'))return;
     if(values.ends_at&&values.ends_at<values.starts_at){toast('A data final não pode ser anterior ao início.',true);return;}
+    let coverWarning='';
     return exec(async()=>{
       const eventId=assertOk(await db.rpc('create_temporary_store',{
        p_name:String(values.name||'').trim(),p_start:values.starts_at,
@@ -3318,7 +3366,14 @@ async function handleSubmit(event){
        p_responsible:values.responsible_id
       }));
       state.activeEvent=eventId;state.view='eventos';
-    },'Loja criada. Prepare a lista de separação e imprima antes do envio.');
+      try{
+       if(values.cover_mode==='upload'){
+        if(!(values.event_cover_file instanceof File)||!values.event_cover_file.size)
+         throw Error('Nenhum arquivo foi enviado.');
+        await uploadEventCover(db,eventId,values.event_cover_file);
+       }else if(values.cover_mode==='generate')await generateEventCover(db,eventId);
+      }catch(error){coverWarning=error.message||'Capa não salva';console.warn('Evento criado sem capa',error);}
+    },()=>coverWarning?'Loja criada. Capa pendente: '+coverWarning:'Loja criada com sucesso. Prepare os produtos em Pedidos.');
   }
   if(type==='event-loss'){
     const quantity=Number(values.quantity),note=String(values.note||'').trim();
