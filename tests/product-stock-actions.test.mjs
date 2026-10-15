@@ -27,8 +27,23 @@ test('cada variação tem somente um comando Gerenciar visível no retrátil',()
  assert.doesNotMatch(html,/data-action="stock-modal"/);
  assert.match(html,/data-product-details/);
  assert.match(html,/Ver 3 tamanhos/);
- assert.match(html,/6<\/b> reservadas/);
- assert.match(html,/30<\/b> livres/);
+ assert.match(html,/Reservado<\/small><strong>6<\/strong>/);
+ assert.match(html,/Livre<\/small><strong>30<\/strong>/);
+});
+test('balanço rápido altera somente o Livre dentro do tamanho expandido',()=>{
+ const html=groupedCard(group,{
+  h,photoButton:()=>'',qtyStore:()=>12,qtyEvent:()=>0,
+  qtyReserved:()=>2,qtyAvailable:()=>10,button,
+  isManager:()=>true,canRegisterProducts:()=>true,
+  canMoveStock:()=>true,canManageSku:()=>true,canQuickCount:()=>true,expanded:true
+ });
+ assert.equal((html.match(/data-count-free/g)||[]).length,3);
+ assert.equal((html.match(/data-action="stock-free-save"/g)||[]).length,3);
+ assert.match(html,/data-expected-physical="12" data-expected-reserved="2"/);
+ assert.match(html,/value="10" data-initial="10"/);
+ assert.match(html,/data-product-details open/);
+ assert.match(html,/Ocultar 3 tamanhos/);
+ assert.doesNotMatch(html,/Cor \*/);
 });
 test('perfil de leitura não exibe operações de movimentação ou edição',()=>{
  const html=groupedCard(group,{
@@ -39,6 +54,8 @@ test('perfil de leitura não exibe operações de movimentação ou edição',()
  assert.doesNotMatch(html,/data-action="sku-manage"/);
  assert.doesNotMatch(html,/data-action="stock-modal"/);
  assert.doesNotMatch(html,/data-action="stock-group-modal"/);
+ assert.doesNotMatch(html,/data-count-free/);
+ assert.doesNotMatch(html,/data-action="stock-free-save"/);
 });
 test('remessa usa carrinho existente sem seção pública de saídas',()=>{
  const html=stockOperationPage({

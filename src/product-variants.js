@@ -1,3 +1,4 @@
+import {makeVariationCards,makeVariationChips,resolveCategoryVariations} from './category-variations.js?v=20261015variants1';
 // Cadastro único de produtos: variações de roupas sem outra seção de navegação.
 export const STANDARD_SIZES=['P','M','G','GG','XGG','XXGG','EXGG'];
 const safe=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -13,32 +14,30 @@ function sizeCard(size){
     '</div></div>';
 }
 export function sizesSection(){
-  return '<section class="form-section wide variant-switch-section">'+
-    '<label class="variation-switch"><input type="checkbox" name="use_sizes" data-use-sizes>'+
-    '<span class="variation-switch-indicator"></span><span><strong>Este produto tem tamanhos?</strong>'+
-    '<small>Para camisetas e outras roupas: cada tamanho com SKU, EAN e estoque independentes.</small></span></label>'+
-    '<div data-variant-panel hidden>'+
-    '<div class="size-common-fields">'+
-    '<label class="field"><span>Tipo de roupa</span><select name="apparel_type" disabled>'+
-    ['Camiseta','Camisa','Polo','Blusa','Vestido','Casaco','Outro'].map(x=>'<option>'+x+'</option>').join('')+'</select></label>'+
-    '<label class="field"><span>Público</span><select name="apparel_audience" disabled>'+
+ return '<section class="form-section wide variant-switch-section">'+
+  '<label class="variation-switch"><input type="checkbox" name="use_sizes" data-use-sizes disabled>'+
+  '<span class="variation-switch-indicator"></span><span><strong>Cadastrar variações?</strong>'+
+  '<small data-variation-selection-caption>Escolha a categoria para ver as variações disponíveis.</small></span></label>'+
+  '<div data-variant-panel hidden>'+
+  '<div class="size-common-fields">'+
+   '<label class="field"><span>Tipo do produto</span><select name="apparel_type" disabled>'+
+    ['Outro','Camiseta','Camisa','Polo','Blusa','Vestido','Casaco'].map(x=>'<option>'+x+'</option>').join('')+'</select></label>'+
+   '<label class="field"><span>Público (opcional para identificação)</span><select name="apparel_audience" disabled>'+
     ['Unissex','Feminino','Masculino'].map(x=>'<option>'+x+'</option>').join('')+'</select></label>'+
-    '<label class="field"><span>Faixa etária</span><select name="apparel_age" disabled>'+
-    ['Adulto','Infantil','Bebê'].map(x=>'<option>'+x+'</option>').join('')+'</select></label>'+
-    '<label class="field"><span>Cor das variações *</span><input name="apparel_color" value="Branco" maxlength="40" disabled required></label></div>'+
-    '<div class="size-selector-title"><strong>Escolha os tamanhos disponíveis</strong>'+
-    '<button type="button" class="button small" data-action="size-common">Selecionar P, M, G, GG</button></div>'+
-    '<div class="size-chip-group" role="group" aria-label="Tamanhos para cadastrar">'+
-    STANDARD_SIZES.map(size=>'<button type="button" class="size-chip" aria-pressed="false" data-action="size-toggle" data-size="'+size+'">'+size+'</button>').join('')+
-    '</div><div class="size-variant-list">'+STANDARD_SIZES.map(sizeCard).join('')+'</div>'+
-    '<p class="help">Se deixar o SKU vazio, o sistema cria um código exclusivo para cada tamanho. Só informe EAN quando existir na etiqueta.</p>'+
-    '</div></section>';
+   '<label class="field"><span>Faixa etária</span><select name="apparel_age" disabled>'+
+    ['Adulto','Infantil','Bebê'].map(x=>'<option>'+x+'</option>').join('')+'</select></label></div>'+
+  '<div class="size-selector-title"><strong>Escolha as variações disponíveis</strong>'+
+   '<button type="button" class="button small" data-action="size-common" disabled>Selecionar primeiras 4</button></div>'+
+  '<div class="size-chip-group" role="group" aria-label="Variações para cadastrar"></div>'+
+  '<div class="size-variant-list"></div>'+
+  '<p class="help">Cada variação terá SKU, EAN e saldo independente. Os nomes vêm da categoria e podem ser editados em Categorias.</p>'+
+  '</div></section>';
 }
 export function setSizesMode(form,checked){
   const panel=form?.querySelector('[data-variant-panel]');
   if(!panel)return;
   panel.hidden=!checked;
-  panel.querySelectorAll('[name="apparel_type"],[name="apparel_audience"],[name="apparel_age"],[name="apparel_color"]')
+  panel.querySelectorAll('[name="apparel_type"],[name="apparel_audience"],[name="apparel_age"]')
     .forEach(input=>input.disabled=!checked);
   for(const row of panel.querySelectorAll('[data-size-variant]')){
     const enabled=checked&&!row.hidden;
@@ -65,8 +64,7 @@ export function setSizeSelected(form,size,enabled){
 
 }
 export function collectSizeVariants(form){
-  const color=form.querySelector('[name="apparel_color"]')?.value?.trim()||'';
-  if(color.length<2||color.length>40)throw new Error('Informe uma cor com 2 a 40 caracteres.');
+  const color='Única'; // Campo Cor foi removido. O banco mantém o identificador técnico.
   const rows=[...form.querySelectorAll('[data-size-variant]')].filter(x=>!x.hidden);
   if(!rows.length)throw new Error('Selecione pelo menos um tamanho.');
   const usedSkus=new Set(),usedEans=new Set();
@@ -92,11 +90,12 @@ export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,cho
   const name=form.elements.namedItem('name')?.value?.trim()||'';
   if(name.length<2||name.length>110)throw new Error('Informe o nome do produto (2 a 110 caracteres).');
   const category=chosenCategory(form);
-  if(!category)throw new Error('Selecione a categoria Roupas ou uma de suas subcategorias.');
-  const ancestry=categoryChain(category);
-  if(!ancestry.some(c=>!c.parent_id&&c.name.toLocaleLowerCase('pt-BR')==='roupas'))
-    throw new Error('Produtos com tamanhos devem usar uma categoria dentro de Roupas.');
+  if(!category)throw new Error('Escolha uma categoria para este produto.');
+  const allowed=resolveCategoryVariations(state.categories,category).options;
+  if(!allowed.length)throw new Error('Configure as variações desta categoria em Categorias.');
   const variants=collectSizeVariants(form);
+  if(variants.some(v=>!allowed.some(label=>label.toLocaleLowerCase('pt-BR')===v.size.toLocaleLowerCase('pt-BR'))))
+   throw new Error('Alguma variação escolhida não pertence à categoria atual. Confira os tamanhos.');
   // Antecipar conflitos para exibir a causa e preservar todo o preenchimento.
   const providedSkus=variants.map(x=>x.sku).filter(Boolean);
   const providedEans=variants.map(x=>x.ean).filter(Boolean);

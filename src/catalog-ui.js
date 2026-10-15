@@ -1,3 +1,4 @@
+import {resolveCategoryVariations} from './category-variations.js?v=20261015variants1';
 // AME MAIS | Administração simplificada de categorias e tags.
 // UI não altera a estrutura, a integridade e a auditoria existentes do Supabase.
 export function makeCategoryStats(categories,products){
@@ -101,6 +102,8 @@ export function catalogCategoryRows({categories,items,expanded,query,h,button,ca
         '<div class="catalog-node-info">')+
       '<strong>'+h(c.name)+'</strong>'+
       '<small>'+h(depth===1?'Categoria principal':categoryFull(c.parent_id))+'</small>'+
+      (resolveCategoryVariations(categories,c.id).options.length?
+       '<small class="catalog-variation-hint">Variações: '+h(resolveCategoryVariations(categories,c.id).options.join(' · '))+'</small>':'')+
       (hasChildren?'</button>':'</div>')+
       '<div class="catalog-node-count"><strong>'+stat.directActive+'</strong><span>ativo(s) aqui</span>'+
       (archived?'<small>'+archived+' inativo(s) no histórico</small>':'')+

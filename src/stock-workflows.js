@@ -5,6 +5,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const bySize=(a,b)=>{
   const ai=sizes.indexOf(a.apparel_size),bi=sizes.indexOf(b.apparel_size);
   return (ai<0?100:ai)-(bi<0?100:bi)||
+    (ai<0&&bi<0?String(a.apparel_size||'').localeCompare(String(b.apparel_size||''),'pt-BR',{numeric:true}):0)||
     String(a.apparel_color||'').localeCompare(String(b.apparel_color||''),'pt-BR');
 };
 export function groupInventory(items,models){
@@ -40,7 +41,7 @@ export function recentInventoryGroups(items,models,limit=6){
       a.group.key.localeCompare(b.group.key))
     .slice(0,max).map(entry=>entry.group);
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canShare=false,mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canShare=false,expanded=false,mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path)||group.main;
   const active=group.products.filter(p=>p.active);
@@ -48,13 +49,14 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const canEdit=isProducts&&canRegisterProducts();
   const canMove=isProducts&&canMoveStock();
   const skuAccess=isProducts&&canManageSku();
+  const inlineCount=isProducts&&canQuickCount();
   const manage=isProducts&&isManager();
   const quantity=p=>mode==='event'?qtyEvent(p.id,eventId):qtyStore(p.id);
   const count=active.reduce((sum,p)=>sum+quantity(p),0);
   const groupReserved=isProducts?active.reduce((sum,p)=>sum+qtyReserved(p.id),0):0;
   const groupAvailable=isProducts?active.reduce((sum,p)=>sum+qtyAvailable(p.id),0):count;
   const stockLabel=mode==='event'?'Na loja temporária':'Físico na central';
-  const colors=[...new Set(active.map(p=>(p.apparel_color||'').trim()).filter(Boolean))];
+  const colors=[...new Set(active.map(p=>(p.apparel_color||'').trim()).filter(c=>c&&c!=='Única'))];
   const description=group.modelId
     ?(colors.length===1?colors[0]+' · ':colors.length>1?colors.length+' cores · ':'')+
       active.length+' tamanho(s)/variação(ões)'
@@ -70,31 +72,44 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const fmt=n=>Number(n||0).toLocaleString('pt-BR');
   const modelRows=()=>{
     return '<div class="group-variant-list">'+group.products.map(p=>{
-      const qty=p.active?quantity(p):0;
-      const name=group.modelId?[p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||p.name:p.name;
+      const physical=p.active?quantity(p):0;
+      const reserved=isProducts?qtyReserved(p.id):0;
+      const available=isProducts?qtyAvailable(p.id):physical;
+      const label=group.modelId?p.apparel_size||'Único':'Único';
       const loc=[p.gondola?'Gôndola '+p.gondola:'',p.prateleira?'Prateleira '+p.prateleira:''].filter(Boolean).join(' · ');
-      return '<div class="group-variant-row'+(!p.active?' product-variant-inactive':'')+'" data-product-id="'+h(p.id)+'">'+
-        '<div class="group-variant-name"><span class="product-size-label">'+h(group.modelId?p.apparel_size||'Único':'Único')+'</span>'+
+      const canCount=p.active&&inlineCount,stockHtml=isProducts?
+        '<div class="variant-balance-grid">'+
+          '<div class="variant-balance-value reserved"><small>Reservado</small><strong>'+fmt(reserved)+'</strong></div>'+
+          '<label class="variant-balance-value available"><small>Livre'+(canCount?' · editar':'')+'</small>'+
+            (canCount?'<input data-count-free type="number" inputmode="numeric" step="1" min="0" max="1000000" '+
+              'value="'+available+'" data-initial="'+available+'" aria-label="Estoque livre · '+h(label)+'">':
+              '<strong>'+fmt(available)+'</strong>')+
+           '</label>'+
+        '</div>':
+        '<span class="group-variant-stock"><b>'+fmt(physical)+'</b><small>un.</small></span>';
+      return '<div class="group-variant-row'+(!p.active?' product-variant-inactive':'')+
+       '" data-product-id="'+h(p.id)+'" data-expected-physical="'+physical+
+       '" data-expected-reserved="'+reserved+'">'+
+        '<div class="group-variant-name"><span class="product-size-label">'+h(label)+'</span>'+
           '<div class="group-variant-description"><strong>'+h(group.modelId?
-            ((p.apparel_color||'').trim()||'Variação'):(p.name||'Produto'))+'</strong>'+
-          '<small class="variant-code">SKU '+h(p.sku||'—')+'</small>'+
-          '<small class="variant-ean">EAN '+h(p.ean||'—')+'</small>'+
+            ((p.apparel_color||'')==='Única'?label:(p.apparel_color||label)):(p.name||'Produto'))+'</strong>'+
+          '<small class="variant-code">SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small>'+
           (loc?'<small class="group-variant-location">'+h(loc)+'</small>':'')+
           (!p.active?'<small class="product-variant-disabled">Inativo</small>':'')+
-          (isProducts?'<small class="stock-variant-breakdown">'+fmt(qtyReserved(p.id))+' reservadas · '+fmt(qtyAvailable(p.id))+' livres</small>':'')+
-          '</div></div>'+
-        '<span class="group-variant-stock '+(qty===0?'stock-zero':'')+'"><b>'+fmt(qty)+'</b><small>un.</small></span>'+
-        (skuAccess&&sizeCount>1?'<div class="group-variant-actions">'+
-          button('Gerenciar','sku-manage','data-id="'+h(p.id)+'"','small primary')+
+          '<small class="stock-variant-physical">Físico: <b>'+fmt(physical)+'</b> un.</small>'+
+          '</div></div>'+stockHtml+
+        (((skuAccess&&sizeCount>1)||canCount)?'<div class="group-variant-actions">'+
+          (canCount?button('✓ Salvar','stock-free-save','data-id="'+h(p.id)+'" hidden','small primary variant-count-save'):'')+
+          (skuAccess&&sizeCount>1?button('Gerenciar','sku-manage','data-id="'+h(p.id)+'"','small'):'')+
           '</div>':'')+
         '</div>';
     }).join('')+'</div>';
   };
-  // Mesmo retrátil para o desktop e o celular. Nenhum saldo é editado diretamente no card.
+  // Retrátil responsivo. Só o saldo livre pode ser conferido diretamente, com RPC auditada.
   const moreOptions=(canShare?'<button type="button" data-action="share-product" data-id="'+h(main.id)+'">'+
       'Compartilhar no WhatsApp</button>':'')+
 
-    (group.modelId&&canEdit?'<button type="button" data-action="add-variants" data-id="'+h(group.modelId)+'">+ Adicionar tamanhos</button>':'')+
+    (group.modelId&&canEdit?'<button type="button" data-action="add-variants" data-id="'+h(group.modelId)+'">+ Adicionar variações</button>':'')+
     (manage?'<button type="button" class="product-menu-danger" data-action="'+
       (group.modelId?'product-card-edit':'product-delete')+'" data-id="'+h(groupEditId)+'">'+
       (group.modelId?'Gerenciar / excluir tamanhos':'Excluir produto')+'</button>':'');
@@ -102,7 +117,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     '<div class="grouped-inventory-actions">'+
       (sizeCount===1&&skuAccess?button('Gerenciar SKU','sku-manage','data-id="'+h(main.id)+'"','primary'):'')+
       '<button type="button" class="product-card-sizes" data-action="product-card-sizes" data-card-key="'+h(group.key)+'"'+
-      ' aria-expanded="false">'+(sizeCount===1?'Ver detalhes':'Ver '+sizeCount+' tamanhos')+' <span aria-hidden="true">⌄</span></button>'+
+      ' aria-expanded="'+String(Boolean(expanded))+'">'+(sizeCount===1?'Ver detalhes':(expanded?'Ocultar':'Ver')+' '+sizeCount+' tamanhos')+' <span aria-hidden="true">⌄</span></button>'+
       (moreOptions?'<details class="product-card-more"><summary aria-label="Mais opções do produto" title="Mais opções">⋯</summary>'+
         '<div class="product-card-more-menu">'+moreOptions+'</div></details>':'')+
     '</div>':'';
@@ -113,16 +128,17 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<strong class="product-card-name">'+h(group.title)+'</strong>'+
         '<small class="product-card-description">'+h(description)+'</small>'+
         '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
-          '<small>'+stockLabel+'</small>'+
-          '<span><b>'+fmt(count)+'</b> un.</span>'+
-        '</div>'+
-        (isProducts?'<div class="stock-total-breakdown"><span><b>'+fmt(groupReserved)+'</b> reservadas</span><span><b>'+fmt(groupAvailable)+'</b> livres</span></div>':'')+
+          '<small>'+stockLabel+'</small><span><b>'+fmt(count)+'</b> un.</span></div>'+
         '<small class="product-card-location">'+h(location)+'</small>'+
       '</div>'+
+      (isProducts?'<div class="stock-total-breakdown">'+
+          '<div class="stock-total-metric reserved"><small>Reservado</small><strong>'+fmt(groupReserved)+'</strong><span>un.</span></div>'+
+          '<div class="stock-total-metric available"><small>Livre</small><strong>'+fmt(groupAvailable)+'</strong><span>un.</span></div>'+
+        '</div>':'')+
     '</div>'+
 
     (isProducts?actions:'')+
-    '<details class="grouped-variants-mobile" data-product-details>'+
+    '<details class="grouped-variants-mobile" data-product-details'+(expanded?' open':'')+'>'+
       '<summary><span>Estoque por '+(group.modelId?'tamanho':'produto')+'</span>'+
       '<span class="group-mobile-total">'+sizeCount+' variação(ões) <span aria-hidden="true">⌄</span></span></summary>'+
       modelRows()+
@@ -130,24 +146,30 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     '</article>';
 }
 function sizeLine(size){
-  return '<div class="add-size-row" data-extra-size="'+size+'" hidden>'+
+  return '<div class="add-size-row" data-extra-size="'+esc(size)+'" hidden>'+
     '<div class="add-size-title"><strong>'+size+'</strong><span>Nova variação</span></div>'+
     '<label>SKU <small>(automático se vazio)</small><input name="sku" maxlength="80" disabled placeholder="Gerar automaticamente"></label>'+
     '<label>EAN <small>(opcional)</small><input name="ean" inputmode="numeric" maxlength="14" disabled placeholder="8 a 14 dígitos"></label>'+
     '<label>Estoque inicial<input name="quantity" type="number" inputmode="numeric" min="0" max="1000000" step="1" value="0" disabled required></label></div>';
 }
-export function addSizesContent(model,variants){
-  const color=variants[0]?.apparel_color||'Branco';
-  const existing=new Set(variants.filter(p=>p.active&&String(p.apparel_color).toLowerCase()===color.toLowerCase()).map(p=>p.apparel_size));
-  return '<p class="muted">Adicione novos tamanhos ao mesmo produto. Os já cadastrados serão preservados, inclusive o histórico.</p>'+
-    '<div class="formgrid"><label class="field wide"><span>Cor</span><input type="text" name="new_color" required minlength="2" maxlength="40" value="'+esc(color)+'"></label></div>'+
-    '<div class="note">Escolha uma cor e marque os tamanhos que chegaram. O SKU será gerado automaticamente, se ficar vazio.</div>'+
-    '<div class="add-sizes-picker">'+sizes.map(s=>'<button type="button" data-action="extra-size-toggle" data-size="'+s+
-       '" class="size-chip" '+(existing.has(s)?'disabled title="Já cadastrado nessa cor"':'')+' aria-pressed="false">'+s+'</button>').join('')+'</div>'+
-    '<div class="extra-size-list">'+sizes.map(sizeLine).join('')+'</div>';
+export function addSizesContent(model,variants,choices=[]){
+  const color=variants.find(p=>p.active)?.apparel_color||'Única';
+  const existing=new Set(variants.filter(p=>p.active&&
+    String(p.apparel_color||'').toLocaleLowerCase('pt-BR')===color.toLocaleLowerCase('pt-BR'))
+    .map(p=>String(p.apparel_size||'').toLocaleLowerCase('pt-BR')));
+  const available=choices.filter(size=>!existing.has(String(size).toLocaleLowerCase('pt-BR')));
+  return '<p class="muted">Adicione novas variações permitidas pela categoria. As existentes e seu histórico serão preservados.</p>'+
+   '<input type="hidden" name="new_color" value="'+esc(color)+'">'+
+   (available.length?
+    '<div class="note">Selecione as variações a cadastrar. SKU e EAN podem ser informados individualmente.</div>'+
+    '<div class="add-sizes-picker">'+available.map(size=>
+      '<button type="button" data-action="extra-size-toggle" data-size="'+esc(size)+
+      '" class="size-chip" aria-pressed="false">'+esc(size)+'</button>').join('')+'</div>'+
+    '<div class="extra-size-list">'+available.map(sizeLine).join('')+'</div>':
+    '<p class="note">Todas as variações da categoria já estão cadastradas, ou a categoria ainda não possui variações. Atualize em Categorias.</p>');
 }
 export function updateExtraSizeButtons(form,products){
-  const color=(form.querySelector('[name="new_color"]')?.value||'').trim().toLowerCase();
+  const color=(form.querySelector('[name="new_color"]')?.value||'Única').trim().toLowerCase();
   for(const btn of form.querySelectorAll('[data-action="extra-size-toggle"]')){
     const taken=products.some(p=>p.active&&p.apparel_size===btn.dataset.size&&String(p.apparel_color).toLowerCase()===color);
     btn.disabled=taken;
@@ -171,7 +193,7 @@ export function toggleExtraSize(form,size){
   row.querySelectorAll('input').forEach(el=>el.disabled=!enable);
 }
 export function collectExtraSizes(form,products){
-  const color=(form.querySelector('[name="new_color"]')?.value||'').trim();
+  const color=(form.querySelector('[name="new_color"]')?.value||'Única').trim();
   if(color.length<2||color.length>40)throw new Error('Informe uma cor válida.');
   const selected=[...form.querySelectorAll('[data-extra-size]')].filter(row=>!row.hidden);
   if(!selected.length)throw new Error('Selecione pelo menos um novo tamanho.');
