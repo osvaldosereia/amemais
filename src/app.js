@@ -2343,6 +2343,21 @@ async function handleSubmit(event){
     return;
   }
 
+  if(type==='store-order-picking'){
+    const orderId=form.dataset.order;
+    const order=state.storeOrders.find(x=>x.id===orderId);
+    if(!order||order.status!=='aprovado'||!hasPermission('orders.separate')||
+       !assignedStore(order.from_store_id))return;
+    const inputs=[...form.querySelectorAll('[data-pick-qty]')];
+    if(!inputs.length)return toast('Pedido sem itens para conferência.',true);
+    const items=inputs.map(input=>({product_id:input.dataset.id,quantity:Number(input.value)}));
+    if(items.some((item,i)=>!Number.isInteger(item.quantity)||item.quantity!==Number(inputs[i].dataset.expected)))
+      return toast('Conferência incompleta ou divergente. Confira cada SKU.',true);
+    if(!window.confirm('Finalizar conferência deste pedido? O físico permanece até a saída.'))return;
+    return exec(async()=>assertOk(await db.rpc('confirm_store_order_picking',{
+      p_order:orderId,p_items:items
+    })),'Itens conferidos; pedido separado e aguardando saída física.');
+  }
   if(type==='store-order-create'){
     if(!canUseStoreOrders())return;
     const lines=[...form.querySelectorAll('[data-store-order-qty]')].map(el=>({
