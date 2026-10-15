@@ -16,7 +16,7 @@ import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=2
 import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014stock1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
-import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015eventphoto3';
+import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015cdsb2';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015access2';
@@ -853,7 +853,7 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
  const saved=batch?state.eventBatchItems.filter(x=>x.batch_id===batch.id):[];
  const groups=eventPickingRows(state.items,state.apparelModels,saved,qtyAvailable);
  formModal((batch?'Editar lote '+String(batch.sequence).padStart(2,'0'):'Novo lote')+' · '+e.name,
-  eventLotForm(eventPlanForm(groups,{h}),{edit:Boolean(batch),number:batch?.sequence,note:batch?.note||''}),
+  eventLotForm(eventPlanForm(groups,{h,showAvailable:isManager()}),{edit:Boolean(batch),number:batch?.sequence,note:batch?.note||''}),
   'event-batch-write',batch?'Salvar nova revisão':'Enviar à separação');
  const form=document.querySelector('.modalback form[data-form="event-batch-write"]');
  if(form){form.dataset.event=e.id;form.dataset.batch=batch?.id||'';
@@ -2362,7 +2362,7 @@ function searchAndManageSku(code,openPanel=false){
 }
 function switchView(view) {
   if(view==='pedidos-lojas'||view==='separacao')view='pedidos';
-  if(view==='eventos')view='lojas';
+  if(view==='eventos'&&state.profile?.role!=='evento')view='lojas';
   if(view==='roupas'||view==='saida'||view==='balanco')view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;state.ordersContext=null;
