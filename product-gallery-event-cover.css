@@ -95,3 +95,8 @@
  .gallery-tile-actions button{width:100%;font-size:.63rem}
  .event-cover.compact{height:105px}
 }
+
+/* Respeita o modo de capa e evita controles apertados na galeria. */
+[data-cover-file][hidden]{display:none!important}
+.gallery-tile-actions{flex-wrap:wrap}
+.gallery-tile-actions button{flex:1 1 72px}
