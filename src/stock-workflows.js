@@ -23,6 +23,23 @@ export function groupInventory(items,models){
     return g;
   }).sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));
 }
+// A home mostra modelos recentes, não uma ficha repetida para cada tamanho/SKU.
+// Um SKU recente coloca todo o modelo na seleção, preservando todas as variações.
+export function recentInventoryGroups(items,models,limit=6){
+  const max=Math.max(0,Math.trunc(Number(limit)||0));
+  return groupInventory(items.filter(p=>p.active),models)
+    .map(group=>({
+      group,
+      recentAt:group.products.reduce((latest,p)=>{
+        const date=String(p.created_at||'');
+        return date>latest?date:latest;
+      },'')
+    }))
+    .sort((a,b)=>b.recentAt.localeCompare(a.recentAt)||
+      a.group.title.localeCompare(b.group.title,'pt-BR')||
+      a.group.key.localeCompare(b.group.key))
+    .slice(0,max).map(entry=>entry.group);
+}
 export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canShare=false,mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path)||group.main;
