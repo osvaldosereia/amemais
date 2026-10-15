@@ -191,15 +191,16 @@ export function apparelFillSizes(target,{h}){
   }
 }
 
-export function apparelVariantEditModal(p,{h,formModal}){
+export function apparelVariantEditModal(p,{h,formModal,variationOptions=[]}){
   if(!p?.apparel_model_id)throw new Error('Variação inválida.');
-  const sizeOptions='<option value="">Tamanho</option>'+
-    sizes.concat(sizes.includes(p.apparel_size)?[]:[p.apparel_size]).map(v=>
+  const configured=variationOptions.length?variationOptions:sizes;
+  const sizeOptions='<option value="">Variação</option>'+
+    configured.concat(configured.includes(p.apparel_size)?[]:[p.apparel_size]).map(v=>
       '<option value="'+h(v)+'" '+(v===p.apparel_size?'selected':'')+'>'+h(v)+'</option>').join('');
   formModal('Editar variação · '+p.name,
     '<div class="formgrid">'+
-    '<label class="field"><span>Cor</span><input name="color" required maxlength="40" value="'+h(p.apparel_color)+'"></label>'+
-    '<label class="field"><span>Tamanho</span><select name="size" required>'+sizeOptions+'</select></label>'+
+    '<input type="hidden" name="color" value="'+h(p.apparel_color||'Única')+'">'+
+    '<label class="field"><span>Variação</span><select name="size" required>'+sizeOptions+'</select></label>'+
     '<label class="field"><span>SKU</span><input name="sku" maxlength="80" value="'+h(p.sku||'')+'"></label>'+
     '<label class="field"><span>EAN</span><div class="inline apparel-ean"><input name="ean" data-variant-ean inputmode="numeric" maxlength="18" value="'+h(p.ean||'')+'">'+
     '<button type="button" class="button small" data-action="apparel-scan">📷</button></div></label>'+
@@ -207,7 +208,7 @@ export function apparelVariantEditModal(p,{h,formModal}){
     '<label class="field"><span>Prateleira</span><input name="prateleira" maxlength="40" value="'+h(p.prateleira||'')+'"></label>'+
     '<label class="field"><span>Situação</span><select name="active"><option value="true" '+(p.active?'selected':'')+'>Ativa</option>'+
     '<option value="false" '+(!p.active?'selected':'')+'>Inativa</option></select></label>'+
-    '</div><div class="note">Esta edição não altera saldos. Use Balanço rápido ou Estoque para ajustar quantidades.</div>',
+    '</div><div class="note">Esta edição não altera saldos. Para conferir o estoque livre, abra os tamanhos no card do produto.</div>',
     'apparel-edit-variant','Salvar variação');
   const form=document.querySelector('.modalback form[data-form="apparel-edit-variant"]');
   if(form)form.dataset.productId=p.id;
@@ -216,7 +217,7 @@ export function apparelVariantEditModal(p,{h,formModal}){
 export async function saveApparelVariant(form,{db,assertOk,loadData,closeTopModal,toast}){
   const v=name=>form.elements.namedItem(name)?.value?.trim()||'';
   const color=v('color'),size=v('size'),sku=v('sku'),ean=v('ean').replace(/[\s-]/g,'');
-  if(color.length<2||color.length>40||!size)throw new Error('Cor e tamanho obrigatórios.');
+  if(color.length<2||color.length>40||!size)throw new Error('Variação inválida.');
   if(ean&&!/^[0-9]{8,14}$/.test(ean))throw new Error('EAN precisa de 8 a 14 dígitos.');
   assertOk(await db.rpc('update_apparel_variant',{
     p_product_id:form.dataset.productId,p_color:color,p_size:size,
