@@ -58,6 +58,19 @@ test('franqueado vê somente franquias disponíveis e não a central nem tempor�
  assert.doesNotMatch(html,/>Loja Central</h2>/);
  assert.doesNotMatch(html,/>Lojas Temporárias</h2>/);
 });
+test('permite separar e imprimir A4 diretamente na fila das lojas',()=>{
+ const html=hub.renderStoreHub({
+  stores:[{id:'central',name:'Central',is_primary:true,kind:'central'},
+   {id:'fran-a',name:'Franquia A',kind:'franquia',active:true}],
+  events:[{id:'event-a',name:'Evento A',status:'ativo'}],
+  orders:sample.map(x=>({...x,lines:[{id:'sku-1',quantity:1}]})),
+  context:{...ctx,canProcess:()=>true,canPrint:()=>true}
+ });
+ assert.match(html,/data-action="avulso-pick"/);
+ assert.match(html,/data-action="store-order-separate"/);
+ assert.match(html,/data-action="event-batch-pick"/);
+ assert.match(html,/data-action="order-print-a4"/);
+});
 test('capa, nomes e informações de unidades são escapados',()=>{
  const html=hub.renderStoreHub({stores:[{id:'x',name:'<script>',kind:'franquia'}],
   events:[{id:'y',name:'Evento',status:'ativo',cover_path:'" onerror="alert(1)'}],
