@@ -7,8 +7,8 @@ import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
-  apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js?v=20261015gallery3';
-import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015gallery3';
+  apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js?v=20261015purchase1';
+import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015purchase1';
 import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015variants1';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
   eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015variants1';
@@ -19,7 +19,7 @@ import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, st
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015cdsb3';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
-import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015access2';
+import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015print1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
