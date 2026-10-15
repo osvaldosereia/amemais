@@ -37,3 +37,14 @@
  .franchise-catalog-photo{width:72px;height:72px;}
  .stock-total-breakdown{gap:4px 10px;}
 }
+
+.store-picking-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:14px 0;}
+.store-picking-head span{font-size:.84rem;color:#5a7060;}
+.store-picking-list{display:grid;gap:10px;max-height:45dvh;overflow-y:auto;}
+.store-picking-line{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid #dce9df;border-radius:12px;padding:12px;background:#fff;}
+.store-picking-line.is-picked{background:#e9f6ee;border-color:#8ccaa2;}
+.store-picking-line strong,.store-picking-line small{display:block;}
+.store-picking-line small{color:#65766b;margin-top:3px;}
+.store-picking-line label{display:grid;gap:5px;min-width:90px;font-size:.8rem;font-weight:650;}
+.store-picking-line input{width:92px;padding:9px;border-radius:9px;border:1px solid #b8ccbd;text-align:center;font-size:1rem;}
+@media(max-width:460px){.store-picking-line{gap:8px;padding:10px;}.store-picking-line input{width:70px;}}
