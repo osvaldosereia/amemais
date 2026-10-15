@@ -24,6 +24,7 @@ function photoTile(item,i){
 export function galleryState(form){
  if(!form.__gallery){
   form.__gallery=[...form.querySelectorAll('[data-gallery-item]')].map(el=>({path:el.dataset.path||''})).filter(x=>x.path);
+  form.__galleryInitial=form.__gallery.map(x=>x.path);
  }
  return form.__gallery;
 }
@@ -86,6 +87,6 @@ export async function savePhotoGallery(form,{db,assertOk,modelId=null,productId=
 }
 export function galleryHasChanges(form){
  const photos=galleryState(form);
- const old=[...form.querySelectorAll('[data-gallery-item][data-path]')].map(x=>x.dataset.path).filter(Boolean);
+ const old=form.__galleryInitial||[];
  return photos.some(x=>x.blob)||photos.map(x=>x.path).join('|')!==old.join('|');
 }
