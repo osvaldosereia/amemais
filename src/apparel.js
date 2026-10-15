@@ -126,7 +126,7 @@ function validatedVariants(form){
 }
 
 export async function submitApparel(form,{
- state,db,assertOk,chosenCategory,productTagValues,loadData,closeTopModal,toast
+ state,db,assertOk,chosenCategory,productTagValues,loadData,closeTopModal,toast,saveGallery
 }){
   const name=form.elements.namedItem('apparel_name')?.value?.trim()||'';
   if(name.length<2||name.length>110)throw new Error('Informe um nome de 2 a 110 caracteres.');
@@ -134,7 +134,7 @@ export async function submitApparel(form,{
   if(!category)throw new Error('Selecione uma categoria de Roupas.');
   const variants=validatedVariants(form);
   if(!variants.length)throw new Error('Adicione pelo menos uma variação.');
-  const photo=form.__photoBlob||null;
+  const hasGallery=Boolean(form.querySelector('[data-gallery]'));
   const created=assertOk(await db.rpc('create_apparel',{
     p_name:name,
     p_type:form.elements.namedItem('apparel_type').value,
@@ -145,16 +145,9 @@ export async function submitApparel(form,{
     p_variants:variants
   }));
   let photoWarning=false;
-  if(photo){
-    try{
-      const ext=photo.type==='image/webp'?'webp':'jpg';
-      const path='apparel/'+created+'/'+crypto.randomUUID()+'.'+ext;
-      assertOk(await db.storage.from('ame-produtos').upload(path,photo,{contentType:photo.type,upsert:false}));
-      assertOk(await db.rpc('set_apparel_photo',{p_model_id:created,p_path:path}));
-    }catch(error){
-      photoWarning=true;
-      console.error('Foto não vinculada ao modelo de roupa',error);
-    }
+  if(hasGallery){
+   try{await saveGallery(form,{db,assertOk,modelId:created});}
+   catch(error){photoWarning=true;console.error('Fotos pendentes',error);}
   }
   state.apparelOpen.add(created);
   state.view='roupas';
@@ -235,23 +228,18 @@ export function apparelPhotoModal(model,state,{formModal,photoChooser,hydrateIma
   if(!model)throw new Error('Modelo de roupa não encontrado.');
   const variant=state.items.find(p=>p.apparel_model_id===model.id);
   formModal('Foto · '+model.name,photoChooser(
-    model.image_path&&variant?{id:variant.id,image_path:model.image_path,name:model.name}:null
+    {...model,id:variant?.id||model.id}
   ),'apparel-photo','Salvar foto');
   const form=document.querySelector('.modalback form[data-form="apparel-photo"]');
   if(form)form.dataset.modelId=model.id;
   hydrateImages();
 }
 
-export async function saveApparelPhoto(form,{db,assertOk,loadData,closeTopModal,toast}){
-  const file=form.__photoBlob;
-  if(!file)throw new Error('Tire uma foto ou escolha uma imagem da galeria.');
-  const id=form.dataset.modelId;
-  const path='apparel/'+id+'/'+crypto.randomUUID()+'.'+(file.type==='image/webp'?'webp':'jpg');
-  assertOk(await db.storage.from('ame-produtos').upload(path,file,{contentType:file.type,upsert:false}));
-  assertOk(await db.rpc('set_apparel_photo',{p_model_id:id,p_path:path}));
-  closeTopModal();await loadData();toast('Foto atualizada para todas as variações.');
+export async function saveApparelPhoto(form,{db,assertOk,loadData,closeTopModal,toast,saveGallery}){
+ const id=form.dataset.modelId;
+ await saveGallery(form,{db,assertOk,modelId:id});
+ closeTopModal();await loadData();toast('Galeria atualizada para todas as variações.');
 }
-
 
 export function apparelSyncCategory(select,state,{categoryFull}){
   const form=select.closest('form[data-form="apparel-create"]');if(!form)return;
