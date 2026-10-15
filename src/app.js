@@ -16,7 +16,7 @@ import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=2
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015thermal1';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015eventorders1';
 import {pickingThermalHTML} from './thermal-picking.js?v=20261015thermal3';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotthermal1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261015catalog2';
@@ -1177,6 +1177,10 @@ function ordersPage(separationOnly=false){
    '</div>';
   }).join(''):'<p class="muted">Nenhum acesso de cliente criado.</p>')+'</div>';
  const scope=state.ordersContext;
+ const contextEvent=scope?.type==='event'?eventById(scope.id):null;
+ const canCreateContextLot=Boolean(contextEvent&&['rascunho','ativo'].includes(contextEvent.status)&&
+   ((isManager()&&hasPermission('events.separate'))||
+     (hasPermission('events.request')&&Boolean(memberRole(contextEvent.id)))));
  const allRecords=unifiedOrderRecords();
  const records=scope?locationOrders(allRecords,scope,scope.mode||'all'):allRecords;
  const contextTitle=scope?.type==='central'?'Centro de Distribuição São Bento':
@@ -1202,9 +1206,11 @@ function ordersPage(separationOnly=false){
      (!portal&&hasPermission('orders.cancel')&&
       (o.kind==='avulso'||assignedStore(o.raw.to_store_id))),
   canReceive:o=>!portal&&o.kind==='loja'&&hasPermission('orders.receive')&&assignedStore(o.raw.to_store_id),
-  canAvulso:!portal&&hasPermission('orders.internal'),
-  canStore:hasPermission('orders.central')||hasPermission('orders.franchise'),
-  canLink:!portal&&hasPermission('catalog.manage')
+  canEventBatch:canCreateContextLot,
+  eventId:contextEvent?.id||'',
+  canAvulso:!contextEvent&&!portal&&hasPermission('orders.internal'),
+  canStore:!contextEvent&&(hasPermission('orders.central')||hasPermission('orders.franchise')),
+  canLink:!contextEvent&&!portal&&hasPermission('catalog.manage')
  });
 }
 function customerAccessLinkModal(label,url){
@@ -3388,13 +3394,15 @@ async function handleClick(event){
     });
   }
   if(action==='unified-order-new'){
+    const contextEvent=state.ordersContext?.type==='event'?eventById(state.ordersContext.id):null;
+    if(contextEvent)return eventBatchModal(contextEvent.id);
     const canAv=hasPermission('orders.internal')&&!isFranchisePortal();
     const canStore=hasPermission('orders.central')||hasPermission('orders.franchise');
     if(!canAv&&!canStore)return;
     if(canAv&&canStore)return formModal('Criar pedido',
-      selectField('Destino / tipo de pedido','kind',[
-       ['avulso','Cliente ou pedido avulso'],['loja','Filial ou franquia']
-      ])+'<p class="help">Ambos reservam automaticamente o estoque disponível. Você poderá conferir e concluir a separação na fila de Pedidos.</p>',
+      selectField('Para quem é o pedido?','kind',[
+       ['avulso','Cliente · pedido avulso'],['loja','Loja própria ou franquia']
+      ])+'<p class="help">Para abastecer uma loja temporária, abra a loja em Lojas e use Montar lote.</p>',
       'unified-order-type','Continuar');
     if(canAv)return openAvulsoOrderModal();
     return storeOrderModal();
