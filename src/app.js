@@ -1851,6 +1851,12 @@ function orderQuantityModal(orderId,phase){
    'store-order-'+phase,receiving?'Confirmar quantidades recebidas':picking?'Concluir conferência':'Salvar ajuste');
  document.querySelector('.modalback form[data-form="store-order-'+phase+'"]').dataset.order=orderId;
 }
+function openAvulsoOrderModal(){
+ if(!hasPermission('orders.internal')||isFranchisePortal())return;
+ formModal('Criar Pedido Avulso',createInternalOrderForm({
+  products:state.items,models:state.apparelModels,events:state.events,groupInventory
+ }),'order-create','Registrar e reservar');
+}
 function unifiedOrderById(kind,id){
  return unifiedOrderRecords().find(o=>o.kind===kind&&o.id===id);
 }
@@ -2584,13 +2590,19 @@ async function handleClick(event){
       toast('EAN conferido: '+(counted+1)+' / '+max);
     });
   }
-  if(action==='order-new'){
-    if(!hasPermission('orders.internal'))return;
-    formModal('Criar Pedido Avulso',createInternalOrderForm({
-      products:state.items,models:state.apparelModels,events:state.events,groupInventory
-    }),'order-create','Salvar pedido');
-    return;
+  if(action==='unified-order-new'){
+    const canAv=hasPermission('orders.internal')&&!isFranchisePortal();
+    const canStore=hasPermission('orders.central')||hasPermission('orders.franchise');
+    if(!canAv&&!canStore)return;
+    if(canAv&&canStore)return formModal('Criar pedido',
+      selectField('Destino / tipo de pedido','kind',[
+       ['avulso','Cliente ou pedido avulso'],['loja','Filial ou franquia']
+      ])+'<p class="help">Ambos reservam automaticamente o estoque disponível. Você poderá conferir e concluir a separação na fila de Pedidos.</p>',
+      'unified-order-type','Continuar');
+    if(canAv)return openAvulsoOrderModal();
+    return storeOrderModal();
   }
+  if(action==='order-new')return openAvulsoOrderModal();
   if(action==='order-assign-event'){
     if(!hasPermission('orders.assign'))return;return orderEventModal(id);
   }
@@ -2996,6 +3008,11 @@ async function handleSubmit(event){
     const id=form.dataset.id;
     closeTopModal();stockModal(id);
     return;
+  }
+  if(type==='unified-order-type'){
+    if(values.kind==='avulso')return openAvulsoOrderModal();
+    if(values.kind==='loja')return storeOrderModal();
+    return toast('Escolha um tipo de pedido.',true);
   }
   if(type==='order-create'){
     if(!hasPermission('orders.internal'))return;
