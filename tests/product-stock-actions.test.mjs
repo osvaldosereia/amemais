@@ -22,7 +22,7 @@ test('card do produto possui movimentação no modelo e em cada tamanho',()=>{
   isManager:()=>true,canRegisterProducts:()=>true,canMoveStock:()=>true
  });
  assert.equal((html.match(/data-action="stock-group-modal"/g)||[]).length,1);
- assert.equal((html.match(/data-action="stock-modal"/g)||[]).length,4); // menu + 3 SKUs
+ assert.equal((html.match(/data-action="stock-modal"/g)||[]).length,6); // 3 SKUs no desktop e no painel mobile
  assert.match(html,/data-product-details/);
  assert.match(html,/3 tamanhos/);
 });
