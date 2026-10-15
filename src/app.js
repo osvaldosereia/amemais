@@ -1328,6 +1328,29 @@ function storeOrdersPage(){
    '<div class="panelbody"><p class="muted">Nenhum pedido registrado.</p></div>')+
    (!portal?'<p class="help">Separar não retira mercadoria do estoque físico. A baixa ocorre apenas em Registrar saída física.</p>':'');
 }
+function storePickingModal(orderId){
+ const order=state.storeOrders.find(o=>o.id===orderId);
+ if(!order||order.status!=='aprovado'||!hasPermission('orders.separate')||!assignedStore(order.from_store_id))return;
+ const items=state.storeOrderItems.filter(x=>x.order_id===orderId);
+ if(!items.length)return toast('Pedido sem itens.',true);
+ const rows=items.map(x=>{
+   const p=product(x.product_id);
+   return '<div class="store-picking-line" data-picking-row="'+h(x.product_id)+'">'+
+     '<div><strong>'+h(p?.name||'Produto')+'</strong>'+
+     '<small>'+h([p?.apparel_color,p?.apparel_size,p?.sku,p?.ean].filter(Boolean).join(' · '))+'</small>'+
+     '<small>Reservado: <b>'+x.quantity+'</b> un.</small></div>'+
+     '<label>Conferido <input type="number" data-pick-qty data-id="'+h(x.product_id)+
+       '" data-expected="'+x.quantity+'" inputmode="numeric" min="0" max="'+x.quantity+
+       '" step="1" value="0" required aria-label="Conferido de '+h(p?.name||'Produto')+'"></label></div>';
+ }).join('');
+ formModal('Conferir separação · #'+orderId.slice(0,8).toUpperCase(),
+   '<p class="help">Leia cada EAN para incrementar a quantidade conferida ou informe o total contado manualmente. Todos os SKUs devem conferir com a reserva.</p>'+
+   '<div class="store-picking-head"><button type="button" class="button" data-action="store-pick-scan">📷 Ler EAN</button>'+
+   '<span>Separar não reduz o estoque físico.</span></div>'+
+   '<div class="store-picking-list">'+rows+'</div>',
+   'store-order-picking','Confirmar itens conferidos');
+ document.querySelector('.modalback form[data-form="store-order-picking"]').dataset.order=orderId;
+}
 function storeOrderModal(){
  const main=state.stores.find(x=>x.is_primary&&x.active);
  if(!main)return toast('Estoque central não cadastrado.',true);
