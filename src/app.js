@@ -766,49 +766,172 @@ function returnWorkflowPage(){
   return eventReturnPage(e,state.items,state.apparelModels,state.balances,photoButton);
 }
 function eventDetails(){
-  const e=eventById(state.activeEvent);
-  if(!e){state.activeEvent=null;return eventsPage();}
-  const mem=state.members.filter(m=>m.event_id===e.id);
-  // Todo o histórico é vinculado aos IDs originais; arquivamentos não somem da contagem.
-  const entries=state.movements.filter(m=>m.event_id===e.id);
-  const transfers=entries.filter(m=>m.action==='transferencia').reduce((n,m)=>n+m.quantity,0);
-  const returned=entries.filter(m=>m.action==='devolucao').reduce((n,m)=>n+m.quantity,0);
-  const sold=entries.filter(m=>m.action==='venda_evento').reduce((n,m)=>n+m.quantity,0);
-  const classifiedLoss=m=>m.action==='baixa_evento'&&/^(PERDA|AVARIA|CONSUMO|OUTRO): /.test(String(m.note||''));
-  const losses=entries.filter(classifiedLoss).reduce((n,m)=>n+m.quantity,0);
-  const historicalUnclassified=entries.filter(m=>m.action==='baixa_evento'&&!classifiedLoss(m)).reduce((n,m)=>n+m.quantity,0);
-  const pending=state.balances.filter(b=>b.event_id===e.id).reduce((n,b)=>n+b.quantity,0);
-  const closure=state.consignationClosures.find(c=>c.event_id===e.id);
-  const inventoryVariances=state.inventorySessions.filter(i=>i.location_type==='temporaria'&&i.location_id===e.id&&i.status==='aplicada');
-  const canModify=e.status==='ativo';
-  const actions=(hasPermission('events.manage')&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
-    (hasPermission('events.separate')&&canModify?button('Enviar mercadorias','event-transfer','','primary'):'')+
-    (canModify&&canSell(e.id)?button('Registrar venda','event-sale','','primary'):'')+
-    (canModify&&hasPermission('events.close')?button('Perda / avaria','event-loss','','small'):'')+
-    (canModify&&canReturn(e.id)?button('Devolução rápida por EAN','event-return','','primary'):'')+
-    (canModify&&hasPermission('events.close')?button('Encerrar consignação','event-close','data-id="'+h(e.id)+'"'):'')+
-    (canModify&&hasPermission('events.manage')?button('Inventariar loja','event-inventory','data-id="'+h(e.id)+'"','small'):'');
-  const history=eventHistoryCards({
-    movements:entries,products:state.items,models:state.apparelModels,
-    balances:state.balances.filter(b=>b.event_id===e.id),
-    photoButton,groupInventory
+ const e=eventById(state.activeEvent);
+ if(!e){state.activeEvent=null;return eventsPage();}
+ const members=state.members.filter(m=>m.event_id===e.id);
+ return eventCompactDetail({
+  event:e,members,plan:state.eventPickPlans.find(x=>x.event_id===e.id),
+  planItems:state.eventPickItems,shipments:state.eventShipments,
+  balances:state.balances,movements:state.movements,
+  damageItems:state.damages,closure:state.consignationClosures.find(x=>x.event_id===e.id),
+  products:state.items,models:state.apparelModels,groupInventory,photoButton,
+  h,button,niceDate,username,
+  canPlan:hasPermission('events.separate')&&isManager(),
+  canClose:hasPermission('events.close')&&(hasPermission('events.manage')||memberRole(e.id)==='responsavel'),
+  canManage:hasPermission('events.manage')
+ });
+}
+function damageStockPage(){
+ if(!permittedView('avarias'))return '<div class="muteblock">Sem autorização.</div>';
+ return damageListHTML(state.damages,state.items,state.events,state.damageActions,{h,button});
+}
+function eventPlanModal(additional=false){
+ const e=eventById(state.activeEvent);
+ if(!e||!(additional?e.status==='ativo':e.status==='rascunho')||
+    !hasPermission('events.separate')||!isManager())return;
+ const planned=additional?[]:state.eventPickItems.filter(x=>x.event_id===e.id);
+ const groups=eventPickingRows(state.items,state.apparelModels,planned,qtyAvailable);
+ formModal((additional?'Envio adicional':'Lista de separação')+' · '+e.name,
+   eventPlanForm(groups,{h,additional}),
+   additional?'event-supplement-send':'event-plan-save',
+   additional?'Confirmar envio adicional':'Salvar lista de separação');
+ const form=document.querySelector('.modalback form');
+ if(form){form.dataset.event=e.id;form.dataset.mode=additional?'additional':'initial';}
+}
+function collectEventPlan(form){
+ const rows=[...form.querySelectorAll('[data-plan-qty]')],items=[];
+ for(const input of rows){
+  if(input.value.trim()==='')continue;
+  const qty=Number(input.value);
+  if(!Number.isInteger(qty)||qty<0||qty>1000000)throw Error('Quantidade inválida. Use números inteiros de 0 a 1.000.000.');
+  if(qty>0)items.push({product_id:input.dataset.id,quantity:qty});
+ }
+ if(items.length>150)throw Error('O limite é 150 variações por remessa.');
+ return items;
+}
+function eventSettlementModal(){
+ const e=eventById(state.activeEvent);
+ if(!e||e.status!=='ativo'||!hasPermission('events.close')||
+   !(hasPermission('events.manage')||memberRole(e.id)==='responsavel'))return;
+ const balances=state.balances.filter(b=>b.event_id===e.id&&Number(b.quantity)>0);
+ if(!balances.length)return toast('Nenhuma unidade pendente. Encerre a loja diretamente.',true);
+ const groups=groupInventory(state.items.filter(p=>balances.some(b=>b.product_id===p.id)),state.apparelModels);
+ const draft=state.eventSettlements.find(x=>x.event_id===e.id);
+ formModal('Conferir fechamento · '+e.name,
+   eventSettlementForm(groups,balances,draft,{h}),
+   'event-settlement-save','Salvar conferência');
+ const form=document.querySelector('.modalback form[data-form="event-settlement-save"]');
+ if(form){
+  form.dataset.event=e.id;
+  const footer=form.querySelector('.modalfooter');
+  footer?.insertAdjacentHTML('beforeend',
+   '<button class="button primary" type="button" data-action="event-settlement-save-finish">Salvar e concluir loja</button>');
+  updateEventSettlementPreview(form);
+ }
+}
+function collectEventSettlement(form){
+ const rows=[...form.querySelectorAll('[data-settle-row]')],items=[];
+ let missing=0,hasIssue=false;
+ for(const row of rows){
+  const expected=Number(row.dataset.expected),line={product_id:row.dataset.id,expected};
+  let count=0;
+  for(const key of ['good','sold','damaged','lost']){
+   const el=row.querySelector('[data-settle-field="'+key+'"]');
+   const value=String(el?.value??'').trim(),quantity=Number(value);
+   if(value===''||!Number.isInteger(quantity)||quantity<0||quantity>1000000)
+    throw Error('Informe uma quantidade válida em todos os campos, inclusive zero.');
+   line[key]=quantity;count+=quantity;
+  }
+  if(count>expected)throw Error('Quantidades acima das enviadas para '+(product(row.dataset.id)?.name||'o produto')+'.');
+  if(count<expected)missing+=expected-count;
+  if(line.damaged||line.lost)hasIssue=true;
+  items.push(line);
+ }
+ const note=String(form.querySelector('[name="note"]')?.value||'').trim();
+ if(hasIssue&&(note.length<5||note.length>250))
+  throw Error('Justifique as avarias ou perdas com 5 a 250 caracteres.');
+ return {items,note,missing};
+}
+function updateEventSettlementPreview(form){
+ let checked=0,expectedTotal=0,invalid=false;
+ for(const row of form.querySelectorAll('[data-settle-row]')){
+  const expected=Number(row.dataset.expected),qty=[...row.querySelectorAll('[data-settle-field]')]
+   .map(el=>Number(el.value||0));
+  expectedTotal+=expected;checked+=qty.reduce((a,b)=>a+b,0);
+  const missing=expected-qty.reduce((a,b)=>a+b,0);
+  invalid=invalid||missing<0||qty.some(v=>!Number.isInteger(v)||v<0);
+  const target=row.querySelector('[data-settle-remaining]');
+  if(target){
+   target.textContent=missing<0?'Excedeu '+Math.abs(missing)+' un.':
+    missing===0?'Conferido ✓':'Pendente: '+missing;
+   target.classList.toggle('event-settle-error',missing<0);
+  }
+ }
+ const summary=form.querySelector('[data-settle-summary]');
+ if(summary)summary.textContent='Conferido: '+checked+' / '+expectedTotal+
+   ' · '+(invalid?'Corrija quantidades excedidas.':expectedTotal-checked+' unidade(s) pendente(s).');
+ const finish=form.querySelector('[data-action="event-settlement-save-finish"]');
+ if(finish)finish.disabled=invalid||checked!==expectedTotal;
+}
+async function submitEventSettlement(form,finish=false){
+ const e=eventById(form.dataset.event);
+ if(!e||e.status!=='ativo'||state.loading)return;
+ let payload;
+ try{payload=collectEventSettlement(form);}catch(error){return toast(error.message,true);}
+ if(finish&&payload.missing) return toast('Confira o destino de todas as unidades antes de concluir.',true);
+ if(finish&&!window.confirm('Concluir a prestação de contas? As unidades boas voltam à central, as avarias ficam em análise e as vendas/perdas são baixadas definitivamente.'))return;
+ return exec(async()=>{
+  assertOk(await db.rpc('save_event_settlement',{
+   p_event:e.id,p_items:payload.items,p_note:payload.note||null
+  }));
+  if(finish)assertOk(await db.rpc('finalize_event_settlement',{p_event:e.id}));
+ },finish?'Loja temporária encerrada com estoque conciliado.':'Conferência salva. Continue depois ou conclua a loja.');
+}
+async function printEventA4(id){
+ const e=eventById(id);if(!e)return;
+ const win=window.open('','_blank');
+ if(!win)return toast('O navegador bloqueou a janela. Habilite pop-ups para imprimir.',true);
+ try{
+  let items=[],status='Planejado',version='';
+  if(e.status==='rascunho'){
+   const plan=state.eventPickPlans.find(x=>x.event_id===id);
+   items=state.eventPickItems.filter(x=>x.event_id===id);
+   version='Revisão '+(plan?.revision||0);
+  }else{
+   status='Enviado';
+   const rows=assertOk(await db.from('stock_movements')
+    .select('product_id,quantity').eq('event_id',id).eq('action','transferencia').limit(10000))||[];
+   const map=new Map();
+   for(const row of rows)map.set(row.product_id,(map.get(row.product_id)||0)+Number(row.quantity||0));
+   items=[...map].map(([product_id,quantity])=>({product_id,quantity}));
+   version='Separação confirmada';
+  }
+  if(!items.length){
+   win.close();toast('Não há quantidades para imprimir.',true);return;
+  }
+  const responsible=state.members.filter(m=>m.event_id===id&&m.role==='responsavel')
+    .map(m=>username(m.user_id)).join(', ');
+  const html=a4PickingHTML({
+   event:e,items,products:state.items,models:state.apparelModels,responsible,
+   version,status,printedAt:new Date().toLocaleString('pt-BR')
   });
-  return '<div class="crumb"><button class="plain" data-action="back-events">← Lojas temporárias</button></div>'+
-    tabHead(e.name,'Data: '+niceDate(e.starts_at)+(e.ends_at?' a '+niceDate(e.ends_at):''),pill(e.status))+
-    '<div class="cards">'+[['Enviados',closure?.sent_units??transfers],['Vendidos',closure?.sold_units??sold],['Devolvidos',closure?.returned_units??returned],['Perdas justificadas',closure?.loss_units??losses],...(historicalUnclassified?[['Baixas antigas sem classificação',historicalUnclassified]]:[]),['Ainda no local',pending]].map(([name,value])=>
-      '<div class="card"><div class="metric-label">'+name+'</div><div class="metric">'+value+'</div></div>').join('')+'</div>'+
-    '<div class="actions" style="margin-bottom:18px">'+actions+'</div>'+
-    (e.status==='ativo'&&pending>0?'<div class="note">Há '+pending+
-      ' unidade(s) na loja temporária. Registre vendas ou baixas justificadas e devolva o restante antes do encerramento.</div>':'')+
-    panel('Produtos e histórico da consignação',history)+
-    panel('Equipe responsável','<div class="panelbody">'+(mem.length?mem.map(m=>
-      '<div class="inline" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid #edf1ee">'+
-      '<div><strong>'+h(username(m.user_id))+'</strong> <span class="pill">'+
-      (m.role==='responsavel'?'Responsável':'Operador')+'</span></div>'+
-      (hasPermission('events.manage')?button('Remover','member-remove','data-user="'+h(m.user_id)+'" data-event="'+h(e.id)+'"','small'):'')+
-      '</div>').join(''):'<p class="muted">Nenhum usuário associado.</p>')+
-      (hasPermission('events.manage')&&e.status!=='encerrado'?'<div style="margin-top:13px">'+
-        button('+ Adicionar usuário','member-add','data-id="'+h(e.id)+'"','small')+'</div>':'')+'</div>');
+  win.document.open();win.document.write(html);win.document.close();
+ }catch(error){win.close();fail(error);}
+}
+function resolveDamageModal(id){
+ if(!permittedView('avarias')||!isManager())return;
+ const d=state.damages.find(x=>x.id===id);
+ if(!d||d.remaining<=0)return;
+ const p=product(d.product_id);
+ formModal('Resolver avaria · '+(p?.name||'Produto'),
+  '<p class="help">'+d.remaining+' unidade(s) fora do estoque livre. Apenas as recuperadas voltarão à central.</p>'+
+  '<div class="formgrid">'+
+  selectField('Decisão','resolution',[['recuperado','Recuperado · voltar ao estoque'],['descartado','Descartado · baixa definitiva']])+
+  field('Quantidade','quantity','number',String(d.remaining),'required min="1" max="'+d.remaining+'" step="1"')+
+  textareaField('Justificativa obrigatória','note')+'</div>',
+  'damage-resolution','Confirmar decisão');
+ const form=document.querySelector('.modalback form[data-form="damage-resolution"]');
+ if(form){form.dataset.damage=id;form.dataset.request=crypto.randomUUID();}
 }
 function movementTable(rows){
   if(!rows.length)return '<div class="muteblock">Nenhuma movimentação registrada.</div>';
