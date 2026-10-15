@@ -4,8 +4,6 @@ ALTER TABLE public.products ADD COLUMN IF NOT EXISTS image_paths text[] NOT NULL
 ALTER TABLE public.apparel_models ADD COLUMN IF NOT EXISTS image_paths text[] NOT NULL DEFAULT '{}';
 ALTER TABLE public.events ADD COLUMN IF NOT EXISTS cover_path text;
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS franchise_min_qty integer;
-UPDATE public.products SET image_paths=ARRAY[image_path] WHERE image_path IS NOT NULL AND cardinality(image_paths)=0;
-UPDATE public.apparel_models SET image_paths=ARRAY[image_path] WHERE image_path IS NOT NULL AND cardinality(image_paths)=0;
 ALTER TABLE public.products ADD CONSTRAINT products_gallery_max_three CHECK (cardinality(image_paths)<=3);
 ALTER TABLE public.apparel_models ADD CONSTRAINT apparel_gallery_max_three CHECK (cardinality(image_paths)<=3);
 ALTER TABLE public.categories ADD CONSTRAINT category_franchise_min_qty CHECK (franchise_min_qty IS NULL OR franchise_min_qty BETWEEN 1 AND 1000000);
