@@ -93,7 +93,7 @@ export function groupedOrderLines(lines){
  }));
 }
 export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canDelete=false,canReceive=false,
- canDispatch=false,canDispatchStock=false,canAdjust=false,portal=false,time=x=>x}={}){
+ canDispatch=false,canDispatchStock=false,canVerify=false,isVerified=false,canAdjust=false,portal=false,time=x=>x}={}){
  const info=statuses[o.status]||[o.status,'pending'];
  const data='data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"';
  const process=canProcess&&!portal;
@@ -105,7 +105,9 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  if(event){
   if(process&&(ready||inProgress))
    actions.push(button(inProgress?'Continuar separação':'Separar lote','event-batch-pick',data,'small primary'));
-  if(canDispatch&&o.status==='separado')
+  if(o.status==='separado'&&canVerify)
+   actions.push(button(isVerified?'Rever conferência':'Conferir produtos','order-final-verify',data,'small primary'));
+  if(canDispatch&&o.status==='separado'&&isVerified)
    actions.push(button('Confirmar saída do lote','event-batch-dispatch',data,'small primary'));
   if(canCancel&&!terminal)actions.push(button('Editar lote','event-batch-edit',data,'small'));
   if(canCancel&&!terminal)actions.push(button('Cancelar lote','event-batch-cancel',data,'small danger'));
@@ -116,7 +118,9 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
    actions.push(button('Resolver falta','order-shortage-adjust',data,'small primary'));
   if(process&&ready)
    actions.push(button('Separar',o.kind==='avulso'?'avulso-pick':'store-order-separate',data,'small primary'));
-  if(process&&canDispatchStock&&o.status==='separado')
+  if(o.status==='separado'&&canVerify)
+   actions.push(button(isVerified?'Rever conferência':'Conferir produtos','order-final-verify',data,'small primary'));
+  if(process&&canDispatchStock&&o.status==='separado'&&isVerified)
    actions.push(button('Confirmar saída',o.kind==='avulso'?'avulso-dispatch':'store-order-dispatch',data,'small primary'));
   if(canReceive&&o.kind==='loja'&&o.status==='despachado')
    actions.push(button('Conferir recebimento','store-order-receive',data,'small primary'));
@@ -178,7 +182,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
 }
 export function unifiedOrdersPage(orders,{
  button=()=>'',time=x=>x,portal=false,separationOnly=false,
- canProcess=()=>false,canCancel=()=>false,canDelete=()=>false,canReceive=()=>false,canDispatch=()=>false,canDispatchStock=()=>false,canAdjust=()=>false,
+ canProcess=()=>false,canCancel=()=>false,canDelete=()=>false,canReceive=()=>false,canDispatch=()=>false,canDispatchStock=()=>false,canVerify=()=>false,isVerified=()=>false,canAdjust=()=>false,
  canAvulso=false,canStore=false,canEventBatch=false,eventId='',canLink=false,linksMarkup='',summaryLink=''
 }={}){
  const active=['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'];
@@ -188,7 +192,8 @@ export function unifiedOrdersPage(orders,{
  const done=orders.filter(o=>['enviado','concluido','recebido','recebido_divergente'].includes(o.status)).length;
  const cards=visible.map(o=>unifiedOrderCard(o,{button,time,portal,
   canProcess:canProcess(o),canCancel:canCancel(o),canDelete:canDelete(o),canReceive:canReceive(o),
-  canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o),canAdjust:canAdjust(o)})).join('');
+  canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o),
+  canVerify:canVerify(o),isVerified:isVerified(o),canAdjust:canAdjust(o)})).join('');
  const actions=!separationOnly?
    (eventId
      ? (canEventBatch?button('+ Montar lote para esta loja','event-batch-new','data-event="'+esc(eventId)+'"','primary'):'')
