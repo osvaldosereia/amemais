@@ -872,8 +872,9 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
  const free=new Map();
  for(const balance of state.balances)if(!balance.event_id)
   free.set(balance.product_id,Number(balance.quantity)||0);
- for(const hold of state.stockReservations)if(hold.status==='ativa')
-  free.set(hold.product_id,(free.get(hold.product_id)||0)-Number(hold.quantity||0));
+ for(const hold of state.stockReservations)
+  if(hold.status==='ativa'&&(!batch||hold.event_batch_id!==batch.id))
+   free.set(hold.product_id,(free.get(hold.product_id)||0)-Number(hold.quantity||0));
  const groups=eventPickingRows(state.items,state.apparelModels,saved,
   id=>Math.max(0,free.get(id)||0));
  const canSeeAvailable=isManager();
