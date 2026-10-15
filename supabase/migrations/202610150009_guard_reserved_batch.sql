@@ -1,0 +1,116 @@
+CREATE OR REPLACE FUNCTION public.stock_operation_batch(p_operation text, p_items jsonb, p_destination_id uuid DEFAULT NULL::uuid, p_note text DEFAULT NULL::text, p_request_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+ v_actor uuid:=auth.uid();v_batch uuid;v_existing record;
+ v_digest bytea;
+ v_line jsonb;v_item record;v_ids uuid[]:='{}'::uuid[];
+ v_product uuid;v_expected integer;v_qty integer;v_current integer;
+ v_results jsonb:='[]'::jsonb;v_total integer:=0;v_count integer:=0;
+ v_delta integer;v_reserved integer;v_note text:=nullif(btrim(coalesce(p_note,'')),'');
+begin
+ if v_actor is null or not app_private.role_in('admin','gerente') then
+  raise exception 'Somente administração pode movimentar estoque';end if;
+ if p_operation not in ('entrada','saida') then raise exception 'Operação inválida';end if;
+ if p_request_id is null then raise exception 'Identificador da operação obrigatório';end if;
+ if length(coalesce(p_note,''))>400 then raise exception 'Observação longa demais';end if;
+ if p_operation='saida' then
+   if p_destination_id is null or not exists(select 1 from public.stock_destinations
+       where id=p_destination_id and active) then
+       raise exception 'Selecione um destino ativo para a saída';end if;
+ elsif p_destination_id is not null then raise exception 'Entrada não aceita destino de saída';end if;
+ if p_items is null or jsonb_typeof(p_items)<>'array'
+   or jsonb_array_length(p_items) not between 1 and 100 then
+   raise exception 'Selecione entre 1 e 100 variações';end if;
+ v_digest:=extensions.digest(p_operation||'|'||coalesce(p_destination_id::text,'')||'|'||
+   coalesce(v_note,'')||'|'||p_items::text,'sha256');
+
+ perform pg_catalog.pg_advisory_xact_lock(8127,hashtext(p_request_id::text));
+ select id,operation,destination_id,actor_id,request_digest into v_existing
+   from public.stock_operation_batches where request_id=p_request_id;
+ if found then
+   if v_existing.operation<>p_operation or v_existing.actor_id<>v_actor or
+     v_existing.destination_id is distinct from p_destination_id or
+     v_existing.request_digest is distinct from v_digest then
+     raise exception 'Identificador reutilizado para uma operação diferente';end if;
+   select coalesce(jsonb_agg(jsonb_build_object(
+       'product_id',m.product_id,'quantity',m.quantity,
+       'new_stock',(select quantity from public.stock_balances b
+                   where b.product_id=m.product_id and b.event_id is null)
+       ) order by m.product_id),'[]'::jsonb) into v_results
+     from public.stock_movements m where m.operation_batch_id=v_existing.id;
+   return jsonb_build_object('batch_id',v_existing.id,'replayed',true,
+     'items',v_results);
+ end if;
+
+ -- Validação de todas as linhas antes da gravação.
+ for v_line in select value from jsonb_array_elements(p_items) loop
+   if jsonb_typeof(v_line)<>'object' or
+     coalesce(v_line->>'product_id','') !~ '^[0-9a-fA-F-]{36}$' or
+     coalesce(v_line->>'quantity','') !~ '^[1-9][0-9]{0,6}$' or
+     coalesce(v_line->>'expected','') !~ '^[0-9]{1,7}$' then
+     raise exception 'Produto ou quantidade inválida';end if;
+   v_product:=(v_line->>'product_id')::uuid;
+   v_qty:=(v_line->>'quantity')::integer;
+   v_expected:=(v_line->>'expected')::integer;
+   if v_qty>1000000 or v_expected>1000000 or v_product=any(v_ids) then
+     raise exception 'Produto repetido ou quantidade acima do limite';end if;
+   if not exists(select 1 from public.products where id=v_product and active)
+     then raise exception 'Produto inexistente ou inativo';end if;
+   v_ids:=array_append(v_ids,v_product);
+   v_total:=v_total+v_qty;v_count:=v_count+1;
+   if v_total>10000000 then raise exception 'Limite total de unidades excedido';end if;
+ end loop;
+
+ insert into public.stock_operation_batches(request_id,operation,destination_id,note,actor_id,request_digest)
+  values(p_request_id,p_operation,p_destination_id,v_note,v_actor,v_digest) returning id into v_batch;
+
+ -- Todos os saldos são bloqueados em ordem estável para evitar deadlocks.
+ for v_item in
+   select (x.value->>'product_id')::uuid id,
+          (x.value->>'quantity')::integer qty,
+          (x.value->>'expected')::integer expected
+   from jsonb_array_elements(p_items) x order by (x.value->>'product_id')::uuid
+ loop
+   insert into public.stock_balances(product_id,event_id,quantity)
+     values(v_item.id,null,0)
+     on conflict (product_id) where event_id is null do nothing;
+   select quantity into v_current from public.stock_balances
+    where product_id=v_item.id and event_id is null for update;
+   if v_current is distinct from v_item.expected then
+     raise exception 'Saldo atualizado por outro operador. Confira novamente os itens antes de salvar.';
+   end if;
+   -- A central nao pode baixar unidades ja reservadas para pedidos aprovados.
+   -- A linha de stock_balances segue bloqueada ate concluir a transacao.
+   if p_operation='saida' then
+     select coalesce(sum(quantity),0) into v_reserved
+     from public.stock_reservations
+     where product_id=v_item.id and status='ativa';
+     if v_current-v_item.qty<v_reserved then
+       raise exception 'Estoque livre insuficiente. Fisico: %, reservado: %, livre: %',
+         v_current,v_reserved,greatest(0,v_current-v_reserved);
+     end if;
+   end if;
+   v_delta:=case when p_operation='entrada' then v_item.qty else -v_item.qty end;
+   if v_current+v_delta<0 then
+     raise exception 'Estoque insuficiente para o produto %. Disponível: %',v_item.id,v_current;
+   end if;
+   update public.stock_balances set quantity=v_current+v_delta,updated_at=now()
+     where product_id=v_item.id and event_id is null;
+   insert into public.stock_movements(
+     product_id,event_id,action,quantity,delta_store,delta_event,actor_id,note,operation_batch_id)
+   values(v_item.id,null,case when p_operation='entrada' then 'entrada' else 'saida_loja' end,
+     v_item.qty,v_delta,0,v_actor,v_note,v_batch);
+   v_results:=v_results||jsonb_build_array(jsonb_build_object(
+     'product_id',v_item.id,'quantity',v_item.qty,'previous_stock',v_current,
+     'new_stock',v_current+v_delta));
+ end loop;
+ insert into public.audit_log(entity,entity_id,action,actor_id,details)
+ values('stock_operation_batches',v_batch::text,p_operation,v_actor,
+ jsonb_build_object('destination_id',p_destination_id,'quantity',v_total,'different_products',v_count));
+ return jsonb_build_object('batch_id',v_batch,'replayed',false,
+   'total',v_total,'count',v_count,'items',v_results);
+end;$function$;
