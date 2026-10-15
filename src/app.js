@@ -18,7 +18,7 @@ import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, st
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015shortcodes1';
 import {pickingThermalHTML} from './thermal-picking.js?v=20261015shortcodes1';
-import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotthermal1';
+import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015shortcodes1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261015catalog2';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
@@ -779,7 +779,8 @@ function eventDetails(){
   canDelete:hasPermission('system.force_delete')||(hasPermission('events.manage')&&hasPermission('events.close')&&hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente'))
  });
  const lots=eventLotsOverview({event:e,batches:state.eventPickBatches,items:state.eventBatchItems,
-  products:state.items,button,canCreate:e.status!=='encerrado'&&isManager()&&hasPermission('events.separate'),time:niceTime});
+  products:state.items,button,canCreate:e.status!=='encerrado'&&isManager()&&hasPermission('events.separate'),
+  time:niceTime,codeForBatch:id=>orderCode('evento',id)});
  return summary.replace('<header class="event-simple-head">',eventCoverCard(e)+'<header class="event-simple-head">')
   .replace('<div class="event-simple-actions">',lots+
     (e.status==='ativo'&&memberRole(e.id)==='responsavel'&&hasPermission('events.request')?
@@ -808,7 +809,7 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
  const groups=eventPickingRows(state.items,state.apparelModels,saved,
   id=>Math.max(0,free.get(id)||0));
  const canSeeAvailable=isManager();
- formModal((batch?'Editar lote '+String(batch.sequence).padStart(2,'0'):'Novo lote')+' · '+e.name,
+ formModal((batch?'Editar lote #'+orderCode('evento',batch.id):'Novo lote')+' · '+e.name,
   eventLotForm(lotCatalogMarkup(groups,state.categories,state.apparelModels,{showAvailable:canSeeAvailable}),
    {edit:Boolean(batch),number:batch?.sequence,note:batch?.note||''}),
   'event-batch-write',batch?'Salvar nova revisão':'Enviar à separação');
@@ -845,7 +846,7 @@ function eventBatchPickModal(id){
  const o=unifiedOrderById('evento',id);
  if(!o||!['aguardando','em_separacao','separado'].includes(o.status)||
  isFranchisePortal()||!(hasPermission('orders.separate')||hasPermission('events.separate')))return;
- formModal('Separação · Lote '+String(o.sequence).padStart(2,'0')+' · '+o.target,
+ formModal('Separação · Lote #'+o.code+' · '+o.target,
   pickingOrderRows(o,{h}),'event-batch-picking','Salvar progresso');
  const form=document.querySelector('.modalback form[data-form="event-batch-picking"]');
  if(form){
