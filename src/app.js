@@ -7,7 +7,8 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261014codes1';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015stockcards1';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015sku1';
+import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
 import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014stock1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014orders2';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
@@ -53,7 +54,6 @@ const profileLabel = u => u?.role==='admin'?'Administrador':u?.role==='franquia'
 const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
-  {id:'balanco',label:'Balanço rápido',ico:'clipboard'},
   {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
   {id:'pedidos',label:'Pedidos Avulsos',ico:'clipboard'},
   {id:'pedidos-lojas',label:'Solicitações de lojas',ico:'arrows'},
@@ -102,7 +102,7 @@ const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'st
 const permittedView = v => {
  if(isFranchisePortal())return v==='produtos'||v==='pedidos-lojas';
  if(v==='inicio')return true;
- if(v==='saida')return false; // Saída excepcional só pelo card.
+ if(v==='saida'||v==='balanco')return false; // Operações e conferência ficam em Produtos.
  if(v==='pedidos-lojas')return canUseStoreOrders();
  if(v==='pedidos')return hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
  if(v==='usuarios')return isAdmin();
@@ -477,6 +477,7 @@ function productGroupCard(group){
   return groupedCard(group,{
     h,photoButton,qtyStore,qtyEvent,qtyReserved,qtyAvailable,button,isManager,canRegisterProducts,
     canMoveStock:()=>!isFranchisePortal()&&(hasPermission('stock.entry')||hasPermission('stock.exit')),
+    canManageSku:()=>!isFranchisePortal()&&['stock.entry','stock.exit','stock.balance','products.edit'].some(hasPermission),
     canShare:canRegisterProducts()
   });
 }
@@ -613,10 +614,11 @@ function productsPage(){
   const groups=groupInventory(expanded,state.apparelModels);
   const filtersApplied=Boolean(q||state.categoryFilter||state.tagFilter||state.showInactiveProducts);
   const available=state.items.filter(p=>p.active).length;
-  const pageSize=20,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
-  state.page=Math.min(state.page,totalPages-1);
-  const list=groups.slice(state.page*pageSize,(state.page+1)*pageSize);
-  const add=((hasPermission('stock.balance')||hasPermission('stock.entry'))?button('Avarias em análise','view','data-view="avarias"','small'):'')+
+  const pageSize=5,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
+  state.page=Math.max(0,Math.min(state.page,totalPages-1));
+  const list=groups.slice(0,(state.page+1)*pageSize);
+  const add=(isAdmin()&&hasPermission('stock.balance')?button('Conferência formal','view','data-view="inventario"','small'):'')+
+    ((hasPermission('stock.balance')||hasPermission('stock.entry'))?button('Avarias em análise','view','data-view="avarias"','small'):'')+
     (hasPermission('stock.entry')?button('↓ Receber remessa','stock-receive-shipment','',''):'')+
     (hasPermission('products.create')?button('+ Novo produto','product-new','','primary'):'');
   return '<header class="pagehead products-pagehead"><div><h1>Produtos</h1>'+
@@ -647,10 +649,10 @@ function productsPage(){
       button('Mostrar todos os produtos','products-clear-filters','','primary'):
       '<p>Cadastre um novo produto ou verifique a opção Mostrar inativos.</p>')+'</div>')+'</div>'+
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+
-    groups.length+' modelo(s)/produto(s) · '+matched.length+' variação(ões) · página '+(state.page+1)+' de '+totalPages+
+    'Exibindo '+list.length+' de '+groups.length+' modelo(s) · '+matched.length+' variação(ões)'+
     '</small><div class="actions">'+
-    button('Anterior','product-prev',state.page===0?'disabled':'','small')+
-    button('Próxima','product-next',state.page+1>=totalPages?'disabled':'','small')+'</div></div></section>';
+    (state.page+1<totalPages?button('Ver mais 5 produtos','product-load-more','','primary'):'')+
+    (state.page>0?button('Mostrar menos','product-show-less','','small'):'')+'</div></div></section>';
 }
 
 function franchiseCatalogPage(){
@@ -1851,7 +1853,7 @@ function closeMobileNavigation(restoreFocus=true){
   if(restoreFocus)trigger?.focus({preventScroll:true});
 }
 function switchView(view) {
-  if(view==='roupas'||view==='saida')view='produtos';
+  if(view==='roupas'||view==='saida'||view==='balanco')view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;
   if(view!=='eventos'){state.activeEvent=null;state.eventWorkflow=null;state.eventReturnQuery='';}
@@ -2450,8 +2452,8 @@ async function handleClick(event){
   if(action==='user-role')return userRoleModal(id);
   if(action==='search-scan')return scanInto('#product-search');
   if(action==='form-scan')return scanInto('input[name="'+scanTarget+'"]',target.closest('form'));
-  if(action==='product-prev'){state.page=Math.max(0,state.page-1);render();return;}
-  if(action==='product-next'){state.page++;render();return;}
+  if(action==='product-load-more'){state.page++;render();return;}
+  if(action==='product-show-less'){state.page=0;render();return;}
   if(action==='export-csv')return exportCsv();
   if(action==='event-activate'){
     if(!window.confirm('Ativar este evento e permitir transferências?'))return;
