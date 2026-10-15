@@ -13,8 +13,8 @@ import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=2
 import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014stock1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
-import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015eventsimple1';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015lotqueue1';
+import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015eventphoto2';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015orderphoto2';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
@@ -59,7 +59,6 @@ const nav = [
   {id:'produtos',label:'Produtos',ico:'package'},
   {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
   {id:'pedidos',label:'Pedidos',ico:'clipboard'},
-  {id:'separacao',label:'Separação',ico:'package'},
   {id:'movimentacoes',label:'Movimentações',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
   {id:'tags',label:'Tags',ico:'more'},
@@ -107,8 +106,8 @@ const permittedView = v => {
  if(v==='inicio')return true;
  if(v==='saida'||v==='balanco')return false; // Operações e conferência ficam em Produtos.
  if(v==='pedidos-lojas')return false;
- if(v==='pedidos')return canUseStoreOrders()||hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
- if(v==='separacao')return !isFranchisePortal()&&(hasPermission('orders.separate')||hasPermission('events.separate'));
+ if(v==='pedidos')return canUseStoreOrders()||hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign')||hasPermission('orders.separate')||hasPermission('events.separate');
+ if(v==='separacao')return permittedView('pedidos');
  if(v==='usuarios')return isAdmin();
  if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
  if(v==='avarias')return !isFranchisePortal()&&(hasPermission('stock.balance')||hasPermission('stock.entry'));
@@ -472,7 +471,7 @@ function pageContent(){
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):eventsPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
-  if(state.view==='separacao')return ordersPage(true);
+  if(state.view==='separacao')return ordersPage();
   if(state.view==='categorias')return categoriesPage();
   if(state.view==='tags')return tagsPage();
   if(state.view==='usuarios')return usersPage();
@@ -764,12 +763,12 @@ function quickBalancePage(){
 function eventsPage(){
   const add=hasPermission('events.manage')?button('+ Nova loja temporária','event-new','','primary'):'';
   return tabHead('Lojas temporárias','Consignação: envio, venda, devolução e conciliação.',add)+
-    '<div class="eventgrid">'+state.events.map(e=>{
+    '<div class="eventgrid">'+state.events.filter(e=>!e.deleted_at).map(e=>{
       const remaining=state.balances.filter(b=>b.event_id===e.id).reduce((s,b)=>s+b.quantity,0);
       return '<article class="panel event-card">'+pill(e.status)+'<h3>'+h(e.name)+'</h3><p class="muted">'+niceDate(e.starts_at)+(e.ends_at?' até '+niceDate(e.ends_at):'')+'</p>'+
         '<div class="statsline"><div class="statline">Na loja temporária <b>'+remaining+'</b> un.</div></div>'+
         button('Gerenciar local','event-detail','data-id="'+h(e.id)+'"','primary')+'</article>';
-    }).join('')+'</div>'+(state.events.length?'':'<div class="panel muteblock">Nenhum evento cadastrado.</div>');
+    }).join('')+'</div>'+(state.events.some(e=>!e.deleted_at)?'':'<div class="panel muteblock">Nenhum evento cadastrado.</div>');
 }
 function returnWorkflowPage(){
   const e=eventById(state.activeEvent);
@@ -781,7 +780,7 @@ function returnWorkflowPage(){
 }
 function eventDetails(){
  const e=eventById(state.activeEvent);
- if(!e){state.activeEvent=null;return eventsPage();}
+ if(!e||e.deleted_at){state.activeEvent=null;return eventsPage();}
  const members=state.members.filter(m=>m.event_id===e.id);
  const summary=eventCompactDetail({
   event:e,members,plan:state.eventPickPlans.find(x=>x.event_id===e.id),
@@ -792,7 +791,8 @@ function eventDetails(){
   h,button,niceDate,username,
   canPlan:false,
   canClose:hasPermission('events.close')&&(hasPermission('events.manage')||memberRole(e.id)==='responsavel'),
-  canManage:hasPermission('events.manage')
+  canManage:hasPermission('events.manage'),
+  canDelete:hasPermission('events.manage')&&hasPermission('events.close')&&hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente')
  });
  const lots=eventLotsOverview({event:e,batches:state.eventPickBatches,items:state.eventBatchItems,
   products:state.items,button,canCreate:e.status!=='encerrado'&&isManager()&&hasPermission('events.separate'),time:niceTime});
@@ -1010,9 +1010,14 @@ async function printEventA4(id){
   }
   const responsible=state.members.filter(m=>m.event_id===id&&m.role==='responsavel')
     .map(m=>username(m.user_id)).join(', ');
+  const paths=items.map(x=>{
+   const p=product(x.product_id);
+   return state.apparelModels.find(m=>m.id===p?.apparel_model_id)?.image_path||p?.image_path;
+  });
+  const photoUrls=await signedPhotoUrls(paths);
   const html=a4PickingHTML({
    event:e,items,products:state.items,models:state.apparelModels,responsible,
-   version,status,printedAt:new Date().toLocaleString('pt-BR')
+   version,status,photoUrls,printedAt:new Date().toLocaleString('pt-BR')
   });
   win.document.open();win.document.write(html);win.document.close();
  }catch(error){win.close();fail(error);}
@@ -1969,6 +1974,7 @@ function avulsoPickingModal(id){
    pickingOrderRows(o,{h}),'avulso-picking','Concluir separação');
  const form=document.querySelector('.modalback form[data-form="avulso-picking"]');
  if(form){form.dataset.order=id;updateUnifiedPickingTotal(form);}
+ hydrateImages();
 }
 function unifiedShortageModal(kind,id){
  if(!hasPermission('orders.separate')||isFranchisePortal())return;
@@ -1989,14 +1995,17 @@ function updateUnifiedPickingTotal(form){
  for(const input of inputs)input.closest('[data-picking-row]')?.classList.toggle('is-picked',
    Number(input.value)===Number(input.dataset.expected));
 }
-function printUnifiedOrder(kind,id){
+async function printUnifiedOrder(kind,id){
  const order=unifiedOrderById(kind,id);
  if(!order||isFranchisePortal()||!order.lines.length)return;
  const popup=window.open('','_blank');
  if(!popup)return toast('O navegador bloqueou a janela de impressão.',true);
- popup.document.open();popup.document.write(pickingA4HTML(order,{
-  printedAt:new Date().toLocaleString('pt-BR')
- }));popup.document.close();
+ try{
+  const photoUrls=await signedPhotoUrls(order.lines.map(line=>line.imagePath));
+  popup.document.open();popup.document.write(pickingA4HTML(order,{
+   printedAt:new Date().toLocaleString('pt-BR'),photoUrls
+  }));popup.document.close();
+ }catch(error){popup.close();fail(error);}
 }
 function storePickingModal(orderId){
  const order=state.storeOrders.find(o=>o.id===orderId);
@@ -2129,20 +2138,32 @@ function exportCsv(){
   const blob=new Blob([data],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='ame-mais-movimentacoes-'+dateToday()+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+async function signedPhotoUrl(path){
+ if(!path)return '';
+ const cached=state.imageCache.get(path);
+ if(cached?.url&&cached.expires>Date.now())return cached.url;
+ const response=await db.storage.from('ame-produtos').createSignedUrl(path,600);
+ if(response.error)throw response.error;
+ const url=response.data?.signedUrl||'';
+ state.imageCache.set(path,{url,expires:Date.now()+570000});
+ return url;
+}
+async function signedPhotoUrls(paths){
+ const urls=Object.create(null);
+ await Promise.all([...new Set(paths.filter(Boolean))].map(async path=>{
+  try{urls[path]=await signedPhotoUrl(path);}
+  catch(error){console.warn('Foto indisponível na impressão',error);}
+ }));
+ return urls;
+}
 async function hydrateImages(){
-  const nodes=[...document.querySelectorAll('img[data-photo-id]')];
-  await Promise.all(nodes.map(async node=>{
-    const id=node.dataset.photoId,p=product(id);if(!p?.image_path)return;
-    const cached=state.imageCache.get(p.image_path);let url=cached?.url;
-    if(!cached||cached.expires<Date.now()){
-      try{
-        const response=await db.storage.from('ame-produtos').createSignedUrl(p.image_path,600);
-        if(response.error)throw response.error;
-        url=response.data.signedUrl;state.imageCache.set(p.image_path,{url,expires:Date.now()+570000});
-      }catch(error){console.warn('Foto indisponível',error);return;}
-    }
-    if(node.isConnected)node.src=url;
-  }));
+ const nodes=[...document.querySelectorAll('img[data-photo-id],img[data-photo-path]')];
+ await Promise.all(nodes.map(async node=>{
+  const path=node.dataset.photoPath||product(node.dataset.photoId)?.image_path;
+  if(!path)return;
+  try{const url=await signedPhotoUrl(path);if(node.isConnected&&url)node.src=url;}
+  catch(error){console.warn('Foto indisponível',error);}
+ }));
 }
 function closeMobileNavigation(restoreFocus=true){
   document.querySelector('.mobile-more-overlay')?.remove();
@@ -2165,7 +2186,7 @@ function searchAndManageSku(code,openPanel=false){
  else if(openPanel&&!found)toast('Código não encontrado no catálogo.',true);
 }
 function switchView(view) {
-  if(view==='pedidos-lojas')view='pedidos';
+  if(view==='pedidos-lojas'||view==='separacao')view='pedidos';
   if(view==='roupas'||view==='saida'||view==='balanco')view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;
@@ -2594,8 +2615,8 @@ async function handleClick(event){
   if(action==='event-batch-finish-pick')return saveEventBatchPicking(target.closest('form'),true);
   if(action==='event-batch-cancel')return eventBatchCancelModal(id);
   if(action==='event-batch-go'){
-    if(!permittedView('separacao'))return toast('Sem permissão de separação.',true);
-    state.view='separacao';state.activeEvent=null;render();
+    if(!permittedView('pedidos'))return toast('Sem permissão para acessar os pedidos.',true);
+    state.view='pedidos';state.activeEvent=null;render();
     const card=document.querySelector('[data-order-id="'+id+'"]');
     card?.scrollIntoView({block:'center',behavior:'smooth'});
     card?.querySelector('details.uo-details')?.setAttribute('open','');
@@ -2642,6 +2663,19 @@ async function handleClick(event){
   }
   if(action==='event-settlement-save-finish')return submitEventSettlement(target.closest('form'),true);
   if(action==='damage-resolve')return resolveDamageModal(id);
+  if(action==='event-delete'){
+   const e=eventById(id);
+   if(!e||e.deleted_at||!isManager()||!hasPermission('events.close')||!hasPermission('events.return'))return;
+   const remaining=state.balances.filter(b=>b.event_id===id).reduce((sum,b)=>sum+Number(b.quantity||0),0);
+   formModal('Excluir loja temporária · '+e.name,
+    '<p class="help">Esta operação arquiva a loja e cancela lotes ainda não enviados. As '+remaining+
+    ' unidade(s) ainda no local serão devolvidas automaticamente à central. Vendas e baixas anteriores não serão revertidas. O histórico ficará preservado.</p>'+
+    '<label class="field"><span>Código de autorização</span><input name="delete_code" type="password" autocomplete="off" required minlength="4" maxlength="80" placeholder="Informe o código de exclusão"></label>',
+    'event-delete-confirm','Excluir e devolver estoque');
+   const form=document.querySelector('.modalback form[data-form="event-delete-confirm"]');
+   if(form)form.dataset.eventId=id;
+   return;
+  }
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
   if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
@@ -3268,6 +3302,20 @@ async function handleSubmit(event){
       p_damage:damage.id,p_action:values.resolution,p_quantity:quantity,
       p_note:reason,p_request:form.dataset.request
     })),values.resolution==='recuperado'?'Produto recuperado e disponível.':'Descarte registrado no histórico.');
+  }
+  if(type==='event-delete-confirm'){
+   const id=form.dataset.eventId,e=eventById(id);
+   if(!e||e.deleted_at||!isManager()||!hasPermission('events.close')||!hasPermission('events.return'))return;
+   const code=String(values.delete_code||'');
+   if(!code)return toast('Informe o código de exclusão.',true);
+   if(!window.confirm('Excluir a loja temporária '+e.name+' e devolver todo o saldo físico restante à central? Esta ação não pode ser desfeita pela interface.'))return;
+   let returned=0;
+   return exec(async()=>{
+    returned=Number(assertOk(await db.rpc('delete_temporary_store',{
+      p_event_id:id,p_code:code
+    }))||0);
+    state.activeEvent=null;state.eventWorkflow=null;state.view='eventos';
+   },()=> 'Loja excluída. '+returned+' unidade(s) devolvida(s) à central. Histórico preservado.');
   }
   if(type==='event-create'){
     if(!hasPermission('events.manage'))return;
