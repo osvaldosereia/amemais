@@ -23,7 +23,7 @@ export function groupInventory(items,models){
     return g;
   }).sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts,canShare=false,mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canShare=false,mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path)||group.main;
   const active=group.products.filter(p=>p.active);
@@ -32,7 +32,9 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,button,isMana
   const manage=isProducts&&isManager();
   const quantity=p=>mode==='event'?qtyEvent(p.id,eventId):qtyStore(p.id);
   const count=active.reduce((sum,p)=>sum+quantity(p),0);
-  const stockLabel=mode==='event'?'Estoque no evento':'Estoque na loja';
+  const groupReserved=isProducts?active.reduce((sum,p)=>sum+qtyReserved(p.id),0):0;
+  const groupAvailable=isProducts?active.reduce((sum,p)=>sum+qtyAvailable(p.id),0):count;
+  const stockLabel=mode==='event'?'Na loja temporária':'Físico na central';
   const colors=[...new Set(active.map(p=>(p.apparel_color||'').trim()).filter(Boolean))];
   const description=group.modelId
     ?(colors.length===1?colors[0]+' · ':colors.length>1?colors.length+' cores · ':'')+
@@ -59,10 +61,12 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,button,isMana
           '<small>EAN: '+h(p.ean||'—')+'</small>'+
           (loc?'<small class="group-variant-location">'+h(loc)+'</small>':'')+
           (!p.active?'<small class="product-variant-disabled">Inativo</small>':'')+
+          (isProducts?'<small class="stock-variant-breakdown">Físico '+qty+' · Reservado '+qtyReserved(p.id)+' · Livre '+qtyAvailable(p.id)+'</small>':'')+
           '</div></div>'+
         '<span class="group-variant-stock '+(qty===0?'stock-zero':'')+'">'+qty+' <small>un.</small></span>'+
-        (isProducts&&canEdit?'<div class="group-variant-actions">'+
-          button('Editar','product-edit','data-id="'+h(p.id)+'"','small')+
+        (isProducts?'<div class="group-variant-actions">'+
+          button('Posição','stock-overview','data-id="'+h(p.id)+'"','small')+
+          (canEdit?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+
           '</div>':'')+
         '</div>';
     }).join('')+'</div>';
@@ -95,6 +99,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,button,isMana
           '<small>'+stockLabel+'</small>'+
           '<span><b>'+count+'</b> unidades</span>'+
         '</div>'+
+        (isProducts?'<div class="stock-total-breakdown"><span><b>'+groupAvailable+'</b> livres</span><span>'+groupReserved+' reservadas</span></div>':'')+
         '<small class="product-card-location">'+h(location)+'</small>'+
       '</div>'+
     '</div>'+
