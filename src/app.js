@@ -706,7 +706,7 @@ function inventorySessionModal(id){
   (session.status==='aberta'?'<label>Físico <input type="number" min="0" max="1000000" step="1" data-inventory-qty data-id="'+h(x.product_id)+'" value="'+(x.counted_quantity===null?'':x.counted_quantity)+'" placeholder="Contar"></label>':
   '<strong>Contado: '+x.counted_quantity+'</strong>')+'</div>';
  }).join('');
- formModal('Inventário · '+session.title,'<p class="help">Todos os '+items.length+' SKUs precisam ser contados. Pendentes: '+pending+
+ formModal('Inventário · '+session.title,(session.status==='aberta'?'<div class="actions">'+button('📷 Ler EAN para localizar SKU','inventory-scan','','small primary')+'</div>':'')+'<p class="help">Todos os '+items.length+' SKUs precisam ser contados. Pendentes: '+pending+
  ' · Divergentes: '+divergent.length+'</p><div class="store-picking-list">'+rows+'</div>'+
  (session.status==='revisao'?textareaField('Justificativa das divergências','note'):'')+
  '<p class="help">O saldo físico será alterado apenas após aprovação. Reservas na central continuam protegidas.</p>',
@@ -2167,6 +2167,16 @@ async function handleClick(event){
     await exec(async()=>assertOk(await db.rpc(rpc,{p_order:id})),msg);return;
   }
   if(action==='event-inventory'){switchView('inventario');return inventoryStartModal();}
+  if(action==='inventory-scan'){
+    return scanEAN(code=>{
+      const p=state.items.find(x=>String(x.ean||'').trim()===String(code).trim());
+      const modal=[...document.querySelectorAll('.modalback')].at(-1);
+      const el=p?[...modal?.querySelectorAll('[data-inventory-qty]')||[]].find(x=>x.dataset.id===p.id):null;
+      if(!el)return toast('EAN não pertence aos SKUs deste inventário.',true);
+      el.scrollIntoView({block:'center',behavior:'smooth'});el.focus();el.select();
+      toast('SKU localizado. Informe a quantidade física.');
+    });
+  }
   if(action==='inventory-new')return inventoryStartModal();
   if(action==='inventory-open')return inventorySessionModal(id);
   if(action==='inventory-submit'){
