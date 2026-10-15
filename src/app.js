@@ -1971,6 +1971,19 @@ async function handleClick(event){
     catch{window.prompt('Copie o link do produto:',url);}
     return;
   }
+  if(action==='stock-receive-shipment'){
+    if(!hasPermission('stock.entry')||isFranchisePortal())return;
+    switchView('entrada');return;
+  }
+  if(action==='product-new-ean'){
+    if(!hasPermission('products.create'))return;
+    const ean=state.search.trim();
+    if(!/^\d{8,14}$/.test(ean))return;
+    productModal();
+    const input=document.querySelector('.modalback form input[name="ean"]');
+    if(input)input.value=ean;
+    return;
+  }
   if(action==='product-new')return productModal();
   if(action==='products-toggle-inactive'){state.showInactiveProducts=!state.showInactiveProducts;state.page=0;render();return;}
   if(action==='products-clear-filters'){
@@ -2066,6 +2079,7 @@ async function handleClick(event){
   }
   if(action==='stock-overview')return stockOverviewModal(id);
   if(action==='stock-overview-close'){target.closest('.stock-overview-overlay')?.remove();return;}
+  if(action==='stock-group-modal')return stockModal(null,target.dataset.cardKey);
   if(action==='stock-modal')return stockModal(id);
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
@@ -2481,6 +2495,48 @@ async function handleSubmit(event){
     finally{state.loading=false;}
     return;
   }
+  if(type==='stock-single-movement'){
+    const id=String(values.product_id||''),p=product(id);
+    const kind=String(values.operation_kind||'');
+    const qty=Number(values.quantity),expected=Number(form.dataset.expected);
+    const requestId=form.dataset.requestId;
+    const note=String(values.note||'').trim();
+    const details=String(values.details||'').trim();
+    const recipient=String(values.recipient||'').trim();
+    const reason=String(values.reason||'');
+    if(!p?.active||!id||!requestId||!['entrada','saida'].includes(kind))
+      return toast('Escolha uma variação ativa e uma operação.',true);
+    if(!hasPermission(kind==='entrada'?'stock.entry':'stock.exit')||isFranchisePortal())return;
+    if(!Number.isInteger(qty)||qty<1||qty>1000000||
+       !Number.isInteger(expected)||expected<0)
+      return toast('Informe uma quantidade válida e atualize o saldo.',true);
+    if(kind==='entrada'&&note.length>400)
+      return toast('Identificação da remessa muito longa.',true);
+    if(kind==='saida'){
+      if(qty>qtyAvailable(id))return toast('Estoque livre insuficiente. Unidades reservadas não podem sair.',true);
+      if(!['avaria','extravio','diretoria','doacao','outro'].includes(reason))
+        return toast('Escolha o motivo da baixa.',true);
+      if(details.length<5||details.length>250)
+        return toast('Descreva a saída em 5 a 250 caracteres.',true);
+      if(['diretoria','doacao'].includes(reason)&&(recipient.length<2||recipient.length>120))
+        return toast('Identifique quem recebeu o produto.',true);
+    }
+    const action=kind==='entrada'?'entrada':'baixa definitiva';
+    if(!window.confirm('Confirmar '+action+' de '+qty+' unidade(s) de '+p.name+'?'))return;
+    return exec(async()=>{
+      if(kind==='entrada'){
+        assertOk(await db.rpc('stock_operation_batch',{
+          p_operation:'entrada',p_items:[{product_id:id,quantity:qty,expected}],
+          p_destination_id:null,p_note:note||null,p_request_id:requestId
+        }));
+      }else{
+        assertOk(await db.rpc('record_stock_exception',{
+          p_product_id:id,p_quantity:qty,p_expected:expected,
+          p_reason:reason,p_details:details,p_recipient:recipient||null,p_request_id:requestId
+        }));
+      }
+    },kind==='entrada'?'Entrada de fornecedor registrada.':'Baixa excepcional registrada com motivo e justificativa.');
+  }
   if(type==='stock-operation'){
     return saveStockOperation(form);
   }
@@ -2500,7 +2556,7 @@ async function handleSubmit(event){
     const kind=values.operation_kind;
     if(!['entrada','saida'].includes(kind))return toast('Escolha Entrada ou Saída.',true);
     const id=form.dataset.id;
-    closeTopModal();switchView(kind);addStockOperationItem(id);
+    closeTopModal();stockModal(id);
     return;
   }
   if(type==='order-create'){
