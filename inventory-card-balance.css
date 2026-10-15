@@ -224,3 +224,79 @@
  .products-panel .product-card-v3 .group-variant-actions .button,
  .c-dashboard .product-card-v3 .group-variant-actions .button{min-width:77px;padding:6px}
 }
+
+
+/* Desktop: um único cabeçalho horizontal por modelo.
+   A foto, os dados e os dois saldos compartilham a primeira linha.
+   O painel de tamanhos ocupa a largura integral ao ser expandido. */
+@media(min-width:761px){
+ .products-panel .product-card-v3{
+  display:flex;flex-direction:column;align-items:stretch;width:100%;
+ }
+ .products-panel .product-card-v3 .grouped-inventory-top,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-top{
+  display:grid;grid-column:auto;grid-row:auto;
+  grid-template-columns:136px minmax(0,1fr) minmax(250px,300px);
+  gap:18px;align-items:center;width:100%;padding:16px 18px;
+ }
+ .products-panel .product-card-v3 .grouped-inventory-photo,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-photo{
+  width:136px;height:136px;max-height:136px;aspect-ratio:1/1;
+ }
+ .products-panel .product-card-v3 .grouped-inventory-info,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-info{
+  min-width:0;align-self:center;
+ }
+ .products-panel .product-card-v3 .stock-total-breakdown,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .stock-total-breakdown{
+  grid-column:3;grid-row:1;width:100%;align-self:center;
+ }
+ .products-panel .product-card-v3 .stock-total-metric,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .stock-total-metric{
+  min-height:104px;padding:12px 13px;
+ }
+ .products-panel .product-card-v3 .grouped-inventory-actions{
+  grid-column:auto;grid-row:auto;order:2;
+ }
+ .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-sizes{
+  display:inline-flex;align-items:center;justify-content:center;
+ }
+ .products-panel .product-card-v3 .grouped-variants-mobile{
+  display:block;order:3;width:100%;margin:0;
+ }
+ .products-panel .product-card-v3 .grouped-variants-mobile>summary{display:none}
+ .products-panel .product-card-v3 .grouped-variants-mobile:not([open]) .group-variant-list{display:none}
+}
+@media(min-width:901px) and (max-width:1199px){
+ .products-panel .product-card-v3 .grouped-inventory-top,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-top{
+  grid-template-columns:112px minmax(0,1fr) minmax(210px,250px);
+  gap:13px;padding:14px;
+ }
+ .products-panel .product-card-v3 .grouped-inventory-photo,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-photo{
+  width:112px;height:112px;max-height:112px;
+ }
+ .products-panel .product-card-v3 .stock-total-metric,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .stock-total-metric{
+  min-height:92px;padding:10px;
+ }
+}
+@media(min-width:761px) and (max-width:900px){
+ .products-panel .product-card-v3 .grouped-inventory-top,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-top{
+  grid-template-columns:104px minmax(0,1fr);gap:11px;padding:13px;
+ }
+ .products-panel .product-card-v3 .grouped-inventory-photo,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-photo{
+  width:104px;height:104px;max-height:104px;
+ }
+ .products-panel .product-card-v3 .stock-total-breakdown,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .stock-total-breakdown{
+  grid-column:1/-1;grid-row:2;
+ }
+ .products-panel .product-card-v3 .stock-total-metric,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .stock-total-metric{
+  min-height:72px;
+ }
+}
