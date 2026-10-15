@@ -17,9 +17,21 @@ export async function uploadEventCover(db,eventId,file){
  const blob=await cropEventCover(file),path='events/'+eventId+'/'+crypto.randomUUID()+'.webp';
  const upload=await db.storage.from('ame-eventos').upload(path,blob,{contentType:'image/webp',upsert:false});
  if(upload.error)throw upload.error;
- const save=await db.from('events').update({cover_path:path}).eq('id',eventId);
- if(save.error)throw save.error;
- return path;
+ // A capa só é considerada salva quando o registro realmente confirma a alteração.
+ // A política RLS restringe a escrita aos usuários com events.manage.
+ try{
+  const save=await db.from('events').update({cover_path:path})
+   .eq('id',eventId).select('id,cover_path').maybeSingle();
+  if(save.error)throw save.error;
+  if(!save.data||save.data.cover_path!==path)
+   throw Error('A imagem foi enviada, mas não foi possível vinculá-la à loja temporária.');
+  return path;
+ }catch(error){
+  // Não deixa arquivo órfão se a confirmação no cadastro falhar.
+  try{await db.storage.from('ame-eventos').remove([path]);}
+  catch(cleanupError){console.warn('Falha ao limpar capa não vinculada.',cleanupError);}
+  throw error;
+ }
 }
 export async function generateEventCover(db,eventId){
  const response=await db.functions.invoke('generate-event-cover',{body:{event_id:eventId}});
