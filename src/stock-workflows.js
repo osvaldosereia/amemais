@@ -48,6 +48,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const groupEdit=group.modelId?'product-card-edit':'product-edit';
   const groupEditId=group.modelId?group.modelId:main.id;
   const sizeCount=group.products.length;
+  const fmt=n=>Number(n||0).toLocaleString('pt-BR');
   const modelRows=()=>{
     return '<div class="group-variant-list">'+group.products.map(p=>{
       const qty=p.active?quantity(p):0;
@@ -57,16 +58,16 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<div class="group-variant-name"><span class="product-size-label">'+h(group.modelId?p.apparel_size||'Único':'Único')+'</span>'+
           '<div class="group-variant-description"><strong>'+h(group.modelId?
             ((p.apparel_color||'').trim()||'Variação'):(p.name||'Produto'))+'</strong>'+
-          '<small>SKU: '+h(p.sku||'—')+'</small>'+
-          '<small>EAN: '+h(p.ean||'—')+'</small>'+
+          '<small class="variant-code">SKU '+h(p.sku||'—')+'</small>'+
+          '<small class="variant-ean">EAN '+h(p.ean||'—')+'</small>'+
           (loc?'<small class="group-variant-location">'+h(loc)+'</small>':'')+
           (!p.active?'<small class="product-variant-disabled">Inativo</small>':'')+
-          (isProducts?'<small class="stock-variant-breakdown">Físico '+qty+' · Reservado '+qtyReserved(p.id)+' · Livre '+qtyAvailable(p.id)+'</small>':'')+
+          (isProducts&&qtyReserved(p.id)>0?'<small class="stock-variant-breakdown">'+fmt(qtyReserved(p.id))+' reservadas · '+fmt(qtyAvailable(p.id))+' livres</small>':'')+
           '</div></div>'+
-        '<span class="group-variant-stock '+(qty===0?'stock-zero':'')+'">'+qty+' <small>un.</small></span>'+
+        '<span class="group-variant-stock '+(qty===0?'stock-zero':'')+'"><b>'+fmt(qty)+'</b><small>un.</small></span>'+
         (isProducts?'<div class="group-variant-actions">'+
-          button('Posição','stock-overview','data-id="'+h(p.id)+'"','small')+
-          (canEdit?button('Editar','product-edit','data-id="'+h(p.id)+'"','small'):'')+
+          button('Local','stock-overview','data-id="'+h(p.id)+'"','small')+
+          (canEdit?button('Editar SKU','product-edit','data-id="'+h(p.id)+'"','small'):'')+
           '</div>':'')+
         '</div>';
     }).join('')+'</div>';
@@ -83,9 +84,9 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const actions=isProducts?
     '<div class="grouped-inventory-actions">'+
       (canEdit?'<button type="button" class="product-card-edit" data-action="'+groupEdit+
-        '" data-id="'+h(groupEditId)+'">✎ Editar</button>':'')+
+        '" data-id="'+h(groupEditId)+'">✎ Editar produto</button>':'')+
       '<button type="button" class="product-card-sizes" data-action="product-card-sizes" data-card-key="'+h(group.key)+'"'+
-        ' aria-expanded="false">Tamanhos <span aria-hidden="true">⌄</span></button>'+
+        ' aria-expanded="false">'+sizeCount+' tamanhos <span aria-hidden="true">⌄</span></button>'+
       (moreOptions?'<details class="product-card-more"><summary aria-label="Mais opções do produto" title="Mais opções">⋯</summary>'+
         '<div class="product-card-more-menu">'+moreOptions+'</div></details>':'')+
     '</div>':'';
@@ -97,9 +98,9 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<small class="product-card-description">'+h(description)+'</small>'+
         '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
           '<small>'+stockLabel+'</small>'+
-          '<span><b>'+count+'</b> unidades</span>'+
+          '<span><b>'+fmt(count)+'</b> un.</span>'+
         '</div>'+
-        (isProducts?'<div class="stock-total-breakdown"><span><b>'+groupAvailable+'</b> livres</span><span>'+groupReserved+' reservadas</span></div>':'')+
+        (isProducts?'<div class="stock-total-breakdown"><span><b>'+fmt(groupAvailable)+'</b> livres</span>'+(groupReserved?'<span>'+fmt(groupReserved)+' reservadas</span>':'')+'</div>':'')+
         '<small class="product-card-location">'+h(location)+'</small>'+
       '</div>'+
     '</div>'+
