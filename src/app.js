@@ -2,13 +2,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
-import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261014cat2';
+import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
-  apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
+  apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js?v=20261015variants1';
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015variants1';
 import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015variants1';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015sku1';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015variants1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
 import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014stock1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
