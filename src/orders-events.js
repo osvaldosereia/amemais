@@ -79,7 +79,7 @@ export function createInternalOrderForm({products,models,events,groupInventory})
    '<label class="field"><span>Telefone com DDD *</span><input name="customer_phone" type="tel" inputmode="tel" autocomplete="tel" required maxlength="20" placeholder="(65) 99999-9999"></label>'+
    '<label class="field wide"><span>Vincular a evento (opcional)</span><select name="event_id"><option value="">Sem evento</option>'+
      events.map(e=>'<option value="'+esc(e.id)+'">'+esc(e.name)+' ('+esc(e.status)+')</option>').join('')+'</select></label>'+
-   '</div><p class="help">Pedido não reserva nem desconta estoque. Pode ser associado a um evento agora ou depois.</p>'+
+   '</div><p class="help">Pedido reserva automaticamente as unidades livres na central, sem baixa física. Faltas ficam pendentes para conferência; o vínculo com evento é apenas informativo.</p>'+
    '<label class="field"><span>Buscar produto</span><input type="search" data-order-search autocomplete="off" placeholder="Nome, tamanho, SKU ou EAN"></label>'+
    '<div class="avulso-create-list">'+groupCards+'</div>'+
    '<div class="avulso-order-selected" data-order-selected>Informe a quantidade de cada variação desejada.</div>';
