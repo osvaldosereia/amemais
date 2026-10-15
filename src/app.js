@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
+import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery1';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
@@ -1226,33 +1227,14 @@ function bindPhotoPreview(form,photoBlob){
   form.querySelector('[data-photo-status]').textContent='Pronta para salvar · '+Math.ceil(photoBlob.size/1024)+' KB';
 }
 async function handlePhotoInput(input){
-  const form=input.closest('form');
-  const file=input.files?.[0];
-  if(!form||!file)return;
-  if(file.size>20*1024*1024){toast('Escolha uma foto de até 20 MB.',true);return;}
-  const status=form.querySelector('[data-photo-status]');if(status)status.textContent='Compactando a foto…';
-  try{
-    const compressed=await compressPhoto(file);
-    if(!form.isConnected)return;
-    bindPhotoPreview(form,compressed);
-  }catch(error){
-    if(status)status.textContent='Não foi possível processar esta imagem.';
-    fail(error);
-  }
+ const form=input.closest('form'),files=input.files;
+ if(!form||!files?.length)return;
+ try{await galleryAddFiles(form,files,compressPhoto);hydrateImages();}
+ catch(error){fail(error);}
+ finally{input.value='';}
 }
-function photoChooser(item){
-  return '<section class="form-section wide">'+
-    '<div class="section-head"><strong>Foto do produto</strong><small>Imagem compactada automaticamente</small></div>'+
-    '<div class="photo-editor"><button type="button" class="photo-preview" data-action="preview-zoom" aria-label="Ampliar foto">'+
-    (item?.image_path?'<img data-photo-id="'+h(item.id)+'" alt="Foto de '+h(item.name)+'" />':
-      '<span class="photo-empty"><span aria-hidden="true">▧</span> Sem foto</span>')+
-    '</button><div class="photo-editor-actions">'+
-    button('📷 Tirar foto','take-photo','','')+
-    button('▧ Escolher da galeria','choose-photo','','')+
-    '<small data-photo-status>JPG/WEBP · até 450 KB após compressão</small>'+
-    '</div><input hidden type="file" name="camera_file" accept="image/*" capture="environment">'+
-    '<input hidden type="file" name="gallery_file" accept="image/*"></div></section>';
-}
+function photoChooser(item){return galleryMarkup(item);}
+
 function productModal(item=null){
   if(!canRegisterProducts())return;
   const single='<div data-single-fields class="single-fields wide">'+
@@ -1280,7 +1262,7 @@ function productModal(item=null){
   const form=document.querySelector('.modalback form');
   if(item)form.dataset.id=item.id;
   else refreshCategorySizeOptions(form,state.categories);
-  if(item?.image_path)hydrateImages();
+  if(item?.image_path||item?.image_paths?.length)hydrateImages();
 }
 
 function shareProductModal(title,shareUrl){
@@ -1764,7 +1746,7 @@ function categoryModal(parentId=null,fromProduct=false,item=null){
     '<span class="taxonomy-icon">▤</span><span class="taxonomy-text"><small>Organização da categoria</small>'+
     '<strong data-category-label>'+h(parentCat?categoryFull(parent):'Nenhuma (principal)')+'</strong></span><span class="taxonomy-arrow">⌄</span></button></div>';
   formModal(label,'<div class="formgrid">'+field('Nome','name','text',item?.name||'','required minlength="2" maxlength="90"')+
-    parentField+'</div>'+renderCategoryVariationFields(item||{parent_id:parent,variation_options:null},state.categories)+
+    parentField+field('Mínimo por SKU para franquia (opcional)','franchise_min_qty','number',item?.franchise_min_qty??'','min="1" max="1000000" step="1" placeholder="Herdar da categoria superior"')+'</div>'+renderCategoryVariationFields(item||{parent_id:parent,variation_options:null},state.categories)+
     '<p class="help" style="margin-top:12px">As variações configuradas aqui aparecerão no cadastro de produtos.</p>',
     editing?'category-edit':'category-new',editing?'Salvar':'Criar categoria',fromProduct);
   const form=[...document.querySelectorAll('.modalback form')].at(-1);
@@ -2315,6 +2297,13 @@ async function handleClick(event){
     }catch(e){fail(e);}
     return;
   }
+  if(action==='gallery-zoom'){
+   const image=target.querySelector('img');
+   if(image?.src)return photoLightbox(image.src,'Foto do produto');
+   return;
+  }
+  if(action==='gallery-remove'){galleryRemove(target.closest('form'),Number(target.dataset.index));return;}
+  if(action==='gallery-primary'){galleryMain(target.closest('form'),Number(target.dataset.index));hydrateImages();return;}
   if(action==='preview-zoom'){
     const preview=target.querySelector('img');
     if(!preview?.src){toast('Escolha ou tire uma foto primeiro.');return;}
@@ -2989,7 +2978,7 @@ async function handleSubmit(event){
     if(type==='product-new'&&form.querySelector('[data-use-sizes]')?.checked){
       state.loading=true;
       try{await saveSizedProduct(form,{
-        db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast
+        db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast,saveGallery:savePhotoGallery
       });}catch(error){fail(error);}finally{state.loading=false;}
       return;
     }
@@ -3022,12 +3011,11 @@ async function handleSubmit(event){
           p_initial_quantity:initial
         }));
       }
-      if(form.__photoBlob){
+      if(galleryHasChanges(form)){
         try{
-          const compressed=form.__photoBlob;
-          const path=productId+'/'+crypto.randomUUID()+'.'+(compressed.type==='image/webp'?'webp':'jpg');
-          assertOk(await db.storage.from('ame-produtos').upload(path,compressed,{contentType:compressed.type,upsert:false}));
-          assertOk(await db.from('products').update({image_path:path}).eq('id',productId));
+          const existing=editing?product(id):null;
+          await savePhotoGallery(form,{db,assertOk,modelId:existing?.apparel_model_id||null,
+            productId:existing?.apparel_model_id?null:productId});
         }catch(error){
           // Falha de foto não significa falha de cadastro: evita que o usuário
           // envie o mesmo produto novamente e encontre SKU/EAN duplicado.
@@ -3045,7 +3033,7 @@ async function handleSubmit(event){
     state.loading=true;
     try{
       await submitApparel(form,{
-        state,db,assertOk,chosenCategory,productTagValues,loadData,closeTopModal,toast
+        state,db,assertOk,chosenCategory,productTagValues,loadData,closeTopModal,toast,saveGallery:savePhotoGallery
       });
     }catch(error){fail(error);}
     finally{state.loading=false;}
@@ -3061,7 +3049,7 @@ async function handleSubmit(event){
   if(type==='apparel-photo'){
     if(!canRegisterProducts())return;
     state.loading=true;
-    try{await saveApparelPhoto(form,{db,assertOk,loadData,closeTopModal,toast});}
+    try{await saveApparelPhoto(form,{db,assertOk,loadData,closeTopModal,toast,saveGallery:savePhotoGallery});}
     catch(error){fail(error);}finally{state.loading=false;}
     return;
   }
@@ -3363,15 +3351,17 @@ async function handleSubmit(event){
     if(!hasPermission('categories.manage'))return;
     const name=String(values.name||'').trim(), parent=form.dataset.fromProduct==='1'?(form.dataset.parent||null):(values.parent_id||null);
     if(name.length<2||name.length>90){toast('Nome entre 2 e 90 caracteres.',true);return;}
+    const min=values.franchise_min_qty===''?null:Number(values.franchise_min_qty);
+    if(min!==null&&(!Number.isInteger(min)||min<1||min>1000000))return toast('Mínimo de franquia inválido.',true);
     let variation_options;
     try{variation_options=variationOptionsToSave(form);}catch(error){return toast(error.message,true);}
     if(form.dataset.fromProduct==='1'){
-      await saveTaxonomyFromProduct(form,'categories',{name,parent_id:parent,variation_options},'Categoria e variações criadas.');
+      await saveTaxonomyFromProduct(form,'categories',{name,parent_id:parent,variation_options,franchise_min_qty:min},'Categoria e variações criadas.');
     }else if(type==='category-edit'){
-      const data={name,variation_options};if(form.dataset.lockParent!=='1')data.parent_id=parent;
+      const data={name,variation_options,franchise_min_qty:min};if(form.dataset.lockParent!=='1')data.parent_id=parent;
       await exec(async()=>assertOk(await db.from('categories').update(data).eq('id',form.dataset.id)),'Categoria e variações atualizadas.');
     }else{
-      await exec(async()=>assertOk(await db.from('categories').insert({name,parent_id:parent,variation_options})),'Categoria criada com variações.');
+      await exec(async()=>assertOk(await db.from('categories').insert({name,parent_id:parent,variation_options,franchise_min_qty:min})),'Categoria criada com variações.');
     }
     return;
   }
