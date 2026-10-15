@@ -535,6 +535,7 @@ function productGroupCard(group){
     canMoveStock:()=>!isFranchisePortal()&&(hasPermission('stock.entry')||hasPermission('stock.exit')),
     canManageSku:()=>!isFranchisePortal()&&['stock.entry','stock.exit','stock.balance','products.edit'].some(hasPermission),
     canQuickCount:()=>!isFranchisePortal()&&hasPermission('stock.balance')&&['admin','gerente','estoquista'].includes(state.profile?.role),
+    canDeleteWholeModel:()=>isAdmin()&&hasPermission('system.force_delete'),
     expanded:state.expandedProductGroups.has(group.key),canShare:canRegisterProducts()
   });
 }
@@ -650,6 +651,8 @@ function productModelManager(modelId){
       '<div class="product-model-manage-actions">'+
         button('Alterar foto','apparel-photo','data-id="'+h(modelId)+'"','small')+
         button('+ Adicionar tamanhos','add-variants','data-id="'+h(modelId)+'"','small primary')+
+        (isAdmin()&&hasPermission('system.force_delete')?
+         button('Excluir produto completo','product-model-delete','data-id="'+h(modelId)+'"','small danger'):'')+
       '</div>'+
       rows+
     '</div></section>';
@@ -2510,27 +2513,36 @@ function storeModal(item=null){
 }
 async function forceDeletePreview(kind,id){
  if(!hasPermission('system.force_delete')||state.loading)return;
- if(!['product','store','event'].includes(kind)||!id)return;
+ if(!['product','model','store','event'].includes(kind)||!id)return;
+ if(kind==='model'&&!isAdmin())return;
  try{
-  const data=assertOk(await db.rpc('force_archive_preview',{p_kind:kind,p_id:id}));
+  const data=kind==='model'
+   ?assertOk(await db.rpc('force_archive_model_preview',{p_model:id}))
+   :assertOk(await db.rpc('force_archive_preview',{p_kind:kind,p_id:id}));
   if(!data?.name)throw Error('Cadastro não encontrado.');
-  const labels={product:'produto/variação',store:'loja/franquia',event:'loja temporária'};
-  const type=labels[kind];
+  const labels={product:'produto/variação',model:'produto completo (todas as variações)',
+   store:'loja/franquia',event:'loja temporária'};
   const warnings=[
-   '<strong>'+h(data.stock_units||0)+'</strong> unidade(s) em saldo',
-   '<strong>'+h(data.pending_records||0)+'</strong> pedido(s)/reserva(s) pendente(s)',
+   ...(kind==='model'?['<strong>'+h(data.variant_count||0)+'</strong> variações/tamanhos']:[]),
+   '<strong>'+h(data.stock_units||0)+'</strong> unidade(s) físicas em saldo',
+   ...(kind==='model'?[
+    '<strong>'+h(data.cd_units||0)+'</strong> no CDSB; <strong>'+h(data.event_units||0)+'</strong> em temporárias',
+    '<strong>'+h(data.reserved_units||0)+'</strong> unidade(s) reservada(s)']:[]),
+   '<strong>'+h(data.pending_records||0)+'</strong> pedido(s) pendente(s)',
    '<strong>'+h(data.history_records||0)+'</strong> registro(s) históricos'
   ];
-  const explanation=kind==='product'?
-   'O produto deixa de aparecer nos cadastros. Saldos físicos ligados a ele serão baixados com auditoria, reservas liberadas e pedidos/lotes pendentes relacionados serão cancelados.':
+  const explanation=kind==='model'?
+   'TODOS os tamanhos e cores serão removidos do catálogo na mesma operação. Saldos físicos serão baixados com registro de auditoria; reservas serão liberadas e pedidos/lotes pendentes que contenham alguma dessas variações serão cancelados. Os pedidos e as movimentações já concluídos permanecem no histórico.':
+   kind==='product'?
+   'A variação deixa de aparecer no catálogo. Os saldos serão baixados com auditoria, as reservas serão liberadas e pedidos/lotes pendentes relacionados serão cancelados.':
    kind==='store'?
    'A loja sai da relação operacional. Pedidos pendentes são cancelados e reservas liberadas. O histórico permanece. Filiais com mercadorias ainda em estoque devem devolver antes.':
    'A loja temporária deixa de aparecer. Lotes não enviados são cancelados e o estoque restante retorna ao CDSB. O histórico é preservado.';
   formModal('Exclusão avançada · '+data.name,
-   '<p class="help"><b>Atenção: autonomia total para excluir '+type+'.</b> Confirme somente cadastros que realmente devem sair de operação.</p>'+
+   '<p class="help"><b>Atenção: exclusão administrativa de '+labels[kind]+'.</b> Revise os números antes de autorizar.</p>'+
    '<div class="force-delete-summary">'+warnings.map(t=>'<div>'+t+'</div>').join('')+'</div>'+
    '<p>'+h(explanation)+'</p>'+
-   '<p class="help">As movimentações e os pedidos históricos permanecem para auditoria. Os saldos envolvidos podem ser alterados. Esta operação não pode ser revertida pela tela.</p>'+
+   '<p class="help">Essa ação não pode ser desfeita pela tela. Ela não exclui o histórico, mas pode baixar o estoque de produtos reais.</p>'+
    '<label class="field"><span>Digite exatamente <strong>'+h(data.name)+'</strong> para autorizar</span>'+
    '<input name="confirmation" type="text" required autocomplete="off" placeholder="'+h(data.name)+'"></label>',
    'force-delete-confirm','Confirmar exclusão avançada');
@@ -2538,7 +2550,6 @@ async function forceDeletePreview(kind,id){
   if(form){form.dataset.kind=kind;form.dataset.id=id;form.dataset.name=data.name;}
  }catch(error){fail(error);}
 }
-
 function userModal(){
   if(!isAdmin())return;
   formModal('Cadastrar usuário','<div class="formgrid">'+
@@ -3033,6 +3044,10 @@ async function handleClick(event){
     return;
   }
   if(action==='size-scan')return scanInto('input[name="size_ean"]',target.closest('[data-size-variant]'));
+  if(action==='product-model-delete'){
+    if(!isAdmin()||!hasPermission('system.force_delete'))return;
+    return forceDeletePreview('model',id);
+  }
   if(action==='product-delete'){
     if(hasPermission('system.force_delete'))return forceDeletePreview('product',id);
     if(!hasPermission('products.delete'))return;
@@ -3990,14 +4005,20 @@ async function handleSubmit(event){
   }
   if(type==='force-delete-confirm'){
    if(!hasPermission('system.force_delete'))return;
+   if(form.dataset.kind==='model'&&!isAdmin())return;
    const kind=form.dataset.kind,entityId=form.dataset.id,expected=form.dataset.name;
    if(String(values.confirmation||'').trim()!==expected)
     return toast('Digite exatamente o nome exibido para confirmar.',true);
    if(!window.confirm('CONFIRMAR EXCLUSÃO AVANÇADA de '+expected+'? Pedidos pendentes e saldos poderão ser alterados; o histórico permanecerá.'))return;
    return exec(async()=>{
-    assertOk(await db.rpc('force_archive_entity',{
-     p_kind:kind,p_id:entityId,p_confirm:expected
-    }));
+    if(kind==='model'){
+     assertOk(await db.rpc('force_archive_model',{p_model:entityId,p_confirm:expected}));
+     state.expandedProductGroups.clear();state.showInactiveProducts=false;
+    }else{
+     assertOk(await db.rpc('force_archive_entity',{
+      p_kind:kind,p_id:entityId,p_confirm:expected
+     }));
+    }
     if(kind==='event'){state.activeEvent=null;state.eventWorkflow=null;state.view='lojas';}
    },'Exclusão avançada concluída. Pedidos e movimentações históricos foram preservados.');
   }
