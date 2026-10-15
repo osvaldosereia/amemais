@@ -13,7 +13,6 @@ import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVaria
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
   eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015photogallery1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
-import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014stock1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
@@ -76,7 +75,7 @@ const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
-  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -107,7 +106,7 @@ const isManager = () => hasPermission('events.manage');
 const isStockkeeper = () => state.profile?.role === 'estoquista';
 const canRegisterProducts = () => hasPermission('products.create') || hasPermission('products.edit');
 const canQuickBalance = () => hasPermission('stock.balance');
-const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',balanco:'stock.balance',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
+const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
 const permittedView = v => {
  if(isFranchisePortal())return v==='minha-loja'||v==='pedidos';
  if(state.profile?.role==='evento'&&hasPermission('events.request'))return v==='meu-evento'||v==='eventos';
@@ -116,7 +115,7 @@ const permittedView = v => {
  if(v==='meu-evento')return state.profile?.role==='evento';
  if(v==='separador')return hasPermission('orders.separate');
  if(v==='inicio')return true;
- if(v==='saida'||v==='balanco')return false; // Operações e conferência ficam em Produtos.
+ if(v==='saida'||v==='balanco'||v==='inventario')return false; // Conferência e ajustes acontecem nos cards de Produtos.
  if(v==='pedidos-lojas')return false;
  if(v==='pedidos')return canUseStoreOrders()||hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign')||hasPermission('orders.separate')||hasPermission('events.separate');
  if(v==='separacao')return permittedView('pedidos');
@@ -126,7 +125,6 @@ const permittedView = v => {
  if(v==='lojas-admin')return hasPermission('stores.manage');
  if(v==='avarias')return !isFranchisePortal()&&(hasPermission('stock.balance')||hasPermission('stock.entry'));
 
- if(v==='inventario')return isAdmin()&&hasPermission('stock.balance');
  if(v==='eventos')return hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.separate');
  return Boolean(viewPermission[v]&&hasPermission(viewPermission[v]));
 };
@@ -208,10 +206,6 @@ async function loadData(){
   if(hasPermission('purchases.manage')){
    resources.push(['purchaseOrders',db.from('purchase_orders').select('*').order('created_at',{ascending:false}).limit(600)]);
    resources.push(['purchaseItems',db.from('purchase_order_items').select('*').limit(12000)]);
-  }
-  if(hasPermission('stock.balance')||hasPermission('stores.manage')||hasPermission('events.manage')){
-   resources.push(['inventorySessions',db.from('inventory_sessions').select('*').order('created_at',{ascending:false}).limit(100)]);
-   resources.push(['inventoryItems',db.from('inventory_session_items').select('*').limit(10000)]);
   }
   if(!isFranchisePortal()&&(hasPermission('orders.separate')||hasPermission('events.separate')||hasPermission('events.read')||hasPermission('events.manage'))){
     resources.push(['eventPickBatches',db.from('event_pick_batches').select('*').order('created_at',{ascending:false}).limit(2000)]);
@@ -495,8 +489,6 @@ function pageContent(){
  if(state.view==='meu-evento')return temporaryPage();
  if(state.view==='separador')return separationHomePage();
  if(state.view==='entrada'||state.view==='saida')return renderStockOperationPage();
-  if(state.view==='balanco')return quickBalancePage();
-  if(state.view==='inventario')return inventoryPage();
   if(state.view==='avarias')return damageStockPage();
   if(state.view==='produtos')return productsPage();
   if(state.view==='compras')return purchasesPage({products:state.items,suppliers:state.suppliers,balances:state.balances,
@@ -679,8 +671,7 @@ function productsPage(){
   const pageSize=5,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.max(0,Math.min(state.page,totalPages-1));
   const list=groups.slice(0,(state.page+1)*pageSize);
-  const add=(isAdmin()&&hasPermission('stock.balance')?button('Conferência formal','view','data-view="inventario"','small'):'')+
-    ((hasPermission('stock.balance')||hasPermission('stock.entry'))?button('Avarias em análise','view','data-view="avarias"','small'):'')+
+  const add=((hasPermission('stock.balance')||hasPermission('stock.entry'))?button('Avarias em análise','view','data-view="avarias"','small'):'')+
     (hasPermission('stock.entry')?button('↓ Receber remessa','stock-receive-shipment','',''):'')+
     (hasPermission('stock.balance')?button('Imprimir estoque','buy-print-stock','','small'):'')+
     (hasPermission('products.create')?button('+ Novo produto','product-new','','primary'):'');
@@ -741,77 +732,6 @@ function franchiseCatalogPage(){
     '<div class="actions">'+button('Anterior','product-prev',state.page===0?'disabled':'','small')+
     button('Próxima','product-next',state.page>=pages-1?'disabled':'','small')+'</div></div></section>';
 }
-function inventoryPage(){
- const sessions=state.inventorySessions;
- const types={central:'Central',filial:'Filial própria',temporaria:'Loja temporária'};
- const rows=sessions.map(x=>{
-  const items=state.inventoryItems.filter(i=>i.session_id===x.id);
-  const counted=items.filter(i=>i.counted_quantity!==null).length;
-  const divergent=items.filter(i=>i.counted_quantity!==null&&i.counted_quantity!==i.expected_quantity).length;
-  const local=x.location_type==='central'?'Estoque central':x.location_type==='filial'?
-    state.stores.find(y=>y.id===x.location_id)?.name:state.events.find(y=>y.id===x.location_id)?.name;
-  const active=x.status==='aberta'||x.status==='revisao';
-  return '<article class="panel"><div class="panelbody"><strong>'+h(x.title)+'</strong><p class="muted">'+
-   h(types[x.location_type]||x.location_type)+' · '+h(local||'Local')+' · '+h(x.status)+
-   '</p><p>Contados: '+counted+'/'+items.length+' SKUs · Divergências: '+divergent+'</p>'+
-   (active?button(x.status==='aberta'?'Continuar contagem':'Revisar divergências','inventory-open','data-id="'+h(x.id)+'"','primary')+
-    (x.status==='aberta'&&counted===items.length?button('Enviar para revisão','inventory-submit','data-id="'+h(x.id)+'"','small'):'')+
-    (x.status==='revisao'?button('Rejeitar sessão','inventory-reject','data-id="'+h(x.id)+'"','small'):''):'')+
-   '</div></article>';
- }).join('');
- return tabHead('Inventário formal','Contagem completa por local, revisão de divergências e aprovação auditada.',
- button('+ Nova sessão','inventory-new','','primary'))+
- panel('Sessões',rows||'<p class="muted">Nenhuma sessão de inventário.</p>');
-}
-function inventoryStartModal(){
- const opts=[];
- if(hasPermission('stock.balance'))opts.push(['central|','Central']);
- if(hasPermission('stores.manage'))state.stores.filter(x=>x.kind==='filial'&&x.active&&assignedStore(x.id)).forEach(x=>opts.push(['filial|'+x.id,'Filial · '+x.name]));
- if(hasPermission('events.manage'))state.events.filter(x=>x.status==='ativo').forEach(x=>opts.push(['temporaria|'+x.id,'Temporária · '+x.name]));
- if(!opts.length)return toast('Sem local habilitado para inventário.',true);
- formModal('Abrir inventário','<div class="formgrid">'+selectField('Local','location',opts)+
- field('Identificação da sessão','title','text','Inventário físico','required maxlength="120"')+
- '</div><p class="help">Será registrada uma fotografia dos saldos por SKU. A aprovação só ocorrerá após todos os itens serem contados.</p>',
- 'inventory-start','Abrir sessão');
-}
-function inventorySessionModal(id){
- const session=state.inventorySessions.find(x=>x.id===id);if(!session)return;
- const items=state.inventoryItems.filter(x=>x.session_id===id);
- const pending=items.filter(x=>x.counted_quantity===null).length;
- const divergent=items.filter(x=>x.counted_quantity!==null&&x.counted_quantity!==x.expected_quantity);
- const rows=items.map(x=>{
-  const p=product(x.product_id);
-  return '<div class="store-picking-line"><div><strong>'+h(p?.name||'Produto')+'</strong><small>'+h([p?.sku,p?.ean,p?.apparel_size].filter(Boolean).join(' · '))+
-  '</small><small>Esperado: '+x.expected_quantity+' · Diferença: '+(x.counted_quantity===null?'não contado':x.counted_quantity-x.expected_quantity)+'</small></div>'+
-  (session.status==='aberta'?'<label>Físico <input type="number" min="0" max="1000000" step="1" data-inventory-qty data-id="'+h(x.product_id)+'" value="'+(x.counted_quantity===null?'':x.counted_quantity)+'" placeholder="Contar"></label>':
-  '<strong>Contado: '+x.counted_quantity+'</strong>')+'</div>';
- }).join('');
- formModal('Inventário · '+session.title,(session.status==='aberta'?'<div class="actions">'+button('📷 Ler EAN para localizar SKU','inventory-scan','','small primary')+'</div>':'')+'<p class="help">Todos os '+items.length+' SKUs precisam ser contados. Pendentes: '+pending+
- ' · Divergentes: '+divergent.length+'</p><div class="store-picking-list">'+rows+'</div>'+
- (session.status==='revisao'?textareaField('Justificativa das divergências','note'):'')+
- '<p class="help">O saldo físico será alterado apenas após aprovação. Reservas na central continuam protegidas.</p>',
- session.status==='aberta'?'inventory-save':'inventory-approve',session.status==='aberta'?'Salvar contagens':'Aprovar e aplicar');
- document.querySelector('.modal form[data-form^="inventory-"]').dataset.session=id;
-}
-function quickBalancePage(){
-  if(!canQuickBalance())return '<div class="muteblock">Sem acesso.</div>';
-  const groups=groupInventory(state.items.filter(p=>p.active),state.apparelModels);
-  const query=state.search.trim().toLocaleLowerCase('pt-BR');
-  const filtered=groups.filter(g=>!query||[g.title,...g.products.flatMap(p=>
-    [p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira])].join(' ').toLocaleLowerCase('pt-BR').includes(query));
-  const cards=filtered.slice(0,50).map(g=>quickBalanceCard(g,{photoButton,qtyStore,qtyReserved,h})).join('');
-  return tabHead('Balanço rápido','Um produto por card; conte os tamanhos sem sair da tela.',
-    isAdmin()?button('Conferência formal','view','data-view="inventario"','small'):'')+
-    '<section class="quick-balance-intro"><div class="quick-balance-search">'+
-    '<input id="quick-search" type="search" class="search" placeholder="Produto, tamanho, SKU ou EAN…" aria-label="Buscar para contagem" value="'+h(state.search)+'">'+
-    button('📷 Ler EAN','quick-scan','','primary')+'</div>'+
-    '<p class="help">Digite a quantidade física apenas dos tamanhos conferidos. <strong>Zero</strong> significa estoque zerado; campo vazio não altera nada. '+
-    'A contagem é do físico, inclusive unidades reservadas na central. O sistema bloqueará qualquer ajuste abaixo do reservado. Use Salvar por tamanho ou por card.</p></section>'+
-    '<div class="quick-group-list">'+(cards||'<div class="panel muteblock">Nenhum produto encontrado.</div>')+
-    (cards?'<div class="quick-group-empty panel muteblock" data-quick-empty hidden>Nenhum produto corresponde à busca.</div>':'')+'</div>'+
-    (filtered.length>50?'<p class="muted">Exibindo 50 modelos. Refine a busca para localizar os demais.</p>':'');
-}
-
 function eventsPage(){
   const add=hasPermission('events.manage')?button('+ Nova loja temporária','event-new','','primary'):'';
   return tabHead('Lojas temporárias','Consignação: envio, venda, devolução e conciliação.',add)+
@@ -2740,7 +2660,7 @@ function searchAndManageSku(code,openPanel=false){
 function switchView(view) {
   if(view==='pedidos-lojas'||view==='separacao')view='pedidos';
   if(view==='eventos'&&state.profile?.role!=='evento')view='lojas';
-  if(view==='roupas'||view==='saida'||view==='balanco')view='produtos';
+  if(['roupas','saida','balanco','inventario'].includes(view))view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;state.ordersContext=null;
   if(view!=='eventos'){state.activeEvent=null;state.eventWorkflow=null;state.eventReturnQuery='';}
@@ -2784,17 +2704,6 @@ async function handleClick(event){
       if((state.view==='entrada'||state.view==='saida')&&permittedView(state.view)){
         handleOperationScanCode(code);return;
       }
-      if(state.view==='balanco'){
-        state.search=code;state.page=0;
-        const search=document.getElementById('quick-search'),list=document.querySelector('.quick-group-list');
-        if(search&&list){
-          search.value=code;
-          const found=searchQuickCards(code);
-          if(found)list.querySelector('[data-quick-group]:not([hidden])')?.scrollIntoView({behavior:'smooth',block:'nearest'});
-          else toast('EAN não encontrado nos produtos exibidos.',true);
-        }else render();
-        return;
-      }
       searchAndManageSku(code,true);
     });}catch(error){fail(error);return;}
   }
@@ -2807,12 +2716,6 @@ async function handleClick(event){
     render();return;
   }
   if(action==='count-focus')return document.querySelector('[data-count-product="'+id+'"] input[name="counted"]')?.focus();
-  if(action==='quick-save-one'){
-    const card=target.closest('[data-quick-group]');
-    if(card)return saveQuickGroupCounts(card,id);
-    return;
-  }
-  if(action==='quick-scan')return scanInto('#quick-search');
   if(action==='mobile-more'){
     closeMobileNavigation(false);
     const overlay=document.createElement('div');
@@ -3548,27 +3451,6 @@ async function handleClick(event){
     if(!window.confirm(confirmation))return;
     await exec(async()=>assertOk(await db.rpc(rpc,{p_order:id})),msg);return;
   }
-  if(action==='event-inventory'){switchView('inventario');return inventoryStartModal();}
-  if(action==='inventory-scan'){
-    return scanEAN(code=>{
-      const p=state.items.find(x=>String(x.ean||'').trim()===String(code).trim());
-      const modal=[...document.querySelectorAll('.modalback')].at(-1);
-      const el=p?[...modal?.querySelectorAll('[data-inventory-qty]')||[]].find(x=>x.dataset.id===p.id):null;
-      if(!el)return toast('EAN não pertence aos SKUs deste inventário.',true);
-      el.scrollIntoView({block:'center',behavior:'smooth'});el.focus();el.select();
-      toast('SKU localizado. Informe a quantidade física.');
-    });
-  }
-  if(action==='inventory-new')return inventoryStartModal();
-  if(action==='inventory-open')return inventorySessionModal(id);
-  if(action==='inventory-submit'){
-    if(!window.confirm('Enviar inventário completo para revisão?'))return;
-    return exec(async()=>assertOk(await db.rpc('inventory_submit',{p_session:id})),'Inventário enviado para revisão.');
-  }
-  if(action==='inventory-reject'){
-    if(!window.confirm('Rejeitar e cancelar este inventário?'))return;
-    return exec(async()=>assertOk(await db.rpc('inventory_finalize',{p_session:id,p_approve:false,p_note:'Rejeitado'})),'Inventário rejeitado.');
-  }
   if(action==='branch-return-new')return branchReturnModal(id);
   if(action==='branch-return-receive'){
     if(!hasPermission('stock.entry'))return;
@@ -3889,10 +3771,6 @@ async function handleSubmit(event){
     }catch(error){fail(error);await loadData().catch(()=>{});}
     finally{state.loading=false;}
     return;
-  }
-  if(type==='quick-group-count'){
-    if(!canQuickBalance())return;
-    return saveQuickGroupCounts(form);
   }
   if(type==='quick-count'){
     if(!canQuickBalance())return;
@@ -4299,27 +4177,6 @@ async function handleSubmit(event){
       p_items:items,p_note:values.note||null
     })),'Pedido criado com reserva automática. A saída física ocorrerá após a conferência.');return;
   }
-  if(type==='inventory-start'){
-    const [locationType,locationId]=String(values.location||'').split('|');
-    if(!window.confirm('Abrir sessão de inventário?'))return;
-    return exec(async()=>assertOk(await db.rpc('inventory_start',{p_type:locationType,p_location:locationId||null,p_title:String(values.title||'').trim()})),'Sessão aberta.');
-  }
-  if(type==='inventory-save'){
-    const id=form.dataset.session;
-    const inputs=[...form.querySelectorAll('[data-inventory-qty]')].filter(el=>el.value!=='');
-    if(!inputs.length)return toast('Preencha ao menos uma contagem.',true);
-    if(inputs.some(el=>!Number.isInteger(Number(el.value))||Number(el.value)<0||Number(el.value)>1000000))return toast('Contagem inválida.',true);
-    return exec(async()=>{
-      for(const el of inputs)assertOk(await db.rpc('inventory_count',{p_session:id,p_product:el.dataset.id,p_counted:Number(el.value)}));
-    },'Contagens registradas.');
-  }
-  if(type==='inventory-approve'){
-    const id=form.dataset.session;
-    const session=state.inventorySessions.find(x=>x.id===id);
-    if(!session||session.status!=='revisao')return;
-    if(!window.confirm('Aprovar diferenças e aplicar todos os ajustes físicos?'))return;
-    return exec(async()=>assertOk(await db.rpc('inventory_finalize',{p_session:id,p_approve:true,p_note:String(values.note||'').trim()})),'Inventário aprovado e aplicado.');
-  }
   if(type==='branch-return-dispatch'){
     const storeId=form.dataset.store;
     const quantity=Number(values.quantity);
@@ -4429,103 +4286,10 @@ async function handleSubmit(event){
   }
 
 }
-async function saveQuickGroupCounts(card,onlyId=null){
-  if(!canQuickBalance()||state.loading||!card?.isConnected)return;
-  let selected;
-  try{selected=collectQuickCounts(card,onlyId);}catch(error){toast(error.message,true);return;}
-  state.loading=true;
-  const buttons=[...card.querySelectorAll('button')].map(button=>({button,disabled:button.disabled}));
-  const selectedInputs=selected.map(item=>[...card.querySelectorAll('[data-quick-row]')]
-    .find(row=>row.dataset.quickRow===item.product_id)?.querySelector('[data-quick-count]')).filter(Boolean);
-  buttons.forEach(({button})=>button.disabled=true);
-  selectedInputs.forEach(input=>input.disabled=true);
-  let resultMessage='';
-  const status=card.querySelector('[data-quick-status]');
-  if(status)status.textContent='Salvando contagens…';
-  try{
-    const saved=assertOk(await db.rpc('quick_stock_count_batch',{p_items:selected}));
-    if(!saved||saved.saved!==selected.length)throw new Error('O balanço não retornou a confirmação esperada.');
-    // Atualização de dados e elementos locais: NÃO chama render nem loadData.
-    for(const item of selected){
-      let balance=state.balances.find(b=>b.product_id===item.product_id&&!b.event_id);
-      if(balance)balance.quantity=item.counted;
-      else state.balances.push({product_id:item.product_id,event_id:null,quantity:item.counted});
-      const row=[...card.querySelectorAll('[data-quick-row]')].find(r=>r.dataset.quickRow===item.product_id);
-      if(!row)continue;
-      row.querySelector('[data-quick-expected]').value=String(item.counted);
-      row.querySelector('[data-quick-current]').textContent=String(item.counted);
-      row.querySelector('[data-quick-count]').value='';
-      row.classList.add('quick-just-saved');
-      // A mensagem confirma o salvamento sem deslocar o card.
-    }
-    const qty=[...card.querySelectorAll('[data-quick-expected]')].reduce((sum,input)=>sum+Number(input.value||0),0);
-    const total=card.querySelector('[data-quick-total]');
-    if(total)total.textContent=String(qty);
-    const adjusted=Number(saved.adjusted)||0;
-    resultMessage=selected.length+' tamanho(s) salvo(s) · '+adjusted+' ajuste(s) de estoque';
-    toast(selected.length===1?'Contagem salva sem recarregar a tela.':selected.length+' contagens salvas sem recarregar a tela.');
-  }catch(error){
-    fail(error);
-    resultMessage='Não foi salvo. Revise as contagens antes de tentar novamente.';
-    // Se outro operador alterou o saldo, atualiza apenas a referência das linhas,
-    // preservando os campos digitados e a posição da rolagem.
-    try{
-      const ids=selected.map(x=>x.product_id);
-      const current=assertOk(await db.from('stock_balances').select('product_id,quantity')
-        .in('product_id',ids).is('event_id',null))||[];
-      for(const bal of current){
-        const row=[...card.querySelectorAll('[data-quick-row]')].find(r=>r.dataset.quickRow===bal.product_id);
-        if(!row)continue;
-        row.querySelector('[data-quick-expected]').value=String(bal.quantity);
-        row.querySelector('[data-quick-current]').textContent=String(bal.quantity);
-        const cached=state.balances.find(b=>b.product_id===bal.product_id&&!b.event_id);
-        if(cached)cached.quantity=bal.quantity;
-      }
-    }catch(syncError){console.warn('Não foi possível sincronizar saldo após falha',syncError);}
-  }finally{
-    state.loading=false;
-    selectedInputs.forEach(input=>input.disabled=false);
-    buttons.forEach(({button,disabled})=>{if(button.isConnected)button.disabled=disabled;});
-    updateQuickCountButtons(card);
-    if(status&&resultMessage)status.textContent=resultMessage;
-  }
-}
-
-function searchQuickCards(query){
-  const container=document.querySelector('.quick-group-list');
-  if(!container)return 0;
-  let found=filterQuickCountCards(container,query);
-  const q=String(query||'').trim().toLocaleLowerCase('pt-BR');
-  if(found>0||q.length<3)return found;
-  // Pesquisa sob demanda fora dos 50 cards iniciais, sem destruir
-  // contagens já digitadas em outros produtos.
-  const existing=new Set([...container.querySelectorAll('[data-quick-group]')].map(el=>el.dataset.quickGroup));
-  const more=groupInventory(state.items.filter(p=>p.active),state.apparelModels).filter(group=>{
-    if(existing.has(group.key))return false;
-    return [group.title,...group.products.flatMap(p=>[
-      p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira
-    ])].join(' ').toLocaleLowerCase('pt-BR').includes(q);
-  }).slice(0,25);
-  if(more.length){
-    const empty=container.querySelector('[data-quick-empty]');
-    const html=more.map(group=>quickBalanceCard(group,{photoButton,qtyStore,qtyReserved,h})).join('');
-    if(empty)empty.insertAdjacentHTML('beforebegin',html);
-    else container.insertAdjacentHTML('beforeend',html);
-    hydrateImages();
-    found=filterQuickCountCards(container,query);
-  }
-  return found;
-}
-
 function updateFiltered(id,value){
   const active=document.activeElement;
   const selection=active?.selectionStart??null;
   state.search=value;state.page=0;
-  if(id==='quick-search'){
-    const area=document.querySelector('.quick-group-list');
-    if(area)searchQuickCards(value);
-    return;
-  }
   render();
   const field=document.getElementById(id);
   if(field&&selection!==null){field.focus();field.setSelectionRange(selection,selection);}
@@ -4628,10 +4392,6 @@ document.addEventListener('input',event=>{
     }
   }
   if(['product-search','movement-search','quick-search'].includes(event.target.id))updateFiltered(event.target.id,event.target.value);
-  if(event.target.matches('[data-quick-count]')){
-    const card=event.target.closest('[data-quick-group]');
-    if(card)updateQuickCountButtons(card);
-  }
   if(event.target.id==='catalog-category-search'){
     state.catalogSearch=event.target.value;
     const list=document.querySelector('.catalog-tree-list');if(list)list.innerHTML=renderCatalogTree();
