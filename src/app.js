@@ -2539,6 +2539,13 @@ async function forceDeletePreview(kind,id){
    '<strong>'+h(data.pending_records||0)+'</strong> pedido(s) pendente(s)',
    '<strong>'+h(data.history_records||0)+'</strong> registro(s) históricos'
   ];
+  const modelVariants=kind==='model'?
+    state.items.filter(p=>p.apparel_model_id===id&&!p.force_archived_at):[];
+  const variantsList=modelVariants.length?
+    '<div class="force-delete-variants"><strong>Variações que serão excluídas juntas</strong>'+
+    '<ul>'+modelVariants.map(p=>'<li><b>'+h([p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||'Único')+
+     '</b> · SKU '+h(p.sku||'—')+' · Físico '+qtyStore(p.id)+
+     ' · Reservado '+qtyReserved(p.id)+'</li>').join('')+'</ul></div>':'';
   const explanation=kind==='model'?
    'TODOS os tamanhos e cores serão removidos do catálogo na mesma operação. Saldos físicos serão baixados com registro de auditoria; reservas serão liberadas e pedidos/lotes pendentes que contenham alguma dessas variações serão cancelados. Os pedidos e as movimentações já concluídos permanecem no histórico.':
    kind==='product'?
@@ -2549,6 +2556,7 @@ async function forceDeletePreview(kind,id){
   formModal('Exclusão avançada · '+data.name,
    '<p class="help"><b>Atenção: exclusão administrativa de '+labels[kind]+'.</b> Revise os números antes de autorizar.</p>'+
    '<div class="force-delete-summary">'+warnings.map(t=>'<div>'+t+'</div>').join('')+'</div>'+
+   variantsList+
    '<p>'+h(explanation)+'</p>'+
    '<p class="help">Essa ação não pode ser desfeita pela tela. Ela não exclui o histórico, mas pode baixar o estoque de produtos reais.</p>'+
    '<label class="field"><span>Digite exatamente <strong>'+h(data.name)+'</strong> para autorizar</span>'+
