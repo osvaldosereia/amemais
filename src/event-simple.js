@@ -14,7 +14,7 @@ export function eventPickingRows(items,models,planItems=[],qtyAvailable=()=>0){
     String(a.apparel_color||'').localeCompare(String(b.apparel_color||''),'pt-BR')||
     String(a.apparel_size||'').localeCompare(String(b.apparel_size||''),'pt-BR'))}));
 }
-export function eventPlanForm(groups,{h=esc,additional=false}={}){
+export function eventPlanForm(groups,{h=esc,additional=false,showAvailable=true}={}){
  return '<p class="help">Busque pelo modelo, tamanho, SKU ou EAN. Quantidades podem ser alteradas antes de confirmar o envio.</p>'+
  '<div class="event-plan-search"><input type="search" class="search" data-plan-search placeholder="Buscar produto, tamanho ou EAN…" autocomplete="off" aria-label="Buscar na separação">'+
  '<button type="button" class="button" data-action="event-plan-scan">📷 Ler EAN</button></div>'+
@@ -24,7 +24,7 @@ export function eventPlanForm(groups,{h=esc,additional=false}={}){
       '<div class="event-plan-row" data-plan-row data-search="'+h([p.name,p.apparel_size,p.apparel_color,p.ean,p.sku].join(' ').toLowerCase())+'">'+
         '<div><strong>'+h([p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||p.name)+'</strong>'+
         '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small>'+
-        '<small>Livre na central: <b>'+format(p.available)+'</b></small></div>'+
+        (showAvailable?'<small>Livre no CDSB: <b>'+format(p.available)+'</b></small>':'')+'</div>'+
         '<label><span>Separar</span><input type="number" inputmode="numeric" min="0" max="1000000" step="1"'+
          ' data-plan-qty data-id="'+h(p.id)+'" value="'+(additional?0:p.planned||0)+'" aria-label="Quantidade de '+h(p.name)+'"></label>'+
       '</div>').join('')+'</section>').join('')+'</div>'+
