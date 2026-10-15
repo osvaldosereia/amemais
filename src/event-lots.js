@@ -22,7 +22,7 @@ export function eventLotsOverview({event,batches,items,products,button,canCreate
   em_separacao:['Em separação','ready'],separado:['Separado','ready'],
   enviado:['Enviado','complete'],cancelado:['Cancelado','closed']};
  return '<section class="event-lots-section"><div class="event-lots-title"><div><h2>Lotes de separação</h2>'+
-  '<p>Crie lotes sucessivos com até 10 modelos. Cada lote vai para a fila de separação e recebe uma folha A4 própria.</p></div>'+
+  '<p>Crie lotes sucessivos com até 10 modelos. Cada lote vai para Pedidos / Separação, com cupom térmico de 80 mm organizado por gôndola.</p></div>'+
   (canCreate&&event.status!=='encerrado'?button('+ Criar lote','event-batch-new','data-event="'+esc(event.id)+'"','primary'):'')+
  '</div><div class="event-lots-list">'+(scoped.length?scoped.map(b=>{
   const info=states[b.status]||[b.status,'pending'];
