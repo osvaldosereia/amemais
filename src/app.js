@@ -913,6 +913,8 @@ async function saveFinalVerification(form){
     .eq('kind',order.kind).eq('order_id',order.id));
   state.orderVerificationRows=state.orderVerificationRows.filter(r=>!(
     r.kind===order.kind&&r.order_id===order.id)).concat(saved);
+  // Atualiza os botões por trás do modal: "Confirmar saída" só aparece após 100%.
+  render();
   if(result.complete)toast('Conferência 100% concluída. Saída liberada.');
   else if(qty!==Number(order.lines.find(x=>x.id===item.productId)?.quantity))
    toast('Divergência registrada. Verifique a separação antes da saída.',true);
