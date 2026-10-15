@@ -5,7 +5,8 @@ import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=2026
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261014cat2';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
-import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261014codes1';
+import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015variants1';
+import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015variants1';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
   eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015sku1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
@@ -405,6 +406,7 @@ function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
     if(label)label.textContent=categoryFull(selectedCategory);
     const add=form.querySelector('[data-action="quick-category"]');
     if(add)add.textContent='+ Subcategoria';
+    refreshCategorySizeOptions(form,state.categories);
   }
   const checks=form.querySelector('[data-tag-choices]');
   if(checks){
@@ -1171,6 +1173,7 @@ function productModal(item=null){
     item?'Salvar alterações':'Cadastrar produto');
   const form=document.querySelector('.modalback form');
   if(item)form.dataset.id=item.id;
+  else refreshCategorySizeOptions(form,state.categories);
   if(item?.image_path)hydrateImages();
 }
 
@@ -1655,7 +1658,8 @@ function categoryModal(parentId=null,fromProduct=false,item=null){
     '<span class="taxonomy-icon">▤</span><span class="taxonomy-text"><small>Organização da categoria</small>'+
     '<strong data-category-label>'+h(parentCat?categoryFull(parent):'Nenhuma (principal)')+'</strong></span><span class="taxonomy-arrow">⌄</span></button></div>';
   formModal(label,'<div class="formgrid">'+field('Nome','name','text',item?.name||'','required minlength="2" maxlength="90"')+
-    parentField+'</div><p class="help" style="margin-top:12px">A criação fica separada da seleção.</p>',
+    parentField+'</div>'+renderCategoryVariationFields(item||{parent_id:parent,variation_options:null},state.categories)+
+    '<p class="help" style="margin-top:12px">As variações configuradas aqui aparecerão no cadastro de produtos.</p>',
     editing?'category-edit':'category-new',editing?'Salvar':'Criar categoria',fromProduct);
   const form=[...document.querySelectorAll('.modalback form')].at(-1);
   form.dataset.parent=parent;
@@ -2213,6 +2217,7 @@ async function handleClick(event){
         if(label)label.textContent=value?categoryFull(value):(mode==='parent'?'Nenhuma (principal)':'Escolher categoria');
         if(mode==='product'){
           refreshProductTagChoices(form);
+          refreshCategorySizeOptions(form,state.categories);
           const add=form.querySelector('[data-action="quick-category"]');
           if(add)add.textContent=value?'+ Subcategoria':'+ Categoria';
         }
@@ -2355,7 +2360,7 @@ async function handleClick(event){
   }
   if(action==='size-common'){
     const form=target.closest('form');
-    for(const size of ['P','M','G','GG'])setSizeSelected(form,size,true);
+    [...form.querySelectorAll('[data-action="size-toggle"]')].slice(0,4).forEach(el=>setSizeSelected(form,el.dataset.size,true));
     return;
   }
   if(action==='size-scan')return scanInto('input[name="size_ean"]',target.closest('[data-size-variant]'));
@@ -3124,13 +3129,15 @@ async function handleSubmit(event){
     if(!hasPermission('categories.manage'))return;
     const name=String(values.name||'').trim(), parent=form.dataset.fromProduct==='1'?(form.dataset.parent||null):(values.parent_id||null);
     if(name.length<2||name.length>90){toast('Nome entre 2 e 90 caracteres.',true);return;}
+    let variation_options;
+    try{variation_options=variationOptionsToSave(form);}catch(error){return toast(error.message,true);}
     if(form.dataset.fromProduct==='1'){
-      await saveTaxonomyFromProduct(form,'categories',{name,parent_id:parent},'Categoria criada e selecionada.');
+      await saveTaxonomyFromProduct(form,'categories',{name,parent_id:parent,variation_options},'Categoria e variações criadas.');
     }else if(type==='category-edit'){
-      const data={name};if(form.dataset.lockParent!=='1')data.parent_id=parent;
-      await exec(async()=>assertOk(await db.from('categories').update(data).eq('id',form.dataset.id)),'Categoria atualizada.');
+      const data={name,variation_options};if(form.dataset.lockParent!=='1')data.parent_id=parent;
+      await exec(async()=>assertOk(await db.from('categories').update(data).eq('id',form.dataset.id)),'Categoria e variações atualizadas.');
     }else{
-      await exec(async()=>assertOk(await db.from('categories').insert({name,parent_id:parent})),'Categoria criada.');
+      await exec(async()=>assertOk(await db.from('categories').insert({name,parent_id:parent,variation_options})),'Categoria criada com variações.');
     }
     return;
   }
@@ -3465,6 +3472,11 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-variation-mode]')){
+    const form=event.target.closest('form');
+    const field=form?.querySelector('[data-variation-custom]');
+    if(field)field.hidden=event.target.value!=='custom';
+  }
   if(event.target.matches('[data-unified-search]')){
     const container=event.target.closest('.uo-page');
     filterUnifiedOrders(container,event.target.value,
