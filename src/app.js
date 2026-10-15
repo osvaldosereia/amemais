@@ -660,7 +660,7 @@ function productModelManager(modelId){
 function productsPage(){
   if(isFranchisePortal())return franchiseCatalogPage();
   const q=state.search.toLocaleLowerCase('pt-BR').trim();
-  const matched=state.items.filter(p=>(state.showInactiveProducts||p.active)&&
+  const matched=state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active)&&
     (!q||[p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira,...(p.tags||[])].join(' ').toLocaleLowerCase('pt-BR').includes(q))&&
     (!state.categoryFilter||categoryChain(p.category_id).some(c=>c.id===state.categoryFilter))&&
     (!state.tagFilter||(p.tags||[]).includes(state.tagFilter)));
@@ -815,7 +815,7 @@ function eventsPage(){
       return '<article class="panel event-card">'+eventCoverCard(e,true)+pill(e.status)+'<h3>'+h(e.name)+'</h3><p class="muted">'+niceDate(e.starts_at)+(e.ends_at?' até '+niceDate(e.ends_at):'')+'</p>'+
         '<div class="statsline"><div class="statline">Na loja temporária <b>'+remaining+'</b> un.</div></div>'+
         button('Gerenciar local','event-detail','data-id="'+h(e.id)+'"','primary')+
-        (isManager()&&hasPermission('events.close')&&hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente')?
+        (hasPermission('system.force_delete')||(isManager()&&hasPermission('events.close')&&hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente'))?
          button('Excluir','event-delete','data-id="'+h(e.id)+'"','small danger'):'')+'</article>';
     }).join('')+'</div>'+(state.events.some(e=>!e.deleted_at)?'':'<div class="panel muteblock">Nenhum evento cadastrado.</div>');
 }
@@ -841,7 +841,7 @@ function eventDetails(){
   canPlan:false,
   canClose:hasPermission('events.close')&&(hasPermission('events.manage')||memberRole(e.id)==='responsavel'),
   canManage:hasPermission('events.manage'),
-  canDelete:hasPermission('events.manage')&&hasPermission('events.close')&&hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente')
+  canDelete:hasPermission('system.force_delete')||(hasPermission('events.manage')&&hasPermission('events.close')&&hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente'))
  });
  const lots=eventLotsOverview({event:e,batches:state.eventPickBatches,items:state.eventBatchItems,
   products:state.items,button,canCreate:e.status!=='encerrado'&&isManager()&&hasPermission('events.separate'),time:niceTime});
@@ -2281,9 +2281,9 @@ function branchStockModal(storeId){
 function storesPage(){
  const portal=isFranchisePortal();
  return renderStoreHub({
-  stores:state.stores,events:state.events,orders:unifiedOrderRecords(),
+  stores:state.stores.filter(s=>!s.force_archived_at),events:state.events,orders:unifiedOrderRecords(),
   context:{
-   button,time:niceTime,portal,
+   button,time:niceTime,portal,canForceDelete:hasPermission('system.force_delete'),
    canBrowseOrders:permittedView('pedidos'),
    canProcess:o=>permittedView('pedidos')&&!portal&&(
      o.kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
@@ -2307,7 +2307,7 @@ function storesAdminPage(){
  const manage=hasPermission('stores.manage');
  return tabHead('Administração de lojas','Cadastros de unidades, filiais e franquias.',button('← Voltar para Lojas','view','data-view="lojas"','small')+(manage?button('+ Nova loja','store-new','','primary'):''))+
  panel('Unidades',state.stores.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Status</th><th></th></tr></thead><tbody>'+
- state.stores.map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.kind)+(x.is_primary?' · Principal':'')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.kind==='franquia'?'Não controlado':(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.')+'</td><td>'+
+ state.stores.filter(x=>!x.force_archived_at).map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.kind)+(x.is_primary?' · Principal':'')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.kind==='franquia'?'Não controlado':(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.')+'</td><td>'+
  ((x.kind==='filial'&&x.active&&assignedStore(x.id)&&(hasPermission('stores.manage')||hasPermission('orders.receive'))?button('Movimentar','branch-stock-new','data-id="'+h(x.id)+'"','small primary')+button('Devolver à central','branch-return-new','data-id="'+h(x.id)+'"','small'):'')+
  (manage?button('Editar','store-edit','data-id="'+h(x.id)+'"','small')+(x.is_primary?'':button(x.active?'Desativar':'Ativar','store-toggle','data-id="'+h(x.id)+'"','small')+button('Excluir','store-delete','data-id="'+h(x.id)+'"','small')):''))+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhuma loja cadastrada.</p>')+
  '<div class="note">A exclusão é bloqueada quando existem vínculos ou saldos. Franquias somente solicitam mercadorias; não têm estoque físico controlado.</div>'+ 
@@ -2993,6 +2993,7 @@ async function handleClick(event){
   }
   if(action==='size-scan')return scanInto('input[name="size_ean"]',target.closest('[data-size-variant]'));
   if(action==='product-delete'){
+    if(hasPermission('system.force_delete'))return forceDeletePreview('product',id);
     if(!hasPermission('products.delete'))return;
     const item=product(id);if(!item)return;
     if(!window.confirm('Excluir o produto "'+item.name+'"?\nSe existir histórico, ele será desativado para preservar as movimentações. O estoque deve estar zerado.'))return;
@@ -3162,6 +3163,7 @@ async function handleClick(event){
   if(action==='event-settlement-save-finish')return submitEventSettlement(target.closest('form'),true);
   if(action==='damage-resolve')return resolveDamageModal(id);
   if(action==='event-delete'){
+   if(hasPermission('system.force_delete'))return forceDeletePreview('event',id);
    const e=eventById(id);
    if(!e||e.deleted_at||!isManager()||!hasPermission('events.close')||!hasPermission('events.return'))return;
    const remaining=state.balances.filter(b=>b.event_id===id).reduce((sum,b)=>sum+Number(b.quantity||0),0);
@@ -3448,6 +3450,7 @@ async function handleClick(event){
     await exec(async()=>assertOk(await db.from('stores').update({active:!store.active}).eq('id',id)),'Loja atualizada.');return;
   }
   if(action==='store-delete'){
+    if(hasPermission('system.force_delete'))return forceDeletePreview('store',id);
     if(!hasPermission('stores.manage')||!window.confirm('Excluir esta loja sem histórico?'))return;
     await exec(async()=>assertOk(await db.from('stores').delete().eq('id',id)),'Loja excluída.');return;
   }
