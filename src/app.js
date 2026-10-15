@@ -52,8 +52,6 @@ const profileLabel = u => u?.role==='admin'?'Administrador':u?.role==='franquia'
 const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
-  {id:'entrada',label:'Entrada',ico:'arrow-down-to-line'},
-  {id:'saida',label:'Saída',ico:'arrow-up-from-line'},
   {id:'balanco',label:'Balanço rápido',ico:'clipboard'},
   {id:'inventario',label:'Inventário formal',ico:'clipboard'},
   {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
@@ -425,7 +423,7 @@ function render(){
   if(!permittedView(state.view))state.view=isFranchisePortal()?'pedidos-lojas':'inicio';
   const mark='<img class="ame-brand-logo" src="./ame-plus-logo.svg" alt="Ame+ Store" width="132" height="70">';
   const menu=nav.filter(x=>permittedView(x.id))
-    .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'">'+
+    .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+((state.view===x.id||(state.view==='entrada'&&x.id==='produtos'))?'active':'')+'">'+
       uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('');
   const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
   root.innerHTML='<div class="app-shell mobile-c-app"><aside class="sidebar">'+desktopIdentity+
@@ -463,6 +461,7 @@ function panel(title,content,buttonMarkup=''){
 function productGroupCard(group){
   return groupedCard(group,{
     h,photoButton,qtyStore,qtyEvent,qtyReserved,qtyAvailable,button,isManager,canRegisterProducts,
+    canMoveStock:()=>!isFranchisePortal()&&(hasPermission('stock.entry')||hasPermission('stock.exit')),
     canShare:canRegisterProducts()
   });
 }
@@ -508,10 +507,8 @@ function dashboard(){
     '<div class="c-dashboard-actions">'+
       (canRegisterProducts()?'<button type="button" class="c-action-primary" data-action="product-new">'+
         uiIcon('plus',20)+' Novo produto</button>':'')+
-      (hasPermission('stock.entry')?'<button type="button" class="c-action-outline" data-action="view" data-view="entrada">'+
-        uiIcon('arrow-down-to-line',20)+' Entrada</button>'+
-        '<button type="button" class="c-action-outline" data-action="view" data-view="saida">'+
-        uiIcon('arrow-up-from-line',20)+' Saída</button>':'')+
+      (hasPermission('stock.entry')?'<button type="button" class="c-action-outline" data-action="stock-receive-shipment">'+
+        uiIcon('arrow-down-to-line',20)+' Receber remessa</button>':'')+
       '<button type="button" class="c-action-outline" data-action="global-scan">'+uiIcon('scan',20)+' Ler EAN</button></div>'+
     '<section class="c-dashboard-section"><div class="c-section-heading"><h2>Categorias</h2>'+
     '<button type="button" data-action="view" data-view="produtos">Ver produtos '+uiIcon('chevron',17)+'</button></div>'+
@@ -604,7 +601,8 @@ function productsPage(){
   const pageSize=20,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=groups.slice(state.page*pageSize,(state.page+1)*pageSize);
-  const add=hasPermission('products.create')?button('+ Novo produto','product-new','','primary'):'';
+  const add=(hasPermission('stock.entry')?button('↓ Receber remessa','stock-receive-shipment','',''):'')+
+    (hasPermission('products.create')?button('+ Novo produto','product-new','','primary'):'');
   return '<header class="pagehead products-pagehead"><div><h1>Produtos</h1>'+
     '<p>Catálogo e estoque</p></div><div class="actions">'+add+'</div></header>'+
     '<section class="panel products-panel"><div class="product-toolbar-v3">'+
@@ -629,6 +627,7 @@ function productsPage(){
     '</div>'+
     '<div class="grouped-inventory-grid">'+(list.length?list.map(productGroupCard).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
       (filtersApplied?'<p>Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.</p>'+
+      (hasPermission('products.create')&&/^\\d{8,14}$/.test(state.search.trim())?button('Cadastrar produto com este EAN','product-new-ean','','primary'):'')+
       button('Mostrar todos os produtos','products-clear-filters','','primary'):
       '<p>Cadastre um novo produto ou verifique a opção Mostrar inativos.</p>')+'</div>')+'</div>'+
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+
@@ -1050,7 +1049,7 @@ function renderStockOperationPage(){
     batches:state.stockBatches.filter(b=>b.operation===kind),
     batchLines:state.stockBatchLines,
     selectedDestination:state.stockSelectedDestination,
-    qtyStore,qtyAvailable,groupInventory,photoButton,h,button
+    qtyStore,qtyAvailable,groupInventory,photoButton,h,button,embeddedReceipt:kind==='entrada'
   });
 }
 function stockOperationDOM(){return document.querySelector('.stock-operation-layout');}
@@ -1652,7 +1651,7 @@ function closeMobileNavigation(restoreFocus=true){
   if(restoreFocus)trigger?.focus({preventScroll:true});
 }
 function switchView(view) {
-  if(view==='roupas')view='produtos';
+  if(view==='roupas'||view==='saida')view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;
   if(view!=='eventos'){state.activeEvent=null;state.eventWorkflow=null;state.eventReturnQuery='';}
