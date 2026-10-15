@@ -67,7 +67,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],
-  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],storeOrders:[],storeOrderItems:[],stockReservations:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -183,7 +183,10 @@ async function loadData(){
   ];
   resources.push(['stores',db.from('stores').select('*').order('name')]);
   resources.push(['storeBalances',db.from('store_stock').select('store_id,product_id,quantity').limit(10000)]);
-  if(hasPermission('stores.read'))resources.push(['branchMovements',db.from('store_stock_movements').select('*').order('created_at',{ascending:false}).limit(500)]);
+  if(hasPermission('stores.read')){
+    resources.push(['branchMovements',db.from('store_stock_movements').select('*').order('created_at',{ascending:false}).limit(500)]);
+    resources.push(['branchReturns',db.from('branch_returns').select('*').order('created_at',{ascending:false}).limit(500)]);
+  }
   if(hasPermission('orders.separate')||hasPermission('stock.entry')||hasPermission('stock.exit')||hasPermission('stock.balance')||hasPermission('products.read')){
     resources.push(['stockReservations',db.from('stock_reservations')
       .select('order_id,product_id,quantity,status').eq('status','ativa').limit(10000)]);
@@ -191,6 +194,10 @@ async function loadData(){
   if(canUseStoreOrders() || hasPermission('orders.read')){
     resources.push(['storeOrders',db.from('store_orders').select('*').order('created_at',{ascending:false}).limit(500)]);
     resources.push(['storeOrderItems',db.from('store_order_items').select('*').limit(5000)]);
+    if(hasPermission('orders.read')){
+      resources.push(['storeOrderAdjustments',db.from('store_order_adjustments').select('*').order('created_at',{ascending:false}).limit(2000)]);
+      resources.push(['storeOrderReceipts',db.from('store_order_receipts').select('*').limit(5000)]);
+    }
   }
   resources.push(['ownPermissions',db.rpc('my_permissions').then(r=>({data:(r.data||[]).map(x=>x.permission),error:r.error}))]);
   resources.push(['staffStores',db.from('staff_stores').select('*').limit(5000)]);
@@ -1346,7 +1353,7 @@ function storeOrdersPage(){
  const create=canRequest?button('+ Montar pedido','store-order-new','','primary'):'';
  const labels={solicitado:'Solicitado · aguardando análise',aprovado:'Aprovado · reservado',
   separado:'Separado · fisicamente na central',despachado:'Saiu da central · aguardando recebimento',
-  concluido:'Saída concluída',recebido:'Recebido',cancelado:'Cancelado'};
+  concluido:'Saída concluída',recebido:'Recebido',recebido_divergente:'Recebido com divergência',cancelado:'Cancelado'};
  const orders=portal?state.storeOrders.filter(o=>o.created_by===state.user?.id):state.storeOrders;
  const rows=orders.map(o=>{
   const from=state.stores.find(x=>x.id===o.from_store_id);
@@ -1362,7 +1369,9 @@ function storeOrdersPage(){
     (o.status==='separado'&&canProcess?
        button('Registrar saída física','store-order-dispatch','data-id="'+h(o.id)+'"','small primary'):'')+
     (o.status==='despachado'&&!portal&&hasPermission('orders.receive')&&assignedStore(o.to_store_id)?
-       button('Confirmar recebimento','store-order-receive','data-id="'+h(o.id)+'"','small primary'):'')+
+       button('Conferir recebimento','store-order-receive','data-id="'+h(o.id)+'"','small primary'):'')+
+    (['solicitado','aprovado'].includes(o.status)&&canProcess?
+       button('Ajustar quantidades','store-order-adjust','data-id="'+h(o.id)+'"','small'):'')+
     (['solicitado','aprovado','separado'].includes(o.status)&&(
       (o.status==='solicitado'&&o.created_by===state.user?.id)||
       (!portal&&hasPermission('orders.cancel')&&assignedStore(o.to_store_id)))?
@@ -1372,7 +1381,9 @@ function storeOrdersPage(){
    '</strong><span class="pill '+(o.status==='concluido'||o.status==='recebido'?'ativo':'')+'">'+h(labels[o.status]||o.status)+'</span></header>'+
    '<small>'+h(niceTime(o.created_at))+' · '+count+' unidade(s)</small>'+
    (o.external_reference?'<small>Referência externa: '+h(o.external_reference)+'</small>':'')+
-   '<ul class="store-order-lines">'+products+'</ul>'+
+   '<ul class="store-order-lines">'+products+'</ul>'+ 
+   (state.storeOrderAdjustments.some(a=>a.order_id===o.id)?'<small>Atendimento ajustado: '+state.storeOrderAdjustments.filter(a=>a.order_id===o.id).map(a=>h(product(a.product_id)?.name||'SKU')+' '+a.previous_quantity+' → '+a.approved_quantity).join('; ')+'</small>':'')+
+   (state.storeOrderReceipts.some(a=>a.order_id===o.id&&a.missing_quantity>0)?'<p class="help">Divergências de recebimento: '+state.storeOrderReceipts.filter(a=>a.order_id===o.id&&a.missing_quantity>0).map(a=>h(product(a.product_id)?.name||'SKU')+': '+a.missing_quantity+' faltante(s)').join('; ')+'</p>':'')+
    (o.note?'<p>'+h(o.note)+'</p>':'')+'<div class="inline">'+actions+'</div></article>';
  });
  return tabHead(portal?'Pedidos da franquia':'Pedidos e solicitações',
@@ -1381,6 +1392,31 @@ function storeOrdersPage(){
    panel('Solicitações',rows.length?'<div class="store-order-list">'+rows.join('')+'</div>':
    '<div class="panelbody"><p class="muted">Nenhum pedido registrado.</p></div>')+
    (!portal?'<p class="help">Separar não retira mercadoria do estoque físico. A baixa ocorre apenas em Registrar saída física.</p>':'');
+}
+function orderQuantityModal(orderId,phase){
+ const order=state.storeOrders.find(o=>o.id===orderId);
+ if(!order)return;
+ const picking=phase==='picking',receiving=phase==='receiving',adjusting=phase==='adjust';
+ const allowed=receiving?order.status==='despachado'&&hasPermission('orders.receive')&&assignedStore(order.to_store_id):
+  ['solicitado','aprovado'].includes(order.status)&&hasPermission('orders.separate')&&assignedStore(order.from_store_id);
+ if(!allowed)return;
+ const items=state.storeOrderItems.filter(x=>x.order_id===orderId);
+ const rows=items.map(x=>{
+   const p=product(x.product_id);
+   const initial=adjusting?x.quantity:0;
+   return '<div class="store-picking-line"><div><strong>'+h(p?.name||'Produto')+'</strong>'+
+    '<small>'+h([p?.sku,p?.ean,p?.apparel_size,p?.apparel_color].filter(Boolean).join(' · '))+'</small>'+
+    '<small>'+x.quantity+' un. '+(receiving?'enviadas':'solicitadas / reservadas')+'</small></div>'+
+    '<label>Quantidade <input type="number" data-phase-qty data-id="'+h(x.product_id)+'" data-expected="'+x.quantity+
+    '" min="0" max="'+x.quantity+'" step="1" inputmode="numeric" value="'+initial+'" required></label></div>';
+ }).join('');
+ formModal(receiving?'Conferir recebimento':picking?'Conferir separação':'Ajustar atendimento',
+   '<p class="help">'+(receiving?'Registre apenas o que chegou fisicamente. Faltas ficam documentadas e não entram no estoque.':
+   'Quantidades menores liberam reservas e registram o motivo; quantidades zero retiram o SKU deste atendimento.')+'</p>'+
+   '<div class="store-picking-list">'+rows+'</div>'+
+   textareaField('Motivo das diferenças (obrigatório se houver)','reason'),
+   'store-order-'+phase,receiving?'Confirmar quantidades recebidas':picking?'Concluir conferência':'Salvar ajuste');
+ document.querySelector('.modalback form[data-form="store-order-'+phase+'"]').dataset.order=orderId;
 }
 function storePickingModal(orderId){
  const order=state.storeOrders.find(o=>o.id===orderId);
@@ -2018,6 +2054,8 @@ async function handleClick(event){
   }
   if(action==='store-order-new')return storeOrderModal();
   if(action==='store-order-separate')return storePickingModal(id);
+  if(action==='store-order-adjust')return orderQuantityModal(id,'adjust');
+  if(action==='store-order-receive')return orderQuantityModal(id,'receiving');
   if(action==='store-pick-scan'){
     return scanEAN(code=>{
       const form=document.querySelector('.modalback form[data-form="store-order-picking"]');
@@ -2033,11 +2071,9 @@ async function handleClick(event){
       toast('Conferido: '+matches[0].name+' ('+(qty+1)+' / '+max+')');
     });
   }
-  if(['store-order-approve','store-order-dispatch',
-       'store-order-receive','store-order-cancel'].includes(action)){
+  if(['store-order-approve','store-order-dispatch','store-order-cancel'].includes(action)){
     const order=state.storeOrders.find(x=>x.id===id);if(!order)return;
     const labels={'store-order-approve':['approve_store_order','Aprovado; unidades reservadas.','Aprovar e reservar as quantidades deste pedido?'],
-      'store-order-receive':['receive_store_order','Recebimento registrado.','Confirmar recebimento integral na unidade de destino?'],
       'store-order-cancel':['cancel_store_order','Pedido cancelado e reservas liberadas.','Cancelar pedido e liberar as reservas?']};
     if(action==='store-order-dispatch'){
       if(!hasPermission('orders.separate')||!assignedStore(order.from_store_id))return;
@@ -2399,6 +2435,25 @@ async function handleSubmit(event){
     return;
   }
 
+  if(type==='store-order-adjust'||type==='store-order-receiving'){
+    const orderId=form.dataset.order,order=state.storeOrders.find(x=>x.id===orderId);
+    if(!order)return;
+    const lines=[...form.querySelectorAll('[data-phase-qty]')];
+    const items=lines.map(el=>({product_id:el.dataset.id,quantity:Number(el.value)}));
+    if(!items.length||items.some((x,i)=>!Number.isInteger(x.quantity)||x.quantity<0||x.quantity>Number(lines[i].dataset.expected)))
+      return toast('Quantidades inválidas ou superiores ao pedido.',true);
+    const diff=items.some((x,i)=>x.quantity!==Number(lines[i].dataset.expected));
+    const reason=String(values.reason||'').trim();
+    if(diff&&reason.length<5)return toast('Informe uma justificativa para a divergência.',true);
+    if(type==='store-order-adjust'&&!items.some(x=>x.quantity>0))
+      return toast('Mantenha ao menos um SKU ou cancele o pedido.',true);
+    if(!window.confirm('Registrar conferência e quantidades informadas?'))return;
+    const rpc=type==='store-order-adjust'?'adjust_store_order_items':'receive_store_order_checked';
+    const args=type==='store-order-adjust'?{p_order:orderId,p_items:items,p_reason:reason||'Atendimento integral'}:
+      {p_order:orderId,p_items:items,p_reason:reason||null};
+    return exec(async()=>assertOk(await db.rpc(rpc,args)),
+      type==='store-order-adjust'?'Quantidades ajustadas.':'Recebimento conferido; divergências registradas.');
+  }
   if(type==='store-order-picking'){
     const orderId=form.dataset.order;
     const order=state.storeOrders.find(x=>x.id===orderId);
