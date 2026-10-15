@@ -92,7 +92,7 @@ export function groupedOrderLines(lines){
  }));
 }
 export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canReceive=false,
- canDispatch=false,canDispatchStock=false,portal=false,time=x=>x}={}){
+ canDispatch=false,canDispatchStock=false,canAdjust=false,portal=false,time=x=>x}={}){
  const info=statuses[o.status]||[o.status,'pending'];
  const data='data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"';
  const process=canProcess&&!portal;
@@ -109,9 +109,9 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
   if(canCancel&&!terminal)actions.push(button('Editar lote','event-batch-edit',data,'small'));
   if(canCancel&&!terminal)actions.push(button('Cancelar lote','event-batch-cancel',data,'small danger'));
  }else{
-  if(process&&['legado','solicitado'].includes(o.status))
+  if(process&&canAdjust&&['legado','solicitado'].includes(o.status))
    actions.push(button('Preparar pedido','order-retry',data,'small primary'));
-  if(process&&waiting)
+  if(process&&canAdjust&&waiting)
    actions.push(button('Resolver falta','order-shortage-adjust',data,'small primary'));
   if(process&&ready)
    actions.push(button('Separar',o.kind==='avulso'?'avulso-pick':'store-order-separate',data,'small primary'));
@@ -176,7 +176,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
 }
 export function unifiedOrdersPage(orders,{
  button=()=>'',time=x=>x,portal=false,separationOnly=false,
- canProcess=()=>false,canCancel=()=>false,canReceive=()=>false,canDispatch=()=>false,canDispatchStock=()=>false,
+ canProcess=()=>false,canCancel=()=>false,canReceive=()=>false,canDispatch=()=>false,canDispatchStock=()=>false,canAdjust=()=>false,
  canAvulso=false,canStore=false,canLink=false,linksMarkup='',summaryLink=''
 }={}){
  const active=['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'];
@@ -186,7 +186,7 @@ export function unifiedOrdersPage(orders,{
  const done=orders.filter(o=>['enviado','concluido','recebido','recebido_divergente'].includes(o.status)).length;
  const cards=visible.map(o=>unifiedOrderCard(o,{button,time,portal,
   canProcess:canProcess(o),canCancel:canCancel(o),canReceive:canReceive(o),
-  canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o)})).join('');
+  canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o),canAdjust:canAdjust(o)})).join('');
  const actions=!separationOnly?
   (((canAvulso||canStore)?button(portal?'+ Montar pedido':'+ Novo pedido','unified-order-new','','primary'):'')+
    (canLink?button('+ Link para cliente','customer-link-new','','small'):'')):'';
