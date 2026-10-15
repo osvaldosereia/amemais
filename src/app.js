@@ -2139,6 +2139,7 @@ function permissionFields(userId){
   '<p class="um-role-description" data-access-profile-help>'+h(profileDescriptions[role]||'')+'</p></section>'+
   storeGroup+eventsGroup+
   '<details class="um-advanced" data-access-advanced><summary><strong>Permissões avançadas</strong><small>Somente para gerentes e consultas. Perfis operacionais usam permissões fixas.</small></summary>'+
+  '<p class="help um-force-help">Autonomia total permite excluir cadastros de teste mesmo com histórico; as movimentações antigas permanecem auditadas. Ao marcar para Gerente, autorizações relacionadas são selecionadas.</p>'+
   '<div class="um-perm-grid">'+advanced+'</div></details>';
 }
 function setupFranchiseProfile(form){
@@ -2197,6 +2198,15 @@ function setupFranchiseProfile(form){
   if(event.target.matches('input[name="store"]')&&role.value==='franquia'&&event.target.checked)
    for(const other of form.querySelectorAll('input[name="store"]'))
     if(other!==event.target)other.checked=false;
+  if(event.target.matches('input[name="perm"][value="system.force_delete"]')&&event.target.checked&&role.value==='gerente'){
+   const needed=['products.delete','products.edit','stock.balance','events.manage','events.close',
+    'events.return','orders.internal','orders.cancel','stores.manage'];
+   for(const input of form.querySelectorAll('input[name="perm"]'))
+    if(needed.includes(input.value))input.checked=true;
+   for(const input of form.querySelectorAll('input[name="store"]'))
+    if(state.stores.some(s=>s.id===input.value&&s.is_primary))input.checked=true;
+   toast('Autonomia avançada ativada com autorizações operacionais necessárias.');
+  }
  });
  show(!existing);
 }
