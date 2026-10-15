@@ -652,13 +652,13 @@ function quickBalancePage(){
   const query=state.search.trim().toLocaleLowerCase('pt-BR');
   const filtered=groups.filter(g=>!query||[g.title,...g.products.flatMap(p=>
     [p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira])].join(' ').toLocaleLowerCase('pt-BR').includes(query));
-  const cards=filtered.slice(0,50).map(g=>quickBalanceCard(g,{photoButton,qtyStore,h})).join('');
+  const cards=filtered.slice(0,50).map(g=>quickBalanceCard(g,{photoButton,qtyStore,qtyReserved,h})).join('');
   return tabHead('Balanço rápido','Um produto por card; conte os tamanhos sem sair da tela.')+
     '<section class="quick-balance-intro"><div class="quick-balance-search">'+
     '<input id="quick-search" type="search" class="search" placeholder="Produto, tamanho, SKU ou EAN…" aria-label="Buscar para contagem" value="'+h(state.search)+'">'+
     button('📷 Ler EAN','quick-scan','','primary')+'</div>'+
     '<p class="help">Digite a quantidade física apenas dos tamanhos conferidos. <strong>Zero</strong> significa estoque zerado; campo vazio não altera nada. '+
-    'Use Salvar em um tamanho ou Salvar contagens do card. O restante da página não será recarregado.</p></section>'+
+    'A contagem é do físico, inclusive unidades reservadas na central. O sistema bloqueará qualquer ajuste abaixo do reservado. Use Salvar por tamanho ou por card.</p></section>'+
     '<div class="quick-group-list">'+(cards||'<div class="panel muteblock">Nenhum produto encontrado.</div>')+
     (cards?'<div class="quick-group-empty panel muteblock" data-quick-empty hidden>Nenhum produto corresponde à busca.</div>':'')+'</div>'+
     (filtered.length>50?'<p class="muted">Exibindo 50 modelos. Refine a busca para localizar os demais.</p>':'');
@@ -670,8 +670,8 @@ function eventsPage(){
     '<div class="eventgrid">'+state.events.map(e=>{
       const remaining=state.balances.filter(b=>b.event_id===e.id).reduce((s,b)=>s+b.quantity,0);
       return '<article class="panel event-card">'+pill(e.status)+'<h3>'+h(e.name)+'</h3><p class="muted">'+niceDate(e.starts_at)+(e.ends_at?' até '+niceDate(e.ends_at):'')+'</p>'+
-        '<div class="statsline"><div class="statline">No evento <b>'+remaining+'</b> un.</div></div>'+
-        button('Gerenciar evento','event-detail','data-id="'+h(e.id)+'"','primary')+'</article>';
+        '<div class="statsline"><div class="statline">Na loja temporária <b>'+remaining+'</b> un.</div></div>'+
+        button('Gerenciar local','event-detail','data-id="'+h(e.id)+'"','primary')+'</article>';
     }).join('')+'</div>'+(state.events.length?'':'<div class="panel muteblock">Nenhum evento cadastrado.</div>');
 }
 function returnWorkflowPage(){
@@ -690,26 +690,29 @@ function eventDetails(){
   const entries=state.movements.filter(m=>m.event_id===e.id);
   const transfers=entries.filter(m=>m.action==='transferencia').reduce((n,m)=>n+m.quantity,0);
   const returned=entries.filter(m=>m.action==='devolucao').reduce((n,m)=>n+m.quantity,0);
-  const unreturned=entries.filter(m=>['baixa_evento','venda_evento'].includes(m.action)).reduce((n,m)=>n+m.quantity,0);
+  const sold=entries.filter(m=>m.action==='venda_evento').reduce((n,m)=>n+m.quantity,0);
+  const losses=entries.filter(m=>m.action==='baixa_evento').reduce((n,m)=>n+m.quantity,0);
   const pending=state.balances.filter(b=>b.event_id===e.id).reduce((n,b)=>n+b.quantity,0);
   const canModify=e.status==='ativo';
   const actions=(hasPermission('events.manage')&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
-    (hasPermission('events.separate')&&canModify?button('Separar produtos para o evento','event-transfer','','primary'):'')+
+    (hasPermission('events.separate')&&canModify?button('Enviar mercadorias','event-transfer','','primary'):'')+
+    (canModify&&canSell(e.id)?button('Registrar venda','event-sale','','primary'):'')+
+    (canModify&&hasPermission('events.close')?button('Perda / avaria','event-loss','','small'):'')+
     (canModify&&canReturn(e.id)?button('Devolução rápida por EAN','event-return','','primary'):'')+
-    (canModify&&hasPermission('events.close')?button('Encerrar evento','event-close','data-id="'+h(e.id)+'"'):'');
+    (canModify&&hasPermission('events.close')?button('Encerrar consignação','event-close','data-id="'+h(e.id)+'"'):'');
   const history=eventHistoryCards({
     movements:entries,products:state.items,models:state.apparelModels,
     balances:state.balances.filter(b=>b.event_id===e.id),
     photoButton,groupInventory
   });
-  return '<div class="crumb"><button class="plain" data-action="back-events">← Eventos</button></div>'+
+  return '<div class="crumb"><button class="plain" data-action="back-events">← Lojas temporárias</button></div>'+
     tabHead(e.name,'Data: '+niceDate(e.starts_at)+(e.ends_at?' a '+niceDate(e.ends_at):''),pill(e.status))+
-    '<div class="cards">'+[['Separados',transfers],['Devolvidos',returned],['Não retornaram',unreturned],['Pendentes',pending]].map(([name,value])=>
+    '<div class="cards">'+[['Enviados',transfers],['Vendidos',sold],['Devolvidos',returned],['Perdas justificadas',losses],['Ainda no local',pending]].map(([name,value])=>
       '<div class="card"><div class="metric-label">'+name+'</div><div class="metric">'+value+'</div></div>').join('')+'</div>'+
     '<div class="actions" style="margin-bottom:18px">'+actions+'</div>'+
     (e.status==='ativo'&&pending>0?'<div class="note">Há '+pending+
       ' unidade(s) na loja temporária. Registre vendas ou baixas justificadas e devolva o restante antes do encerramento.</div>':'')+
-    panel('Produtos e movimentações do evento',history)+
+    panel('Produtos e histórico da consignação',history)+
     panel('Equipe responsável','<div class="panelbody">'+(mem.length?mem.map(m=>
       '<div class="inline" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid #edf1ee">'+
       '<div><strong>'+h(username(m.user_id))+'</strong> <span class="pill">'+
@@ -975,7 +978,7 @@ function renderStockOperationPage(){
     batches:state.stockBatches.filter(b=>b.operation===kind),
     batchLines:state.stockBatchLines,
     selectedDestination:state.stockSelectedDestination,
-    qtyStore,groupInventory,photoButton,h,button
+    qtyStore,qtyAvailable,groupInventory,photoButton,h,button
   });
 }
 function stockOperationDOM(){return document.querySelector('.stock-operation-layout');}
@@ -987,7 +990,7 @@ function refreshStockOperationSearch(){
   const q=state.stockQuery[kind];
   target.innerHTML=q.trim()?stockOperationSearchHTML({
     groups:stockOperationResults(state.items,state.apparelModels,q,groupInventory),
-    h,qtyStore
+    h,qtyStore,qtyAvailable,kind
   }):'<p class="stock-search-welcome">Digite o nome, SKU ou EAN de um produto.</p>';
 }
 function updateStockOperationBasket(redraw=true,clearError=true){
@@ -996,7 +999,7 @@ function updateStockOperationBasket(redraw=true,clearError=true){
   if(redraw){
     const list=document.querySelector('[data-stock-cart]');
     if(list){list.innerHTML=stockCartHTML({
-      cart,items:state.items,models:state.apparelModels,qtyStore,groupInventory,
+      cart,items:state.items,models:state.apparelModels,qtyStore,qtyAvailable,groupInventory,
       kind,photoButton,h
     });hydrateImages();}
   }
@@ -1054,7 +1057,7 @@ async function saveStockOperation(form){
   if(kind==='saida'&&!state.stockDestinations.some(d=>d.active&&d.id===dest))
     return toast('Selecione um destino válido para esta saída.',true);
   let lines;
-  try{lines=operationCartLines(cart,state.items,qtyStore,kind);}
+  try{lines=operationCartLines(cart,state.items,qtyStore,kind,qtyAvailable);}
   catch(error){toast(error.message,true);return;}
   const requestId=state.stockRequestIds[kind]||crypto.randomUUID();
   state.stockRequestIds[kind]=requestId;
@@ -1164,7 +1167,7 @@ function eventModal(){
   formModal('Criar loja temporária','<div class="formgrid">'+field('Nome do local / evento','name','text','','required maxlength="150"')+
     field('Data de início','starts_at','date',dateToday(),'required')+
     field('Data de término (opcional)','ends_at','date')+
-    textareaField('Observações','notes')+'</div><div class="note">O evento começa como rascunho. Vincule a equipe, ative e então transfira os produtos.</div>',
+    textareaField('Observações','notes')+'</div><div class="note">A loja temporária começa como rascunho. Associe responsáveis, ative e envie os produtos consignados.</div>',
     'event-create','Criar loja temporária');
 }
 function eventMove(action){
@@ -1182,6 +1185,20 @@ function eventMove(action){
       action==='devolucao'?'A devolução retorna os produtos à loja.':'A venda reduz apenas o estoque deste evento.')+'</div>',
     'event-move','Confirmar');
   const form=document.querySelector('.modal form');form.dataset.event=eid;form.dataset.movement=action;
+}
+function eventLossModal(){
+ const eid=state.activeEvent;
+ if(eventStatus(eid)!=='ativo'||!hasPermission('events.close'))return;
+ const opts=productOptions(true,eid);
+ if(opts.length<=1)return toast('Não há mercadorias no local para baixar.',true);
+ formModal('Registrar perda ou avaria','<div class="formgrid">'+
+  selectField('Produto','product_id',opts,'','required')+
+  field('Quantidade','quantity','number','1','required min="1" max="1000000" step="1"')+
+  selectField('Motivo','reason',[['perda','Perda / extravio'],['avaria','Produto avariado'],['consumo','Consumo interno'],['outro','Outro motivo']])+
+  textareaField('Justificativa obrigatória','note')+'</div>'+
+  '<div class="note">Esta baixa reduz apenas o saldo da loja temporária e fica registrada como perda justificada. Não é uma devolução.</div>',
+  'event-loss','Confirmar baixa');
+ document.querySelector('.modal form[data-form="event-loss"]').dataset.event=eid;
 }
 function memberModal(eid){
   if(!hasPermission('events.manage'))return;
@@ -1809,6 +1826,8 @@ async function handleClick(event){
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
   if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
+  if(action==='event-sale'){return eventMove('venda_evento');}
+  if(action==='event-loss'){return eventLossModal();}
   if(action==='event-transfer'){
     if(!hasPermission('events.separate')||eventStatus(state.activeEvent)!=='ativo')return;
     const eligible=state.items.filter(p=>p.active&&qtyAvailable(p.id)>0);
@@ -2230,8 +2249,18 @@ async function handleSubmit(event){
     await exec(async()=>assertOk(await db.from('events').insert({
       name:String(values.name).trim(),starts_at:values.starts_at,ends_at:values.ends_at||null,
       notes:values.notes||null,created_by:state.user.id
-    })),'Evento criado.');
+    })),'Loja temporária cadastrada.');
     return;
+  }
+  if(type==='event-loss'){
+    const quantity=Number(values.quantity),note=String(values.note||'').trim();
+    if(!Number.isInteger(quantity)||quantity<1||!values.product_id||note.length<5)
+      return toast('Informe produto, quantidade e justificativa com pelo menos 5 caracteres.',true);
+    if(!window.confirm('Confirmar baixa justificada de '+quantity+' unidade(s) nesta loja temporária?'))return;
+    return exec(async()=>assertOk(await db.rpc('record_event_loss',{
+      p_event_id:form.dataset.event,p_product_id:values.product_id,
+      p_quantity:quantity,p_reason:values.reason,p_note:note
+    })),'Baixa justificada registrada.');
   }
   if(type==='event-move'){
     const quantity=Number(values.quantity);
