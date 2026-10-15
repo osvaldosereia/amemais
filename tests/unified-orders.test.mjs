@@ -39,10 +39,10 @@ test('unifica dois bancos de pedidos sem duplicar reservas',()=>{
 test('pedidos com falta mostram quantidade original, reservada e diferença',()=>{
  const order=makeUnifiedOrders(props).find(x=>x.kind==='avulso');
  const html=unifiedOrderCard(order,{button,canProcess:true,canCancel:true});
- assert.match(html,/10 solicitadas/);
+ assert.match(html,/10 unidades/);
  assert.match(html,/6 reservadas/);
- assert.match(html,/4 em falta/);
- assert.match(html,/order-retry/);
+ assert.match(html,/4 faltam/);
+ assert.doesNotMatch(html,/order-retry/);
  assert.match(html,/order-shortage-adjust/);
  assert.doesNotMatch(html,/avulso-dispatch/);
 });
@@ -72,8 +72,8 @@ test('concluídos, cancelados e expirados não exibem falsas faltas após consum
   const order=result.find(x=>x.kind==='avulso');
   assert.equal(order.missing,0);
   const html=unifiedOrderCard(order,{button});
-  assert.doesNotMatch(html,/\d+ em falta/);
-  assert.match(html,/Reserva encerrada/);
+  assert.doesNotMatch(html,/\d+ faltam/);
+  assert.match(html,/Saída\/encerramento registrado/);
  }
 });
 test('pedidos legados ficam sem avaliação, em vez de falta confirmada',()=>{
@@ -81,8 +81,8 @@ test('pedidos legados ficam sem avaliação, em vez de falta confirmada',()=>{
   fulfillment_status:'legado'}],reservations:[]}).find(x=>x.kind==='avulso');
  assert.equal(order.missing,0);
  const html=unifiedOrderCard(order,{button,canProcess:true});
- assert.match(html,/Pedido antigo preservado/);
- assert.match(html,/Reserva não avaliada/);
+ assert.match(html,/Pedido anterior ao novo sistema/);
+ assert.match(html,/Pendente de preparação/);
 });
 test('conferência EAN apresenta campos e não baixa estoque ao separar',()=>{
  const order=makeUnifiedOrders(props)[0];
@@ -107,6 +107,8 @@ test('A4 gera tabela para separação com código e espaço de conferência',()=
  assert.match(html,/SKU123/);
  assert.match(html,/000100001129/);
  assert.match(html,/Total solicitado: 10/);
+ assert.match(html,/Gôndola 01/);
+ assert.match(html,/Separado/);
  assert.match(html,/Faltando: 4/);
  assert.match(html,/window\.print/);
 });
