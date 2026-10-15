@@ -24,7 +24,7 @@ import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lot
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
-import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261015shelf1';
+import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261015shelf2';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -3223,6 +3223,11 @@ async function handleClick(event){
     if(isFranchisePortal())return toast('Impressão permitida no estoque central.',true);
     const item=product(id);
     if(!item||item.force_archived_at)return toast('Produto não encontrado.',true);
+    const editForm=target.closest('form[data-form="product-edit"]');
+    if(editForm&&['name','sku','ean','gondola','prateleira'].some(field=>
+       editForm.querySelector('[name="'+field+'"]')?.value?.trim()!==
+       String(item[field]||'').trim()))
+      return toast('Salve as alterações do produto antes de imprimir a etiqueta.',true);
     const model=state.apparelModels.find(m=>m.id===item.apparel_model_id);
     const label=shelfLabelData(item,model?.name||'');
     if(!label.valid)return toast('Cadastre primeiro a gôndola e um EAN ou SKU válido.',true);
