@@ -1023,8 +1023,10 @@ function ordersPage(){
   button,time:niceTime,portal,linksMarkup:links,summaryLink:activeAccess+' ativo(s)',
   canProcess:o=>!portal&&hasPermission('orders.separate')&&
     (o.kind==='avulso'||assignedStore(o.raw.from_store_id)),
-  canCancel:o=>!portal&&hasPermission('orders.cancel')&&
-    (o.kind==='avulso'||assignedStore(o.raw.to_store_id)),
+  canCancel:o=>(portal&&o.kind==='loja'&&o.isOwner&&
+     ['solicitado','pendente_estoque','aprovado'].includes(o.status))||
+     (!portal&&hasPermission('orders.cancel')&&
+      (o.kind==='avulso'||assignedStore(o.raw.to_store_id))),
   canReceive:o=>!portal&&o.kind==='loja'&&hasPermission('orders.receive')&&assignedStore(o.raw.to_store_id),
   canAvulso:!portal&&hasPermission('orders.internal'),
   canStore:hasPermission('orders.central')||hasPermission('orders.franchise'),
