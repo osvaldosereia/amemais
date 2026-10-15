@@ -14,7 +14,8 @@ import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQu
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015eventsimple1';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261014ordersunified1';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015lotqueue1';
+import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -58,6 +59,7 @@ const nav = [
   {id:'produtos',label:'Produtos',ico:'package'},
   {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
   {id:'pedidos',label:'Pedidos',ico:'clipboard'},
+  {id:'separacao',label:'Separação',ico:'package'},
   {id:'movimentacoes',label:'Movimentações',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
   {id:'tags',label:'Tags',ico:'more'},
@@ -67,7 +69,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],
-  eventPickPlans:[],eventPickItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
+  eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
@@ -106,6 +108,7 @@ const permittedView = v => {
  if(v==='saida'||v==='balanco')return false; // Operações e conferência ficam em Produtos.
  if(v==='pedidos-lojas')return false;
  if(v==='pedidos')return canUseStoreOrders()||hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
+ if(v==='separacao')return !isFranchisePortal()&&(hasPermission('orders.separate')||hasPermission('events.separate'));
  if(v==='usuarios')return isAdmin();
  if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
  if(v==='avarias')return !isFranchisePortal()&&(hasPermission('stock.balance')||hasPermission('stock.entry'));
@@ -191,6 +194,10 @@ async function loadData(){
    resources.push(['inventorySessions',db.from('inventory_sessions').select('*').order('created_at',{ascending:false}).limit(100)]);
    resources.push(['inventoryItems',db.from('inventory_session_items').select('*').limit(10000)]);
   }
+  if(!isFranchisePortal()&&(hasPermission('orders.separate')||hasPermission('events.separate')||hasPermission('events.read')||hasPermission('events.manage'))){
+    resources.push(['eventPickBatches',db.from('event_pick_batches').select('*').order('created_at',{ascending:false}).limit(2000)]);
+    resources.push(['eventBatchItems',db.from('event_pick_batch_items').select('*').limit(10000)]);
+  }
   if(hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.close')){
     resources.push(['eventPickPlans',db.from('event_pick_plans').select('*').limit(1000)]);
     resources.push(['eventPickItems',db.from('event_pick_plan_items').select('*').limit(10000)]);
@@ -209,7 +216,7 @@ async function loadData(){
   }
   if(hasPermission('orders.separate')||hasPermission('stock.entry')||hasPermission('stock.exit')||hasPermission('stock.balance')||hasPermission('products.read')){
     resources.push(['stockReservations',db.from('stock_reservations')
-      .select('order_id,avulso_order_id,product_id,quantity,status').eq('status','ativa').limit(10000)]);
+      .select('order_id,avulso_order_id,event_batch_id,product_id,quantity,status').eq('status','ativa').limit(10000)]);
   }
   if(canUseStoreOrders() || hasPermission('orders.read')){
     resources.push(['storeOrders',db.from('store_orders').select('*').order('created_at',{ascending:false}).limit(500)]);
@@ -465,6 +472,7 @@ function pageContent(){
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):eventsPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
+  if(state.view==='separacao')return ordersPage(true);
   if(state.view==='categorias')return categoriesPage();
   if(state.view==='tags')return tagsPage();
   if(state.view==='usuarios')return usersPage();
@@ -775,17 +783,20 @@ function eventDetails(){
  const e=eventById(state.activeEvent);
  if(!e){state.activeEvent=null;return eventsPage();}
  const members=state.members.filter(m=>m.event_id===e.id);
- return eventCompactDetail({
+ const summary=eventCompactDetail({
   event:e,members,plan:state.eventPickPlans.find(x=>x.event_id===e.id),
   planItems:state.eventPickItems,shipments:state.eventShipments,
   balances:state.balances,movements:state.movements,
   damageItems:state.damages,closure:state.consignationClosures.find(x=>x.event_id===e.id),
   products:state.items,models:state.apparelModels,groupInventory,photoButton,
   h,button,niceDate,username,
-  canPlan:hasPermission('events.separate')&&isManager(),
+  canPlan:false,
   canClose:hasPermission('events.close')&&(hasPermission('events.manage')||memberRole(e.id)==='responsavel'),
   canManage:hasPermission('events.manage')
  });
+ const lots=eventLotsOverview({event:e,batches:state.eventPickBatches,items:state.eventBatchItems,
+  products:state.items,button,canCreate:e.status!=='encerrado'&&isManager()&&hasPermission('events.separate'),time:niceTime});
+ return summary.replace('<div class="event-simple-actions">',lots+'<div class="event-simple-actions">');
 }
 function damageStockPage(){
  if(!permittedView('avarias'))return '<div class="muteblock">Sem autorização.</div>';
@@ -1003,13 +1014,14 @@ function unifiedOrderRecords(){
  return makeUnifiedOrders({
   avulsoOrders:state.orders,avulsoItems:state.orderItems,
   storeOrders:state.storeOrders,storeItems:state.storeOrderItems,
+  eventBatches:state.eventPickBatches,eventBatchItems:state.eventBatchItems,events:state.events,models:state.apparelModels,
   reservations:state.stockReservations,stores:state.stores,
   products:state.items,adjustments:state.unifiedOrderAdjustments,
   portal:isFranchisePortal(),userId:state.user?.id
  });
 }
-function ordersPage(){
- if(!permittedView('pedidos'))return '<div class="muteblock">Sem permissão.</div>';
+function ordersPage(separationOnly=false){
+ if(!permittedView(separationOnly?'separacao':'pedidos'))return '<div class="muteblock">Sem permissão.</div>';
  const portal=isFranchisePortal();
  const activeAccess=state.customerAccess.filter(a=>!a.revoked_at&&new Date(a.expires_at)>new Date()).length;
  const links='<div class="avulso-access-list">'+(state.customerAccess.length?
@@ -1023,10 +1035,13 @@ function ordersPage(){
   }).join(''):'<p class="muted">Nenhum acesso de cliente criado.</p>')+'</div>';
  const records=unifiedOrderRecords();
  return unifiedOrdersPage(records,{
-  button,time:niceTime,portal,linksMarkup:links,summaryLink:activeAccess+' ativo(s)',
-  canProcess:o=>!portal&&hasPermission('orders.separate')&&
-    (o.kind==='avulso'||assignedStore(o.raw.from_store_id)),
-  canCancel:o=>(portal&&o.kind==='loja'&&o.isOwner&&
+  button,time:niceTime,portal,separationOnly,linksMarkup:links,summaryLink:activeAccess+' ativo(s)',
+  canProcess:o=>!portal&&(
+    o.kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
+    hasPermission('orders.separate')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id))),
+  canDispatch:o=>o.kind==='evento'&&!portal&&isManager()&&hasPermission('events.separate'),
+  canCancel:o=>o.kind==='evento'?(!portal&&isManager()&&hasPermission('events.separate')):
+    (portal&&o.kind==='loja'&&o.isOwner&&
      ['solicitado','pendente_estoque','aprovado'].includes(o.status))||
      (!portal&&hasPermission('orders.cancel')&&
       (o.kind==='avulso'||assignedStore(o.raw.to_store_id))),
