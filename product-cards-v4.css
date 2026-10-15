@@ -1,0 +1,52 @@
+/* AME MAIS — apresentação operacional compacta para produtos e variações. */
+.products-panel .product-card-v3 .product-card-name{letter-spacing:-.015em}
+.products-panel .product-card-v3 .product-stock-total{background:#eaf5ee;border:1px solid #d8eade}
+.products-panel .product-card-v3 .group-variant-stock{font-variant-numeric:tabular-nums}
+.products-panel .product-card-v3 .group-variant-stock b{font-size:1.12rem;line-height:1.1}
+.products-panel .product-card-v3 .group-variant-stock small{font-size:.72rem}
+.products-panel .product-card-v3 .variant-code,.products-panel .product-card-v3 .variant-ean{font-variant-numeric:tabular-nums}
+@media(max-width:760px){
+ .products-panel .grouped-inventory-grid{padding:8px;gap:10px;background:#f6f8f6}
+ .products-panel .product-card-v3{border-radius:15px;box-shadow:0 2px 12px #153d2510}
+ .products-panel .product-card-v3 .grouped-inventory-top{grid-template-columns:112px minmax(0,1fr);gap:12px;padding:14px}
+ .products-panel .product-card-v3 .grouped-inventory-photo{aspect-ratio:1/1;max-height:124px;border-radius:11px}
+ .products-panel .product-card-v3 .grouped-inventory-info{gap:5px}
+ .products-panel .product-card-v3 .product-card-name{font-size:1.04rem;line-height:1.24;font-weight:800}
+ .products-panel .product-card-v3 .product-card-description{font-size:.73rem;line-height:1.3}
+ .products-panel .product-card-v3 .product-stock-total{padding:8px 11px;margin:4px 0 0;min-width:0;width:100%;border-radius:10px;gap:2px}
+ .products-panel .product-card-v3 .product-stock-total>small{font-size:.69rem}
+ .products-panel .product-card-v3 .product-stock-total b{font-size:1.55rem}
+ .products-panel .product-card-v3 .stock-total-breakdown{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:.75rem}
+ .products-panel .product-card-v3 .stock-total-breakdown b{font-weight:800}
+ .products-panel .product-card-v3 .product-card-location{font-size:.72rem}
+ .products-panel .product-card-v3 .grouped-inventory-actions{order:2;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px;gap:7px;padding:10px 12px;border-top:1px solid #e9eeea}
+ .products-panel .product-card-v3 .grouped-inventory-actions>button{min-width:0;width:100%;min-height:43px;padding:8px 7px;font-size:.79rem}
+ .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-edit{flex:none}
+ .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-sizes{flex:none}
+ .products-panel .product-card-v3 .product-card-more>summary{min-height:43px;width:44px}
+ .products-panel .product-card-v3 .grouped-variants-mobile{order:3;background:#fafcfb}
+ .products-panel .product-card-v3 .group-variant-row{display:grid;grid-template-columns:54px minmax(0,1fr) auto;gap:6px 10px;align-items:start;padding:13px 12px;border-bottom:1px solid #e7eee9;background:#fff}
+ .products-panel .product-card-v3 .group-variant-row:last-child{border-bottom:0}
+ .products-panel .product-card-v3 .group-variant-name{display:contents;min-width:0}
+ .products-panel .product-card-v3 .product-size-label{grid-column:1;grid-row:1;display:flex;align-items:center;justify-content:center;width:54px;min-height:45px;border-radius:11px;background:#edf5ef;color:#245b3f;font-weight:800;font-size:.87rem}
+ .products-panel .product-card-v3 .group-variant-description{grid-column:2;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+ .products-panel .product-card-v3 .group-variant-description strong{font-size:.9rem;line-height:1.25}
+ .products-panel .product-card-v3 .group-variant-description small{font-size:.72rem;line-height:1.28;color:#728578;overflow-wrap:anywhere}
+ .products-panel .product-card-v3 .group-variant-description .variant-ean{color:#657a6b}
+ .products-panel .product-card-v3 .group-variant-description .group-variant-location{color:#47745a}
+ .products-panel .product-card-v3 .group-variant-stock{grid-column:3;grid-row:1;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:2px;min-width:64px;padding:6px 9px;border-radius:10px;background:#eaf5ee;color:#155b3c;white-space:nowrap;font-size:1rem}
+ .products-panel .product-card-v3 .group-variant-stock b{font-size:1.27rem;font-weight:850}
+ .products-panel .product-card-v3 .group-variant-stock.stock-zero{background:#f6eeeb;color:#9b5547}
+ .products-panel .product-card-v3 .group-variant-actions{grid-column:2/4;grid-row:2;display:flex;justify-content:flex-end;gap:7px;margin:2px 0 0;width:100%;min-width:0}
+ .products-panel .product-card-v3 .group-variant-actions .button{min-height:34px;padding:6px 11px;font-size:.74rem;border-radius:9px}
+ .products-panel .product-card-v3 .stock-variant-breakdown{font-weight:700;color:#9a7047!important}
+}
+@media(max-width:380px){
+ .products-panel .product-card-v3 .grouped-inventory-top{grid-template-columns:92px minmax(0,1fr);gap:9px;padding:11px}
+ .products-panel .product-card-v3 .grouped-inventory-photo{max-height:104px}
+ .products-panel .product-card-v3 .group-variant-row{grid-template-columns:46px minmax(0,1fr) auto;gap:6px;padding:11px 9px}
+ .products-panel .product-card-v3 .product-size-label{width:46px;min-height:42px}
+ .products-panel .product-card-v3 .group-variant-stock{min-width:52px;padding:6px}
+ .products-panel .product-card-v3 .grouped-inventory-actions{padding:9px;gap:5px}
+ .products-panel .product-card-v3 .grouped-inventory-actions>button{font-size:.73rem}
+}
