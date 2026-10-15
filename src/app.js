@@ -107,6 +107,7 @@ const permittedView = v => {
  if(v==='pedidos')return hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
  if(v==='usuarios')return isAdmin();
  if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
+ if(v==='inventario')return hasPermission('stock.balance')||hasPermission('stores.manage')||hasPermission('events.manage');
  if(v==='eventos')return hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.separate');
  return Boolean(viewPermission[v]&&hasPermission(viewPermission[v]));
 };
