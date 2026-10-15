@@ -19,8 +19,10 @@ const patterns=[
 ];
 export function code128SVG(value){
  const code=String(value??'').trim();
- if(!code||code.length>65||!/^[\x20-\x7e]+$/.test(code))return '';
+ if(!code||!/^[\x20-\x7e]+$/.test(code))return '';
  const numeric=code.length%2===0&&/^\d+$/.test(code);
+ // Evita barras estreitas demais nas impressoras térmicas de 203 dpi.
+ if(code.length>(numeric?40:20))return '';
  const symbols=[numeric?105:104];
  if(numeric){
   for(let i=0;i<code.length;i+=2)symbols.push(Number(code.slice(i,i+2)));
