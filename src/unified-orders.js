@@ -294,5 +294,5 @@ export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE'}={}){
    '</b><div>Observações / divergências: _________________________________________________</div></div>'+
   '<div class="signatures"><div>Separador · assinatura / hora</div><div>Conferente · assinatura / hora</div></div>'+
   '<p class="instructions">Mantenha esta folha junto das mercadorias deste lote. O envio físico só será registrado após confirmação no sistema.</p>'+
-  '<script>window.addEventListener("load",()=>{window.focus();window.print()});<\\/script></body></html>';
+  '<script>window.addEventListener("load",()=>{window.focus();window.print()});</script></body></html>';
 }
