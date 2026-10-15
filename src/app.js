@@ -17,7 +17,7 @@ import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQu
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015cdsb2';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015cdsb3';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015access2';
 
@@ -1229,6 +1229,7 @@ function ordersPage(separationOnly=false){
     hasPermission('orders.separate')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id))),
   canDispatch:o=>o.kind==='evento'&&!portal&&isManager()&&hasPermission('orders.dispatch'),
   canDispatchStock:o=>!portal&&hasPermission('orders.dispatch')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id)),
+  canAdjust:o=>!portal&&hasPermission('orders.dispatch'),
   canCancel:o=>o.kind==='evento'?(!portal&&isManager()&&hasPermission('events.separate')):
     (portal&&o.kind==='loja'&&o.isOwner&&
      ['solicitado','pendente_estoque','aprovado'].includes(o.status))||
@@ -2133,7 +2134,7 @@ function avulsoPickingModal(id){
  hydrateImages();
 }
 function unifiedShortageModal(kind,id){
- if(!hasPermission('orders.separate')||isFranchisePortal())return;
+ if(!hasPermission('orders.dispatch')||isFranchisePortal())return;
  const o=unifiedOrderById(kind,id);
  if(!o||!['legado','solicitado','pendente_estoque','aprovado','reservado'].includes(o.status))return;
  if(o.kind==='loja'&&!assignedStore(o.raw.from_store_id))return;
@@ -2966,7 +2967,7 @@ async function handleClick(event){
   }
   if(action==='order-retry'){
     const kind=target.dataset.kind,order=unifiedOrderById(kind,id);
-    if(!order||!hasPermission('orders.separate')||isFranchisePortal())return;
+    if(!order||!hasPermission('orders.dispatch')||isFranchisePortal())return;
     if(kind==='loja'&&!assignedStore(order.raw.from_store_id))return;
     return exec(async()=>assertOk(await db.rpc('retry_unified_order_reservation',{
       p_kind:kind,p_order:id
