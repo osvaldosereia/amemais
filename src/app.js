@@ -24,7 +24,7 @@ import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lot
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
-import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261015shelf2';
+import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261015shelf3';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
