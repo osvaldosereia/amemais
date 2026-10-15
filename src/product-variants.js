@@ -86,7 +86,7 @@ export function collectSizeVariants(form){
     return {size,color,sku,ean:ean||null,quantity};
   });
 }
-export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast,saveGallery}){
+export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast,saveGallery,saveProcurement}){
   const name=form.elements.namedItem('name')?.value?.trim()||'';
   if(name.length<2||name.length>110)throw new Error('Informe o nome do produto (2 a 110 caracteres).');
   const category=chosenCategory(form);
@@ -123,6 +123,7 @@ export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,cho
       throw new Error('EAN duplicado. Confira os códigos das etiquetas dos tamanhos selecionados.');
     throw error;
   }
+  await saveProcurement(id,form);
   let photoWarning=false;
   if(hasGallery){
    try{await saveGallery(form,{db,assertOk,modelId:id});}
