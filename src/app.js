@@ -1406,6 +1406,7 @@ function manageSku(id,requestedMode=''){
       const details=form.querySelector('[data-sku-history]');
       const list=details?.querySelector('.sku-history-list');
       if(!list)return;
+      if(data.length)details.querySelector('[data-sku-history-empty]')?.remove();
       list.innerHTML=data.map(m=>'<li><span>'+h(m.action||'Movimento')+
         '<small>'+h(m.note||'Sem observação')+'</small></span><span><b>'+
         Number(m.quantity||0).toLocaleString('pt-BR')+' un.</b><small>'+
