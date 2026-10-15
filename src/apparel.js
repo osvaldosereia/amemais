@@ -193,7 +193,7 @@ export function apparelFillSizes(target,{h}){
 
 export function apparelVariantEditModal(p,{h,formModal,variationOptions=[]}){
   if(!p?.apparel_model_id)throw new Error('Variação inválida.');
-  const configured=variationOptions.length?variationOptions:sizes;
+  const configured=variationOptions.length?variationOptions:[p.apparel_size];
   const sizeOptions='<option value="">Variação</option>'+
     configured.concat(configured.includes(p.apparel_size)?[]:[p.apparel_size]).map(v=>
       '<option value="'+h(v)+'" '+(v===p.apparel_size?'selected':'')+'>'+h(v)+'</option>').join('');
