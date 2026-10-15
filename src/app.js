@@ -1223,15 +1223,68 @@ function stockOverviewModal(id){
  document.body.append(overlay);
  overlay.querySelector('[data-action="stock-overview-close"]')?.focus({preventScroll:true});
 }
-function stockModal(id){
-  if(!(hasPermission('stock.entry')||hasPermission('stock.exit')))return;
-  const p=product(id);if(!p)return;
-  formModal('Movimentar · '+p.name,
-    '<div class="note">Físico na central: <strong>'+qtyStore(id)+'</strong> · Reservado: <strong>'+qtyReserved(id)+'</strong> · Livre: <strong>'+qtyAvailable(id)+'</strong></div>'+
-    '<p class="help">Entradas e saídas têm processos independentes, com histórico e destino obrigatório nas saídas.</p>'+
-    selectField('O que deseja fazer?','operation_kind',[...(hasPermission('stock.entry')?[['entrada','Entrada · receber mercadoria']]:[]),...(hasPermission('stock.exit')?[['saida','Saída · encaminhar a um destino']]:[])]),
-    'stock-choose-direction','Continuar');
-  document.querySelector('.modalback form[data-form="stock-choose-direction"]').dataset.id=id;
+// Operação pontual diretamente no card, sempre em SKU real e sem simular pedidos.
+function stockModal(id=null,groupKey=null){
+  if(isFranchisePortal()||!(hasPermission('stock.entry')||hasPermission('stock.exit')))return;
+  const selected=id?product(id):null;
+  const key=groupKey||(selected?.apparel_model_id?'model:'+selected.apparel_model_id:
+    selected?'product:'+selected.id:null);
+  if(!key)return;
+  const members=state.items.filter(p=>p.active&&
+    (p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id)===key);
+  if(!members.length)return toast('Produto não encontrado ou inativo.',true);
+  const group=groupInventory(members,state.apparelModels)[0];
+  const initial=id&&members.some(p=>p.id===id)?id:members.length===1?members[0].id:'';
+  const variants=members.length>1?[['','Escolha a variação / tamanho'],...group.products.map(p=>
+    [p.id,[p.apparel_color,p.apparel_size,p.sku].filter(Boolean).join(' · ')||p.name])]:
+    [[members[0].id,members[0].name]];
+  const types=[
+    ...(hasPermission('stock.entry')?[['entrada','Entrada · chegou do fornecedor']]:[]),
+    ...(hasPermission('stock.exit')?[['saida','Saída · baixa excepcional']]:[])
+  ];
+  formModal('Movimentar · '+group.title,
+    '<div class="stock-single-form">'+
+      '<p class="help">Escolha o tamanho correto e registre a quantidade física. O histórico guarda operador, data e justificativa.</p>'+
+      selectField('Produto / variação','product_id',variants,initial,'required')+
+      '<div class="stock-single-balance" data-single-stock aria-live="polite">Selecione a variação para ver o saldo.</div>'+
+      selectField('Operação','operation_kind',types,types[0][0],'required')+
+      field('Quantidade de unidades','quantity','number','1','required min="1" max="1000000" step="1" inputmode="numeric"')+
+      '<div data-single-entry>'+textareaField('Fornecedor / número da remessa (opcional)','note')+'</div>'+
+      '<div data-single-exit hidden>'+
+        selectField('Motivo da saída','reason',[
+          ['avaria','Produto avariado / inutilizado'],['extravio','Perda / extravio'],
+          ['diretoria','Uso da diretoria'],['doacao','Doação'],['outro','Outro motivo']
+        ])+
+        '<div data-single-recipient hidden>'+field('Quem recebeu?','recipient','text','','maxlength="120" placeholder="Nome ou identificação"')+'</div>'+
+        textareaField('Justificativa obrigatória','details')+
+        '<p class="help">A baixa é definitiva, não representa venda ou transferência. Não é permitido utilizar unidades reservadas.</p>'+
+      '</div>'+
+    '</div>','stock-single-movement','Confirmar movimentação');
+  const form=document.querySelector('.modalback form[data-form="stock-single-movement"]');
+  if(!form)return;
+  form.dataset.requestId=crypto.randomUUID();
+  const sync=()=>{
+    const pid=form.querySelector('[name="product_id"]')?.value;
+    const op=form.querySelector('[name="operation_kind"]')?.value;
+    const reason=form.querySelector('[name="reason"]')?.value;
+    const current=pid?qtyStore(pid):null,reserved=pid?qtyReserved(pid):0,free=pid?qtyAvailable(pid):0;
+    form.dataset.expected=pid?String(current):'';
+    form.querySelector('[data-single-stock]').textContent=pid?
+      'Físico: '+current+' un.  ·  Reservado: '+reserved+' un.  ·  Livre: '+free+' un.':
+      'Selecione a variação antes de informar a quantidade.';
+    const exiting=op==='saida';
+    form.querySelector('[data-single-entry]').hidden=exiting;
+    form.querySelector('[data-single-exit]').hidden=!exiting;
+    form.querySelector('[data-single-recipient]').hidden=!exiting||!['diretoria','doacao'].includes(reason);
+    form.querySelector('[name="recipient"]').required=exiting&&['diretoria','doacao'].includes(reason);
+    form.querySelector('[name="details"]').required=exiting;
+    const qty=form.querySelector('[name="quantity"]');
+    qty.max=String(exiting?free:1000000);
+    form.querySelector('button[type="submit"]').textContent=exiting?'Confirmar baixa':'Confirmar entrada';
+  };
+  ['product_id','operation_kind','reason'].forEach(name=>
+    form.querySelector('[name="'+name+'"]')?.addEventListener('change',sync));
+  sync();
 }
 function eventModal(){
   if(!hasPermission('events.manage'))return;
