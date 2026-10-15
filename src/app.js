@@ -471,7 +471,7 @@ function pageContent(){
   if(state.view==='inventario')return inventoryPage();
   if(state.view==='avarias')return damageStockPage();
   if(state.view==='produtos')return productsPage();
-  if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):eventsPage();
+  if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):storesPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
   if(state.view==='separacao')return ordersPage();
@@ -3478,7 +3478,7 @@ async function handleSubmit(event){
     returned=Number(assertOk(await db.rpc('delete_temporary_store',{
       p_event_id:id,p_code:code
     }))||0);
-    state.activeEvent=null;state.eventWorkflow=null;state.view='eventos';
+    state.activeEvent=null;state.eventWorkflow=null;state.view='lojas';
    },()=> 'Loja excluída. '+returned+' unidade(s) devolvida(s) à central. Histórico preservado.');
   }
   if(type==='event-cover-update'){
