@@ -67,7 +67,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],
-  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],storeOrders:[],storeOrderItems:[],stockReservations:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],storeOrders:[],storeOrderItems:[],stockReservations:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -183,6 +183,7 @@ async function loadData(){
   ];
   resources.push(['stores',db.from('stores').select('*').order('name')]);
   resources.push(['storeBalances',db.from('store_stock').select('store_id,product_id,quantity').limit(10000)]);
+  if(hasPermission('stores.read'))resources.push(['branchMovements',db.from('store_stock_movements').select('*').order('created_at',{ascending:false}).limit(500)]);
   if(hasPermission('orders.separate')||hasPermission('stock.entry')||hasPermission('stock.exit')||hasPermission('stock.balance')||hasPermission('products.read')){
     resources.push(['stockReservations',db.from('stock_reservations')
       .select('order_id,product_id,quantity,status').eq('status','ativa').limit(10000)]);
@@ -1300,13 +1301,41 @@ function userRoleModal(id){
  const form=document.querySelector('.modal form');form.dataset.id=id;
  setupFranchiseProfile(form);
 }
+function branchStockModal(storeId){
+ const store=state.stores.find(x=>x.id===storeId);
+ if(!store||!store.active||store.kind!=='filial'||!assignedStore(storeId)||
+    !(hasPermission('stores.manage')||hasPermission('orders.receive')))return;
+ const opts=state.items.filter(p=>p.active).map(p=>[p.id,[p.name,p.apparel_size,p.apparel_color,p.sku].filter(Boolean).join(' · ')]);
+ if(!opts.length)return toast('Nenhum produto ativo cadastrado.',true);
+ formModal('Movimentar estoque · '+store.name,
+  '<div class="formgrid">'+
+  selectField('Produto','product_id',opts)+
+  selectField('Operação','operation',[['saida','Saída avulsa da filial'],['ajuste','Contagem / ajuste físico']])+
+  field('Quantidade (saída ou contagem)','quantity','number','1','required min="0" max="1000000" step="1"')+
+  '<p class="wide help" data-branch-available>Saldo atual: selecione um produto.</p>'+
+  textareaField('Motivo obrigatório','reason')+
+  '</div><div class="note">A saída reduz apenas o estoque desta filial. A contagem define o novo saldo físico e registra a diferença. Nenhuma operação afeta a central.</div>',
+  'branch-stock-movement','Registrar movimento');
+ const form=document.querySelector('.modal form[data-form="branch-stock-movement"]');
+ form.dataset.store=storeId;
+ const update=()=>{
+  const pid=form.querySelector('[name="product_id"]')?.value;
+  const current=Number(state.storeBalances.find(x=>x.store_id===storeId&&x.product_id===pid)?.quantity||0);
+  form.dataset.expected=String(current);
+  form.querySelector('[data-branch-available]').textContent='Saldo físico atual nesta filial: '+current+' un.';
+ };
+ form.querySelector('[name="product_id"]')?.addEventListener('change',update);
+ update();
+}
 function storesPage(){
  const manage=hasPermission('stores.manage');
- return tabHead('Lojas','Unidades cadastradas e seus saldos de estoque.',manage?button('+ Nova loja','store-new','','primary'):'')+
+ return tabHead('Lojas','Central, filiais próprias e franquias. Franquias não possuem saldo interno.',manage?button('+ Nova loja','store-new','','primary'):'')+
  panel('Unidades',state.stores.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Status</th><th></th></tr></thead><tbody>'+
  state.stores.map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.kind)+(x.is_primary?' · Principal':'')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.kind==='franquia'?'Não controlado':(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.')+'</td><td>'+
- (manage?button('Editar','store-edit','data-id="'+h(x.id)+'"','small')+(x.is_primary?'':button(x.active?'Desativar':'Ativar','store-toggle','data-id="'+h(x.id)+'"','small')+button('Excluir','store-delete','data-id="'+h(x.id)+'"','small')):'')+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhuma loja cadastrada.</p>')+
- '<div class="note">A exclusão é bloqueada quando existem vínculos ou saldos. Franquias somente solicitam mercadorias; não têm estoque físico controlado.</div>';
+ ((x.kind==='filial'&&x.active&&assignedStore(x.id)&&(hasPermission('stores.manage')||hasPermission('orders.receive'))?button('Movimentar','branch-stock-new','data-id="'+h(x.id)+'"','small primary'):'')+
+ (manage?button('Editar','store-edit','data-id="'+h(x.id)+'"','small')+(x.is_primary?'':button(x.active?'Desativar':'Ativar','store-toggle','data-id="'+h(x.id)+'"','small')+button('Excluir','store-delete','data-id="'+h(x.id)+'"','small')):''))+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhuma loja cadastrada.</p>')+
+ '<div class="note">A exclusão é bloqueada quando existem vínculos ou saldos. Franquias somente solicitam mercadorias; não têm estoque físico controlado.</div>'+ 
+ panel('Últimos movimentos de filiais',state.branchMovements.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Data</th><th>Filial</th><th>Produto</th><th>Operação</th><th>Variação</th><th>Saldo</th><th>Motivo</th></tr></thead><tbody>'+state.branchMovements.slice(0,60).map(m=>'<tr><td>'+h(niceTime(m.created_at))+'</td><td>'+h(state.stores.find(x=>x.id===m.store_id)?.name||'—')+'</td><td>'+h(product(m.product_id)?.name||'—')+'</td><td>'+h(m.operation)+'</td><td>'+h(m.quantity_delta>0?'+'+m.quantity_delta:String(m.quantity_delta))+'</td><td>'+m.new_quantity+'</td><td>'+h(m.reason)+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhum movimento de filial registrado.</p>');
 }
 function assignedStore(storeId){
  return state.profile?.role==='admin'||state.staffStores.some(x=>x.user_id===state.user?.id&&x.store_id===storeId);
@@ -2023,6 +2052,7 @@ async function handleClick(event){
     if(!window.confirm(confirmation))return;
     await exec(async()=>assertOk(await db.rpc(rpc,{p_order:id})),msg);return;
   }
+  if(action==='branch-stock-new')return branchStockModal(id);
   if(action==='store-new')return storeModal();
   if(action==='store-edit')return storeModal(state.stores.find(x=>x.id===id));
   if(action==='store-toggle'){
@@ -2403,6 +2433,20 @@ async function handleSubmit(event){
       p_type:state.stores.find(x=>x.id===values.to_store_id)?.kind==='franquia'?'franquia':'central',
       p_items:items,p_note:values.note||null
     })),'Solicitação criada. A separação ainda não movimentou estoque.');return;
+  }
+  if(type==='branch-stock-movement'){
+    const storeId=form.dataset.store,store=state.stores.find(x=>x.id===storeId);
+    if(!store||store.kind!=='filial'||!assignedStore(storeId)||
+       !(hasPermission('stores.manage')||hasPermission('orders.receive')))return;
+    const quantity=Number(values.quantity),expected=Number(form.dataset.expected);
+    if(!Number.isInteger(quantity)||quantity<0||quantity>1000000||!Number.isInteger(expected))
+      return toast('Quantidade ou saldo esperado inválido.',true);
+    if(String(values.reason||'').trim().length<5)return toast('Justifique a movimentação com pelo menos 5 caracteres.',true);
+    if(!window.confirm('Registrar '+(values.operation==='saida'?'saída':'contagem')+' de '+quantity+' unidade(s) na filial '+store.name+'?'))return;
+    return exec(async()=>assertOk(await db.rpc('record_branch_stock_movement',{
+      p_store:storeId,p_product:values.product_id,p_operation:values.operation,
+      p_quantity:quantity,p_expected:expected,p_reason:String(values.reason).trim()
+    })),'Movimentação da filial registrada.');
   }
   if(type==='store-save'){
     if(!hasPermission('stores.manage'))return;
