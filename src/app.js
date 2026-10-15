@@ -2270,7 +2270,10 @@ async function handleClick(event){
   }
   if(action==='apparel-variant-edit'){
     if(!canRegisterProducts())return;
-    try{return apparelVariantEditModal(product(id),{h,formModal});}catch(error){fail(error);return;}
+    try{const p=product(id),m=state.apparelModels.find(x=>x.id===p?.apparel_model_id);
+      return apparelVariantEditModal(p,{h,formModal,
+        variationOptions:resolveCategoryVariations(state.categories,m?.category_id||p?.category_id).options});
+    }catch(error){fail(error);return;}
   }
   if(action==='apparel-photo'){
     if(!canRegisterProducts())return;
@@ -2477,7 +2480,9 @@ async function handleClick(event){
   if(action==='sku-edit-advanced'){
     const form=target.closest('form[data-form="sku-manage"]'),item=product(form?.dataset.id);
     if(!item||!hasPermission('products.edit'))return;
-    if(item.apparel_model_id)return apparelVariantEditModal(item,{h,formModal});
+    if(item.apparel_model_id){const m=state.apparelModels.find(x=>x.id===item.apparel_model_id);
+      return apparelVariantEditModal(item,{h,formModal,
+        variationOptions:resolveCategoryVariations(state.categories,m?.category_id||item.category_id).options});}
     return productModal(item);
   }
   if(action==='stock-overview')return stockOverviewModal(id);
