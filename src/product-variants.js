@@ -86,7 +86,7 @@ export function collectSizeVariants(form){
     return {size,color,sku,ean:ean||null,quantity};
   });
 }
-export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast}){
+export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast,saveGallery}){
   const name=form.elements.namedItem('name')?.value?.trim()||'';
   if(name.length<2||name.length>110)throw new Error('Informe o nome do produto (2 a 110 caracteres).');
   const category=chosenCategory(form);
@@ -108,7 +108,7 @@ export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,cho
     if(check.length)throw new Error('O EAN "'+check[0].ean+'" está em uso por outro produto ativo. Confira a etiqueta desse tamanho.');
   }
   const v=n=>form.elements.namedItem(n)?.value?.trim()||'';
-  const photo=form.__photoBlob||null;
+  const hasGallery=Boolean(form.querySelector('[data-gallery]'));
   let id;
   try{
     id=assertOk(await db.rpc('create_apparel_with_location',{
@@ -124,12 +124,9 @@ export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,cho
     throw error;
   }
   let photoWarning=false;
-  if(photo){
-    try{
-      const path='apparel/'+id+'/'+crypto.randomUUID()+'.'+(photo.type==='image/webp'?'webp':'jpg');
-      assertOk(await db.storage.from('ame-produtos').upload(path,photo,{contentType:photo.type,upsert:false}));
-      assertOk(await db.rpc('set_apparel_photo',{p_model_id:id,p_path:path}));
-    }catch(error){photoWarning=true;console.error('Falha ao vincular foto da variação',error);}
+  if(hasGallery){
+   try{await saveGallery(form,{db,assertOk,modelId:id});}
+   catch(error){photoWarning=true;console.error('Fotos pendentes após criar variações',error);}
   }
   state.view='produtos';state.search=name;state.page=0;
   closeTopModal();
