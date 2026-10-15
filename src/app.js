@@ -2498,6 +2498,37 @@ function storeModal(item=null){
  textareaField('Endereço','address',item?.address||'')+'</div>','store-save','Salvar loja');
  document.querySelector('.modal form').dataset.id=item?.id||'';
 }
+async function forceDeletePreview(kind,id){
+ if(!hasPermission('system.force_delete')||state.loading)return;
+ if(!['product','store','event'].includes(kind)||!id)return;
+ try{
+  const data=assertOk(await db.rpc('force_archive_preview',{p_kind:kind,p_id:id}));
+  if(!data?.name)throw Error('Cadastro não encontrado.');
+  const labels={product:'produto/variação',store:'loja/franquia',event:'loja temporária'};
+  const type=labels[kind];
+  const warnings=[
+   '<strong>'+h(data.stock_units||0)+'</strong> unidade(s) em saldo',
+   '<strong>'+h(data.pending_records||0)+'</strong> pedido(s)/reserva(s) pendente(s)',
+   '<strong>'+h(data.history_records||0)+'</strong> registro(s) históricos'
+  ];
+  const explanation=kind==='product'?
+   'O produto deixa de aparecer nos cadastros. Saldos físicos ligados a ele serão baixados com auditoria, reservas liberadas e pedidos/lotes pendentes relacionados serão cancelados.':
+   kind==='store'?
+   'A loja sai da relação operacional. Pedidos pendentes são cancelados e reservas liberadas. O histórico permanece. Filiais com mercadorias ainda em estoque devem devolver antes.':
+   'A loja temporária deixa de aparecer. Lotes não enviados são cancelados e o estoque restante retorna ao CDSB. O histórico é preservado.';
+  formModal('Exclusão avançada · '+data.name,
+   '<p class="help"><b>Atenção: autonomia total para excluir '+type+'.</b> Confirme somente cadastros que realmente devem sair de operação.</p>'+
+   '<div class="force-delete-summary">'+warnings.map(t=>'<div>'+t+'</div>').join('')+'</div>'+
+   '<p>'+h(explanation)+'</p>'+
+   '<p class="help">As movimentações e os pedidos históricos permanecem para auditoria. Os saldos envolvidos podem ser alterados. Esta operação não pode ser revertida pela tela.</p>'+
+   '<label class="field"><span>Digite exatamente <strong>'+h(data.name)+'</strong> para autorizar</span>'+
+   '<input name="confirmation" type="text" required autocomplete="off" placeholder="'+h(data.name)+'"></label>',
+   'force-delete-confirm','Confirmar exclusão avançada');
+  const form=document.querySelector('.modalback form[data-form="force-delete-confirm"]');
+  if(form){form.dataset.kind=kind;form.dataset.id=id;form.dataset.name=data.name;}
+ }catch(error){fail(error);}
+}
+
 function userModal(){
   if(!isAdmin())return;
   formModal('Cadastrar usuário','<div class="formgrid">'+
@@ -3943,6 +3974,19 @@ async function handleSubmit(event){
       p_damage:damage.id,p_action:values.resolution,p_quantity:quantity,
       p_note:reason,p_request:form.dataset.request
     })),values.resolution==='recuperado'?'Produto recuperado e disponível.':'Descarte registrado no histórico.');
+  }
+  if(type==='force-delete-confirm'){
+   if(!hasPermission('system.force_delete'))return;
+   const kind=form.dataset.kind,entityId=form.dataset.id,expected=form.dataset.name;
+   if(String(values.confirmation||'').trim()!==expected)
+    return toast('Digite exatamente o nome exibido para confirmar.',true);
+   if(!window.confirm('CONFIRMAR EXCLUSÃO AVANÇADA de '+expected+'? Pedidos pendentes e saldos poderão ser alterados; o histórico permanecerá.'))return;
+   return exec(async()=>{
+    assertOk(await db.rpc('force_archive_entity',{
+     p_kind:kind,p_id:entityId,p_confirm:expected
+    }));
+    if(kind==='event'){state.activeEvent=null;state.eventWorkflow=null;state.view='lojas';}
+   },'Exclusão avançada concluída. Pedidos e movimentações históricos foram preservados.');
   }
   if(type==='event-delete-confirm'){
    const id=form.dataset.eventId,e=eventById(id);
