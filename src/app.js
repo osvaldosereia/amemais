@@ -690,7 +690,9 @@ function eventDetails(){
   const transfers=entries.filter(m=>m.action==='transferencia').reduce((n,m)=>n+m.quantity,0);
   const returned=entries.filter(m=>m.action==='devolucao').reduce((n,m)=>n+m.quantity,0);
   const sold=entries.filter(m=>m.action==='venda_evento').reduce((n,m)=>n+m.quantity,0);
-  const losses=entries.filter(m=>m.action==='baixa_evento').reduce((n,m)=>n+m.quantity,0);
+  const classifiedLoss=m=>m.action==='baixa_evento'&&/^(PERDA|AVARIA|CONSUMO|OUTRO): /.test(String(m.note||''));
+  const losses=entries.filter(classifiedLoss).reduce((n,m)=>n+m.quantity,0);
+  const historicalUnclassified=entries.filter(m=>m.action==='baixa_evento'&&!classifiedLoss(m)).reduce((n,m)=>n+m.quantity,0);
   const pending=state.balances.filter(b=>b.event_id===e.id).reduce((n,b)=>n+b.quantity,0);
   const canModify=e.status==='ativo';
   const actions=(hasPermission('events.manage')&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
@@ -706,7 +708,7 @@ function eventDetails(){
   });
   return '<div class="crumb"><button class="plain" data-action="back-events">← Lojas temporárias</button></div>'+
     tabHead(e.name,'Data: '+niceDate(e.starts_at)+(e.ends_at?' a '+niceDate(e.ends_at):''),pill(e.status))+
-    '<div class="cards">'+[['Enviados',transfers],['Vendidos',sold],['Devolvidos',returned],['Perdas justificadas',losses],['Ainda no local',pending]].map(([name,value])=>
+    '<div class="cards">'+[['Enviados',transfers],['Vendidos',sold],['Devolvidos',returned],['Perdas justificadas',losses],...(historicalUnclassified?[['Baixas antigas sem classificação',historicalUnclassified]]:[]),['Ainda no local',pending]].map(([name,value])=>
       '<div class="card"><div class="metric-label">'+name+'</div><div class="metric">'+value+'</div></div>').join('')+'</div>'+
     '<div class="actions" style="margin-bottom:18px">'+actions+'</div>'+
     (e.status==='ativo'&&pending>0?'<div class="note">Há '+pending+
@@ -2577,6 +2579,7 @@ document.addEventListener('keydown',event=>{
     else if(document.querySelector('.tax-backdrop'))closeTaxonomyPicker();
     else if(document.querySelector('.photo-lightbox'))document.querySelector('.photo-lightbox').remove();
     else if(document.querySelector('.mobile-more-overlay'))closeMobileNavigation();
+    else if(document.querySelector('.stock-overview-overlay'))document.querySelector('.stock-overview-overlay').remove();
     else if(document.querySelector('.modalback'))closeTopModal();
   }
 });
