@@ -1449,17 +1449,37 @@ function printCommercialOrder(orderId){
 }
 function printEventSummary(eventId){
  const e=eventById(eventId);
- if(!e||!((hasPermission('events.manage'))||Boolean(memberRole(eventId))))return;
+ if(!e||!(hasPermission('events.manage')||Boolean(memberRole(eventId))))return;
+ const draft=state.eventSettlements.find(d=>d.event_id===eventId);
+ const items=Array.isArray(draft?.items)?draft.items:[];
+ const base=(p)=>h([p?.apparel_color,p?.apparel_size,p?.sku].filter(Boolean).join(' · '));
+ if(items.length){
+  const rows=items.map(row=>{
+   const p=product(row.product_id);
+   return '<tr><td>'+h(p?.name||'Produto')+'</td><td>'+base(p)+'</td>'+
+    '<td class="num">'+Number(row.expected||0)+'</td>'+
+    '<td class="num">'+Number(row.good||0)+'</td>'+
+    '<td class="num">'+Number(row.damaged||0)+'</td>'+
+    '<td class="num">'+Number(row.lost||0)+'</td></tr>';
+  }).join('');
+  return printHTML(printPage('Conferência de devolução · '+e.name,
+   '<p><b>Evento:</b> '+h(e.name)+' · <b>Situação da conferência:</b> '+h(draft.status||'Em análise')+
+   '. Este documento não registra nem presume vendas.</p>'+
+   '<table><thead><tr><th>Produto</th><th>Variação / SKU</th><th>Enviado / pendente</th>'+
+   '<th>Devolvido bom</th><th>Avariado</th><th>Não devolvido</th></tr></thead><tbody>'+
+   rows+'</tbody></table>'+(draft.note?'<p><b>Observações:</b> '+h(draft.note)+'</p>':'')+
+   '<div class="print-signatures"><span>Responsável pelo evento</span><span>Conferente CDSB</span></div>'));
+ }
  const balances=state.balances.filter(b=>b.event_id===eventId&&Number(b.quantity)>0);
  const rows=balances.map(b=>{
   const p=product(b.product_id);
-  return '<tr><td>'+h(p?.name||'Produto')+'</td><td>'+h([p?.apparel_color,p?.apparel_size,p?.sku].filter(Boolean).join(' · '))+
+  return '<tr><td>'+h(p?.name||'Produto')+'</td><td>'+base(p)+
    '</td><td class="num">'+Number(b.quantity)+'</td></tr>';
  }).join('');
- printHTML(printPage('Conferência de retorno · '+e.name,'<p>Loja temporária: '+h(e.name)+
-  '. Este documento registra mercadorias e não vendas.</p>'+
+ printHTML(printPage('Ficha de retorno · '+e.name,'<p>Loja temporária: '+h(e.name)+
+  '. Este documento registra mercadorias, nunca vendas.</p>'+
   '<table><thead><tr><th>Produto</th><th>Variação / SKU</th><th>Saldo a conferir</th></tr></thead><tbody>'+rows+'</tbody></table>'+
-  '<p>Marque o que será devolvido ao CDSB, avariado ou não devolvido. A aprovação final ocorre no sistema.</p>'+
+  '<p>Conferir produtos devolvidos, avariados e quantidades não devolvidas. Aprovação final no CDSB.</p>'+
   '<div class="print-signatures"><span>Responsável pelo evento</span><span>Conferente CDSB</span></div>'));
 }
 function productModal(item=null){
