@@ -218,7 +218,7 @@ export function lotCatalogAction(form,button){
   store.view='catalog';store.page=1;
  }else if(action==='lot-reset'){
   for(const selector of scope.querySelectorAll('[data-lot-category],[data-lot-tag],[data-lot-stock],[data-lot-sort]'))
-   selector.value=selector.dataset.lotStock?'all':selector.dataset.lotSort?'name':'';
+   selector.value=selector.hasAttribute('data-lot-stock')?'all':selector.hasAttribute('data-lot-sort')?'name':'';
   const search=scope.querySelector('[data-lot-search]');
   if(search)search.value='';
   store.view='catalog';store.page=1;
