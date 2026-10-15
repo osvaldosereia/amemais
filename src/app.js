@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery2';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015cover2';
-import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015storehub4';
+import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015force1';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
@@ -3479,6 +3479,9 @@ async function handleClick(event){
     if(!hasPermission('stores.manage'))return;
     const store=state.stores.find(x=>x.id===id);if(!store)return;
     await exec(async()=>assertOk(await db.from('stores').update({active:!store.active}).eq('id',id)),'Loja atualizada.');return;
+  }
+  if(action==='force-delete-preview'){
+   return forceDeletePreview(target.dataset.kind,id);
   }
   if(action==='store-delete'){
     if(hasPermission('system.force_delete'))return forceDeletePreview('store',id);
