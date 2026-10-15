@@ -91,7 +91,7 @@ export function groupedOrderLines(lines){
   missing:g.lines.reduce((n,l)=>n+l.missing,0)
  }));
 }
-export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canReceive=false,
+export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canDelete=false,canReceive=false,
  canDispatch=false,canDispatchStock=false,canAdjust=false,portal=false,time=x=>x}={}){
  const info=statuses[o.status]||[o.status,'pending'];
  const data='data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"';
@@ -122,6 +122,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
   if(canCancel&&['legado','solicitado','pendente_estoque','aprovado','reservado','separado'].includes(o.status))
    actions.push(button('Cancelar',o.kind==='avulso'?'avulso-cancel':'store-order-cancel',data,'small danger'));
  }
+ if(canDelete&&!portal)actions.push(button('Excluir pedido','admin-order-delete-open',data,'small danger'));
  if(!portal&&o.lines.length&&!waiting&&!['legado','solicitado','cancelado','expirado'].includes(o.status))
   actions.push(button('Imprimir lote A4','order-print-a4',data,'small'));
  const originLabel=event?'Loja temporária · Lote '+String(o.sequence).padStart(2,'0'):
@@ -176,7 +177,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
 }
 export function unifiedOrdersPage(orders,{
  button=()=>'',time=x=>x,portal=false,separationOnly=false,
- canProcess=()=>false,canCancel=()=>false,canReceive=()=>false,canDispatch=()=>false,canDispatchStock=()=>false,canAdjust=()=>false,
+ canProcess=()=>false,canCancel=()=>false,canDelete=()=>false,canReceive=()=>false,canDispatch=()=>false,canDispatchStock=()=>false,canAdjust=()=>false,
  canAvulso=false,canStore=false,canLink=false,linksMarkup='',summaryLink=''
 }={}){
  const active=['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'];
@@ -185,7 +186,7 @@ export function unifiedOrdersPage(orders,{
  const waiting=orders.filter(o=>o.status==='pendente_estoque').length;
  const done=orders.filter(o=>['enviado','concluido','recebido','recebido_divergente'].includes(o.status)).length;
  const cards=visible.map(o=>unifiedOrderCard(o,{button,time,portal,
-  canProcess:canProcess(o),canCancel:canCancel(o),canReceive:canReceive(o),
+  canProcess:canProcess(o),canCancel:canCancel(o),canDelete:canDelete(o),canReceive:canReceive(o),
   canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o),canAdjust:canAdjust(o)})).join('');
  const actions=!separationOnly?
   (((canAvulso||canStore)?button(portal?'+ Montar pedido':'+ Novo pedido','unified-order-new','','primary'):'')+
