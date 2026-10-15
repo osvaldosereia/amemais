@@ -13,6 +13,7 @@ import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQu
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014orders2';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015eventsimple1';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261014ordersunified1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -55,8 +56,7 @@ const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
   {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
-  {id:'pedidos',label:'Pedidos Avulsos',ico:'clipboard'},
-  {id:'pedidos-lojas',label:'Solicitações de lojas',ico:'arrows'},
+  {id:'pedidos',label:'Pedidos',ico:'clipboard'},
   {id:'movimentacoes',label:'Movimentações',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
   {id:'tags',label:'Tags',ico:'more'},
@@ -65,7 +65,7 @@ const nav = [
 ];
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
-  balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],
+  balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],
   eventPickPlans:[],eventPickItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
@@ -85,7 +85,7 @@ const permissionCatalog=[
  ['products.read','Consultar produtos'],['products.create','Cadastrar produtos'],['products.edit','Editar produtos'],['products.delete','Excluir produtos'],
  ['stock.entry','Registrar entrada'],['stock.exit','Registrar saída'],['stock.balance','Realizar balanço'],['stock.destinations','Gerenciar destinos'],
  ['events.read','Consultar eventos'],['events.manage','Administrar eventos'],['events.separate','Separar para eventos'],['events.return','Devolver de eventos'],['events.sell','Baixar no evento'],['events.close','Encerrar eventos'],
- ['orders.read','Consultar pedidos avulsos'],['orders.internal','Criar pedidos avulsos'],['orders.assign','Vincular pedidos a eventos'],
+ ['orders.read','Consultar todos os pedidos'],['orders.internal','Criar pedidos avulsos'],['orders.assign','Vincular pedidos a eventos'],
  ['orders.central','Pedir para loja central'],['orders.franchise','Pedir para franquia'],['orders.separate','Separar pedidos de lojas'],['orders.receive','Receber pedidos'],['orders.cancel','Cancelar pedidos'],
  ['movements.read','Consultar movimentações'],['movements.export','Exportar relatórios'],
  ['categories.manage','Gerenciar categorias'],['tags.manage','Gerenciar tags'],
@@ -100,11 +100,11 @@ const canRegisterProducts = () => hasPermission('products.create') || hasPermiss
 const canQuickBalance = () => hasPermission('stock.balance');
 const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',balanco:'stock.balance',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
 const permittedView = v => {
- if(isFranchisePortal())return v==='produtos'||v==='pedidos-lojas';
+ if(isFranchisePortal())return v==='produtos'||v==='pedidos';
  if(v==='inicio')return true;
  if(v==='saida'||v==='balanco')return false; // Operações e conferência ficam em Produtos.
- if(v==='pedidos-lojas')return canUseStoreOrders();
- if(v==='pedidos')return hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
+ if(v==='pedidos-lojas')return false;
+ if(v==='pedidos')return canUseStoreOrders()||hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
  if(v==='usuarios')return isAdmin();
  if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
  if(v==='avarias')return !isFranchisePortal()&&(hasPermission('stock.balance')||hasPermission('stock.entry'));
@@ -208,7 +208,7 @@ async function loadData(){
   }
   if(hasPermission('orders.separate')||hasPermission('stock.entry')||hasPermission('stock.exit')||hasPermission('stock.balance')||hasPermission('products.read')){
     resources.push(['stockReservations',db.from('stock_reservations')
-      .select('order_id,product_id,quantity,status').eq('status','ativa').limit(10000)]);
+      .select('order_id,avulso_order_id,product_id,quantity,status').eq('status','ativa').limit(10000)]);
   }
   if(canUseStoreOrders() || hasPermission('orders.read')){
     resources.push(['storeOrders',db.from('store_orders').select('*').order('created_at',{ascending:false}).limit(500)]);
@@ -227,9 +227,10 @@ async function loadData(){
     resources.push(['audits',db.from('audit_log').select('id,entity,entity_id,action,actor_id,created_at').order('created_at',{ascending:false}).limit(100)]);
   }
   if(hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('catalog.manage')){
-    resources.push(['orders',db.from('avulso_orders').select('id,customer_name,customer_phone,created_at,source,event_id').order('created_at',{ascending:false}).limit(1000)]);
-    resources.push(['orderItems',db.from('avulso_order_items').select('order_id,product_name,color,size,sku,ean,quantity').limit(3000)]);
+    resources.push(['orders',db.from('avulso_orders').select('id,customer_name,customer_phone,created_at,source,event_id,created_by,fulfillment_status,expires_at').order('created_at',{ascending:false}).limit(1000)]);
+    resources.push(['orderItems',db.from('avulso_order_items').select('order_id,product_id,product_name,color,size,sku,ean,quantity').limit(3000)]);
   }
+  if(hasPermission('orders.read'))resources.push(['unifiedOrderAdjustments',db.from('unified_order_adjustments').select('*').order('created_at',{ascending:false}).limit(3000)]);
   if(hasPermission('catalog.manage')){
     resources.push(['customerAccess',db.from('customer_catalog_access').select('id,label,created_at,expires_at,revoked_at').order('created_at',{ascending:false}).limit(250)]);
   }
@@ -434,7 +435,7 @@ function render(){
   if(!state.user){loginScreen();return;}
   if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
   if(!state.profile.active){pendingAccessScreen();return;}
-  if(!permittedView(state.view))state.view=isFranchisePortal()?'pedidos-lojas':'inicio';
+  if(!permittedView(state.view))state.view=isFranchisePortal()?'pedidos':'inicio';
   const mark='<img class="ame-brand-logo" src="./ame-plus-logo.svg" alt="Ame+ Store" width="132" height="70">';
   const menu=nav.filter(x=>permittedView(x.id))
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+((state.view===x.id||(state.view==='entrada'&&x.id==='produtos'))?'active':'')+'">'+
@@ -466,7 +467,7 @@ function pageContent(){
   if(state.view==='tags')return tagsPage();
   if(state.view==='usuarios')return usersPage();
   if(state.view==='lojas')return storesPage();
-  if(state.view==='pedidos-lojas')return storeOrdersPage();
+  if(state.view==='pedidos-lojas')return ordersPage();
   return dashboard();
 }
 function panel(title,content,buttonMarkup=''){
@@ -995,32 +996,40 @@ function tagsPage(){
     '<div class="catalog-tags-list">'+renderTagsCatalog()+'</div></section>';
 }
 
+function unifiedOrderRecords(){
+ return makeUnifiedOrders({
+  avulsoOrders:state.orders,avulsoItems:state.orderItems,
+  storeOrders:state.storeOrders,storeItems:state.storeOrderItems,
+  reservations:state.stockReservations,stores:state.stores,
+  products:state.items,adjustments:state.unifiedOrderAdjustments,
+  portal:isFranchisePortal(),userId:state.user?.id
+ });
+}
 function ordersPage(){
-  if(!hasPermission('orders.read')&&!hasPermission('orders.internal'))return '<div class="muteblock">Sem permissão.</div>';
-  const activeAccess=state.customerAccess.filter(a=>!a.revoked_at&&new Date(a.expires_at)>new Date()).length;
-  const links='<div class="avulso-access-list">'+(state.customerAccess.length?
-    state.customerAccess.map(access=>{
-      const valid=!access.revoked_at&&new Date(access.expires_at)>new Date();
-      return '<div class="avulso-access-row"><div><strong>'+h(access.label)+'</strong>'+
-        '<small>Criado: '+h(niceTime(access.created_at))+' · Válido até '+h(niceTime(access.expires_at))+'</small></div>'+
-        '<span class="pill '+(valid?'ativo':'encerrado')+'">'+(valid?'Ativo':'Encerrado')+'</span>'+
-        (valid&&hasPermission('catalog.manage')?button('Revogar link','customer-link-revoke','data-id="'+h(access.id)+'"','small danger'):'')+
-        '</div>';
-    }).join(''):'<p class="muted">Nenhum acesso para clientes criado ainda.</p>')+'</div>';
-  const orders=ordersPageMarkup({
-    orders:state.orders,items:state.orderItems,events:state.events,
-    photoButton,button,niceTime
-  });
-  return tabHead('Pedidos Avulsos','Pedidos são independentes do estoque e podem ser vinculados a um evento depois.',
-    (hasPermission('orders.internal')?button('+ Criar pedido','order-new','','primary'):'')+
-    (hasPermission('catalog.manage')?button('+ Acesso para cliente','customer-link-new','','primary'):''))+
-    '<div class="orders-overview"><div><strong>'+state.orders.length+'</strong><span>Pedidos registrados</span></div>'+
-    '<div><strong>'+state.orders.filter(o=>!o.event_id).length+'</strong><span>Sem evento</span></div>'+
-    '<div><strong>'+activeAccess+'</strong><span>Acessos ativos de clientes</span></div></div>'+
-    panel('Pedidos registrados',orders)+
-    panel('Acesso limitado para clientes', '<div class="panelbody">'+
-      '<p class="help">Crie um link individual válido por 30 dias. O cliente poderá ver os produtos e montar pedidos, sem consultar estoques, movimentos, custos ou telas administrativas. Você pode revogar o acesso quando desejar.</p>'+
-      links+'</div>');
+ if(!permittedView('pedidos'))return '<div class="muteblock">Sem permissão.</div>';
+ const portal=isFranchisePortal();
+ const activeAccess=state.customerAccess.filter(a=>!a.revoked_at&&new Date(a.expires_at)>new Date()).length;
+ const links='<div class="avulso-access-list">'+(state.customerAccess.length?
+  state.customerAccess.map(access=>{
+   const valid=!access.revoked_at&&new Date(access.expires_at)>new Date();
+   return '<div class="avulso-access-row"><div><strong>'+h(access.label)+'</strong>'+
+    '<small>Válido até '+h(niceTime(access.expires_at))+'</small></div>'+
+    '<span class="pill '+(valid?'ativo':'encerrado')+'">'+(valid?'Ativo':'Encerrado')+'</span>'+
+    (valid&&hasPermission('catalog.manage')?button('Revogar link','customer-link-revoke','data-id="'+h(access.id)+'"','small danger'):'')+
+   '</div>';
+  }).join(''):'<p class="muted">Nenhum acesso de cliente criado.</p>')+'</div>';
+ const records=unifiedOrderRecords();
+ return unifiedOrdersPage(records,{
+  button,time:niceTime,portal,linksMarkup:links,summaryLink:activeAccess+' ativo(s)',
+  canProcess:o=>!portal&&hasPermission('orders.separate')&&
+    (o.kind==='avulso'||assignedStore(o.raw.from_store_id)),
+  canCancel:o=>!portal&&hasPermission('orders.cancel')&&
+    (o.kind==='avulso'||assignedStore(o.raw.to_store_id)),
+  canReceive:o=>!portal&&o.kind==='loja'&&hasPermission('orders.receive')&&assignedStore(o.raw.to_store_id),
+  canAvulso:!portal&&hasPermission('orders.internal'),
+  canStore:hasPermission('orders.central')||hasPermission('orders.franchise'),
+  canLink:!portal&&hasPermission('catalog.manage')
+ });
 }
 function customerAccessLinkModal(label,url){
   document.querySelector('.share-product-modal')?.remove();
@@ -2007,6 +2016,7 @@ function searchAndManageSku(code,openPanel=false){
  else if(openPanel&&!found)toast('Código não encontrado no catálogo.',true);
 }
 function switchView(view) {
+  if(view==='pedidos-lojas')view='pedidos';
   if(view==='roupas'||view==='saida'||view==='balanco')view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;
