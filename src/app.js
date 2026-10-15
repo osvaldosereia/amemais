@@ -8,8 +8,8 @@ import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=2026
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js?v=20261015purchase1';
-import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015purchase1';
-import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015variants1';
+import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015categorymetadata2';
+import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015categorymetadata2';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
   eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015modeldelete2';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
@@ -1546,8 +1546,9 @@ function productModal(item=null){
   const markup='<div class="formgrid">'+
     '<div class="wide">'+field('Nome do produto *','name','text',item?.name||'','required maxlength="180"')+'</div>'+
     (!item?'<p class="help wide">SKU e EAN de produtos excluídos podem ser reutilizados. O sistema impede duplicações somente com produtos ativos.</p>':'')+
+    categorySelector(item)+
     (!item?sizesSection():'')+
-    single+photoChooser(item)+categorySelector(item)+productTagChooser(item)+locations+procurementFields(item)+
+    single+photoChooser(item)+productTagChooser(item)+locations+procurementFields(item)+
     (!item?'<div class="wide" data-single-stock>'+
       (state.view==='entrada'?'<p class="help">Ao cadastrar um produto para esta remessa, deixe o estoque inicial em zero e adicione-o à lista abaixo para não contabilizar duas vezes.</p>':'')+
       field('Quantidade inicial na loja','initial_quantity','number','0','min="0" max="1000000" step="1"','Entrada registrada no histórico.')+'</div>':'')+
