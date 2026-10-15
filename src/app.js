@@ -16,7 +16,8 @@ import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=2
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015shortcodes1';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015finalverify1';
+import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,findVerificationProduct} from './final-verification.js?v=20261015finalverify1';
 import {pickingThermalHTML} from './thermal-picking.js?v=20261015shortcodes1';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015shortcodes1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261015catalog2';
@@ -74,7 +75,7 @@ const nav = [
 ];
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
-  balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),
+  balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
@@ -205,6 +206,10 @@ async function loadData(){
   resources.push(['stores',db.from('stores').select('*').order('name')]);
   resources.push(['removedOrders',db.from('admin_removed_orders').select('kind,order_id').limit(10000)]);
   resources.push(['orderCodes',db.from('order_public_codes').select('kind,order_id,code').limit(12000)]);
+  if(hasPermission('orders.read')||hasPermission('orders.separate')||hasPermission('events.separate'))
+    resources.push(['orderVerificationRows',db.from('order_final_verifications')
+      .select('kind,order_id,product_id,expected_quantity,counted_quantity,verified_by,verified_at')
+      .limit(15000)]);
   if(hasPermission('products.edit')||hasPermission('purchases.manage'))
    resources.push(['suppliers',db.from('suppliers').select('*').order('name').limit(1000)]);
   if(hasPermission('purchases.manage')){
@@ -842,6 +847,80 @@ function refreshEventLotCounter(form){
  const submit=form.querySelector('button[type="submit"]');
  if(submit)submit.disabled=models<1||models>10||Boolean(form.__lotPicker?.invalid);
 }
+function finalVerificationModal(kind,id){
+ const order=unifiedOrderById(kind,id);
+ if(!order||order.status!=='separado'||isFranchisePortal()||!(
+  kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
+  hasPermission('orders.separate')&&(kind==='avulso'||assignedStore(order.raw.from_store_id))
+ ))return toast('Sem acesso ou pedido ainda não separado.',true);
+ const p=verificationProgress(order,state.orderVerificationRows);
+ formModal('Conferência final · Pedido '+order.code,
+   finalVerificationMarkup(order,state.orderVerificationRows),'order-final-verify','Fechar');
+ const form=document.querySelector('.modalback form[data-form="order-final-verify"]');
+ if(!form)return;
+ form.dataset.kind=kind;
+ form.dataset.order=id;
+ const submit=form.querySelector('button[type="submit"]');
+ if(submit){submit.type='button';submit.dataset.action='modal-close';}
+ form.closest('.modal')?.classList.add('final-verify-modal');
+ const reader=form.querySelector('[data-verify-scan]');
+ reader?.focus({preventScroll:true});
+ hydrateImages();
+ if(p.complete)form.querySelector('[data-verify-feedback]').textContent=
+   'Conferência completa. Feche esta janela para confirmar a saída do pedido.';
+}
+function verificationReadCode(form,code){
+ const order=unifiedOrderById(form.dataset.kind,form.dataset.order);
+ if(!order)return;
+ const result=findVerificationProduct(order,code);
+ const msg=form.querySelector('[data-verify-feedback]');
+ if(result.error){
+  form.__verification=null;
+  form.querySelector('[data-verify-selected]').hidden=true;
+  if(msg){msg.textContent=result.error;msg.classList.add('is-error');}
+  form.querySelector('[data-verify-scan]')?.focus();
+  return;
+ }
+ const line=result.line;
+ form.__verification={productId:line.id,scannedCode:String(code).trim()};
+ const panel=form.querySelector('[data-verify-selected]');
+ panel.hidden=false;
+ form.querySelector('[data-verify-selected-name]').textContent=
+   (line.modelTitle||line.name)+' · '+(line.color||'')+' '+(line.size||'')+
+   ' · Solicitado: '+line.quantity+' un.';
+ const qty=form.querySelector('[data-verify-quantity]');
+ qty.value='';qty.max='1000000';qty.focus({preventScroll:true});
+ if(msg){msg.textContent='Produto identificado. Conte as unidades físicas e informe a quantidade encontrada.';
+  msg.classList.remove('is-error');}
+}
+async function saveFinalVerification(form){
+ if(state.loading||!form?.__verification)return toast('Leia o EAN antes de informar a quantidade.',true);
+ const order=unifiedOrderById(form.dataset.kind,form.dataset.order);
+ if(!order)return toast('Pedido não encontrado.',true);
+ const raw=form.querySelector('[data-verify-quantity]')?.value?.trim()??'';
+ const qty=raw===''?NaN:Number(raw);
+ if(!Number.isInteger(qty)||qty<0||qty>1000000)
+   return toast('Informe a quantidade física encontrada (número inteiro).',true);
+ const item=form.__verification;
+ state.loading=true;
+ try{
+  const result=assertOk(await db.rpc('save_order_final_verification',{
+    p_kind:order.kind,p_order:order.id,p_product:item.productId,
+    p_scanned_code:item.scannedCode,p_counted:qty
+  }));
+  const saved=assertOk(await db.from('order_final_verifications')
+    .select('kind,order_id,product_id,expected_quantity,counted_quantity,verified_by,verified_at')
+    .eq('kind',order.kind).eq('order_id',order.id));
+  state.orderVerificationRows=state.orderVerificationRows.filter(r=>!(
+    r.kind===order.kind&&r.order_id===order.id)).concat(saved);
+  if(result.complete)toast('Conferência 100% concluída. Saída liberada.');
+  else if(qty!==Number(order.lines.find(x=>x.id===item.productId)?.quantity))
+   toast('Divergência registrada. Verifique a separação antes da saída.',true);
+  else toast('SKU conferido. Pode ler o próximo.');
+  finalVerificationModal(order.kind,order.id);
+ }catch(error){fail(error);}
+ finally{state.loading=false;}
+}
 function eventBatchPickModal(id){
  const o=unifiedOrderById('evento',id);
  if(!o||!['aguardando','em_separacao','separado'].includes(o.status)||
@@ -1203,6 +1282,10 @@ function ordersPage(separationOnly=false){
     hasPermission('orders.separate')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id))),
   canDispatch:o=>o.kind==='evento'&&!portal&&isManager()&&hasPermission('orders.dispatch'),
   canDispatchStock:o=>!portal&&hasPermission('orders.dispatch')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id)),
+  canVerify:o=>!portal&&o.status==='separado'&&(
+    o.kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
+    hasPermission('orders.separate')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id))),
+  isVerified:o=>verificationCanDispatch(o,state.orderVerificationRows),
   canAdjust:o=>!portal&&hasPermission('orders.dispatch'),
   canDelete:o=>!portal&&isAdmin(),
   canCancel:o=>o.kind==='evento'?(!portal&&isManager()&&hasPermission('events.separate')):
@@ -3367,6 +3450,12 @@ async function handleClick(event){
       p_kind:kind,p_order:id
     })),'Disponibilidade reavaliada. Consulte as faltas no pedido.');
   }
+  if(action==='order-final-verify')return finalVerificationModal(target.dataset.kind,id);
+  if(action==='verify-open-camera')return scanEAN(code=>{
+    const form=document.querySelector('.modalback form[data-form="order-final-verify"]');
+    if(form)verificationReadCode(form,code);
+  });
+  if(action==='verify-confirm-item')return saveFinalVerification(target.closest('form'));
   if(action==='order-shortage-adjust')return unifiedShortageModal(target.dataset.kind,id);
   if(action==='order-print-thermal'||action==='order-print-a4')return printUnifiedOrder(target.dataset.kind,id);
   if(action==='avulso-pick')return avulsoPickingModal(id);
@@ -4345,6 +4434,16 @@ document.addEventListener('click',event=>{
   handleClick(event).catch(fail);
 });
 document.addEventListener('keydown',event=>{
+  if(event.key==='Enter'&&event.target.matches('[data-verify-scan]')){
+    event.preventDefault();
+    verificationReadCode(event.target.closest('form'),event.target.value);
+    return;
+  }
+  if(event.key==='Enter'&&event.target.matches('[data-verify-quantity]')){
+    event.preventDefault();
+    saveFinalVerification(event.target.closest('form'));
+    return;
+  }
   if(event.key==='Enter'&&event.target.id==='product-search'&&canOpenSkuManager()){
     const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
     const matched=state.items.find(p=>p.active&&(
