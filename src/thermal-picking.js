@@ -10,7 +10,9 @@ export function groupedThermalPickingLines(lines=[]){
   if(!(Number(line.quantity)>0))continue;
   const text=String(line.gondola??'').trim();
   if(!text){unlocated.push(line);continue;}
-  const key=text.replace(/^g[oô]ndola\s*/i,'').trim()||text;
+  const location=text.replace(/^g[oô]ndola\s*/i,'').trim()||text;
+  // Gôndola 03 e gôndola 3 representam o mesmo endereço físico.
+  const key=/^\d+$/.test(location)?String(Number(location)):location;
   if(!groups.has(key))groups.set(key,[]);
   groups.get(key).push(line);
  }
