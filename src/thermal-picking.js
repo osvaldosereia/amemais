@@ -28,19 +28,15 @@ export function groupedThermalPickingLines(lines=[]){
  return output.map(g=>({...g,units:g.lines.reduce((sum,line)=>sum+Number(line.quantity||0),0)}));
 }
 
-export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE',photoUrls={}}={}){
+export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE'}={}){
  const locations=groupedThermalPickingLines(order.lines||[]);
  const markup=locations.map(group=>
   '<section class="gondola-group"><h2>'+esc(group.title)+
   '<small>'+fmt(group.units)+' un. · '+group.lines.length+' SKU(s)</small></h2>'+
   group.lines.map(line=>{
-    const photo=line.imagePath&&photoUrls[line.imagePath];
     const variant=[line.color,line.size].filter(x=>x&&x!=='Única').join(' · ');
     return '<article class="pick-item">'+
-      '<div class="pick-main"><div class="pick-photo">'+(photo?
-       '<img src="'+esc(photo)+'" alt="Foto: '+esc(line.modelTitle||line.name)+'">':
-       '<span>SEM FOTO</span>')+'</div>'+
-      '<div class="pick-info"><div class="pick-name">'+esc(line.modelTitle||line.name||'Produto')+'</div>'+
+      '<div class="pick-main"><div class="pick-info"><div class="pick-name">'+esc(line.modelTitle||line.name||'Produto')+'</div>'+
         (variant?'<div class="pick-variant">'+esc(variant)+'</div>':'')+
         '<div class="pick-code">CÓD. '+esc(line.sku||'—')+'</div>'+
         '<div class="pick-ean">EAN '+esc(line.ean||'—')+'</div>'+
@@ -70,12 +66,9 @@ export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE',photoU
  'h2{font-size:13pt;line-height:1.15;border-top:2px solid #000;border-bottom:2px solid #000;padding:2mm 0 1.5mm;margin:0 0 1.2mm;font-weight:900}',
  'h2 small{display:block;font-size:8pt;margin-top:1mm;font-weight:700}',
  '.pick-item{padding:2mm 0;border-bottom:1px dashed #555;break-inside:avoid;page-break-inside:avoid}',
- '.pick-main{display:flex;align-items:flex-start;gap:2mm;min-width:0}',
- '.pick-photo{width:22mm;height:24mm;flex:0 0 22mm;border:1px solid #444;display:flex;align-items:center;justify-content:center;overflow:hidden}',
- '.pick-photo img{display:block;width:100%;height:100%;object-fit:contain;filter:grayscale(100%) contrast(1.15)}',
- '.pick-photo span{font-size:8pt;text-align:center}',
- '.pick-info{min-width:0;flex:1;font-size:9pt;line-height:1.3}',
- '.pick-name{font-size:10pt;line-height:1.2;font-weight:900;margin-bottom:1mm}',
+ '.pick-main{display:block;min-width:0}',
+ '.pick-info{width:100%;min-width:0;font-size:10pt;line-height:1.35}',
+ '.pick-name{font-size:11pt;line-height:1.2;font-weight:900;margin-bottom:1mm}',
  '.pick-variant{font-size:9pt;font-weight:800;margin-bottom:1mm}',
  '.pick-code,.pick-ean{font-size:8.5pt;overflow-wrap:anywhere;word-break:break-word}',
  '.pick-shelf{font-size:9pt;font-weight:900;margin-top:1mm}',
@@ -105,12 +98,7 @@ export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE',photoU
  'page.textContent="@page{size:80mm "+Math.min(3000,Math.max(40,heightMM))+"mm;margin:0}";',
  'window.focus();window.print();',
  '};',
- 'window.addEventListener("load",async()=>{',
- 'const pending=Array.from(document.images,img=>img.complete?Promise.resolve():new Promise(resolve=>{',
- 'img.addEventListener("load",resolve,{once:true});img.addEventListener("error",resolve,{once:true});}));',
- 'await Promise.race([Promise.all(pending),new Promise(resolve=>setTimeout(resolve,7000))]);',
- 'window.printSlip80();',
- '});',
+ 'window.addEventListener("load",()=>window.printSlip80());',
  '</script>'
  ].join('');
  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'+
