@@ -1849,6 +1849,45 @@ function orderQuantityModal(orderId,phase){
    'store-order-'+phase,receiving?'Confirmar quantidades recebidas':picking?'Concluir conferência':'Salvar ajuste');
  document.querySelector('.modalback form[data-form="store-order-'+phase+'"]').dataset.order=orderId;
 }
+function unifiedOrderById(kind,id){
+ return unifiedOrderRecords().find(o=>o.kind===kind&&o.id===id);
+}
+function avulsoPickingModal(id){
+ const o=unifiedOrderById('avulso',id);
+ if(!o||o.status!=='reservado'||!hasPermission('orders.separate')||isFranchisePortal())return;
+ formModal('Conferir separação · #'+id.slice(0,8).toUpperCase(),
+   pickingOrderRows(o,{h}),'avulso-picking','Concluir separação');
+ const form=document.querySelector('.modalback form[data-form="avulso-picking"]');
+ if(form){form.dataset.order=id;updateUnifiedPickingTotal(form);}
+}
+function unifiedShortageModal(kind,id){
+ if(!hasPermission('orders.separate')||isFranchisePortal())return;
+ const o=unifiedOrderById(kind,id);
+ if(!o||!['legado','solicitado','pendente_estoque','aprovado','reservado'].includes(o.status))return;
+ if(o.kind==='loja'&&!assignedStore(o.raw.from_store_id))return;
+ formModal('Ajustar pedido · #'+id.slice(0,8).toUpperCase(),
+   shortageEditRows(o,{h}),'unified-shortage','Salvar ajuste');
+ const form=document.querySelector('.modalback form[data-form="unified-shortage"]');
+ if(form){form.dataset.order=id;form.dataset.kind=kind;}
+}
+function updateUnifiedPickingTotal(form){
+ if(!form)return;
+ const inputs=[...form.querySelectorAll('[data-pick-qty]')];
+ const sum=inputs.reduce((a,el)=>a+Math.max(0,Number(el.value||0)),0);
+ const total=form.querySelector('[data-picked-total]');
+ if(total)total.textContent=String(sum);
+ for(const input of inputs)input.closest('[data-picking-row]')?.classList.toggle('is-picked',
+   Number(input.value)===Number(input.dataset.expected));
+}
+function printUnifiedOrder(kind,id){
+ const order=unifiedOrderById(kind,id);
+ if(!order||isFranchisePortal()||!order.lines.length)return;
+ const popup=window.open('','_blank');
+ if(!popup)return toast('O navegador bloqueou a janela de impressão.',true);
+ popup.document.open();popup.document.write(pickingA4HTML(order,{
+  printedAt:new Date().toLocaleString('pt-BR')
+ }));popup.document.close();
+}
 function storePickingModal(orderId){
  const order=state.storeOrders.find(o=>o.id===orderId);
  if(!order||order.status!=='aprovado'||!hasPermission('orders.separate')||!assignedStore(order.from_store_id))return;
