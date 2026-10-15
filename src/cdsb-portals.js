@@ -22,7 +22,7 @@ export function pickerHome(orders,{button,time}){
    const eligible=['aprovado','aguardando','reservado','em_separacao'].includes(o.status);
    const status=h(labels[o.status]||o.status);
    return '<article class="cdsb-queue-item"><div><strong>'+h(o.target)+'</strong>'+
-    '<small>Pedido #'+h(o.id.slice(0,8).toUpperCase())+' · '+Number(o.total||0)+' unidades · '+h(time(o.created_at))+'</small></div>'+
+    '<small>Pedido #'+h(o.code||'—')+' · '+Number(o.total||0)+' unidades · '+h(time(o.created_at))+'</small></div>'+
     '<span class="cdsb-status">'+status+'</span><div class="cdsb-queue-actions">'+
      (o.lines?.length?button('Imprimir 80 mm','order-print-thermal','data-kind="'+h(o.kind)+'" data-id="'+h(o.id)+'"','small'):'')+
      (eligible?button('Separar',''+action,'data-kind="'+h(o.kind)+'" data-id="'+h(o.id)+'"','primary'):'')+
@@ -34,7 +34,7 @@ export function permanentHome({stores=[],orders=[],button,time,userId}){
  const history=orders.filter(o=>finished.has(o.status));
  const display=stores.length===1?stores[0]?.name:'Minhas Lojas';
  const list=rows=>rows.slice(0,16).map(o=>
-   '<article class="cdsb-order-row"><div><strong>Pedido #'+h(o.id.slice(0,8).toUpperCase())+'</strong>'+
+   '<article class="cdsb-order-row"><div><strong>Pedido #'+h(o.code||'—')+'</strong>'+
    '<small>'+h(time(o.created_at))+' · '+h((stores.find(s=>s.id===o.to_store_id)?.name)||'Minha loja')+'</small></div>'+
    '<span class="cdsb-status">'+h(labels[o.status]||o.status)+'</span>'+ 
    button('Imprimir pedido','commercial-order-print','data-id="'+h(o.id)+'"','small')+
