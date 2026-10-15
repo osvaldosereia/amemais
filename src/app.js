@@ -1963,7 +1963,7 @@ function storesPage(){
    showFranchises:portal||hasPermission('stores.read')||hasPermission('stores.manage')||canUseStoreOrders(),
    showEvents:!portal&&permittedView('eventos'),
    showBranches:!portal&&(hasPermission('stores.read')||hasPermission('stores.manage')),
-   canSeeStore:store=>isAdmin()||assignedStore(store.id),
+   canSeeStore:store=>hasPermission('stores.manage')||assignedStore(store.id),
    canSeeEvent:event=>hasPermission('events.read')||hasPermission('events.manage')||Boolean(memberRole(event.id))
   }
  });
@@ -2821,7 +2821,7 @@ async function handleClick(event){
    const store=state.stores.find(s=>s.id===location);
    const ev=eventById(location),portal=isFranchisePortal();
    const scopeAllowed=type==='central'?!portal:
-    type==='store'?Boolean(store&&(isAdmin()||assignedStore(store.id))):
+    type==='store'?Boolean(store&&(hasPermission('stores.manage')||assignedStore(store.id))):
     Boolean(ev&&!ev.deleted_at&&!portal&&
       (hasPermission('events.read')||hasPermission('events.manage')||Boolean(memberRole(ev.id))));
    if(!scopeAllowed)return toast('Sem autorização para consultar esta unidade.',true);
