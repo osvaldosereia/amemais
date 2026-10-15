@@ -44,7 +44,7 @@ begin
  insert into public.audit_log(entity,entity_id,action,actor_id,details)
  values('store_orders',p_order::text,'DISPATCHED',auth.uid(),
    jsonb_build_object('destination_kind',v_target_kind,'external_reference',p_external_reference));
-end;$function$
+end;$function$;
 
 CREATE OR REPLACE FUNCTION public.create_event_pick_batch(p_event uuid, p_items jsonb, p_note text DEFAULT NULL::text)
  RETURNS uuid
@@ -69,7 +69,7 @@ begin
  values('events',p_event::text,'EVENT_BATCH_CREATED',auth.uid(),
  jsonb_build_object('batch',v_batch,'sequence',v_seq));
  return v_batch;
-end;$function$
+end;$function$;
 
 CREATE OR REPLACE FUNCTION public.save_event_settlement(p_event uuid, p_items jsonb, p_note text)
  RETURNS integer
@@ -118,7 +118,7 @@ begin
  insert into public.audit_log(entity,entity_id,action,actor_id,details)
  values('events',p_event::text,'SETTLEMENT_DRAFT_SAVED',auth.uid(),jsonb_build_object('sku_count',v_count));
  return v_count;
-end;$function$
+end;$function$;
 
 CREATE OR REPLACE FUNCTION public.finalize_event_settlement(p_event uuid)
  RETURNS void
@@ -167,7 +167,7 @@ begin
  insert into public.audit_log(entity,entity_id,action,actor_id,details)
  values('events',p_event::text,'SETTLEMENT_FINALIZED',auth.uid(),
  jsonb_build_object('items',d.items,'note',d.note));
-end;$function$
+end;$function$;
 
 -- Nova confirmação de entrega SEM estoque no destino (Loja Cristo Rei e franquias).
 CREATE OR REPLACE FUNCTION public.confirm_commercial_order_delivery(p_order uuid)
