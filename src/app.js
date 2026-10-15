@@ -835,6 +835,8 @@ function eventDetails(){
   products:state.items,button,canCreate:e.status!=='encerrado'&&isManager()&&hasPermission('events.separate'),time:niceTime});
  return summary.replace('<header class="event-simple-head">',eventCoverCard(e)+'<header class="event-simple-head">')
   .replace('<div class="event-simple-actions">',lots+
+    (e.status==='ativo'&&memberRole(e.id)==='responsavel'&&hasPermission('events.request')?
+      '<div class="event-cover-tools">'+button('Informar devolução e diferenças','event-settle','','small')+'</div>':'')+
     (isManager()?'<div class="event-cover-tools">'+button(e.cover_path?'Trocar / excluir capa':'Adicionar capa','event-cover-edit','data-id="'+h(e.id)+'"','small')+'</div>':'')+
     '<div class="event-simple-actions">');
 }
@@ -844,8 +846,8 @@ function damageStockPage(){
 }
 function eventBatchModal(eventId=state.activeEvent,batchId=null){
  const e=eventById(eventId),batch=batchId?state.eventPickBatches.find(x=>x.id===batchId):null;
- if(!e||!['rascunho','ativo'].includes(e.status)||!isManager()||
-  !hasPermission('events.separate'))return;
+ if(!e||!['rascunho','ativo'].includes(e.status)||!((isManager()&&hasPermission('events.separate'))||
+  (!batch&&hasPermission('events.request')&&Boolean(memberRole(e.id)))))return;
  if(batch&&!['aguardando','pendente_estoque','em_separacao','separado'].includes(batch.status))
   return toast('Este lote já saiu ou foi cancelado.',true);
  const saved=batch?state.eventBatchItems.filter(x=>x.batch_id===batch.id):[];
@@ -951,8 +953,8 @@ function collectEventPlan(form){
 }
 function eventSettlementModal(){
  const e=eventById(state.activeEvent);
- if(!e||e.status!=='ativo'||!hasPermission('events.close')||
-   !(hasPermission('events.manage')||memberRole(e.id)==='responsavel'))return;
+ if(!e||e.status!=='ativo'||!((hasPermission('events.close')&&hasPermission('events.manage'))||
+   (hasPermission('events.request')&&memberRole(e.id)==='responsavel')))return;
  const balances=state.balances.filter(b=>b.event_id===e.id&&Number(b.quantity)>0);
  if(!balances.length)return toast('Nenhuma unidade pendente. Encerre a loja diretamente.',true);
  const groups=groupInventory(state.items.filter(p=>balances.some(b=>b.product_id===p.id)),state.apparelModels);
@@ -964,8 +966,8 @@ function eventSettlementModal(){
  if(form){
   form.dataset.event=e.id;
   const footer=form.querySelector('.modalfooter');
-  footer?.insertAdjacentHTML('beforeend',
-   '<button class="button primary" type="button" data-action="event-settlement-save-finish">Salvar e concluir loja</button>');
+  if(hasPermission('events.manage')&&hasPermission('events.close'))footer?.insertAdjacentHTML('beforeend',
+   '<button class="button primary" type="button" data-action="event-settlement-save-finish">Aprovar e encerrar evento</button>');
   updateEventSettlementPreview(form);
  }
 }
@@ -975,7 +977,7 @@ function collectEventSettlement(form){
  for(const row of rows){
   const expected=Number(row.dataset.expected),line={product_id:row.dataset.id,expected};
   let count=0;
-  for(const key of ['good','sold','damaged','lost']){
+  for(const key of ['good','damaged','lost']){
    const el=row.querySelector('[data-settle-field="'+key+'"]');
    const value=String(el?.value??'').trim(),quantity=Number(value);
    if(value===''||!Number.isInteger(quantity)||quantity<0||quantity>1000000)
@@ -985,11 +987,12 @@ function collectEventSettlement(form){
   if(count>expected)throw Error('Quantidades acima das enviadas para '+(product(row.dataset.id)?.name||'o produto')+'.');
   if(count<expected)missing+=expected-count;
   if(line.damaged||line.lost)hasIssue=true;
+  line.sold=0; // Compatibilidade com RPC legado; o CDSB não registra vendas.
   items.push(line);
  }
  const note=String(form.querySelector('[name="note"]')?.value||'').trim();
  if(hasIssue&&(note.length<5||note.length>250))
-  throw Error('Justifique as avarias ou perdas com 5 a 250 caracteres.');
+  throw Error('Justifique as avarias ou diferenças não devolvidas com 5 a 250 caracteres.');
  return {items,note,missing};
 }
 function updateEventSettlementPreview(form){
@@ -1019,7 +1022,7 @@ async function submitEventSettlement(form,finish=false){
  let payload;
  try{payload=collectEventSettlement(form);}catch(error){return toast(error.message,true);}
  if(finish&&payload.missing) return toast('Confira o destino de todas as unidades antes de concluir.',true);
- if(finish&&!window.confirm('Concluir a prestação de contas? As unidades boas voltam à central, as avarias ficam em análise e as vendas/perdas são baixadas definitivamente. Qualquer inventário formal antigo pendente será arquivado como substituído, sem aplicar seus ajustes.'))return;
+ if(finish&&!window.confirm('Produtos bons voltarão ao CDSB. Avarias ficarão suspensas e quantidades não devolvidas serão registradas como diferença, sem contabilizar vendas. Confirmar?'))return;
  return exec(async()=>{
   assertOk(await db.rpc('save_event_settlement',{
    p_event:e.id,p_items:payload.items,p_note:payload.note||null
@@ -1841,7 +1844,7 @@ function memberModal(eid){
   if(!users.length){toast('Nenhum usuário ativo disponível. Cadastre usuários primeiro.',true);return;}
   formModal('Adicionar responsável / operador','<div class="formgrid">'+selectField('Usuário','user_id',users.map(u=>[u.id,u.full_name+' · '+u.email]))+
     selectField('Papel neste evento','role',[['responsavel','Responsável'],['operador','Operador']])+'</div>'+
-    '<div class="note">Responsáveis podem registrar devoluções e encerrar o evento. Operadores registram vendas, apenas neste evento.</div>',
+    '<div class="note">Responsáveis informam devoluções; somente o gestor do CDSB aprova o encerramento.</div>',
     'member-add','Adicionar');
   document.querySelector('.modal form').dataset.event=eid;
 }
@@ -2782,7 +2785,7 @@ async function handleClick(event){
   }
   if(action==='event-batch-dispatch'){
     const b=state.eventPickBatches.find(x=>x.id===id);
-    if(!b||b.status!=='separado'||!isManager()||!hasPermission('events.separate'))return;
+    if(!b||b.status!=='separado'||!isManager()||!hasPermission('orders.dispatch'))return;
     if(!window.confirm('Confirmar saída física do lote '+b.sequence+'? O estoque central será baixado agora.'))return;
     return exec(async()=>assertOk(await db.rpc('dispatch_event_pick_batch',{p_batch:id})),
       'Lote enviado. Saída física registrada e reservas consumidas.');
@@ -2811,13 +2814,6 @@ async function handleClick(event){
     if(!window.confirm('Confirmar envio físico da lista separada? Após o envio, ajustes serão movimentações adicionais auditadas.'))return;
     return exec(async()=>assertOk(await db.rpc('dispatch_event_pick_plan',{p_event:e.id})),
       'Mercadorias enviadas. A loja temporária está ativa.');
-  }
-  if(action==='event-fill-sold'){
-    const row=target.closest('[data-settle-row]');if(!row)return;
-    const expected=Number(row.dataset.expected);
-    const rest=['good','damaged','lost'].reduce((n,key)=>n+Number(row.querySelector('[data-settle-field="'+key+'"]')?.value||0),0);
-    row.querySelector('[data-settle-field="sold"]').value=String(Math.max(0,expected-rest));
-    updateEventSettlementPreview(row.closest('form'));return;
   }
   if(action==='event-settlement-save-finish')return submitEventSettlement(target.closest('form'),true);
   if(action==='damage-resolve')return resolveDamageModal(id);
@@ -2875,8 +2871,8 @@ async function handleClick(event){
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
   if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;state.view='lojas';render();return;}
-  if(action==='event-sale'){return eventMove('venda_evento');}
-  if(action==='event-loss'){return eventLossModal();}
+  if(action==='event-sale')return toast('O CDSB não registra vendas dos eventos.',true);
+  if(action==='event-loss')return toast('Informe avarias e diferenças somente na conferência.',true);
   if(action==='event-transfer')return eventBatchModal(state.activeEvent);
   // Registro de venda foi retirado do gerenciador: só há separação, devolução e baixa final.
   if(action==='event-return'){
@@ -3046,7 +3042,7 @@ async function handleClick(event){
     const labels={'store-order-approve':['approve_store_order','Aprovado; unidades reservadas.','Aprovar e reservar as quantidades deste pedido?'],
       'store-order-cancel':['cancel_store_order','Pedido cancelado e reservas liberadas.','Cancelar pedido e liberar as reservas?']};
     if(action==='store-order-dispatch'){
-      if(!hasPermission('orders.separate')||!assignedStore(order.from_store_id))return;
+      if(!hasPermission('orders.dispatch')||!assignedStore(order.from_store_id))return;
       if(!window.confirm('Confirmar saída física deste pedido da central? A quantidade será baixada agora.'))return;
       const ref=window.prompt('Referência do outro sistema (opcional):','');
       if(ref===null)return;
@@ -3439,7 +3435,8 @@ async function handleSubmit(event){
   }
   if(type==='event-batch-write'){
     const eid=form.dataset.event,batchId=form.dataset.batch;
-    if(!isManager()||!hasPermission('events.separate'))return;
+    if(!((isManager()&&hasPermission('events.separate'))||
+      (!batchId&&hasPermission('events.request')&&Boolean(memberRole(eid)))))return;
     let items;try{items=collectEventPlan(form);}catch(error){return toast(error.message,true);}
     const models=selectedEventModels(items,state.items);
     if(!items.length||models>10)return toast('Selecione entre 1 e 10 modelos diferentes por lote. Variações não contam como modelos adicionais.',true);
