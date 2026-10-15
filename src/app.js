@@ -1308,6 +1308,20 @@ function userRoleModal(id){
  const form=document.querySelector('.modal form');form.dataset.id=id;
  setupFranchiseProfile(form);
 }
+function branchReturnModal(storeId){
+ const store=state.stores.find(x=>x.id===storeId);
+ if(!store||store.kind!=='filial'||!store.active||!assignedStore(storeId)||
+    !(hasPermission('stores.manage')||hasPermission('orders.receive')))return;
+ const lines=state.storeBalances.filter(b=>b.store_id===storeId&&Number(b.quantity)>0);
+ if(!lines.length)return toast('Esta filial não possui saldo para devolver.',true);
+ formModal('Devolver mercadorias · '+store.name,'<div class="formgrid">'+
+ selectField('Produto','product_id',lines.map(x=>[x.product_id,(product(x.product_id)?.name||'Produto')+' · '+x.quantity+' un.']))+
+ field('Quantidade','quantity','number','1','required min="1" max="1000000" step="1"')+
+ textareaField('Motivo obrigatório','reason')+'</div>'+
+ '<div class="note">A mercadoria sai da filial e fica em trânsito. Só entra na central depois da conferência física.</div>',
+ 'branch-return-dispatch','Registrar devolução');
+ document.querySelector('.modal form[data-form="branch-return-dispatch"]').dataset.store=storeId;
+}
 function branchStockModal(storeId){
  const store=state.stores.find(x=>x.id===storeId);
  if(!store||!store.active||store.kind!=='filial'||!assignedStore(storeId)||
@@ -1339,9 +1353,10 @@ function storesPage(){
  return tabHead('Lojas','Central, filiais próprias e franquias. Franquias não possuem saldo interno.',manage?button('+ Nova loja','store-new','','primary'):'')+
  panel('Unidades',state.stores.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Status</th><th></th></tr></thead><tbody>'+
  state.stores.map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.kind)+(x.is_primary?' · Principal':'')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.kind==='franquia'?'Não controlado':(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.')+'</td><td>'+
- ((x.kind==='filial'&&x.active&&assignedStore(x.id)&&(hasPermission('stores.manage')||hasPermission('orders.receive'))?button('Movimentar','branch-stock-new','data-id="'+h(x.id)+'"','small primary'):'')+
+ ((x.kind==='filial'&&x.active&&assignedStore(x.id)&&(hasPermission('stores.manage')||hasPermission('orders.receive'))?button('Movimentar','branch-stock-new','data-id="'+h(x.id)+'"','small primary')+button('Devolver à central','branch-return-new','data-id="'+h(x.id)+'"','small'):'')+
  (manage?button('Editar','store-edit','data-id="'+h(x.id)+'"','small')+(x.is_primary?'':button(x.active?'Desativar':'Ativar','store-toggle','data-id="'+h(x.id)+'"','small')+button('Excluir','store-delete','data-id="'+h(x.id)+'"','small')):''))+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhuma loja cadastrada.</p>')+
  '<div class="note">A exclusão é bloqueada quando existem vínculos ou saldos. Franquias somente solicitam mercadorias; não têm estoque físico controlado.</div>'+ 
+ panel('Devoluções de filiais',state.branchReturns.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Filial</th><th>Produto</th><th>Quantidade</th><th>Situação</th><th>Ação</th></tr></thead><tbody>'+state.branchReturns.map(r=>'<tr><td>'+h(state.stores.find(x=>x.id===r.from_store_id)?.name||'—')+'</td><td>'+h(product(r.product_id)?.name||'—')+'</td><td>'+r.quantity+'</td><td>'+h(r.status==='em_transito'?'Em trânsito':'Recebido')+'</td><td>'+(r.status==='em_transito'&&hasPermission('stock.entry')?button('Conferir na central','branch-return-receive','data-id="'+h(r.id)+'"','small primary'):'')+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhuma devolução registrada.</p>')+
  panel('Últimos movimentos de filiais',state.branchMovements.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Data</th><th>Filial</th><th>Produto</th><th>Operação</th><th>Variação</th><th>Saldo</th><th>Motivo</th></tr></thead><tbody>'+state.branchMovements.slice(0,60).map(m=>'<tr><td>'+h(niceTime(m.created_at))+'</td><td>'+h(state.stores.find(x=>x.id===m.store_id)?.name||'—')+'</td><td>'+h(product(m.product_id)?.name||'—')+'</td><td>'+h(m.operation)+'</td><td>'+h(m.quantity_delta>0?'+'+m.quantity_delta:String(m.quantity_delta))+'</td><td>'+m.new_quantity+'</td><td>'+h(m.reason)+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhum movimento de filial registrado.</p>');
 }
 function assignedStore(storeId){
@@ -2088,6 +2103,19 @@ async function handleClick(event){
     if(!window.confirm(confirmation))return;
     await exec(async()=>assertOk(await db.rpc(rpc,{p_order:id})),msg);return;
   }
+  if(action==='branch-return-new')return branchReturnModal(id);
+  if(action==='branch-return-receive'){
+    if(!hasPermission('stock.entry'))return;
+    const item=state.branchReturns.find(x=>x.id===id&&x.status==='em_transito');
+    if(!item)return;
+    const received=window.prompt('Quantidade física conferida na central (esperado '+item.quantity+'):',String(item.quantity));
+    if(received===null)return;
+    if(!Number.isInteger(Number(received))||Number(received)<0)return toast('Quantidade inválida.',true);
+    if(!window.confirm('Confirmar entrada física na central?'))return;
+    return exec(async()=>assertOk(await db.rpc('receive_branch_return',{
+      p_return:id,p_quantity:Number(received)
+    })),'Devolução recebida e registrada na central.');
+  }
   if(action==='branch-stock-new')return branchStockModal(id);
   if(action==='store-new')return storeModal();
   if(action==='store-edit')return storeModal(state.stores.find(x=>x.id===id));
@@ -2488,6 +2516,18 @@ async function handleSubmit(event){
       p_type:state.stores.find(x=>x.id===values.to_store_id)?.kind==='franquia'?'franquia':'central',
       p_items:items,p_note:values.note||null
     })),'Solicitação criada. A separação ainda não movimentou estoque.');return;
+  }
+  if(type==='branch-return-dispatch'){
+    const storeId=form.dataset.store;
+    const quantity=Number(values.quantity);
+    const expected=Number(state.storeBalances.find(x=>x.store_id===storeId&&x.product_id===values.product_id)?.quantity||0);
+    if(!Number.isInteger(quantity)||quantity<1||quantity>expected)return toast('Quantidade maior que o saldo da filial.',true);
+    if(String(values.reason||'').trim().length<5)return toast('Informe motivo da devolução.',true);
+    if(!window.confirm('Enviar '+quantity+' unidade(s) da filial para a central?'))return;
+    return exec(async()=>assertOk(await db.rpc('dispatch_branch_return',{
+      p_store:storeId,p_product:values.product_id,p_quantity:quantity,
+      p_expected:expected,p_reason:String(values.reason).trim()
+    })),'Devolução expedida. Aguardando conferência na central.');
   }
   if(type==='branch-stock-movement'){
     const storeId=form.dataset.store,store=state.stores.find(x=>x.id===storeId);
