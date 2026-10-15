@@ -846,6 +846,7 @@ function eventBatchPickModal(id){
    '<button type="button" class="button primary" data-action="event-batch-finish-pick">Concluir separação</button>');
   updateUnifiedPickingTotal(form);
  }
+ hydrateImages();
 }
 function collectEventBatchPicking(form){
  const order=unifiedOrderById('evento',form.dataset.batch);
