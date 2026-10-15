@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION public.tv_operations_snapshot()
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = ''
 AS $function$
-WITH authorization AS (
+WITH access_gate AS (
  SELECT EXISTS(
   SELECT 1 FROM public.staff_profiles p
   WHERE p.id = auth.uid() AND p.active IS TRUE AND p.archived_at IS NULL
@@ -99,7 +99,7 @@ recent_actions AS (
  SELECT s.code,s.kind,'Novo pedido recebido',s.created_at
  FROM staged s WHERE s.created_at>=now()-interval '48 hours'
 )
-SELECT CASE WHEN (SELECT allowed FROM authorization) THEN
+SELECT CASE WHEN (SELECT allowed FROM access_gate) THEN
  jsonb_build_object(
   'generated_at',now(),
   'time_zone','America/Cuiaba',
