@@ -260,14 +260,62 @@ export function shortageEditRows(order,{h=esc}={}){
 }
 export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE',photoUrls={}}={}){
  const groups=groupedOrderLines(order.lines);
- const compactGroups=groups.map(g=>'<section class="lot-card">'+
-  '<div class="lot-card-photo">'+
-  (g.imagePath&&photoUrls[g.imagePath]?
+ const cards=groups.map(g=>
+  '<section class="print-model-card">'+
+  '<div class="print-model-photo">'+
+   (g.imagePath&&photoUrls[g.imagePath]?
     '<img class="lot-photo" src="'+esc(photoUrls[g.imagePath])+'" alt="Foto do modelo '+esc(g.title)+'">':
-    '<span class="lot-photo-empty">Sem foto</span>')+'</div>'+
-  '<div class="lot-card-right"><div class="lot-group-title">'+
-  esc(g.title)+' · '+g.lines.length+' variação(ões) · '+n(g.total)+' unidades</div>'+
-  compactGroups+
+    '<span class="print-model-no-photo">Sem foto</span>')+
+  '</div><div class="print-model-details">'+
+  '<div class="print-model-title">'+esc(g.title)+' · '+g.lines.length+
+    ' variação(ões) · '+n(g.total)+' unidades</div>'+
+  '<table><thead><tr>'+
+   '<th style="width:14%">Variação</th><th style="width:22%">Gôndola / local</th>'+
+   '<th style="width:15%">SKU</th><th style="width:21%">EAN</th>'+
+   '<th style="width:9%">Qtde</th><th style="width:12%">Separado</th><th style="width:7%">✓</th>'+
+  '</tr></thead><tbody>'+
+  g.lines.map(l=>'<tr>'+
+   '<td>'+esc([l.color,l.size].filter(x=>x&&x!=='Única').join(' · ')||'Único')+'</td>'+
+   '<td>'+esc(l.gondola?'Gôndola '+l.gondola:'Não informada')+(l.prateleira?' / '+esc(l.prateleira):'')+'</td>'+
+   '<td>'+esc(l.sku||'—')+'</td><td>'+esc(l.ean||'—')+'</td>'+
+   '<td class="center"><b>'+n(l.quantity)+'</b></td>'+
+   '<td class="write"></td><td class="center check"></td></tr>').join('')+
+  '</tbody></table></div></section>').join('');
+ const name=order.kind==='evento'?'LOTE DE EVENTO':'PEDIDO';
+ const code=order.kind==='evento'?'Lote '+String(order.sequence||'').padStart(2,'0'):'Pedido';
+ const reserve=order.reserved>0?' · Reservado: '+n(order.reserved):'';
+ const shortage=order.missing>0?' · Faltando: '+n(order.missing):'';
+ return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'+
+  '<title>Separação '+esc(code)+' '+esc(order.id.slice(0,8))+'</title>'+
+  '<style>@page{size:A4 portrait;margin:10mm 10mm 12mm}*{box-sizing:border-box}'+
+  'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#192f24;margin:0}'+
+  'header{display:flex;justify-content:space-between;gap:14px;border-bottom:2px solid #155f42;padding-bottom:7px;margin-bottom:9px}'+
+  '.brand{font-size:13pt;color:#176747;font-weight:900;letter-spacing:.2pt}h1{font-size:13pt;margin:2px 0 4px}'+
+  '.reference{font-size:8pt;color:#66796d;overflow-wrap:anywhere}.meta{text-align:right;line-height:1.4;font-size:8pt}'+
+  '.header-note{font-size:8pt;margin:7px 0 11px;padding:6px;background:#f3f7f3;border:1px solid #dee8e0}'+
+  '.print-model-card{display:grid;grid-template-columns:32mm minmax(0,1fr);border:1px solid #b8cfc0;margin:8px 0;break-inside:avoid-page;overflow:hidden}'+
+  '.print-model-photo{background:#f3f7f4;border-right:1px solid #b8cfc0;min-height:110px;align-self:stretch;display:flex;align-items:stretch;justify-content:center;overflow:hidden}'+
+  '.lot-photo{display:block;width:100%;height:100%;min-height:110px;object-fit:cover}'+
+  '.print-model-no-photo{align-self:center;color:#879b89;font-size:8pt}'+
+  '.print-model-details{min-width:0}.print-model-title{font-size:8.3pt;font-weight:800;background:#edf5ef;color:#1a5036;padding:7px 6px;line-height:1.3}'+
+  'table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}'+
+  'th,td{border:1px solid #bdcdc1;border-left:0;padding:4px 5px;vertical-align:middle;overflow-wrap:anywhere}'+
+  'th:last-child,td:last-child{border-right:0}tbody tr:last-child td{border-bottom:0}'+
+  'th{background:#eaf2ec;font-size:7.5pt}td{font-size:7.7pt;line-height:1.2}'+
+  'tr{break-inside:avoid}.center{text-align:center;font-variant-numeric:tabular-nums}'+
+  '.write{height:22px}.check{height:22px}.totals{font-size:8.5pt;margin-top:10px;padding:6px 0;border-top:1px solid #9cb7a3}'+
+  '.signatures{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:29px}'+
+  '.signatures>div{border-top:1px solid #53665a;text-align:center;padding-top:5px;font-size:8pt}'+
+  '.instructions{font-size:7.5pt;color:#526658;margin-top:9px}'+
+  '</style></head><body>'+
+  '<header><div><div class="brand">'+esc(brand)+'</div><h1>SEPARAÇÃO · '+name+'</h1>'+
+  '<div class="reference">'+esc(code)+' #'+esc(order.id.slice(0,8).toUpperCase())+'</div>'+
+  '<div class="reference">Identificador: '+esc(order.id)+'</div></div>'+
+  '<div class="meta"><b>DESTINO: '+esc(order.target)+'</b><div>Origem: '+esc(order.origin)+'</div>'+
+  '<div>Emissão: '+esc(printedAt)+'</div></div></header>'+
+  '<div class="header-note"><b>'+n(groups.length)+' modelo(s) · '+n(order.lines.length)+' variação(ões) · '+
+   n(order.total)+' unidades solicitadas</b>. Marque somente após encontrar cada item.</div>'+
+  cards+
   '<div class="totals"><b>Total solicitado: '+n(order.total)+' unidades'+reserve+shortage+
    '</b><div>Observações / divergências: _________________________________________________</div></div>'+
   '<div class="signatures"><div>Separador · assinatura / hora</div><div>Conferente · assinatura / hora</div></div>'+
