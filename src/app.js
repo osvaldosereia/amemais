@@ -21,6 +21,7 @@ import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015print1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
+import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -1467,14 +1468,20 @@ function printActivityReport(){
     '<td>'+h(x.what)+'</td><td>'+h(x.detail)+'</td><td class="num">'+(x.qty??'—')+'</td></tr>').join('')+
   '</tbody></table>'));
 }
-function printStockReport(){
+async function printStockReport(){
  if(!hasPermission('stock.balance'))return;
- const rows=state.items.filter(p=>p.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(p=>
-  '<tr><td>'+h(p.name)+'</td><td>'+h([p.apparel_color,p.apparel_size,p.sku].filter(Boolean).join(' · '))+'</td>'+
-  '<td class="num">'+qtyStore(p.id)+'</td><td class="num">'+qtyReserved(p.id)+'</td>'+
-  '<td class="num">'+qtyAvailable(p.id)+'</td><td class="num">'+Number(p.min_stock||0)+'</td></tr>').join('');
- printHTML(printPage('Posição de estoque · CDSB','<p>Saldo físico no Centro de Distribuição São Bento, reservas e disponibilidade por SKU.</p>'+
-  '<table><thead><tr><th>Produto</th><th>Variação / SKU</th><th>Físico</th><th>Reservado</th><th>Livre</th><th>Mínimo</th></tr></thead><tbody>'+rows+'</tbody></table>'));
+ // Abra a janela antes do await para evitar bloqueio de pop-ups.
+ const popup=window.open('','_blank');
+ if(!popup)return toast('Libere as janelas de impressão no navegador.',true);
+ popup.document.write('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Preparando estoque CDSB</title><body style="font:16px Arial;padding:25px">Preparando fotos e ficha A4 do estoque…</body></html>');
+ popup.document.close();
+ try{
+  const groups=stockPrintGroups(state.items,state.apparelModels,state.balances,state.stockReservations);
+  const photos=await signedPhotoUrls(groups.map(group=>group.photoPath));
+  if(popup.closed)return;
+  const html=stockPrintHTML(groups,photos,new Date().toLocaleString('pt-BR'));
+  popup.document.open();popup.document.write(html);popup.document.close();
+ }catch(error){if(!popup.closed)popup.close();fail(error);}
 }
 function printCommercialOrder(orderId){
  if(!isFranchisePortal()&&!hasPermission('orders.read'))return;
