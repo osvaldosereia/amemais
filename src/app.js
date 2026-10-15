@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery2';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015cover2';
+import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015storehub1';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
@@ -59,13 +60,12 @@ const profileLabel = u => u?.role==='admin'?'Administrador':u?.role==='franquia'
 const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
-  {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
+  {id:'lojas',label:'Lojas',ico:'home'},
   {id:'pedidos',label:'Pedidos',ico:'clipboard'},
   {id:'movimentacoes',label:'Atividades',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
   {id:'tags',label:'Tags',ico:'more'},
-  {id:'usuarios',label:'Usuários',ico:'users'},
-  {id:'lojas',label:'Lojas',ico:'home'}
+  {id:'usuarios',label:'Usuários',ico:'users'}
 ];
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
@@ -73,7 +73,7 @@ const state = {
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
-  search:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',
+  search:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
@@ -104,14 +104,15 @@ const canRegisterProducts = () => hasPermission('products.create') || hasPermiss
 const canQuickBalance = () => hasPermission('stock.balance');
 const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',balanco:'stock.balance',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
 const permittedView = v => {
- if(isFranchisePortal())return v==='produtos'||v==='pedidos';
+ if(isFranchisePortal())return v==='produtos'||v==='pedidos'||v==='lojas';
  if(v==='inicio')return true;
  if(v==='saida'||v==='balanco')return false; // Operações e conferência ficam em Produtos.
  if(v==='pedidos-lojas')return false;
  if(v==='pedidos')return canUseStoreOrders()||hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign')||hasPermission('orders.separate')||hasPermission('events.separate');
  if(v==='separacao')return permittedView('pedidos');
  if(v==='usuarios')return isAdmin();
- if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
+ if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage')||hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.separate')||canUseStoreOrders()||hasPermission('orders.read');
+ if(v==='lojas-admin')return hasPermission('stores.manage');
  if(v==='avarias')return !isFranchisePortal()&&(hasPermission('stock.balance')||hasPermission('stock.entry'));
 
  if(v==='inventario')return isAdmin()&&hasPermission('stock.balance');
@@ -448,7 +449,7 @@ function render(){
   if(!permittedView(state.view))state.view=isFranchisePortal()?'pedidos':'inicio';
   const mark='<img class="ame-brand-logo" src="./ame-plus-logo.svg" alt="Ame+ Store" width="132" height="70">';
   const menu=nav.filter(x=>permittedView(x.id))
-    .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+((state.view===x.id||(state.view==='entrada'&&x.id==='produtos'))?'active':'')+'">'+
+    .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+((state.view===x.id||(state.view==='entrada'&&x.id==='produtos')||(['eventos','lojas-admin'].includes(state.view)&&x.id==='lojas'))?'active':'')+'">'+
       uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('');
   const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
   root.innerHTML='<div class="app-shell mobile-c-app"><aside class="sidebar">'+desktopIdentity+
@@ -478,6 +479,7 @@ function pageContent(){
   if(state.view==='tags')return tagsPage();
   if(state.view==='usuarios')return usersPage();
   if(state.view==='lojas')return storesPage();
+  if(state.view==='lojas-admin')return storesAdminPage();
   if(state.view==='pedidos-lojas')return ordersPage();
   return dashboard();
 }
@@ -776,7 +778,7 @@ function eventsPage(){
 }
 function returnWorkflowPage(){
   const e=eventById(state.activeEvent);
-  if(!e){state.eventWorkflow=null;state.activeEvent=null;return eventsPage();}
+  if(!e){state.eventWorkflow=null;state.activeEvent=null;state.view='lojas';return storesPage();}
   if(!canReturn(e.id)||e.status!=='ativo'){
     state.eventWorkflow=null;return eventDetails();
   }
@@ -784,7 +786,7 @@ function returnWorkflowPage(){
 }
 function eventDetails(){
  const e=eventById(state.activeEvent);
- if(!e||e.deleted_at){state.activeEvent=null;return eventsPage();}
+ if(!e||e.deleted_at){state.activeEvent=null;state.view='lojas';return storesPage();}
  const members=state.members.filter(m=>m.event_id===e.id);
  const summary=eventCompactDetail({
   event:e,members,plan:state.eventPickPlans.find(x=>x.event_id===e.id),
@@ -1932,8 +1934,28 @@ function branchStockModal(storeId){
  update();
 }
 function storesPage(){
+ const portal=isFranchisePortal();
+ return renderStoreHub({
+  stores:state.stores,events:state.events,orders:unifiedOrderRecords(),
+  context:{
+   button,time:niceTime,portal,
+   canBrowseOrders:permittedView('pedidos'),
+   canManageStores:hasPermission('stores.manage')&&!portal,
+   canManageEvent:hasPermission('events.manage')&&!portal,
+   showCentral:!portal&&(hasPermission('stores.read')||hasPermission('stores.manage')||
+      hasPermission('orders.read')||hasPermission('orders.separate')||hasPermission('orders.internal')||
+      hasPermission('events.separate')),
+   showFranchises:portal||hasPermission('stores.read')||hasPermission('stores.manage')||canUseStoreOrders(),
+   showEvents:!portal&&permittedView('eventos'),
+   showBranches:!portal&&(hasPermission('stores.read')||hasPermission('stores.manage')),
+   canSeeStore:store=>isAdmin()||assignedStore(store.id),
+   canSeeEvent:event=>hasPermission('events.read')||hasPermission('events.manage')||Boolean(memberRole(event.id))
+  }
+ });
+}
+function storesAdminPage(){
  const manage=hasPermission('stores.manage');
- return tabHead('Lojas','Central, filiais próprias e franquias. Franquias não possuem saldo interno.',manage?button('+ Nova loja','store-new','','primary'):'')+
+ return tabHead('Administração de lojas','Cadastros de unidades, filiais e franquias.',button('← Voltar para Lojas','view','data-view="lojas"','small')+(manage?button('+ Nova loja','store-new','','primary'):''))+
  panel('Unidades',state.stores.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Status</th><th></th></tr></thead><tbody>'+
  state.stores.map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.kind)+(x.is_primary?' · Principal':'')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.kind==='franquia'?'Não controlado':(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.')+'</td><td>'+
  ((x.kind==='filial'&&x.active&&assignedStore(x.id)&&(hasPermission('stores.manage')||hasPermission('orders.receive'))?button('Movimentar','branch-stock-new','data-id="'+h(x.id)+'"','small primary')+button('Devolver à central','branch-return-new','data-id="'+h(x.id)+'"','small'):'')+
@@ -2264,9 +2286,10 @@ function searchAndManageSku(code,openPanel=false){
 }
 function switchView(view) {
   if(view==='pedidos-lojas'||view==='separacao')view='pedidos';
+  if(view==='eventos')view='lojas';
   if(view==='roupas'||view==='saida'||view==='balanco')view='produtos';
   if(!permittedView(view))return;
-  state.view=view;state.search='';state.page=0;
+  state.view=view;state.search='';state.page=0;state.ordersContext=null;
   if(view!=='eventos'){state.activeEvent=null;state.eventWorkflow=null;state.eventReturnQuery='';}
   render();window.scrollTo(0,0);
 }
@@ -2768,7 +2791,7 @@ async function handleClick(event){
   if(action==='event-cover-edit')return eventCoverModal(id);
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
-  if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
+  if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;state.view='lojas';render();return;}
   if(action==='event-sale'){return eventMove('venda_evento');}
   if(action==='event-loss'){return eventLossModal();}
   if(action==='event-transfer')return eventBatchModal(state.activeEvent);
