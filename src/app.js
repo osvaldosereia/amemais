@@ -1398,7 +1398,7 @@ function stockModal(id=null,groupKey=null){
         ])+
         '<div data-single-recipient hidden>'+field('Quem recebeu?','recipient','text','','maxlength="120" placeholder="Nome ou identificação"')+'</div>'+
         textareaField('Justificativa obrigatória','details')+
-        '<p class="help">A baixa é definitiva, não representa venda ou transferência. Não é permitido utilizar unidades reservadas.</p>'+
+        '<p class="help">Avarias ficam em análise, fora do estoque disponível; podem ser recuperadas ou descartadas. Demais motivos geram baixa definitiva. Unidades reservadas não podem sair.</p>'+
       '</div>'+
     '</div>','stock-single-movement','Confirmar movimentação');
   const form=document.querySelector('.modalback form[data-form="stock-single-movement"]');
@@ -2688,13 +2688,17 @@ async function handleSubmit(event){
       if(['diretoria','doacao'].includes(reason)&&(recipient.length<2||recipient.length>120))
         return toast('Identifique quem recebeu o produto.',true);
     }
-    const action=kind==='entrada'?'entrada':'baixa definitiva';
+    const action=kind==='entrada'?'entrada':reason==='avaria'?'envio para análise':'baixa definitiva';
     if(!window.confirm('Confirmar '+action+' de '+qty+' unidade(s) de '+p.name+'?'))return;
     return exec(async()=>{
       if(kind==='entrada'){
         assertOk(await db.rpc('stock_operation_batch',{
           p_operation:'entrada',p_items:[{product_id:id,quantity:qty,expected}],
           p_destination_id:null,p_note:note||null,p_request_id:requestId
+        }));
+      }else if(reason==='avaria'){
+        assertOk(await db.rpc('quarantine_central_stock',{
+          p_product:id,p_quantity:qty,p_expected:expected,p_note:details,p_request:requestId
         }));
       }else{
         assertOk(await db.rpc('record_stock_exception',{
@@ -2704,7 +2708,8 @@ async function handleSubmit(event){
           p_request_id:requestId
         }));
       }
-    },kind==='entrada'?'Entrada de fornecedor registrada.':'Baixa excepcional registrada com motivo e justificativa.');
+    },kind==='entrada'?'Entrada de fornecedor registrada.':
+      reason==='avaria'?'Avaria em análise: unidade fora do estoque disponível.':'Baixa excepcional registrada com motivo e justificativa.');
   }
   if(type==='stock-operation'){
     return saveStockOperation(form);
@@ -3142,6 +3147,19 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-plan-search]')){
+    const q=event.target.value.trim().toLocaleLowerCase('pt-BR'),form=event.target.closest('form');
+    for(const group of form.querySelectorAll('[data-plan-group]')){
+      const rows=[...group.querySelectorAll('[data-plan-row]')];
+      const matchGroup=group.dataset.search.includes(q);
+      for(const row of rows)row.hidden=Boolean(q)&&!matchGroup&&!row.dataset.search.includes(q);
+      group.hidden=rows.every(row=>row.hidden);
+    }
+  }
+  if(event.target.matches('[data-settle-field]')){
+    const form=event.target.closest('form');
+    if(form)updateEventSettlementPreview(form);
+  }
   if(event.target.matches('[data-store-order-search]')){
     const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
     event.target.closest('form')?.querySelectorAll('[data-store-row]').forEach(el=>{
