@@ -2260,8 +2260,7 @@ async function handleClick(event){
   }
   if(action==='apparel-new'){
     if(!canRegisterProducts())return;
-    try{return apparelModal(state,{h,formModal,photoChooser,categorySelector,productTagChooser});}
-    catch(error){fail(error);return;}
+    return productModal();
   }
   if(action==='apparel-add-row'){
     try{return apparelAddRow(target,{h});}catch(error){fail(error);return;}
@@ -2296,10 +2295,12 @@ async function handleClick(event){
     if(!canRegisterProducts())return;
     const model=state.apparelModels.find(m=>m.id===id);if(!model)return toast('Modelo não encontrado.',true);
     const variants=state.items.filter(p=>p.apparel_model_id===id);
-    formModal('Adicionar tamanhos · '+model.name,addSizesContent(model,variants),'extra-sizes','Cadastrar novos tamanhos');
+    const options=resolveCategoryVariations(state.categories,model.category_id).options;
+    if(!options.length)return toast('Configure primeiro as variações desta categoria em Categorias.',true);
+    formModal('Adicionar variações · '+model.name,
+      addSizesContent(model,variants,options),'extra-sizes','Cadastrar variações');
     const form=document.querySelector('.modalback form[data-form="extra-sizes"]');
     form.dataset.modelId=id;
-    form.querySelector('[name="new_color"]')?.addEventListener('input',()=>updateExtraSizeButtons(form,variants));
     return;
   }
   if(action==='extra-size-toggle')return toggleExtraSize(target.closest('form'),target.dataset.size);
