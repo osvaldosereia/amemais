@@ -115,10 +115,9 @@ Deno.serve(async (request) => {
     }
     if(role==='evento'&&(!same(['products.read','events.read','events.request'])||storeIds.length))
       return respond({error:'Responsável de evento deve ter apenas catálogo e solicitações de eventos.'},400);
-    if(role==='consulta'&&permissions.some(p=>[
-      'users.manage','stores.manage','stock.entry','stock.exit','stock.balance','orders.separate',
-      'orders.dispatch','events.manage','events.close','events.sell','products.edit','products.create'
-    ].includes(p)))return respond({error:'Consulta não pode modificar o CDSB.'},400);
+    if(role==='consulta'&&permissions.some(p=>![
+      'products.read','orders.read','stores.read','movements.read','movements.export','events.read'
+    ].includes(p)))return respond({error:'Perfil Consulta permite somente leitura.'},400);
     if(role==='gerente'&&permissions.some(p=>['users.manage','events.sell'].includes(p)))
       return respond({error:'Gerente não pode administrar usuários nem registrar vendas de eventos.'},400);
     const technicalRole=role;
