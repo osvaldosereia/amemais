@@ -79,3 +79,21 @@ test('avarias pendentes oferecem resolver e mantêm histórico',()=>{
  assert.match(html,/damage-resolve/);
  assert.match(html,/Ocorrências resolvidas/);
 });
+
+test('exclusão de loja é oferecida apenas com permissão e impressão exibe uma foto por modelo',()=>{
+ const allowed=eventCompactDetail({
+  event,products,models,groupInventory,h,button,canManage:true,canDelete:true
+ });
+ const blocked=eventCompactDetail({
+  event,products,models,groupInventory,h,button,canManage:true,canDelete:false
+ });
+ assert.match(allowed,/data-action="event-delete"/);
+ assert.doesNotMatch(blocked,/data-action="event-delete"/);
+ const withImages=products.map((p,i)=>({...p,image_path:i===0?'produtos/modelo.jpg':null}));
+ const a4=a4PickingHTML({event,items:plan,products:withImages,models,
+  photoUrls:{'produtos/modelo.jpg':'https://example.com/img.jpg'}
+ });
+ assert.equal((a4.match(/class="event-print-photo"/g)||[]).length,1);
+ assert.match(a4,/SKU/);
+ assert.match(a4,/document.images/);
+});
