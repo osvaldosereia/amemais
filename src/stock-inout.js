@@ -87,7 +87,7 @@ export function operationCartLines(cart,products,qtyStore,kind,qtyAvailable=qtyS
   if(arr.length>100)throw Error('Limite de 100 variações por operação.');
   return arr;
 }
-export function stockOperationPage({kind,query,cart,items,models,destinations,batches,batchLines=[],selectedDestination='',qtyStore,qtyAvailable=qtyStore,groupInventory,photoButton,h=esc,button}){
+export function stockOperationPage({kind,query,cart,items,models,destinations,batches,batchLines=[],selectedDestination='',qtyStore,qtyAvailable=qtyStore,groupInventory,photoButton,h=esc,button,embeddedReceipt=false}){
  const entry=kind==='entrada';
  const groups=stockOperationResults(items,models,query,groupInventory);
  const active=destinations.filter(d=>d.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
@@ -110,9 +110,10 @@ export function stockOperationPage({kind,query,cart,items,models,destinations,ba
  const search=query.trim()?stockOperationSearchHTML({groups,h,qtyStore,qtyAvailable,kind}):
     '<p class="stock-search-welcome">Pesquise pelo nome, SKU ou leia um código EAN.</p>';
  const stepSearch=entry?'1':'2',stepCart=entry?'2':'3';
- return '<div class="stock-op-v2 '+(entry?'stock-entry':'stock-exit')+'">'+
-  '<header class="stock-op-heading"><div><h1>'+(entry?'Entrada de estoque':'Saída de estoque')+'</h1>'+
-  '<p>'+(entry?'Receber produtos e acrescentar quantidades à loja.':'Retirar produtos com registro do destino.')+'</p></div>'+
+ return '<div class="stock-op-v2 '+(entry?'stock-entry':'stock-exit')+(embeddedReceipt?' stock-receipt-workflow':'')+'">'+
+  (embeddedReceipt?'<button type="button" class="stock-receipt-back" data-action="view" data-view="produtos">← Voltar aos produtos</button>':'')+
+  '<header class="stock-op-heading"><div><h1>'+(embeddedReceipt?'Receber remessa':entry?'Entrada de estoque':'Saída de estoque')+'</h1>'+
+  '<p>'+(embeddedReceipt?'Confira a remessa do fornecedor por SKU ou EAN e registre várias quantidades de uma vez.':entry?'Receber produtos e acrescentar quantidades à loja.':'Retirar produtos com registro do destino.')+'</p></div>'+
   '<div class="stock-op-tabs" role="group" aria-label="Tipo de movimentação">'+
    '<button type="button" data-action="view" data-view="entrada" class="'+(entry?'is-active':'')+'"'+(entry?' aria-current="page"':'')+'>↓ Entrada</button>'+
    '<button type="button" data-action="view" data-view="saida" class="'+(!entry?'is-active':'')+'"'+(!entry?' aria-current="page"':'')+'>↑ Saída</button>'+

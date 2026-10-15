@@ -1,0 +1,84 @@
+/* AME MAIS — Produtos como ponto central das movimentações pontuais. */
+.products-panel .product-card-v3 .grouped-inventory-actions>.product-card-move{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-height:44px;padding:9px 13px;border:1px solid #176747;
+  border-radius:10px;background:#176747;color:#fff;font-size:.87rem;font-weight:800;
+  white-space:nowrap;cursor:pointer;
+}
+.products-panel .product-card-v3 .grouped-inventory-actions>.product-card-move:hover{
+  background:#0e5136;border-color:#0e5136;
+}
+.products-panel .product-card-v3 .group-variant-actions{
+  display:flex;flex-wrap:wrap;gap:6px;
+}
+.products-panel .product-card-v3 .group-variant-actions .button.primary{
+  color:#fff;background:#176747;border-color:#176747;
+}
+.stock-single-form{
+  display:flex;flex-direction:column;gap:13px;padding:4px 2px;
+}
+.stock-single-form .help{margin:0;font-size:.81rem;line-height:1.5}
+.stock-single-form>.field,.stock-single-form [data-single-entry]>.field,
+.stock-single-form [data-single-exit]>.field,
+.stock-single-form [data-single-recipient]>.field{
+  display:flex;flex-direction:column;gap:5px;
+}
+.stock-single-form .field select,.stock-single-form .field input,
+.stock-single-form .field textarea{
+  min-height:44px;border-radius:9px;
+}
+.stock-single-form .field textarea{min-height:76px;resize:vertical}
+.stock-single-form [hidden]{display:none!important}
+.stock-single-balance{
+  padding:12px 13px;border:1px solid #cde3d5;border-radius:10px;
+  background:#eff8f1;color:#245b3e;font-size:.83rem;font-weight:700;
+  line-height:1.45;font-variant-numeric:tabular-nums;
+}
+.stock-single-form [data-single-exit]{
+  display:flex;flex-direction:column;gap:11px;
+  padding:13px;border:1px solid #ecded3;border-radius:11px;background:#fffaf6;
+}
+.stock-single-form [data-single-entry]{
+  padding:11px 12px;border:1px solid #dfeee3;border-radius:11px;background:#fbfdfb;
+}
+.stock-single-form [data-single-recipient]{display:flex;flex-direction:column}
+.stock-single-form [data-single-exit]>.help{color:#866149}
+.stock-receipt-back{
+  appearance:none;margin:0 0 10px;padding:8px 2px;
+  border:0;background:transparent;color:#236444;
+  font-size:.86rem;font-weight:760;cursor:pointer;
+}
+.stock-receipt-workflow .stock-op-tabs{display:none!important}
+@media(min-width:761px){
+  .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-move{flex:1}
+  .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-edit{
+    background:#f5faf7;color:#20583d;border-color:#cbded2;
+  }
+}
+@media(max-width:760px){
+  .products-panel .product-card-v3 .grouped-inventory-actions{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px;grid-auto-flow:row;gap:7px;
+  }
+  .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-move{
+    grid-column:1/-1;grid-row:1;min-width:0;min-height:44px;
+  }
+  .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-edit{
+    grid-column:1;grid-row:2;background:#f5faf7;color:#20583d;border-color:#cbded2;
+  }
+  .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-sizes{
+    grid-column:2;grid-row:2;
+  }
+  .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-more{
+    grid-column:3;grid-row:2;
+  }
+  .products-panel .product-card-v3 .group-variant-actions .button{min-height:36px}
+  .products-panel .product-toolbar-v3 .product-search-row{flex:1 1 100%}
+  .products-pagehead .actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+  .products-pagehead .actions .button{min-height:39px;font-size:.73rem;padding:7px 10px}
+  .stock-single-form{gap:11px}
+}
+@media(max-width:390px){
+  .products-panel .product-card-v3 .group-variant-actions .button{font-size:.69rem;padding:5px 8px}
+  .products-pagehead{align-items:flex-start}
+  .products-pagehead .actions{max-width:65%}
+}
