@@ -665,8 +665,8 @@ function quickBalancePage(){
 }
 
 function eventsPage(){
-  const add=hasPermission('events.manage')?button('+ Criar evento','event-new','','primary'):'';
-  return tabHead('Eventos','Controle de mercadorias enviadas, devolvidas e não retornadas.',add)+
+  const add=hasPermission('events.manage')?button('+ Nova loja temporária','event-new','','primary'):'';
+  return tabHead('Lojas temporárias','Consignação: envio, venda, devolução e conciliação.',add)+
     '<div class="eventgrid">'+state.events.map(e=>{
       const remaining=state.balances.filter(b=>b.event_id===e.id).reduce((s,b)=>s+b.quantity,0);
       return '<article class="panel event-card">'+pill(e.status)+'<h3>'+h(e.name)+'</h3><p class="muted">'+niceDate(e.starts_at)+(e.ends_at?' até '+niceDate(e.ends_at):'')+'</p>'+
@@ -707,8 +707,8 @@ function eventDetails(){
     '<div class="cards">'+[['Separados',transfers],['Devolvidos',returned],['Não retornaram',unreturned],['Pendentes',pending]].map(([name,value])=>
       '<div class="card"><div class="metric-label">'+name+'</div><div class="metric">'+value+'</div></div>').join('')+'</div>'+
     '<div class="actions" style="margin-bottom:18px">'+actions+'</div>'+
-    (e.status==='ativo'&&pending>0?'<div class="note">Ainda há '+pending+
-      ' unidade(s) no evento. Você pode devolver as que voltaram e encerrar; as restantes terão baixa neutra, sem registrar venda.</div>':'')+
+    (e.status==='ativo'&&pending>0?'<div class="note">Há '+pending+
+      ' unidade(s) na loja temporária. Registre vendas ou baixas justificadas e devolva o restante antes do encerramento.</div>':'')+
     panel('Produtos e movimentações do evento',history)+
     panel('Equipe responsável','<div class="panelbody">'+(mem.length?mem.map(m=>
       '<div class="inline" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid #edf1ee">'+
@@ -1161,11 +1161,11 @@ function stockModal(id){
 }
 function eventModal(){
   if(!hasPermission('events.manage'))return;
-  formModal('Criar evento','<div class="formgrid">'+field('Nome do evento','name','text','','required maxlength="150"')+
+  formModal('Criar loja temporária','<div class="formgrid">'+field('Nome do local / evento','name','text','','required maxlength="150"')+
     field('Data de início','starts_at','date',dateToday(),'required')+
     field('Data de término (opcional)','ends_at','date')+
     textareaField('Observações','notes')+'</div><div class="note">O evento começa como rascunho. Vincule a equipe, ative e então transfira os produtos.</div>',
-    'event-create','Criar evento');
+    'event-create','Criar loja temporária');
 }
 function eventMove(action){
   const eid=state.activeEvent;
@@ -1173,7 +1173,7 @@ function eventMove(action){
   const labels={transferencia:'Transferir produtos',venda_evento:'Registrar venda',devolucao:'Devolver produtos'};
   if(action==='transferencia'&&!hasPermission('events.separate') || action==='venda_evento'&&!canSell(eid) ||
     action==='devolucao'&&!canReturn(eid))return;
-  const opts=action==='transferencia'?productOptions(true):productOptions(true,eid);
+  const opts=action==='transferencia'?[['','Escolha um produto'],...state.items.filter(p=>p.active&&qtyAvailable(p.id)>0).map(p=>[p.id,p.name])]:productOptions(true,eid);
   if(opts.length===1){toast('Não há produtos disponíveis para essa operação.',true);return;}
   formModal(labels[action],'<div class="formgrid">'+selectField('Produto','product_id',opts,'','required')+
     field('Quantidade','quantity','number','1','required min="1" max="1000000" step="1"')+
@@ -1262,55 +1262,74 @@ function storesPage(){
  const manage=hasPermission('stores.manage');
  return tabHead('Lojas','Unidades cadastradas e seus saldos de estoque.',manage?button('+ Nova loja','store-new','','primary'):'')+
  panel('Unidades',state.stores.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Status</th><th></th></tr></thead><tbody>'+
- state.stores.map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.kind)+(x.is_primary?' · Principal':'')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.</td><td>'+
+ state.stores.map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.kind)+(x.is_primary?' · Principal':'')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.kind==='franquia'?'Não controlado':(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.')+'</td><td>'+
  (manage?button('Editar','store-edit','data-id="'+h(x.id)+'"','small')+(x.is_primary?'':button(x.active?'Desativar':'Ativar','store-toggle','data-id="'+h(x.id)+'"','small')+button('Excluir','store-delete','data-id="'+h(x.id)+'"','small')):'')+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhuma loja cadastrada.</p>')+
- '<div class="note">A exclusão é bloqueada quando existem vínculos ou saldos. Estoques individuais serão ativados somente após a migração das operações.</div>';
+ '<div class="note">A exclusão é bloqueada quando existem vínculos ou saldos. Franquias somente solicitam mercadorias; não têm estoque físico controlado.</div>';
 }
 function assignedStore(storeId){
  return state.profile?.role==='admin'||state.staffStores.some(x=>x.user_id===state.user?.id&&x.store_id===storeId);
 }
 function storeOrdersPage(){
+ const portal=isFranchisePortal();
  const canRequest=hasPermission('orders.central')||hasPermission('orders.franchise');
- const create=canRequest?button('+ Solicitar mercadorias','store-order-new','','primary'):'';
- const status={solicitado:'Aguardando separação',separado:'Em transporte · receber',recebido:'Recebido',cancelado:'Cancelado'};
- const rows=state.storeOrders.map(o=>{
+ const create=canRequest?button('+ Montar pedido','store-order-new','','primary'):'';
+ const labels={solicitado:'Solicitado · aguardando análise',aprovado:'Aprovado · reservado',
+  separado:'Separado · fisicamente na central',despachado:'Saiu da central · aguardando recebimento',
+  concluido:'Saída concluída',recebido:'Recebido',cancelado:'Cancelado'};
+ const orders=portal?state.storeOrders.filter(o=>o.created_by===state.user?.id):state.storeOrders;
+ const rows=orders.map(o=>{
   const from=state.stores.find(x=>x.id===o.from_store_id);
   const to=state.stores.find(x=>x.id===o.to_store_id);
   const lines=state.storeOrderItems.filter(x=>x.order_id===o.id);
-  const products=lines.map(x=>h(product(x.product_id)?.name||'Produto')+' · '+x.quantity+' un.').join(' | ');
-  const actions=(o.status==='solicitado'&&hasPermission('orders.separate')&&assignedStore(o.from_store_id)?
-    button('Confirmar separação','store-order-separate','data-id="'+h(o.id)+'"','small primary'):'')+
-    (o.status==='separado'&&hasPermission('orders.receive')&&assignedStore(o.to_store_id)?
-    button('Confirmar recebimento','store-order-receive','data-id="'+h(o.id)+'"','small primary'):'')+
-    (o.status==='solicitado'&&(o.created_by===state.user?.id||(hasPermission('orders.cancel')&&assignedStore(o.to_store_id)))?
-    button('Cancelar','store-order-cancel','data-id="'+h(o.id)+'"','small'):'');
-  return '<article class="store-order-card"><header><strong>'+h(from?.name||'Origem')+' → '+h(to?.name||'Destino')+
-    '</strong><span class="pill '+(o.status==='recebido'?'ativo':'')+'">'+h(status[o.status]||o.status)+'</span></header>'+
-    '<small>'+h(niceTime(o.created_at))+'</small><p>'+products+'</p><div class="inline">'+actions+'</div></article>';
+  const count=lines.reduce((sum,x)=>sum+Number(x.quantity),0);
+  const products=lines.map(x=>'<li>'+h(product(x.product_id)?.name||'Produto')+' · '+x.quantity+' un.</li>').join('');
+  const canProcess=!portal&&hasPermission('orders.separate')&&assignedStore(o.from_store_id);
+  const actions=(o.status==='solicitado'&&canProcess?
+       button('Aprovar e reservar','store-order-approve','data-id="'+h(o.id)+'"','small primary'):'')+
+    (o.status==='aprovado'&&canProcess?
+       button('Confirmar separação','store-order-separate','data-id="'+h(o.id)+'"','small primary'):'')+
+    (o.status==='separado'&&canProcess?
+       button('Registrar saída física','store-order-dispatch','data-id="'+h(o.id)+'"','small primary'):'')+
+    (o.status==='despachado'&&!portal&&hasPermission('orders.receive')&&assignedStore(o.to_store_id)?
+       button('Confirmar recebimento','store-order-receive','data-id="'+h(o.id)+'"','small primary'):'')+
+    (['solicitado','aprovado','separado'].includes(o.status)&&(
+      (o.status==='solicitado'&&o.created_by===state.user?.id)||
+      (!portal&&hasPermission('orders.cancel')&&assignedStore(o.to_store_id)))?
+       button('Cancelar','store-order-cancel','data-id="'+h(o.id)+'"','small'):'');
+  return '<article class="store-order-card"><header><strong>Pedido #'+h(o.id.slice(0,8).toUpperCase())+
+   ' · '+h(from?.name||'Central')+' → '+h(to?.name||'Loja')+
+   '</strong><span class="pill '+(o.status==='concluido'||o.status==='recebido'?'ativo':'')+'">'+h(labels[o.status]||o.status)+'</span></header>'+
+   '<small>'+h(niceTime(o.created_at))+' · '+count+' unidade(s)</small>'+
+   (o.external_reference?'<small>Referência externa: '+h(o.external_reference)+'</small>':'')+
+   '<ul class="store-order-lines">'+products+'</ul>'+
+   (o.note?'<p>'+h(o.note)+'</p>':'')+'<div class="inline">'+actions+'</div></article>';
  });
- return tabHead('Pedidos entre lojas','Solicite, separe e confirme a chegada das mercadorias.',create)+
-  panel('Solicitações',rows.length?'<div class="store-order-list">'+rows.join('')+'</div>':'<div class="panelbody"><p class="muted">Ainda não há pedidos entre lojas.</p></div>')+
-  '<div class="note">A quantidade sai da origem quando a separação é confirmada e entra no destino somente após o recebimento.</div>';
+ return tabHead(portal?'Pedidos da franquia':'Pedidos e solicitações',
+   portal?'Monte pedidos; a central fará a conferência e informará o andamento.':
+   'Aprovar reserva → separar fisicamente → registrar saída; franquias não possuem estoque controlado.',create)+
+   panel('Solicitações',rows.length?'<div class="store-order-list">'+rows.join('')+'</div>':
+   '<div class="panelbody"><p class="muted">Nenhum pedido registrado.</p></div>')+
+   (!portal?'<p class="help">Separar não retira mercadoria do estoque físico. A baixa ocorre apenas em Registrar saída física.</p>':'');
 }
 function storeOrderModal(){
  const main=state.stores.find(x=>x.is_primary&&x.active);
- if(!main)return toast('Cadastre a loja principal antes de solicitar.',true);
- const targets=state.stores.filter(x=>x.active&&!x.is_primary&&assignedStore(x.id));
- const types=[...(hasPermission('orders.central')?[['central','Pedido à loja central']]:[]),
-  ...(hasPermission('orders.franchise')?[['franquia','Pedido para franquia']]:[])];
- if(!types.length||!targets.length)return toast('Associe o funcionário à loja de destino para solicitar.',true);
- const list=state.items.filter(x=>x.active).slice(0,1500);
- const rows=list.map(p=>'<div class="store-order-product" data-store-row data-filter="'+h([p.name,p.ean,p.sku,p.apparel_color,p.apparel_size].join(' ').toLocaleLowerCase('pt-BR'))+'">'+
+ if(!main)return toast('Estoque central não cadastrado.',true);
+ const targets=state.stores.filter(x=>x.active&&!x.is_primary&&assignedStore(x.id)&&
+  ((x.kind==='franquia'&&hasPermission('orders.franchise'))||
+   (x.kind==='filial'&&hasPermission('orders.central'))));
+ if(!targets.length)return toast('Não há unidade habilitada para solicitar mercadorias.',true);
+ const portal=isFranchisePortal();
+ const rows=state.items.filter(p=>p.active).slice(0,1500).map(p=>
+  '<div class="store-order-product" data-store-row data-filter="'+h([p.name,p.ean,p.sku,p.apparel_color,p.apparel_size].join(' ').toLocaleLowerCase('pt-BR'))+'">'+
   '<div><strong>'+h(p.name)+'</strong><small>'+h([p.apparel_color,p.apparel_size,p.sku,p.ean].filter(Boolean).join(' · '))+
-  ' · Central: '+qtyStore(p.id)+' un.</small></div>'+
+  (portal?'':' · Livre na central: '+qtyAvailable(p.id)+' un.')+'</small></div>'+
   '<input type="number" inputmode="numeric" min="0" max="1000000" step="1" value="0" data-store-order-qty data-id="'+h(p.id)+'" aria-label="Quantidade de '+h(p.name)+'"></div>').join('');
- formModal('Solicitar mercadorias','<div class="formgrid">'+
-  selectField('Tipo de pedido','request_type',types)+
-  selectField('Loja solicitante','to_store_id',targets.map(x=>[x.id,x.name]))+
-  '<div class="field wide"><span>Pesquisar por nome, SKU ou EAN</span><input type="search" data-store-order-search placeholder="Buscar mercadorias…"></div>'+
+ formModal('Montar solicitação de mercadorias','<div class="formgrid">'+
+  selectField('Unidade solicitante','to_store_id',targets.map(x=>[x.id,x.name]))+
+  '<div class="field wide"><span>Buscar por nome, SKU ou EAN</span><input type="search" data-store-order-search placeholder="Buscar produtos…"></div>'+
   '<section class="wide store-order-products">'+rows+'</section>'+
-  textareaField('Observação','note')+'</div><div class="note">Somente produtos com quantidade maior que zero serão incluídos.</div>',
-  'store-order-create','Criar solicitação');
+  textareaField('Observação (opcional)','note')+'</div><div class="note">Enviar o pedido não reserva nem baixa unidades. A central analisará a solicitação.</div>',
+  'store-order-create','Enviar solicitação');
 }
 function storeModal(item=null){
  if(!hasPermission('stores.manage'))return;
@@ -1792,9 +1811,9 @@ async function handleClick(event){
   if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
   if(action==='event-transfer'){
     if(!hasPermission('events.separate')||eventStatus(state.activeEvent)!=='ativo')return;
-    const eligible=state.items.filter(p=>p.active&&qtyStore(p.id)>0);
+    const eligible=state.items.filter(p=>p.active&&qtyAvailable(p.id)>0);
     if(!eligible.length)return toast('Nenhum produto com saldo na loja.',true);
-    formModal('Separação para o evento',eventBatchContent(eligible,state.apparelModels,qtyStore,photoButton),
+    formModal('Transferência para loja temporária',eventBatchContent(eligible,state.apparelModels,qtyAvailable,photoButton),
       'event-batch','Confirmar transferência');
     const form=document.querySelector('.modalback form[data-form="event-batch"]');
     form.dataset.event=state.activeEvent;
@@ -1901,14 +1920,24 @@ async function handleClick(event){
     const w=window.open(wa,'_blank','noopener,noreferrer');if(!w)window.location.assign(wa);return;
   }
   if(action==='store-order-new')return storeOrderModal();
-  if(['store-order-separate','store-order-receive','store-order-cancel'].includes(action)){
+  if(['store-order-approve','store-order-separate','store-order-dispatch',
+       'store-order-receive','store-order-cancel'].includes(action)){
     const order=state.storeOrders.find(x=>x.id===id);if(!order)return;
-    const actionMap={'store-order-separate':['separate_store_order','Separação concluída.'],
-      'store-order-receive':['receive_store_order','Recebimento confirmado.'],
-      'store-order-cancel':['cancel_store_order','Pedido cancelado.']};
-    if(!window.confirm(action==='store-order-separate'?'Confirmar retirada das unidades do estoque de origem?':
-      action==='store-order-receive'?'Confirmar que todas as unidades chegaram?':'Cancelar este pedido ainda não separado?'))return;
-    const [rpc,msg]=actionMap[action];
+    const labels={'store-order-approve':['approve_store_order','Aprovado; unidades reservadas.','Aprovar e reservar as quantidades deste pedido?'],
+      'store-order-separate':['separate_store_order','Separação registrada; físico permanece na central.','Confirmar que os produtos foram fisicamente separados?'],
+      'store-order-receive':['receive_store_order','Recebimento registrado.','Confirmar recebimento integral na unidade de destino?'],
+      'store-order-cancel':['cancel_store_order','Pedido cancelado e reservas liberadas.','Cancelar pedido e liberar as reservas?']};
+    if(action==='store-order-dispatch'){
+      if(!hasPermission('orders.separate')||!assignedStore(order.from_store_id))return;
+      if(!window.confirm('Confirmar saída física deste pedido da central? A quantidade será baixada agora.'))return;
+      const ref=window.prompt('Referência do outro sistema (opcional):','');
+      if(ref===null)return;
+      return exec(async()=>assertOk(await db.rpc('dispatch_store_order',{
+        p_order:id,p_external_reference:ref.trim()||null
+      })),'Saída física registrada e reserva consumida.');
+    }
+    const [rpc,msg,confirmation]=labels[action];
+    if(!window.confirm(confirmation))return;
     await exec(async()=>assertOk(await db.rpc(rpc,{p_order:id})),msg);return;
   }
   if(action==='store-new')return storeModal();
@@ -1935,8 +1964,9 @@ async function handleClick(event){
   }
   if(action==='event-close'){
     const remaining=state.balances.filter(x=>x.event_id===id).reduce((s,b)=>s+b.quantity,0);
-    if(!window.confirm('Encerrar o evento? '+remaining+' unidade(s) não voltaram ao estoque. Essas unidades terão baixa neutra do evento, sem venda nem devolução. A operação é definitiva.'))return;
-    await exec(async()=>assertOk(await db.rpc('close_event',{p_event_id:id})),'Evento encerrado. Unidades não retornadas baixadas, sem alterar o estoque da loja.');
+    if(remaining>0)return toast('Há '+remaining+' unidade(s) ainda na loja temporária. Registre venda/baixa justificada ou devolva tudo antes de encerrar.',true);
+    if(!window.confirm('Encerrar esta loja temporária? O saldo está conciliado em zero.'))return;
+    await exec(async()=>assertOk(await db.rpc('close_event',{p_event_id:id})),'Loja temporária encerrada com saldo conciliado.');
   }
   if(action==='member-remove'){
     if(!window.confirm('Remover o acesso desta pessoa a este evento?'))return;
@@ -2255,9 +2285,14 @@ async function handleSubmit(event){
     const items=lines.filter(x=>x.quantity>0);
     if(!items.length)return toast('Selecione ao menos um produto.',true);
     if(items.length>100)return toast('Limite de 100 produtos por pedido.',true);
+    const target=state.stores.find(x=>x.id===values.to_store_id);
+    if(!target||!target.active||!assignedStore(target.id)||
+      (target.kind==='franquia'&&!hasPermission('orders.franchise'))||
+      (target.kind!=='franquia'&&!hasPermission('orders.central')))return toast('Unidade não autorizada.',true);
     const main=state.stores.find(x=>x.is_primary);
     await exec(async()=>assertOk(await db.rpc('create_store_order',{
-      p_from_store:main.id,p_to_store:values.to_store_id,p_type:values.request_type,
+      p_from_store:main.id,p_to_store:values.to_store_id,
+      p_type:state.stores.find(x=>x.id===values.to_store_id)?.kind==='franquia'?'franquia':'central',
       p_items:items,p_note:values.note||null
     })),'Solicitação criada. A separação ainda não movimentou estoque.');return;
   }
