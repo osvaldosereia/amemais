@@ -36,7 +36,9 @@ export function permanentHome({stores=[],orders=[],button,time,userId}){
  const list=rows=>rows.slice(0,16).map(o=>
    '<article class="cdsb-order-row"><div><strong>Pedido #'+h(o.id.slice(0,8).toUpperCase())+'</strong>'+
    '<small>'+h(time(o.created_at))+' · '+h((stores.find(s=>s.id===o.to_store_id)?.name)||'Minha loja')+'</small></div>'+
-   '<span class="cdsb-status">'+h(labels[o.status]||o.status)+'</span></article>').join('');
+   '<span class="cdsb-status">'+h(labels[o.status]||o.status)+'</span>'+
+   (o.status==='despachado'?button('Confirmar entrega','commercial-confirm-delivery','data-id="'+h(o.id)+'"','small primary'):'')+
+   '</article>').join('');
  return '<div class="cdsb-portal"><header class="cdsb-portal-head"><div><small>CDSB · Área da loja</small>'+
    '<h1>'+h(display)+'</h1><p>Solicite mercadorias ao CDSB e acompanhe seus pedidos. Seu estoque interno não é controlado aqui.</p></div>'+
   button('+ Novo pedido','store-order-new','','primary')+'</header>'+
