@@ -1177,8 +1177,18 @@ function ordersPage(separationOnly=false){
     (valid&&hasPermission('catalog.manage')?button('Revogar link','customer-link-revoke','data-id="'+h(access.id)+'"','small danger'):'')+
    '</div>';
   }).join(''):'<p class="muted">Nenhum acesso de cliente criado.</p>')+'</div>';
- const records=unifiedOrderRecords();
- return unifiedOrdersPage(records,{
+ const scope=state.ordersContext;
+ const allRecords=unifiedOrderRecords();
+ const records=scope?locationOrders(allRecords,scope,scope.mode||'all'):allRecords;
+ const contextTitle=scope?.type==='central'?'Loja Central':
+   scope?.type==='store'?(state.stores.find(s=>s.id===scope.id)?.name||'Loja'):
+   scope?.type==='event'?(eventById(scope.id)?.name||'Loja temporária'):'';
+ const contextHeader=scope?
+  '<div class="sh-context"><div>'+button('← Lojas','store-hub-back','','small')+
+  '<strong>'+h(contextTitle)+'</strong><span>'+(scope.mode==='pending'?'Pedidos em andamento':
+    scope.mode==='history'?'Histórico de pedidos':'Todos os pedidos')+'</span></div>'+
+  button('Mostrar todos os pedidos','store-hub-reset','','small')+'</div>':'';
+ return contextHeader+unifiedOrdersPage(records,{
   button,time:niceTime,portal,separationOnly,linksMarkup:links,summaryLink:activeAccess+' ativo(s)',
   canProcess:o=>!portal&&(
     o.kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
@@ -2786,6 +2796,43 @@ async function handleClick(event){
     'event-delete-confirm','Excluir e devolver estoque');
    const form=document.querySelector('.modalback form[data-form="event-delete-confirm"]');
    if(form)form.dataset.eventId=id;
+   return;
+  }
+  if(action==='store-hub-admin'){
+   if(!hasPermission('stores.manage'))return;
+   state.view='lojas-admin';state.ordersContext=null;render();window.scrollTo(0,0);return;
+  }
+  if(action==='store-hub-back'){
+   state.ordersContext=null;state.view='lojas';render();window.scrollTo(0,0);return;
+  }
+  if(action==='store-hub-reset'){
+   if(!permittedView('pedidos'))return;
+   state.ordersContext=null;state.view='pedidos';render();window.scrollTo(0,0);return;
+  }
+  if(action==='store-hub-orders'||action==='store-hub-open-order'){
+   if(!permittedView('pedidos'))return;
+   const type=target.dataset.locationType,location=target.dataset.locationId;
+   if(!['central','store','event'].includes(type))return;
+   const store=state.stores.find(s=>s.id===location);
+   const ev=eventById(location),portal=isFranchisePortal();
+   const scopeAllowed=type==='central'?!portal:
+    type==='store'?Boolean(store&&(isAdmin()||assignedStore(store.id))):
+    Boolean(ev&&!ev.deleted_at&&!portal&&
+      (hasPermission('events.read')||hasPermission('events.manage')||Boolean(memberRole(ev.id))));
+   if(!scopeAllowed)return toast('Sem autorização para consultar esta unidade.',true);
+   const mode=action==='store-hub-open-order'?'all':target.dataset.mode;
+   const context={type,id:location,mode:['all','pending','history'].includes(mode)?mode:'all'};
+   const focus=action==='store-hub-open-order'?target.dataset.orderId:null;
+   if(focus&&!locationOrders(unifiedOrderRecords(),context).some(o=>o.id===focus))return;
+   state.ordersContext=context;state.view='pedidos';state.search='';state.page=0;
+   render();window.scrollTo(0,0);
+   if(focus)requestAnimationFrame(()=>{
+    const card=[...document.querySelectorAll('[data-order-card]')].find(el=>el.dataset.orderId===focus);
+    if(!card)return;
+    const details=card.querySelector('details.uo-details');
+    if(details)details.open=true;
+    card.scrollIntoView({block:'center',behavior:'smooth'});
+   });
    return;
   }
   if(action==='event-cover-edit')return eventCoverModal(id);
