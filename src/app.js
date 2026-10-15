@@ -55,6 +55,7 @@ const nav = [
   {id:'entrada',label:'Entrada',ico:'arrow-down-to-line'},
   {id:'saida',label:'Saída',ico:'arrow-up-from-line'},
   {id:'balanco',label:'Balanço rápido',ico:'clipboard'},
+  {id:'inventario',label:'Inventário formal',ico:'clipboard'},
   {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
   {id:'pedidos',label:'Pedidos Avulsos',ico:'clipboard'},
   {id:'pedidos-lojas',label:'Solicitações de lojas',ico:'arrows'},
@@ -67,7 +68,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],
-  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -106,6 +107,7 @@ const permittedView = v => {
  if(v==='pedidos')return hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
  if(v==='usuarios')return isAdmin();
  if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
+ if(v==='inventario')return hasPermission('stock.balance')||hasPermission('stores.manage')||hasPermission('events.manage');
  if(v==='eventos')return hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.separate');
  return Boolean(viewPermission[v]&&hasPermission(viewPermission[v]));
 };
@@ -182,6 +184,11 @@ async function loadData(){
     ['users',db.from('staff_profiles').select('id,full_name,username,role,active,permissions_customized,created_at').order('full_name').limit(1000)]
   ];
   resources.push(['stores',db.from('stores').select('*').order('name')]);
+  if(hasPermission('stock.balance')||hasPermission('stores.manage')||hasPermission('events.manage')){
+   resources.push(['inventorySessions',db.from('inventory_sessions').select('*').order('created_at',{ascending:false}).limit(100)]);
+   resources.push(['inventoryItems',db.from('inventory_session_items').select('*').limit(10000)]);
+  }
+  if(hasPermission('events.manage')||hasPermission('events.close'))resources.push(['consignationClosures',db.from('consignation_closures').select('*').limit(500)]);
   resources.push(['storeBalances',db.from('store_stock').select('store_id,product_id,quantity').limit(10000)]);
   if(hasPermission('stores.read')){
     resources.push(['branchMovements',db.from('store_stock_movements').select('*').order('created_at',{ascending:false}).limit(500)]);
@@ -437,6 +444,7 @@ function render(){
 function pageContent(){
   if(state.view==='entrada'||state.view==='saida')return renderStockOperationPage();
   if(state.view==='balanco')return quickBalancePage();
+  if(state.view==='inventario')return inventoryPage();
   if(state.view==='produtos')return productsPage();
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):eventsPage();
   if(state.view==='movimentacoes')return movementsPage();
@@ -653,6 +661,58 @@ function franchiseCatalogPage(){
     '<div class="actions">'+button('Anterior','product-prev',state.page===0?'disabled':'','small')+
     button('Próxima','product-next',state.page>=pages-1?'disabled':'','small')+'</div></div></section>';
 }
+function inventoryPage(){
+ const sessions=state.inventorySessions;
+ const types={central:'Central',filial:'Filial própria',temporaria:'Loja temporária'};
+ const rows=sessions.map(x=>{
+  const items=state.inventoryItems.filter(i=>i.session_id===x.id);
+  const counted=items.filter(i=>i.counted_quantity!==null).length;
+  const divergent=items.filter(i=>i.counted_quantity!==null&&i.counted_quantity!==i.expected_quantity).length;
+  const local=x.location_type==='central'?'Estoque central':x.location_type==='filial'?
+    state.stores.find(y=>y.id===x.location_id)?.name:state.events.find(y=>y.id===x.location_id)?.name;
+  const active=x.status==='aberta'||x.status==='revisao';
+  return '<article class="panel"><div class="panelbody"><strong>'+h(x.title)+'</strong><p class="muted">'+
+   h(types[x.location_type]||x.location_type)+' · '+h(local||'Local')+' · '+h(x.status)+
+   '</p><p>Contados: '+counted+'/'+items.length+' SKUs · Divergências: '+divergent+'</p>'+
+   (active?button(x.status==='aberta'?'Continuar contagem':'Revisar divergências','inventory-open','data-id="'+h(x.id)+'"','primary')+
+    (x.status==='aberta'&&counted===items.length?button('Enviar para revisão','inventory-submit','data-id="'+h(x.id)+'"','small'):'')+
+    (x.status==='revisao'?button('Rejeitar sessão','inventory-reject','data-id="'+h(x.id)+'"','small'):''):'')+
+   '</div></article>';
+ }).join('');
+ return tabHead('Inventário formal','Contagem completa por local, revisão de divergências e aprovação auditada.',
+ button('+ Nova sessão','inventory-new','','primary'))+
+ panel('Sessões',rows||'<p class="muted">Nenhuma sessão de inventário.</p>');
+}
+function inventoryStartModal(){
+ const opts=[];
+ if(hasPermission('stock.balance'))opts.push(['central|','Central']);
+ if(hasPermission('stores.manage'))state.stores.filter(x=>x.kind==='filial'&&x.active&&assignedStore(x.id)).forEach(x=>opts.push(['filial|'+x.id,'Filial · '+x.name]));
+ if(hasPermission('events.manage'))state.events.filter(x=>x.status==='ativo').forEach(x=>opts.push(['temporaria|'+x.id,'Temporária · '+x.name]));
+ if(!opts.length)return toast('Sem local habilitado para inventário.',true);
+ formModal('Abrir inventário','<div class="formgrid">'+selectField('Local','location',opts)+
+ field('Identificação da sessão','title','text','Inventário físico','required maxlength="120"')+
+ '</div><p class="help">Será registrada uma fotografia dos saldos por SKU. A aprovação só ocorrerá após todos os itens serem contados.</p>',
+ 'inventory-start','Abrir sessão');
+}
+function inventorySessionModal(id){
+ const session=state.inventorySessions.find(x=>x.id===id);if(!session)return;
+ const items=state.inventoryItems.filter(x=>x.session_id===id);
+ const pending=items.filter(x=>x.counted_quantity===null).length;
+ const divergent=items.filter(x=>x.counted_quantity!==null&&x.counted_quantity!==x.expected_quantity);
+ const rows=items.map(x=>{
+  const p=product(x.product_id);
+  return '<div class="store-picking-line"><div><strong>'+h(p?.name||'Produto')+'</strong><small>'+h([p?.sku,p?.ean,p?.apparel_size].filter(Boolean).join(' · '))+
+  '</small><small>Esperado: '+x.expected_quantity+' · Diferença: '+(x.counted_quantity===null?'não contado':x.counted_quantity-x.expected_quantity)+'</small></div>'+
+  (session.status==='aberta'?'<label>Físico <input type="number" min="0" max="1000000" step="1" data-inventory-qty data-id="'+h(x.product_id)+'" value="'+(x.counted_quantity===null?'':x.counted_quantity)+'" placeholder="Contar"></label>':
+  '<strong>Contado: '+x.counted_quantity+'</strong>')+'</div>';
+ }).join('');
+ formModal('Inventário · '+session.title,'<p class="help">Todos os '+items.length+' SKUs precisam ser contados. Pendentes: '+pending+
+ ' · Divergentes: '+divergent.length+'</p><div class="store-picking-list">'+rows+'</div>'+
+ (session.status==='revisao'?textareaField('Justificativa das divergências','note'):'')+
+ '<p class="help">O saldo físico será alterado apenas após aprovação. Reservas na central continuam protegidas.</p>',
+ session.status==='aberta'?'inventory-save':'inventory-approve',session.status==='aberta'?'Salvar contagens':'Aprovar e aplicar');
+ document.querySelector('.modal form[data-form^="inventory-"]').dataset.session=id;
+}
 function quickBalancePage(){
   if(!canQuickBalance())return '<div class="muteblock">Sem acesso.</div>';
   const groups=groupInventory(state.items.filter(p=>p.active),state.apparelModels);
@@ -702,13 +762,16 @@ function eventDetails(){
   const losses=entries.filter(classifiedLoss).reduce((n,m)=>n+m.quantity,0);
   const historicalUnclassified=entries.filter(m=>m.action==='baixa_evento'&&!classifiedLoss(m)).reduce((n,m)=>n+m.quantity,0);
   const pending=state.balances.filter(b=>b.event_id===e.id).reduce((n,b)=>n+b.quantity,0);
+  const closure=state.consignationClosures.find(c=>c.event_id===e.id);
+  const inventoryVariances=state.inventorySessions.filter(i=>i.location_type==='temporaria'&&i.location_id===e.id&&i.status==='aplicada');
   const canModify=e.status==='ativo';
   const actions=(hasPermission('events.manage')&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
     (hasPermission('events.separate')&&canModify?button('Enviar mercadorias','event-transfer','','primary'):'')+
     (canModify&&canSell(e.id)?button('Registrar venda','event-sale','','primary'):'')+
     (canModify&&hasPermission('events.close')?button('Perda / avaria','event-loss','','small'):'')+
     (canModify&&canReturn(e.id)?button('Devolução rápida por EAN','event-return','','primary'):'')+
-    (canModify&&hasPermission('events.close')?button('Encerrar consignação','event-close','data-id="'+h(e.id)+'"'):'');
+    (canModify&&hasPermission('events.close')?button('Encerrar consignação','event-close','data-id="'+h(e.id)+'"'):'')+
+    (canModify&&hasPermission('events.manage')?button('Inventariar loja','event-inventory','data-id="'+h(e.id)+'"','small'):'');
   const history=eventHistoryCards({
     movements:entries,products:state.items,models:state.apparelModels,
     balances:state.balances.filter(b=>b.event_id===e.id),
@@ -716,7 +779,7 @@ function eventDetails(){
   });
   return '<div class="crumb"><button class="plain" data-action="back-events">← Lojas temporárias</button></div>'+
     tabHead(e.name,'Data: '+niceDate(e.starts_at)+(e.ends_at?' a '+niceDate(e.ends_at):''),pill(e.status))+
-    '<div class="cards">'+[['Enviados',transfers],['Vendidos',sold],['Devolvidos',returned],['Perdas justificadas',losses],...(historicalUnclassified?[['Baixas antigas sem classificação',historicalUnclassified]]:[]),['Ainda no local',pending]].map(([name,value])=>
+    '<div class="cards">'+[['Enviados',closure?.sent_units??transfers],['Vendidos',closure?.sold_units??sold],['Devolvidos',closure?.returned_units??returned],['Perdas justificadas',closure?.loss_units??losses],...(historicalUnclassified?[['Baixas antigas sem classificação',historicalUnclassified]]:[]),['Ainda no local',pending]].map(([name,value])=>
       '<div class="card"><div class="metric-label">'+name+'</div><div class="metric">'+value+'</div></div>').join('')+'</div>'+
     '<div class="actions" style="margin-bottom:18px">'+actions+'</div>'+
     (e.status==='ativo'&&pending>0?'<div class="note">Há '+pending+
@@ -2103,6 +2166,17 @@ async function handleClick(event){
     if(!window.confirm(confirmation))return;
     await exec(async()=>assertOk(await db.rpc(rpc,{p_order:id})),msg);return;
   }
+  if(action==='event-inventory'){switchView('inventario');return inventoryStartModal();}
+  if(action==='inventory-new')return inventoryStartModal();
+  if(action==='inventory-open')return inventorySessionModal(id);
+  if(action==='inventory-submit'){
+    if(!window.confirm('Enviar inventário completo para revisão?'))return;
+    return exec(async()=>assertOk(await db.rpc('inventory_submit',{p_session:id})),'Inventário enviado para revisão.');
+  }
+  if(action==='inventory-reject'){
+    if(!window.confirm('Rejeitar e cancelar este inventário?'))return;
+    return exec(async()=>assertOk(await db.rpc('inventory_finalize',{p_session:id,p_approve:false,p_note:'Rejeitado'})),'Inventário rejeitado.');
+  }
   if(action==='branch-return-new')return branchReturnModal(id);
   if(action==='branch-return-receive'){
     if(!hasPermission('stock.entry'))return;
@@ -2516,6 +2590,27 @@ async function handleSubmit(event){
       p_type:state.stores.find(x=>x.id===values.to_store_id)?.kind==='franquia'?'franquia':'central',
       p_items:items,p_note:values.note||null
     })),'Solicitação criada. A separação ainda não movimentou estoque.');return;
+  }
+  if(type==='inventory-start'){
+    const [locationType,locationId]=String(values.location||'').split('|');
+    if(!window.confirm('Abrir sessão de inventário?'))return;
+    return exec(async()=>assertOk(await db.rpc('inventory_start',{p_type:locationType,p_location:locationId||null,p_title:String(values.title||'').trim()})),'Sessão aberta.');
+  }
+  if(type==='inventory-save'){
+    const id=form.dataset.session;
+    const inputs=[...form.querySelectorAll('[data-inventory-qty]')].filter(el=>el.value!=='');
+    if(!inputs.length)return toast('Preencha ao menos uma contagem.',true);
+    if(inputs.some(el=>!Number.isInteger(Number(el.value))||Number(el.value)<0||Number(el.value)>1000000))return toast('Contagem inválida.',true);
+    return exec(async()=>{
+      for(const el of inputs)assertOk(await db.rpc('inventory_count',{p_session:id,p_product:el.dataset.id,p_counted:Number(el.value)}));
+    },'Contagens registradas.');
+  }
+  if(type==='inventory-approve'){
+    const id=form.dataset.session;
+    const session=state.inventorySessions.find(x=>x.id===id);
+    if(!session||session.status!=='revisao')return;
+    if(!window.confirm('Aprovar diferenças e aplicar todos os ajustes físicos?'))return;
+    return exec(async()=>assertOk(await db.rpc('inventory_finalize',{p_session:id,p_approve:true,p_note:String(values.note||'').trim()})),'Inventário aprovado e aplicado.');
   }
   if(type==='branch-return-dispatch'){
     const storeId=form.dataset.store;
