@@ -103,7 +103,8 @@ export function eventCompactDetail(data){
  '<span class="'+(active?'active':closed?'done':'')+'">2. Envio</span>'+
  '<span class="'+(closed?'done':'')+'">3. Fechamento</span></div>'+
  '<div class="event-simple-metrics">'+summaries.map(([name,v])=>'<div><small>'+h(name)+'</small><strong>'+format(v)+'</strong></div>').join('')+'</div>'+
- '<div class="event-simple-actions">'+primary+'</div>'+
+ '<div class="event-simple-actions">'+primary+
+  (canManage?button('Excluir evento','event-delete','data-id="'+h(e.id)+'"','small danger'):'')+'</div>'+
  (draft?'<p class="event-simple-guidance">Monte sua lista, imprima em A4, confira o que foi encontrado e ajuste as quantidades antes de confirmar a saída física.</p>':
   active&&pending?'<p class="event-simple-guidance">Na volta, informe quantos produtos retornaram bons, foram vendidos, ficaram avariados ou foram perdidos. O sistema só encerra quando tudo estiver conciliado.</p>':'')+
  (active&&pending?'<section class="event-simple-section"><header><h2>Produtos ainda no local</h2><small>'+pending+' unidades pendentes</small></header>'+productsMarkup+'</section>':
@@ -150,13 +151,15 @@ export function damageListHTML(damages,products,events,actions=[],{h=esc,button=
  closed.map(card).join('')+'</details>':'');
 }
 export function a4PickingHTML({event,items=[],products=[],models=[],responsible='',version='',
- printedAt='',status='Planejado'}){
+ printedAt='',status='Planejado',photoUrls={}}){
  const byId=new Map(products.map(p=>[p.id,p])),byModel=new Map(models.map(m=>[m.id,m])),groups=new Map();
  for(const x of items){
   if(!x.quantity||x.quantity<1)continue;
   const p=byId.get(x.product_id);if(!p)continue;
   const key=p.apparel_model_id||p.id;
-  if(!groups.has(key))groups.set(key,{name:byModel.get(p.apparel_model_id)?.name||p.name,rows:[]});
+  if(!groups.has(key))groups.set(key,{name:byModel.get(p.apparel_model_id)?.name||p.name,
+   imagePath:byModel.get(p.apparel_model_id)?.image_path||p.image_path||'',rows:[]});
+  if(!groups.get(key).imagePath&&p.image_path)groups.get(key).imagePath=p.image_path;
   groups.get(key).rows.push({p,qty:x.quantity});
  }
  const sections=[...groups.values()].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
@@ -166,6 +169,7 @@ export function a4PickingHTML({event,items=[],products=[],models=[],responsible=
  '<style>@page{size:A4 portrait;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1c3528;font-size:10.5pt}'+
  'header{display:flex;justify-content:space-between;border-bottom:2px solid #166b4b;padding-bottom:10px;margin-bottom:12px}'+
  'h1{font-size:16pt;margin:4px 0}h2{font-size:11pt;background:#eaf3ed;padding:6px;margin:13px 0 5px}'+
+  '.event-print-title{display:flex;align-items:center;gap:9px}.event-print-photo{display:block;width:49px;height:49px;object-fit:contain;border:1px solid #dce7dd;background:#fff;border-radius:5px}'+
  '.brand{font-size:19pt;color:#166b4b;font-weight:800}.meta{line-height:1.5;text-align:right}'+
  'table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #bacdc0;padding:7px 6px;text-align:left;word-break:break-word}'+
  'th{background:#f0f5f1;font-size:9pt}.center{text-align:center}.hand{min-width:48px;height:28px}.group{break-inside:avoid-page}'+
@@ -178,7 +182,9 @@ export function a4PickingHTML({event,items=[],products=[],models=[],responsible=
  '<div class="meta"><b>'+esc(event.name)+'</b><div>Início: '+esc(event.starts_at)+
  (event.ends_at?' · Fim: '+esc(event.ends_at):'')+'</div><div>Responsável: '+esc(responsible||'—')+
  '</div><div>Data da impressão: '+esc(printedAt)+'</div><div>'+esc(status)+' · '+esc(version)+'</div></div></header>'+
- sections.map(g=>'<section class="group"><h2>'+esc(g.name)+'</h2><table><thead><tr>'+
+ sections.map(g=>'<section class="group"><h2 class="event-print-title">'+
+  (g.imagePath&&photoUrls[g.imagePath]?'<img class="event-print-photo" src="'+esc(photoUrls[g.imagePath])+'" alt="Foto do modelo '+esc(g.name)+'">':'')+
+  esc(g.name)+'</h2><table><thead><tr>'+
  '<th style="width:14%">Tamanho / cor</th><th style="width:20%">SKU</th><th style="width:27%">EAN</th>'+
  '<th class="center" style="width:13%">Previsto</th><th class="center" style="width:13%">Separado</th>'+
  '<th class="center" style="width:13%">Conf.</th></tr></thead><tbody>'+
@@ -191,5 +197,5 @@ export function a4PickingHTML({event,items=[],products=[],models=[],responsible=
  '<div class="signatures"><div class="sign">Separado por · Data / hora</div>'+
  '<div class="sign">Conferido por · Data / hora</div></div>'+
  '<div class="pagefooter">Ao encontrar divergências, atualize a separação no sistema antes de confirmar o envio.</div>'+
- '<script>window.addEventListener("load",()=>{window.focus();window.print()});<\/script></body></html>';
+ '<script>window.addEventListener("load",()=>{Promise.all(Array.from(document.images,im=>im.complete?Promise.resolve():new Promise(resolve=>{im.onload=resolve;im.onerror=resolve}))).then(()=>{window.focus();window.print()})});<\/script></body></html>';
 }
