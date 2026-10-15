@@ -21,6 +21,11 @@ export function makeUnifiedOrders({avulsoOrders=[],avulsoItems=[],storeOrders=[]
  const eventById=new Map(events.map(x=>[x.id,x]));
  const productById=new Map(products.map(x=>[x.id,x]));
  const modelById=new Map(models.map(x=>[x.id,x]));
+ const photoByModel=new Map();
+ for(const item of products){
+  const key=item.apparel_model_id||item.id;
+  if(item.image_path&&!photoByModel.has(key))photoByModel.set(key,item.image_path);
+ }
  const held=new Map();
  for(const r of reservations.filter(x=>x.status==='ativa')){
   const parent=r.event_batch_id?'evento:'+r.event_batch_id:
@@ -38,6 +43,7 @@ export function makeUnifiedOrders({avulsoOrders=[],avulsoItems=[],storeOrders=[]
     color:p?.apparel_color??line.color??'',size:p?.apparel_size??line.size??'',
     sku:p?.sku||line.sku||'',ean:p?.ean||line.ean||'',
     gondola:p?.gondola||'',prateleira:p?.prateleira||'',
+    imagePath:model?.image_path||photoByModel.get(p?.apparel_model_id||p?.id)||p?.image_path||'',
     quantity,reserved,picked:Number(line.picked||0),
     missing:Math.max(0,quantity-reserved)};
  });
@@ -75,7 +81,8 @@ export function groupedOrderLines(lines){
  const groups=new Map();
  for(const line of lines){
   const key=String(line.modelId||line.id);
-  if(!groups.has(key))groups.set(key,{key,title:line.modelTitle||line.name,lines:[]});
+  if(!groups.has(key))groups.set(key,{key,title:line.modelTitle||line.name,imagePath:line.imagePath||'',lines:[]});
+  if(!groups.get(key).imagePath&&line.imagePath)groups.get(key).imagePath=line.imagePath;
   groups.get(key).lines.push(line);
  }
  return [...groups.values()].map(g=>({
@@ -124,7 +131,9 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  const unchecked=['legado','solicitado'].includes(o.status);
  const groups=groupedOrderLines(o.lines);
  const content=groups.map((g,i)=>'<section class="uo-model-group">'+
-   '<div class="uo-model-head"><strong>'+esc(g.title)+'</strong>'+
+   '<div class="uo-model-head"><div class="uo-model-identity">'+
+    (g.imagePath?'<img class="uo-model-photo" data-photo-path="'+esc(g.imagePath)+'" alt="Foto do modelo '+esc(g.title)+'" loading="lazy">':'<span class="uo-model-photo uo-photo-empty" aria-hidden="true">▧</span>')+
+    '<strong>'+esc(g.title)+'</strong></div>'+
     '<span>'+n(g.total)+' un. · '+g.lines.length+' variação(ões)</span></div>'+
    g.lines.map(l=>'<div class="uo-model-variant">'+
     '<div class="uo-variant-identity"><b>'+esc([l.color,l.size].filter(x=>x&&x!=='Única').join(' · ')||'Único')+'</b>'+
@@ -226,7 +235,9 @@ export function pickingOrderRows(order,{h=esc}={}){
  '<span>Separadas: <b data-picked-total>'+n(order.lines.reduce((a,l)=>a+(l.picked||0),0))+
  '</b> / '+n(order.total)+' unidades</span></div>'+
  '<div class="uo-picking">'+groupedOrderLines(order.lines).map(group=>
-  '<section class="uo-pick-model"><h3>'+h(group.title)+' <small>'+group.lines.length+' variações</small></h3>'+
+  '<section class="uo-pick-model"><h3 class="uo-pick-heading">'+
+   (group.imagePath?'<img class="uo-model-photo" data-photo-path="'+h(group.imagePath)+'" alt="Foto do modelo '+h(group.title)+'">':'')+
+   '<span>'+h(group.title)+' <small>'+group.lines.length+' variações</small></span></h3>'+
    group.lines.map(l=>'<div class="store-picking-line" data-picking-row="'+h(l.id)+'">'+
     '<div><strong>'+h([l.color,l.size].filter(x=>x&&x!=='Única').join(' · ')||'Único')+
     '</strong><small>SKU '+h(l.sku||'—')+' · EAN '+h(l.ean||'—')+'</small>'+
@@ -247,10 +258,11 @@ export function shortageEditRows(order,{h=esc}={}){
  '" min="0" max="'+l.quantity+'" step="1" inputmode="numeric" value="'+l.quantity+'"></label></div>').join('')+'</div>'+
  '<label class="field">Justificativa obrigatória<textarea name="reason" minlength="5" maxlength="250" required placeholder="Ex.: furo identificado na separação"></textarea></label>';
 }
-export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE'}={}){
+export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE',photoUrls={}}={}){
  const groups=groupedOrderLines(order.lines);
- const compactGroups=groups.map(g=>'<tbody class="lot-group"><tr class="lot-group-title"><td colspan="7">'+
-  esc(g.title)+' · '+g.lines.length+' variação(ões) · '+n(g.total)+' unidades</td></tr>'+
+ const compactGroups=groups.map(g=>'<tbody class="lot-group"><tr class="lot-group-title"><td colspan="7"><div class="lot-heading">'+
+  (g.imagePath&&photoUrls[g.imagePath]?'<img class="lot-photo" src="'+esc(photoUrls[g.imagePath])+'" alt="Foto do modelo '+esc(g.title)+'">':'')+
+  '<div>'+esc(g.title)+' · '+g.lines.length+' variação(ões) · '+n(g.total)+' unidades</div></div></td></tr>'+
   g.lines.map(l=>'<tr><td>'+esc([l.color,l.size].filter(x=>x&&x!=='Única').join(' · ')||'Único')+
    '</td><td>'+esc(l.gondola?'Gôndola '+l.gondola:'Não informada')+
     (l.prateleira?' / '+esc(l.prateleira):'')+
@@ -273,6 +285,7 @@ export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE'}={}){
   'th,td{border:1px solid #bdcdc1;padding:4px 5px;vertical-align:middle;overflow-wrap:anywhere}'+
   'th{background:#eaf2ec;font-size:7.5pt}td{font-size:7.7pt;line-height:1.2}'+
   '.lot-group-title td{font-weight:800;background:#f0f6f1;color:#1a5036;padding:5px}'+
+  '.lot-heading{display:flex;align-items:center;gap:9px;min-height:38px}.lot-photo{width:43px;height:43px;object-fit:contain;border:1px solid #d2ded5;border-radius:5px;background:#fff;flex:none}'+
   '.lot-group{break-inside:avoid-page}tr{break-inside:avoid}.center{text-align:center;font-variant-numeric:tabular-nums}'+
   '.write{height:22px}.check{height:22px}.totals{font-size:8.5pt;margin-top:10px;padding:6px 0;border-top:1px solid #9cb7a3}'+
   '.signatures{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:29px}'+
@@ -294,5 +307,5 @@ export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE'}={}){
    '</b><div>Observações / divergências: _________________________________________________</div></div>'+
   '<div class="signatures"><div>Separador · assinatura / hora</div><div>Conferente · assinatura / hora</div></div>'+
   '<p class="instructions">Mantenha esta folha junto das mercadorias deste lote. O envio físico só será registrado após confirmação no sistema.</p>'+
-  '<script>window.addEventListener("load",()=>{window.focus();window.print()});</script></body></html>';
+  '<script>window.addEventListener("load",()=>{Promise.all(Array.from(document.images,im=>im.complete?Promise.resolve():new Promise(resolve=>{im.onload=resolve;im.onerror=resolve}))).then(()=>{window.focus();window.print()})});</script></body></html>';
 }
