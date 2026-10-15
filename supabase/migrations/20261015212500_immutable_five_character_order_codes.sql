@@ -1,0 +1,2 @@
+-- Registry SQL deployed through Supabase project migration immutable_five_character_order_codes.
+-- Canonical implementation recorded in Supabase schema migration history; see migration in Supabase for full SQL.
