@@ -1,0 +1,62 @@
+/* CDSB · Compras e cadastro de fornecedores */
+.buy-page{display:flex;flex-direction:column;gap:17px;padding-bottom:27px;min-width:0}
+.buy-page .pagehead{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.buy-page .pagehead .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.buy-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.buy-stat-grid>div{border-radius:13px;border:1px solid #dee9e1;background:#f8fbf8;padding:16px;display:flex;flex-direction:column;gap:5px}
+.buy-stat-grid strong{font-size:1.6rem;color:#24583d;line-height:1.1;font-variant-numeric:tabular-nums}
+.buy-stat-grid span{color:#668071;font-size:.79rem}
+.buy-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 19px;border-bottom:1px solid #e4eee6}
+.buy-section-head h2{font-size:1rem;margin:0 0 5px;color:#24543c}
+.buy-section-head small{color:#71897a;font-size:.78rem}
+.buy-filters{padding:12px 19px;border-bottom:1px solid #e5eee7}
+.buy-filters label{display:flex;align-items:center;gap:10px;font-size:.83rem;color:#355f46;font-weight:600}
+.buy-filters select{padding:9px 11px;border:1px solid #d6e4d9;border-radius:9px;background:white;max-width:330px;min-width:170px}
+.buy-table-wrap{overflow:auto;max-width:100%;padding:0 10px 10px}
+.buy-table{border-collapse:collapse;width:100%;font-size:.83rem}
+.buy-table th{font-size:.76rem;text-align:left;background:#f5f9f6;color:#476751;padding:12px 10px;border-bottom:1px solid #e1eae3;white-space:nowrap}
+.buy-table td{padding:11px 10px;border-bottom:1px solid #edf1ed;vertical-align:middle}
+.buy-table td strong{color:#1e4d36}
+.buy-table td small{display:block;color:#6e8074;font-size:.73rem;margin-top:4px}
+.buy-table .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.buy-order{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid #e7eee7}
+.buy-order:last-child{border-bottom:0}
+.buy-order>div:first-child{min-width:0;flex:1;display:flex;flex-direction:column;gap:5px}
+.buy-order strong{font-size:.86rem;color:#26543b}
+.buy-order small{font-size:.72rem;color:#708476}
+.buy-status{font-size:.7rem;background:#ebf4ee;color:#2a6848;font-weight:700;border-radius:99px;padding:6px 10px;white-space:nowrap}
+.buy-order-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.buy-product-list{max-height:390px;overflow-y:auto;border:1px solid #dce8df;border-radius:12px}
+.buy-product-row{display:flex;gap:13px;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #e7eee8}
+.buy-product-row:last-child{border-bottom:0}
+.buy-product-row[hidden]{display:none}
+.buy-product-row>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.buy-product-row strong{font-size:.82rem;color:#235039}
+.buy-product-row small{font-size:.73rem;color:#748776}
+.buy-product-row input{width:88px;padding:11px 8px;border:1px solid #cbded1;border-radius:8px;font-variant-numeric:tabular-nums;text-align:center}
+.supplier-list{display:flex;flex-direction:column;gap:7px;padding:4px 0}
+.supplier-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px;border:1px solid #e2ebe3;border-radius:10px}
+.supplier-row>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.supplier-row strong{color:#23513a;font-size:.87rem}
+.supplier-row small{color:#698071;font-size:.74rem}
+.buy-empty{padding:17px;color:#7b8b7f}
+.buy-note{font-size:.79rem;color:#607769;margin:0}
+@media(max-width:760px){
+ .buy-page .pagehead{flex-direction:column;align-items:stretch}
+ .buy-page .pagehead .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .buy-page .pagehead .actions .button{width:100%;min-height:45px}
+ .buy-stat-grid{gap:7px}
+ .buy-stat-grid>div{padding:12px 9px}
+ .buy-stat-grid strong{font-size:1.23rem}
+ .buy-stat-grid span{font-size:.68rem}
+ .buy-section-head{padding:13px;flex-wrap:wrap}
+ .buy-filters{padding:12px}
+ .buy-filters label{flex-wrap:wrap}
+ .buy-filters select{min-width:0;max-width:100%;width:100%}
+ .buy-order{gap:7px;flex-wrap:wrap;padding:13px}
+ .buy-order>div:first-child{flex-basis:66%}
+ .buy-order-actions{width:100%}
+ .buy-order-actions .button{flex:1;min-height:42px}
+ .buy-product-row{padding:10px;gap:8px}
+ .buy-product-row input{width:75px}
+}
