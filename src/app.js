@@ -17,7 +17,7 @@ import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectIn
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015thermal1';
-import {pickingThermalHTML} from './thermal-picking.js?v=20261015thermal1';
+import {pickingThermalHTML} from './thermal-picking.js?v=20261015thermal2';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotcatalog1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261015catalog2';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015thermal1';
