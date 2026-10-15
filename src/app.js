@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery2';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015covergrant1';
-import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015cristorei1';
+import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015thermal1';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
@@ -16,10 +16,11 @@ import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=2
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015admindelete1';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015thermal1';
+import {pickingThermalHTML} from './thermal-picking.js?v=20261015thermal1';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotcatalog1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261015catalog2';
-import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015print1';
+import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015thermal1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
 
@@ -2404,7 +2405,7 @@ async function printUnifiedOrder(kind,id){
  if(!popup)return toast('O navegador bloqueou a janela de impressão.',true);
  try{
   const photoUrls=await signedPhotoUrls(order.lines.map(line=>line.imagePath));
-  popup.document.open();popup.document.write(pickingA4HTML(order,{
+  popup.document.open();popup.document.write(pickingThermalHTML(order,{
    printedAt:new Date().toLocaleString('pt-BR'),photoUrls
   }));popup.document.close();
  }catch(error){popup.close();fail(error);}
@@ -3356,7 +3357,7 @@ async function handleClick(event){
     })),'Disponibilidade reavaliada. Consulte as faltas no pedido.');
   }
   if(action==='order-shortage-adjust')return unifiedShortageModal(target.dataset.kind,id);
-  if(action==='order-print-a4')return printUnifiedOrder(target.dataset.kind,id);
+  if(action==='order-print-thermal'||action==='order-print-a4')return printUnifiedOrder(target.dataset.kind,id);
   if(action==='avulso-pick')return avulsoPickingModal(id);
   if(action==='avulso-dispatch'){
     const order=unifiedOrderById('avulso',id);
