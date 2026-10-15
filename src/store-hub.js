@@ -48,8 +48,8 @@ function locationCard(loc,all,ctx,{primary=false}={}){
   if(pending.length)actions.push(ctx.button('Fila de separação','store-hub-orders',
    'data-location-type="'+esc(loc.type)+'" data-location-id="'+esc(loc.id)+'" data-mode="pending"','small primary'));
  }
- if(loc.type==='event'&&ctx.canManageEvent)
-  actions.push(ctx.button('Gerenciar local','event-detail','data-id="'+esc(loc.id)+'"','small'));
+ if(loc.type==='event'&&ctx.canOpenEvent)
+  actions.push(ctx.button(ctx.canManageEvent?'Gerenciar local':'Ver local','event-detail','data-id="'+esc(loc.id)+'"','small'));
  if(loc.type==='store'&&ctx.canManageStores&&!primary)
   actions.push(ctx.button('Editar loja','store-edit','data-id="'+esc(loc.id)+'"','small'));
  const cover=loc.coverPath?'<div class="sh-event-cover"><img data-event-cover="'+esc(loc.coverPath)+
@@ -80,7 +80,7 @@ function group(title,description,items,orders,ctx,empty){
 }
 export function renderStoreHub({stores=[],events=[],orders=[],context={}}){
  const ctx={button:()=>'',time:x=>x,canBrowseOrders:false,canManageEvent:false,canManageStores:false,
-  showCentral:true,showFranchises:true,showEvents:true,showBranches:false,portal:false,...context};
+  showCentral:true,showFranchises:true,showEvents:true,showBranches:false,portal:false,canOpenEvent:false,...context};
  const central=stores.find(s=>s.is_primary)||null;
  const centralItems=ctx.showCentral?[{type:'central',id:central?.id||'central',primary:true,
   kicker:'Estoque e expedição',name:central?.name||'Loja Central',subtitle:'Fila geral de separação e pedidos'}]:[];
@@ -104,9 +104,9 @@ export function renderStoreHub({stores=[],events=[],orders=[],context={}}){
  return '<div class="sh-page"><header class="pagehead"><div><h1>Lojas</h1>'+
   '<p>Central, franquias e lojas temporárias. Pedidos pendentes e histórico por unidade.</p></div>'+
   '<div class="actions">'+actions+'</div></header>'+
-  group('Loja Central','Fila geral: pedidos para separação, envio e conferência.',centralItems,orders,ctx,'Central indisponível.')+
-  group('Franquias','Pedidos enviados à central e histórico de atendimento.',franchiseItems,orders,ctx,'Nenhuma franquia cadastrada ou acessível.')+
-  group('Lojas Temporárias','Lotes de reposição e envios para cada evento.',eventItems,orders,ctx,'Nenhuma loja temporária cadastrada ou acessível.')+
+  (ctx.showCentral?group('Loja Central','Fila geral: pedidos para separação, envio e conferência.',centralItems,orders,ctx,'Central indisponível.'):'')+
+  (ctx.showFranchises?group('Franquias','Pedidos enviados à central e histórico de atendimento.',franchiseItems,orders,ctx,'Nenhuma franquia cadastrada ou acessível.'):'')+
+  (ctx.showEvents?group('Lojas Temporárias','Lotes de reposição e envios para cada evento.',eventItems,orders,ctx,'Nenhuma loja temporária cadastrada ou acessível.'):'')+
   (branchItems.length?group('Filiais próprias','Movimentações e pedidos das filiais próprias.',branchItems,orders,ctx,''):'')+
   '<p class="sh-footer-help">A separação, a impressão A4 e a baixa física continuam na seção Pedidos. O histórico permanece vinculado à unidade.</p></div>';
 }
