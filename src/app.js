@@ -101,6 +101,7 @@ const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'st
 const permittedView = v => {
  if(isFranchisePortal())return v==='produtos'||v==='pedidos-lojas';
  if(v==='inicio')return true;
+ if(v==='saida')return false; // Saída excepcional só pelo card.
  if(v==='pedidos-lojas')return canUseStoreOrders();
  if(v==='pedidos')return hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
  if(v==='usuarios')return isAdmin();
@@ -1007,6 +1008,7 @@ function productModal(item=null){
     (!item?sizesSection():'')+
     single+photoChooser(item)+categorySelector(item)+productTagChooser(item)+locations+
     (!item?'<div class="wide" data-single-stock>'+
+      (state.view==='entrada'?'<p class="help">Ao cadastrar um produto para esta remessa, deixe o estoque inicial em zero e adicione-o à lista abaixo para não contabilizar duas vezes.</p>':'')+
       field('Quantidade inicial na loja','initial_quantity','number','0','min="0" max="1000000" step="1"','Entrada registrada no histórico.')+'</div>':'')+
     (item?selectField('Situação','active',[['true','Ativo'],['false','Inativo']],String(item.active)):'')+'</div>';
   formModal(item?'Editar produto':'Novo produto',markup,item?'product-edit':'product-new',
