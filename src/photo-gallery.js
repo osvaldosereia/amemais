@@ -81,8 +81,12 @@ export async function savePhotoGallery(form,{db,assertOk,modelId=null,productId=
   image_paths:paths,image_path:paths[0]||null
  }).eq('id',productId));
  // Limpeza é posterior à atualização; erro de limpeza não reverte dados válidos.
- const removed=[...form.querySelectorAll('[data-gallery-item][data-path]')]
-  .map(x=>x.dataset.path).filter(x=>x&&!paths.includes(x));
+ const removed=(form.__galleryInitial||[]).filter(x=>x&&!paths.includes(x)&&x.startsWith(folder));
+ if(removed.length){
+  try{const r=await db.storage.from('ame-produtos').remove(removed);
+   if(r.error)console.warn('Arquivo desvinculado mas remoção física pendente',r.error);}
+  catch(error){console.warn('Limpeza posterior de foto necessária',error);}
+ }
  return {paths,uploaded,removed};
 }
 export function galleryHasChanges(form){
