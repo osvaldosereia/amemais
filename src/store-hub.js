@@ -26,6 +26,19 @@ function itemRow(o,scope,ctx){
  const label=o.kind==='evento'?'Lote '+String(o.sequence||'?').padStart(2,'0'):'Pedido';
  const attrs='data-location-type="'+esc(scope.type)+'" data-location-id="'+esc(scope.id||'central')+
   '" data-order-kind="'+esc(o.kind)+'" data-order-id="'+esc(o.id)+'"';
+ const activeAction=()=>{
+  if(!ctx.canProcess?.(o))return '';
+  const idData='data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"';
+  if(['reservado','aprovado','aguardando','em_separacao'].includes(o.status)){
+   const action=o.kind==='evento'?'event-batch-pick':o.kind==='avulso'?'avulso-pick':'store-order-separate';
+   return ctx.button(o.status==='em_separacao'?'Continuar':'Separar',action,idData,'small primary');
+  }
+  return '';
+ };
+ const quickPrint=ctx.canPrint?.(o)&&o.lines?.length&&
+  !['legado','solicitado','pendente_estoque','cancelado','expirado'].includes(o.status)?
+  ctx.button('Imprimir A4','order-print-a4',
+   'data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"','small'):'';
  return '<div class="sh-order-line">'+
   '<div class="sh-order-identity"><strong>'+label+' #'+esc(o.id.slice(0,8).toUpperCase())+'</strong>'+
    '<small>'+esc(o.kind==='avulso'?o.target:o.kind==='evento'?'Loja temporária':o.origin+' → '+o.target)+
@@ -33,8 +46,9 @@ function itemRow(o,scope,ctx){
   '<div class="sh-order-count">'+Number(o.total||0).toLocaleString('pt-BR')+' un.</div>'+
   '<span class="sh-order-status '+(isHistoricalOrder(o)?'done':o.status==='pendente_estoque'?'short':'active')+'">'+
    esc(statuses[o.status]||o.status)+'</span>'+
-  (ctx.canBrowseOrders?ctx.button('Abrir','store-hub-open-order',attrs,'small'):'')+
-  '</div>';
+  '<div class="sh-order-actions">'+activeAction()+quickPrint+
+  (ctx.canBrowseOrders?ctx.button('Ver detalhes','store-hub-open-order',attrs,'small'):'')+
+  '</div></div>';
 }
 function locationCard(loc,all,ctx,{primary=false}={}){
  const scope={type:loc.type,id:loc.id};
