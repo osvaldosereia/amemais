@@ -1428,12 +1428,18 @@ function stockModal(id=null,groupKey=null){
   sync();
 }
 function eventModal(){
-  if(!hasPermission('events.manage'))return;
-  formModal('Criar loja temporária','<div class="formgrid">'+field('Nome do local / evento','name','text','','required maxlength="150"')+
-    field('Data de início','starts_at','date',dateToday(),'required')+
-    field('Data de término (opcional)','ends_at','date')+
-    textareaField('Observações','notes')+'</div><div class="note">A loja temporária começa como rascunho. Associe responsáveis, ative e envie os produtos consignados.</div>',
-    'event-create','Criar loja temporária');
+ if(!hasPermission('events.manage'))return;
+ const people=state.users.filter(u=>u.active&&u.role!=='franquia');
+ if(!people.length)return toast('Cadastre um responsável ativo antes de criar a loja.',true);
+ formModal('Criar loja temporária',
+  '<div class="formgrid">'+
+  field('Nome da loja / evento','name','text','','required maxlength="150"')+
+  field('Data de início','starts_at','date',dateToday(),'required')+
+  field('Data de término (opcional)','ends_at','date')+
+  selectField('Responsável','responsible_id',people.map(u=>[u.id,u.full_name]),state.user.id,'required')+
+  textareaField('Local, observações e informações básicas','notes')+
+  '</div><p class="help">Após criar, monte a lista de separação, imprima em A4 e confirme o envio físico.</p>',
+  'event-create','Criar e preparar');
 }
 function eventMove(action){
   const eid=state.activeEvent;
@@ -2222,6 +2228,26 @@ async function handleClick(event){
   if(action==='stock-overview-close'){target.closest('.stock-overview-overlay')?.remove();return;}
   if(action==='stock-group-modal')return stockModal(null,target.dataset.cardKey);
   if(action==='stock-modal')return stockModal(id);
+  if(action==='event-plan')return eventPlanModal(false);
+  if(action==='event-supplement')return eventPlanModal(true);
+  if(action==='event-settle')return eventSettlementModal();
+  if(action==='event-print')return printEventA4(state.activeEvent);
+  if(action==='event-dispatch'){
+    const e=eventById(state.activeEvent);
+    if(!e||e.status!=='rascunho'||!hasPermission('events.separate'))return;
+    if(!window.confirm('Confirmar envio físico da lista separada? Após o envio, ajustes serão movimentações adicionais auditadas.'))return;
+    return exec(async()=>assertOk(await db.rpc('dispatch_event_pick_plan',{p_event:e.id})),
+      'Mercadorias enviadas. A loja temporária está ativa.');
+  }
+  if(action==='event-fill-sold'){
+    const row=target.closest('[data-settle-row]');if(!row)return;
+    const expected=Number(row.dataset.expected);
+    const rest=['good','damaged','lost'].reduce((n,key)=>n+Number(row.querySelector('[data-settle-field="'+key+'"]')?.value||0),0);
+    row.querySelector('[data-settle-field="sold"]').value=String(Math.max(0,expected-rest));
+    updateEventSettlementPreview(row.closest('form'));return;
+  }
+  if(action==='event-settlement-save-finish')return submitEventSettlement(target.closest('form'),true);
+  if(action==='damage-resolve')return resolveDamageModal(id);
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
   if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
@@ -2736,14 +2762,50 @@ async function handleSubmit(event){
     finally{state.loading=false;}
     return;
   }
+  if(type==='event-plan-save'||type==='event-supplement-send'){
+    const eid=form.dataset.event,e=eventById(eid);
+    if(!e)return;
+    let items;
+    try{items=collectEventPlan(form);}catch(error){return toast(error.message,true);}
+    if(type==='event-plan-save'){
+      if(!items.length)return toast('Inclua ao menos um SKU na separação.',true);
+      return exec(async()=>assertOk(await db.rpc('save_event_pick_plan',{
+       p_event:eid,p_items:items
+      })),'Lista de separação salva. Imprima A4 e confirme quando o material estiver pronto.');
+    }
+    if(!items.length)return toast('Escolha ao menos um SKU para complemento.',true);
+    const note=String(values.reason||'').trim();
+    if(note.length<5)return toast('Justifique o envio adicional.',true);
+    if(!window.confirm('Enviar fisicamente '+items.reduce((n,x)=>n+x.quantity,0)+' unidades adicionais?'))return;
+    return exec(async()=>assertOk(await db.rpc('event_send_additional',{
+      p_event:eid,p_items:items,p_note:note
+    })),'Envio adicional registrado e auditado.');
+  }
+  if(type==='event-settlement-save')return submitEventSettlement(form,false);
+  if(type==='damage-resolution'){
+    if(!permittedView('avarias')||!isManager())return;
+    const damage=state.damages.find(x=>x.id===form.dataset.damage);
+    const quantity=Number(values.quantity),reason=String(values.note||'').trim();
+    if(!damage||!Number.isInteger(quantity)||quantity<1||quantity>damage.remaining||
+      reason.length<5)return toast('Quantidade e justificativa obrigatórias.',true);
+    if(!window.confirm((values.resolution==='recuperado'?'Devolver ao estoque':'Descartar definitivamente')+
+      ' '+quantity+' unidade(s)?'))return;
+    return exec(async()=>assertOk(await db.rpc('resolve_stock_damage',{
+      p_damage:damage.id,p_action:values.resolution,p_quantity:quantity,
+      p_note:reason,p_request:form.dataset.request
+    })),values.resolution==='recuperado'?'Produto recuperado e disponível.':'Descarte registrado no histórico.');
+  }
   if(type==='event-create'){
     if(!hasPermission('events.manage'))return;
     if(values.ends_at&&values.ends_at<values.starts_at){toast('A data final não pode ser anterior ao início.',true);return;}
-    await exec(async()=>assertOk(await db.from('events').insert({
-      name:String(values.name).trim(),starts_at:values.starts_at,ends_at:values.ends_at||null,
-      notes:values.notes||null,created_by:state.user.id
-    })),'Loja temporária cadastrada.');
-    return;
+    return exec(async()=>{
+      const eventId=assertOk(await db.rpc('create_temporary_store',{
+       p_name:String(values.name||'').trim(),p_start:values.starts_at,
+       p_end:values.ends_at||null,p_notes:String(values.notes||'').trim()||null,
+       p_responsible:values.responsible_id
+      }));
+      state.activeEvent=eventId;state.view='eventos';
+    },'Loja criada. Prepare a lista de separação e imprima antes do envio.');
   }
   if(type==='event-loss'){
     const quantity=Number(values.quantity),note=String(values.note||'').trim();
