@@ -1,7 +1,7 @@
 // Balanço rápido agrupado: uma ficha por produto, cada tamanho com sua contagem.
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-export function quickBalanceCard(group,{photoButton,qtyStore,h}){
+export function quickBalanceCard(group,{photoButton,qtyStore,qtyReserved=()=>0,h}){
   const variants=group.products,main=group.main;
   const total=variants.reduce((n,p)=>n+qtyStore(p.id),0);
   const q=[group.title,...variants.flatMap(p=>[p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira])].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
@@ -20,7 +20,7 @@ export function quickBalanceCard(group,{photoButton,qtyStore,h}){
         return '<div class="quick-group-variant" data-quick-row="'+h(p.id)+'" data-ean="'+h(p.ean||'')+'">'+
           '<div class="quick-group-variant-info"><strong>'+h(name)+'</strong>'+
           '<small>SKU: '+h(p.sku||'—')+' · EAN: '+h(p.ean||'—')+'</small>'+
-          '<span class="quick-group-expected">Sistema: <b data-quick-current>'+qty+'</b> un.</span></div>'+
+          '<span class="quick-group-expected">Físico: <b data-quick-current>'+qty+'</b> un. · Reservado: '+qtyReserved(p.id)+'</span></div>'+
           '<div class="quick-group-input">'+
             '<label><span>Contado</span><input type="number" data-quick-count inputmode="numeric" min="0" max="1000000" step="1" '+
               'placeholder="Qtd." autocomplete="off" aria-label="Quantidade contada de '+h(name)+'"></label>'+
