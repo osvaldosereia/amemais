@@ -1990,6 +1990,17 @@ function closeMobileNavigation(restoreFocus=true){
   trigger?.setAttribute('aria-expanded','false');
   if(restoreFocus)trigger?.focus({preventScroll:true});
 }
+function searchAndManageSku(code,openPanel=false){
+ const value=String(code||'').trim();
+ if(!value)return;
+ state.view='produtos';state.search=value;state.page=0;
+ state.categoryFilter='';state.tagFilter='';
+ render();
+ const found=state.items.find(p=>p.active&&(String(p.ean||'')===value||
+   String(p.sku||'').toLocaleLowerCase('pt-BR')===value.toLocaleLowerCase('pt-BR')));
+ if(found&&openPanel&&canOpenSkuManager())manageSku(found.id);
+ else if(openPanel&&!found)toast('Código não encontrado no catálogo.',true);
+}
 function switchView(view) {
   if(view==='roupas'||view==='saida'||view==='balanco')view='produtos';
   if(!permittedView(view))return;
@@ -2046,9 +2057,7 @@ async function handleClick(event){
         }else render();
         return;
       }
-      state.view='produtos';state.search=code;state.page=0;state.categoryFilter='';state.tagFilter='';
-      render();
-      if(!state.items.some(p=>p.ean===code))toast('Leitura concluída. Nenhum produto encontrado para este EAN.',true);
+      searchAndManageSku(code,true);
     });}catch(error){fail(error);return;}
   }
   if(action==='home-category'){
@@ -2364,6 +2373,18 @@ async function handleClick(event){
     if(state.stockSelectedDestination===id)state.stockSelectedDestination='';
     return exec(async()=>assertOk(await db.rpc('deactivate_stock_destination',{p_id:id})),'Destino desativado; histórico preservado.');
   }
+  if(action==='sku-manage')return manageSku(id);
+  if(action==='sku-mode'){
+    const form=target.closest('form[data-form="sku-manage"]');
+    if(form)setSkuMode(form,target.dataset.mode);
+    return;
+  }
+  if(action==='sku-edit-advanced'){
+    const form=target.closest('form[data-form="sku-manage"]'),item=product(form?.dataset.id);
+    if(!item||!hasPermission('products.edit'))return;
+    if(item.apparel_model_id)return apparelVariantEditModal(item,{h,formModal});
+    return productModal(item);
+  }
   if(action==='stock-overview')return stockOverviewModal(id);
   if(action==='stock-overview-close'){target.closest('.stock-overview-overlay')?.remove();return;}
   if(action==='stock-group-modal')return stockModal(null,target.dataset.cardKey);
@@ -2588,7 +2609,13 @@ async function handleClick(event){
   }
   if(action==='user-new')return userModal();
   if(action==='user-role')return userRoleModal(id);
-  if(action==='search-scan')return scanInto('#product-search');
+  if(action==='search-scan'){
+    try{return scanEAN(code=>{
+      searchAndManageSku(code,true);
+      toast(state.items.some(p=>p.active&&p.ean===code)?
+        'EAN encontrado.':'EAN não localizado; confira o cadastro.');
+    });}catch(error){fail(error);return;}
+  }
   if(action==='form-scan')return scanInto('input[name="'+scanTarget+'"]',target.closest('form'));
   if(action==='product-load-more'){state.page++;render();return;}
   if(action==='product-show-less'){state.page=0;render();return;}
@@ -2803,6 +2830,7 @@ async function handleSubmit(event){
     finally{state.loading=false;}
     return;
   }
+  if(type==='sku-manage')return saveSkuManager(form);
   if(type==='stock-single-movement'){
     const id=String(values.product_id||''),p=product(id);
     const kind=String(values.operation_kind||'');
@@ -3288,6 +3316,9 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.closest('form[data-form="sku-manage"]')){
+    syncSkuManagerPreview(event.target.closest('form[data-form="sku-manage"]'));
+  }
   if(event.target.matches('[data-plan-search]')){
     const q=event.target.value.trim().toLocaleLowerCase('pt-BR'),form=event.target.closest('form');
     for(const group of form.querySelectorAll('[data-plan-group]')){
