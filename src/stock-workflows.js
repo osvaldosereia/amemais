@@ -120,11 +120,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<small class="product-card-location">'+h(location)+'</small>'+
       '</div>'+
     '</div>'+
-    '<section class="grouped-variants-desktop" aria-label="Estoque por '+(group.modelId?'tamanho':'produto')+'">'+
-      '<div class="group-variants-heading">Estoque por '+(group.modelId?'tamanho':'produto')+
-        ' <span>'+sizeCount+' variação(ões)</span></div>'+
-      modelRows()+
-    '</section>'+
+
     (isProducts?actions:'')+
     '<details class="grouped-variants-mobile" data-product-details>'+
       '<summary><span>Estoque por '+(group.modelId?'tamanho':'produto')+'</span>'+
