@@ -100,3 +100,49 @@
 [data-cover-file][hidden]{display:none!important}
 .gallery-tile-actions{flex-wrap:wrap}
 .gallery-tile-actions button{flex:1 1 72px}
+
+/* Produtos no celular: título acima e ações alinhadas em duas colunas.
+   Evita os quatro botões empilhados no canto direito. */
+@media(max-width:760px){
+  .mobile-c-app .content .products-pagehead{
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    justify-content:flex-start;
+    gap:14px;
+    width:100%;
+    min-width:0;
+    margin-bottom:15px;
+  }
+  .mobile-c-app .content .products-pagehead>div:first-child{
+    width:100%;
+    min-width:0;
+  }
+  .mobile-c-app .content .products-pagehead>.actions{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:9px;
+    width:100%;
+    max-width:none;
+    flex:none;
+    justify-content:stretch;
+    align-items:stretch;
+    margin:0;
+  }
+  .mobile-c-app .content .products-pagehead>.actions>.button{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:100%;
+    min-width:0;
+    max-width:none;
+    min-height:48px;
+    margin:0;
+    padding:9px 8px;
+    font-size:.78rem;
+    line-height:1.25;
+    text-align:center;
+    white-space:normal;
+    overflow-wrap:normal;
+  }
+}
