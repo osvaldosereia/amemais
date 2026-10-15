@@ -74,7 +74,7 @@ Deno.serve(async (request) => {
       'events.read','events.request','events.manage','events.separate','events.return','events.sell','events.close',
       'orders.read','orders.internal','orders.assign','orders.central','orders.franchise',
       'orders.separate','orders.dispatch','orders.receive','orders.cancel','movements.read','movements.export','purchases.manage',
-      'categories.manage','tags.manage','catalog.manage','products.share','stores.read','stores.manage','users.manage'
+      'categories.manage','tags.manage','catalog.manage','products.share','stores.read','stores.manage','users.manage','system.force_delete'
     ]);
     if (!/^[A-Za-z][A-Za-z0-9._-]{2,31}$/.test(username) ||
         fullName.length < 2 || fullName.length > 120 ||
