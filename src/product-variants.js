@@ -123,7 +123,7 @@ export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,cho
       throw new Error('EAN duplicado. Confira os códigos das etiquetas dos tamanhos selecionados.');
     throw error;
   }
-  await saveProcurement(id,form);
+  if(saveProcurement)await saveProcurement(id,form);
   let photoWarning=false;
   if(hasGallery){
    try{await saveGallery(form,{db,assertOk,modelId:id});}
