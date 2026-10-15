@@ -15,23 +15,28 @@ const products=['P','M','G'].map((size,i)=>({
 const group=groupInventory(products,[{id:'model-1',name:'Camiseta Preta'}])[0];
 const h=x=>String(x);
 const button=(label,action,extra='')=>'<button data-action="'+action+'" '+extra+'>'+label+'</button>';
-test('card do produto possui movimentação no modelo e em cada tamanho',()=>{
+test('cada variação tem somente um comando Gerenciar visível no retrátil',()=>{
  const html=groupedCard(group,{
   h,photoButton:()=>'<button>Foto</button>',qtyStore:()=>12,qtyEvent:()=>0,
-  qtyReserved:()=>0,qtyAvailable:()=>12,button,
-  isManager:()=>true,canRegisterProducts:()=>true,canMoveStock:()=>true
+  qtyReserved:()=>2,qtyAvailable:()=>10,button,
+  isManager:()=>true,canRegisterProducts:()=>true,canMoveStock:()=>true,
+  canManageSku:()=>true
  });
- assert.equal((html.match(/data-action="stock-group-modal"/g)||[]).length,1);
- assert.equal((html.match(/data-action="stock-modal"/g)||[]).length,6); // 3 SKUs no desktop e no painel mobile
+ assert.equal((html.match(/data-action="sku-manage"/g)||[]).length,6); // 3 linhas nas duas árvores responsivas, uma só visível
+ assert.doesNotMatch(html,/data-action="stock-group-modal"/);
+ assert.doesNotMatch(html,/data-action="stock-modal"/);
  assert.match(html,/data-product-details/);
- assert.match(html,/3 tamanhos/);
+ assert.match(html,/Ver 3 tamanhos/);
+ assert.match(html,/2<\/b> reservadas/);
+ assert.match(html,/10<\/b> livres/);
 });
-test('card sem permissão não expõe movimentações',()=>{
+test('perfil de leitura não exibe operações de movimentação ou edição',()=>{
  const html=groupedCard(group,{
   h,photoButton:()=>'',qtyStore:()=>12,qtyEvent:()=>0,qtyReserved:()=>0,
   qtyAvailable:()=>12,button,isManager:()=>false,canRegisterProducts:()=>false,
-  canMoveStock:()=>false
+  canMoveStock:()=>false,canManageSku:()=>false
  });
+ assert.doesNotMatch(html,/data-action="sku-manage"/);
  assert.doesNotMatch(html,/data-action="stock-modal"/);
  assert.doesNotMatch(html,/data-action="stock-group-modal"/);
 });
