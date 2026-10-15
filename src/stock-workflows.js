@@ -84,7 +84,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
           (isProducts?'<small class="stock-variant-breakdown">'+fmt(qtyReserved(p.id))+' reservadas · '+fmt(qtyAvailable(p.id))+' livres</small>':'')+
           '</div></div>'+
         '<span class="group-variant-stock '+(qty===0?'stock-zero':'')+'"><b>'+fmt(qty)+'</b><small>un.</small></span>'+
-        (skuAccess?'<div class="group-variant-actions">'+
+        (skuAccess&&sizeCount>1?'<div class="group-variant-actions">'+
           button('Gerenciar','sku-manage','data-id="'+h(p.id)+'"','small primary')+
           '</div>':'')+
         '</div>';
