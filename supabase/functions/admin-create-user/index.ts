@@ -78,7 +78,7 @@ Deno.serve(async (request) => {
     ]);
     if (!/^[A-Za-z][A-Za-z0-9._-]{2,31}$/.test(username) ||
         fullName.length < 2 || fullName.length > 120 ||
-        !['admin','gerente','estoquista','evento','consulta'].includes(role) ||
+        !['admin','gerente','estoquista','evento','consulta','franquia'].includes(role) ||
         permissions.length === 0 || permissions.some(p => !validPermissionNames.has(p)) ||
         storeIds.some(id => !/^[0-9a-f-]{36}$/i.test(id))) {
       return respond({error:'Informe nome, usuário de 3 a 32 caracteres e função.'},400);
@@ -89,6 +89,18 @@ Deno.serve(async (request) => {
         .select('id').in('id',storeIds).eq('active',true);
       if (storesError || (activeStores?.length ?? 0) !== storeIds.length) {
         return respond({error:'Uma ou mais lojas selecionadas não estão ativas.'},400);
+      }
+    }
+    if (role === 'franquia') {
+      const allowed = ['products.read','orders.franchise'];
+      if (permissions.length !== allowed.length || !allowed.every(permission => permissions.includes(permission)) ||
+          storeIds.length !== 1) {
+        return respond({error:'Perfil franquia exige apenas catálogo e pedidos e uma unidade franqueada.'},400);
+      }
+      const {data: franchise,error:franchiseError} = await admin.from('stores')
+        .select('id,kind').eq('id',storeIds[0]).eq('active',true).maybeSingle();
+      if (franchiseError || franchise?.kind !== 'franquia') {
+        return respond({error:'O usuário deve estar vinculado a uma franquia ativa.'},400);
       }
     }
     // Compatibilidade com verificações de perfil das rotinas legadas.
