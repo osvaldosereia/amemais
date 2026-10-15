@@ -97,7 +97,7 @@ const permissionCatalog=[
  ['movements.read','Consultar movimentações'],['movements.export','Exportar relatórios'],
  ['categories.manage','Gerenciar categorias'],['tags.manage','Gerenciar tags'],
  ['catalog.manage','Gerenciar catálogos de clientes'],['products.share','Compartilhar produtos'],
- ['stores.read','Consultar lojas'],['stores.manage','Administrar lojas'],['purchases.manage','Fornecedores e pedidos de compra'],['users.manage','Administrar usuários']
+ ['stores.read','Consultar lojas'],['stores.manage','Administrar lojas'],['purchases.manage','Fornecedores e pedidos de compra'],['users.manage','Administrar usuários'],['system.force_delete','Autonomia total: exclusões avançadas (com histórico)']
 ];
 const hasPermission = p => Boolean(state.profile?.active) && (state.profile?.role==='admin'||state.ownPermissions.includes(p));
 const canUseStoreOrders=()=>['orders.central','orders.franchise','orders.separate','orders.receive','orders.cancel'].some(hasPermission);
@@ -540,8 +540,8 @@ function productGroupCard(group){
 }
 function dashboard(){
   const all=state.items.filter(p=>p.active);
-  const total=state.balances.filter(b=>!b.event_id).reduce((sum,b)=>sum+b.quantity,0);
-  const eventTotal=state.balances.filter(b=>b.event_id).reduce((sum,b)=>sum+b.quantity,0);
+  const total=state.balances.filter(b=>!b.event_id&&state.items.some(p=>p.id===b.product_id&&!p.force_archived_at)).reduce((sum,b)=>sum+b.quantity,0);
+  const eventTotal=state.balances.filter(b=>b.event_id&&state.items.some(p=>p.id===b.product_id&&!p.force_archived_at)).reduce((sum,b)=>sum+b.quantity,0);
   const zero=all.filter(p=>qtyAvailable(p.id)===0).length;
   const reserved=state.stockReservations.reduce((sum,x)=>sum+Number(x.quantity||0),0);
   const available=Math.max(0,total-reserved);
@@ -618,7 +618,7 @@ function mobileProductCard(p){
     (hasPermission('products.read')?button('Detalhar estoque','stock-overview','data-id="'+h(p.id)+'"','small'):'')+
     ((hasPermission('stock.entry')||hasPermission('stock.exit'))?button('Movimentar','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
     (hasPermission('products.edit')?button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+
-    (hasPermission('products.delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></div></article>';
+    (hasPermission('products.delete')||hasPermission('system.force_delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></div></article>';
 }
 
 function categoryFull(id){
@@ -630,7 +630,7 @@ function productModelManager(modelId){
   if(!canRegisterProducts())return;
   const model=state.apparelModels.find(m=>m.id===modelId);
   if(!model)return toast('Modelo não encontrado.',true);
-  const variants=state.items.filter(p=>p.apparel_model_id===modelId);
+  const variants=state.items.filter(p=>p.apparel_model_id===modelId&&!p.force_archived_at);
   if(!variants.length)return toast('Não há variações neste modelo.',true);
   while(document.querySelector('.modalback'))closeTopModal();
   const overlay=document.createElement('div');
@@ -640,7 +640,7 @@ function productModelManager(modelId){
       '<small>SKU: '+h(p.sku||'—')+' · EAN: '+h(p.ean||'—')+'</small>'+
       (!p.active?'<small>Variação inativa</small>':'')+'</div>'+
     '<div class="actions">'+button('Editar','product-edit','data-id="'+h(p.id)+'"','small')+
-      (hasPermission('products.delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
+      (hasPermission('products.delete')||hasPermission('system.force_delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
     '</div></div>').join('');
   overlay.innerHTML='<section class="modal" role="dialog" aria-modal="true" aria-label="Editar '+h(model.name)+'">'+
     '<div class="modalhead"><h2>Editar · '+h(model.name)+'</h2>'+
