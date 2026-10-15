@@ -28,7 +28,7 @@ export function stockPrintGroups(items,models,balances,reservations){
     a.size.localeCompare(b.size,'pt-BR',{numeric:true});
   });
   const colors=[...new Set(rows.map(r=>r.color).filter(Boolean))];
-  return {key,title:base.name||group.items[0].name,color:colors.join(' · '),
+  return {key:group.key,title:base.name||group.items[0].name,color:colors.join(' · '),
    photoPath:group.model?.image_path||group.model?.image_paths?.[0]||
     group.items.find(p=>p.image_path)?.image_path||group.items.find(p=>p.image_paths?.length)?.image_paths?.[0]||'',
    rows,total:rows.reduce((sum,row)=>({
