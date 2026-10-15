@@ -2228,6 +2228,7 @@ async function handleClick(event){
   if(action==='stock-overview-close'){target.closest('.stock-overview-overlay')?.remove();return;}
   if(action==='stock-group-modal')return stockModal(null,target.dataset.cardKey);
   if(action==='stock-modal')return stockModal(id);
+  if(action==='event-plan-scan')return scanInto('[data-plan-search]',target.closest('form'));
   if(action==='event-plan')return eventPlanModal(false);
   if(action==='event-supplement')return eventPlanModal(true);
   if(action==='event-settle')return eventSettlementModal();
