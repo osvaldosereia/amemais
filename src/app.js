@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery2';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015cover2';
-import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015storehub1';
+import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015storehub2';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
@@ -1952,6 +1952,7 @@ function storesPage(){
    canBrowseOrders:permittedView('pedidos'),
    canManageStores:hasPermission('stores.manage')&&!portal,
    canManageEvent:hasPermission('events.manage')&&!portal,
+   canOpenEvent:permittedView('eventos'),
    showCentral:!portal&&(hasPermission('stores.read')||hasPermission('stores.manage')||
       hasPermission('orders.read')||hasPermission('orders.separate')||hasPermission('orders.internal')||
       hasPermission('events.separate')),
