@@ -1278,16 +1278,46 @@ function orderEventModal(orderId){
   document.querySelector('form[data-form="order-associate"]').dataset.id=orderId;
 }
 function usersPage(){
-  return tabHead('Usuários','Perfis do CDSB, unidades vinculadas e permissões.',
-    button('Preparar 6 contas CDSB','users-provision','','small')+button('+ Novo usuário','user-new','','primary'))+
-    panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Usuário</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
-    state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.username)+'</td><td>'+h(profileLabel(u))+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
-      (u.id!==state.user.id?'<div class="inline">'+button('Funções e lojas','user-role','data-id="'+h(u.id)+'"','small')+
-      button('Definir senha','set-user-password','data-id="'+h(u.id)+'"','small')+
-      button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+'</div>':
-      button('Minha senha','my-password','','small'))+'</td></tr>').join('')+'</tbody></table></div>')+
-    '<div class="note">Os acessos são individuais. Bloquear um usuário não apaga seu histórico de operações. Senhas não são armazenadas pela aplicação.</div>';
+ if(!isAdmin())return '<p class="help">Acesso restrito ao administrador CDSB.</p>';
+ const archived=state.usersAdminArchived===true;
+ const active=state.users.filter(u=>!u.archived_at),removed=state.users.filter(u=>Boolean(u.archived_at));
+ const dataset=archived?removed:active;
+ const counters=[['Ativos',active.filter(x=>x.active).length],['Bloqueados',active.filter(x=>!x.active).length],['Arquivados',removed.length]];
+ const entry=u=>'<article class="um-user" data-user-row data-user-filter="'+h([u.full_name,u.username,profileLabel(u)].join(' ').toLowerCase())+'" data-user-role="'+h(u.role)+'">'+
+  '<div class="um-user-main"><span class="um-avatar" aria-hidden="true">'+h((u.full_name||'?').slice(0,1).toUpperCase())+'</span>'+
+   '<div class="um-user-names"><strong>'+h(u.full_name)+'</strong><small>@'+h(u.username)+'</small></div></div>'+
+  '<div class="um-user-details"><span class="um-role">'+h(profileLabel(u))+'</span>'+
+   '<span class="pill '+(u.archived_at?'encerrado':u.active?'ativo':'encerrado')+'">'+(u.archived_at?'Excluído':u.active?'Ativo':'Bloqueado')+'</span>'+
+   (u.role==='franquia'?'<small class="um-linked">'+h(state.stores.filter(s=>state.staffStores.some(a=>a.user_id===u.id&&a.store_id===s.id)).map(x=>x.name).join(', ')||'Sem loja vinculada')+'</small>':'')+
+  '</div><div class="um-user-actions">'+
+   (u.archived_at?button('Restaurar','user-restore','data-id="'+h(u.id)+'"','small'):
+    button('Editar','user-edit','data-id="'+h(u.id)+'"','small')+
+    (u.id===state.user?.id?'':button('Perfil e acessos','user-role','data-id="'+h(u.id)+'"','small')+
+     button('Senha','set-user-password','data-id="'+h(u.id)+'"','small')+
+     button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+
+     button('Excluir','user-delete','data-id="'+h(u.id)+'"','small danger'))+
+    (u.id===state.user?.id?button('Minha senha','my-password','','small'):''))+
+  '</div></article>';
+ return tabHead('Usuários','Administre pessoas, perfis, vínculos e acessos em um só lugar.',
+   button('Preparar 6 contas CDSB','users-provision','','small')+button('+ Novo usuário','user-new','','primary'))+
+  '<div class="um-shell"><div class="um-totals">'+counters.map(([name,val])=>
+   '<div><strong>'+val+'</strong><small>'+name+'</small></div>').join('')+'</div>'+
+  '<div class="um-filters"><label class="um-search"><span>Buscar usuário</span><input type="search" data-users-search placeholder="Nome, usuário ou função..."></label>'+
+   '<label><span>Perfil</span><select data-users-filter-role><option value="">Todos os perfis</option>'+
+   Object.entries(roles).map(([role,title])=>'<option value="'+h(role)+'">'+h(title)+'</option>').join('')+'</select></label>'+
+   button(archived?'Ver equipe atual':'Ver arquivados','users-archived-toggle','','small')+'</div>'+
+  '<section class="um-list" data-users-list>'+ (dataset.length?dataset.map(entry).join(''):
+   '<p class="um-empty">'+(archived?'Nenhuma conta arquivada.':'Nenhum usuário cadastrado.')+'</p>')+'</section>'+
+  '<p class="um-footnote">Excluir retira a conta da equipe e bloqueia seu login, preservando movimentos, pedidos e auditoria. Contas arquivadas podem ser restauradas.</p></div>';
 }
+function applyUserListFilter(){
+ const root=document.querySelector('.um-shell');if(!root)return;
+ const query=(root.querySelector('[data-users-search]')?.value||'').trim().toLowerCase();
+ const role=root.querySelector('[data-users-filter-role]')?.value||'';
+ for(const el of root.querySelectorAll('[data-user-row]'))
+  el.hidden=Boolean((query&&!el.dataset.userFilter.includes(query))||(role&&el.dataset.userRole!==role));
+}
+
 
 function closeTopModal(){
   const backdrops=[...document.querySelectorAll('.modalback')];
@@ -2062,55 +2092,108 @@ async function saveTaxonomyFromProduct(form,table,data,success){
   }catch(e){fail(e);}finally{state.loading=false;}
 }
 
+const accessPresets={
+ admin:permissionCatalog.map(([key])=>key).filter(x=>x!=='events.sell'),
+ gerente:['products.read','products.create','products.edit','stock.entry','stock.exit','stock.balance',
+  'stores.read','stores.manage','orders.read','orders.internal','orders.franchise','orders.separate',
+  'orders.dispatch','orders.receive','orders.cancel','events.read','events.manage','events.separate',
+  'events.return','events.close','purchases.manage','movements.read','movements.export',
+  'categories.manage','tags.manage'],
+ estoquista:['products.read','orders.read','orders.separate'],
+ evento:['products.read','events.read','events.request'],
+ consulta:['products.read','orders.read','stores.read','movements.read'],
+ franquia:['products.read','orders.franchise']
+};
+const profileDescriptions={
+ admin:'Acesso integral ao Centro de Distribuição São Bento.',
+ gerente:'Coordena o CDSB. É possível ajustar permissões operacionais avançadas.',
+ estoquista:'Somente fila de separação e conferência. Não expede nem ajusta estoque.',
+ evento:'Solicita reposições e informa devoluções nos eventos vinculados. Não registra vendas.',
+ consulta:'Consulta informações sem permissão para movimentar produtos.',
+ franquia:'Loja Cristo Rei ou franquia: somente seus pedidos e comprovantes, sem controle de estoque no destino.'
+};
 function permissionFields(userId){
  const user=state.users.find(x=>x.id===userId);
+ const role=user?.role||'evento';
  const explicit=state.userPermissions.filter(x=>x.user_id===userId).map(x=>x.permission);
- const chosen=explicit.length?explicit:(user?.role==='admin'?permissionCatalog.map(([key])=>key):
-   (permissionDefaults[user?.role||'evento']||[]));
- return '<section class="form-section wide"><strong>Vinculação às unidades</strong>'+
- '<p class="help">Loja permanente: selecione somente uma unidade. Separador: CDSB. Temporária: vínculo pelo evento.</p>'+
- state.stores.filter(x=>x.active).map(x=>'<label class="field"><span>'+
-  '<input type="checkbox" name="store" value="'+h(x.id)+'" data-store-kind="'+h(x.kind)+'" '+
-  ((state.staffStores.some(ss=>ss.user_id===userId&&ss.store_id===x.id)||(!userId&&x.is_primary))?'checked':'')+
-  '> '+h(x.name)+'</span></label>').join('')+'</section>'+
- '<details class="access-advanced wide"><summary>Permissões avançadas · somente administradores</summary>'+
- '<p class="help">O perfil escolhido define as permissões automáticas. Personalize somente quando necessário; o backend valida o acesso.</p>'+
- permissionCatalog.map(([key,label])=>'<label class="field"><span><input type="checkbox" name="perm" value="'+h(key)+'" '+
-  (chosen.includes(key)?'checked':'')+'> '+h(label)+'</span></label>').join('')+'</details>';
+ const chosen=explicit.length?explicit:(accessPresets[role]||[]);
+ const linkedStores=new Set(state.staffStores.filter(ss=>ss.user_id===userId).map(ss=>ss.store_id));
+ const events=new Set(state.members.filter(m=>m.user_id===userId).map(m=>m.event_id));
+ const stores=state.stores.filter(x=>x.active);
+ const storeGroup='<section class="um-access-group" data-access-stores>'+
+  '<h3>2. Unidade vinculada</h3><p class="help" data-access-store-help>Apenas as unidades autorizadas estarão disponíveis para este acesso.</p>'+
+  '<div class="um-choice-list">'+stores.map(s=>
+   '<label class="um-choice" data-store-role="'+h(s.kind)+'" data-is-primary="'+String(s.is_primary)+'"><input type="checkbox" name="store" value="'+h(s.id)+'" '+
+    (linkedStores.has(s.id)||(!userId&&s.is_primary)?'checked':'')+'><span><strong>'+h(s.name)+'</strong>'+
+    '<small>'+(s.is_primary?'Centro de distribuição':s.kind==='franquia'?'Loja sem estoque interno':'Unidade gerenciada')+'</small></span></label>').join('')+
+  '</div></section>';
+ const eventsGroup='<section class="um-access-group" data-access-events hidden>'+
+  '<h3>3. Eventos autorizados</h3><p class="help">O responsável verá somente as lojas temporárias assinaladas. Pode alterar depois.</p>'+
+  '<div class="um-choice-list">'+state.events.filter(e=>!e.deleted_at&&['rascunho','ativo'].includes(e.status)).map(e=>
+   '<label class="um-choice"><input type="checkbox" name="event_member" value="'+h(e.id)+'" '+(events.has(e.id)?'checked':'')+'>'+
+   '<span><strong>'+h(e.name)+'</strong><small>'+h(e.status)+'</small></span></label>').join('')+
+  '</div></section>';
+ const advanced=permissionCatalog.filter(([p])=>!['events.sell'].includes(p)).map(([key,label])=>
+   '<label class="um-perm"><input type="checkbox" name="perm" value="'+h(key)+'" '+(chosen.includes(key)?'checked':'')+'><span>'+h(label)+'</span></label>').join('');
+ return '<section class="um-access-group"><h3>1. Perfil de referência</h3>'+
+  '<p class="um-role-description" data-access-profile-help>'+h(profileDescriptions[role]||'')+'</p></section>'+
+  storeGroup+eventsGroup+
+  '<details class="um-advanced" data-access-advanced><summary><strong>Permissões avançadas</strong><small>Somente para gerentes e consultas. Perfis operacionais usam permissões fixas.</small></summary>'+
+  '<div class="um-perm-grid">'+advanced+'</div></details>';
 }
 function setupFranchiseProfile(form){
  const role=form?.querySelector('[name="role"]');if(!role)return;
- const choose=(current)=>{
-  const profiles={
-   franquia:['products.read','orders.franchise'],
-   estoquista:['products.read','orders.read','orders.separate'],
-   evento:['products.read','events.read','events.request'],
-   admin:permissionCatalog.map(([p])=>p)
-  };
-  const selected=profiles[current]||permissionDefaults[current]||[];
-  for(const input of form.querySelectorAll('input[name="perm"]'))input.checked=selected.includes(input.value);
-  const choices=[...form.querySelectorAll('input[name="store"]')];
-  for(const input of choices){
-   input.checked=current==='estoquista'&&state.stores.some(s=>s.id===input.value&&s.is_primary);
+ const existing=Boolean(form.dataset.id);
+ const show=(reset)=>{
+  const current=role.value;
+  const allowed=accessPresets[current]||[];
+  if(reset){
+   for(const input of form.querySelectorAll('input[name="perm"]'))input.checked=allowed.includes(input.value);
+   for(const input of form.querySelectorAll('input[name="store"]'))input.checked=false;
+   for(const input of form.querySelectorAll('input[name="event_member"]'))input.checked=false;
+  }
+  const desc=form.querySelector('[data-access-profile-help]');
+  if(desc)desc.textContent=profileDescriptions[current]||'';
+  const storeSection=form.querySelector('[data-access-stores]');
+  const eventSection=form.querySelector('[data-access-events]');
+  if(storeSection)storeSection.hidden=current==='evento'||current==='consulta'||current==='admin';
+  if(eventSection)eventSection.hidden=current!=='evento';
+  const advanced=form.querySelector('[data-access-advanced]');
+  if(advanced){advanced.hidden=!['gerente','consulta'].includes(current);if(advanced.hidden)advanced.open=false;}
+  for(const input of form.querySelectorAll('input[name="store"]')){
+   const item=input.closest('.um-choice');
    const store=state.stores.find(s=>s.id===input.value);
-   const shown=current==='franquia'?store?.kind==='franquia':
+   const valid=current==='franquia'?store?.kind==='franquia':
      current==='estoquista'?store?.is_primary:
-     current==='evento'?false:true;
-   const label=input.closest('label');if(label)label.hidden=!shown;
+     current==='gerente'?true:false;
+   if(item)item.hidden=!valid;
+   if(!valid)input.checked=false;
+   if(current==='estoquista'&&store?.is_primary)input.checked=true;
   }
   if(current==='franquia'){
-   const active=choices.filter(x=>!x.closest('label')?.hidden);
-   if(active.length===1)active[0].checked=true;
+   const allowedStores=[...form.querySelectorAll('input[name="store"]')].filter(x=>!x.closest('.um-choice')?.hidden);
+   const checked=allowedStores.filter(x=>x.checked);
+   if(checked.length>1)checked.slice(1).forEach(x=>x.checked=false);
+   if(!checked.length&&allowedStores.length===1)allowedStores[0].checked=true;
+  }
+  const help=form.querySelector('[data-access-store-help]');
+  if(help)help.textContent=current==='franquia'?'Escolha uma única loja permanente.':
+   current==='estoquista'?'O separador fica vinculado apenas ao CDSB.':
+   'Selecione as unidades gerenciadas pelo usuário.';
+  if(!['gerente','consulta'].includes(current)){
+   for(const input of form.querySelectorAll('input[name="perm"]'))input.checked=allowed.includes(input.value);
   }
  };
- role.addEventListener('change',()=>choose(role.value));
+ role.addEventListener('change',()=>show(true));
  form.addEventListener('change',event=>{
   if(event.target.matches('input[name="store"]')&&role.value==='franquia'&&event.target.checked)
    for(const other of form.querySelectorAll('input[name="store"]'))
     if(other!==event.target)other.checked=false;
  });
- if(!form.dataset.id&&!form.dataset.existingUser)choose(role.value);
+ show(!existing);
 }
+
+
 function assertFranchiseProfile(form,role,perms,storeIds){
  if(role!=='franquia')return;
  const expected=permissionDefaults.franquia;
@@ -2120,13 +2203,33 @@ function assertFranchiseProfile(form,role,perms,storeIds){
 }
 function userRoleModal(id){
  if(!isAdmin()||id===state.user?.id)return;
- const target=state.users.find(x=>x.id===id);if(!target)return;
- formModal('Autorizações · '+target.full_name,
- '<div class="formgrid">'+selectField('Perfil de referência','role',Object.entries(roles),target.role)+permissionFields(id)+'</div>',
- 'user-permissions','Salvar autorizações');
- const form=document.querySelector('.modal form');form.dataset.id=id;
+ const target=state.users.find(x=>x.id===id);
+ if(!target||target.archived_at)return;
+ formModal('Perfil e acessos · '+target.full_name,
+  '<p class="help">Selecione o perfil. Depois confira a loja ou evento vinculado. O perfil é preservado exatamente como escolhido.</p>'+
+  '<div class="um-role-field">'+selectField('Perfil','role',Object.entries(roles),target.role)+'</div>'+
+  permissionFields(id),'user-permissions','Salvar perfil e acessos');
+ const form=document.querySelector('.modalback form[data-form="user-permissions"]');
+ if(!form)return;
+ form.dataset.id=id;
  setupFranchiseProfile(form);
 }
+function userEditModal(id){
+ if(!isAdmin())return;
+ const target=state.users.find(u=>u.id===id);
+ if(!target||target.archived_at)return;
+ formModal('Editar dados · '+target.full_name,
+  '<p class="help">Altere o nome e o usuário de login. O perfil e as unidades são editados em “Perfil e acessos”.</p>'+
+  '<div class="formgrid">'+
+  field('Nome completo','full_name','text',target.full_name,'required minlength="2" maxlength="120"')+
+  field('Nome de usuário (login)','username','text',target.username,
+   'required minlength="3" maxlength="32" autocapitalize="none" autocomplete="off"')+
+  '</div>','user-edit','Salvar alterações');
+ const form=document.querySelector('.modalback form[data-form="user-edit"]');
+ if(form)form.dataset.id=id;
+}
+
+
 function branchReturnModal(storeId){
  const store=state.stores.find(x=>x.id===storeId);
  if(!store||store.kind!=='filial'||!store.active||!assignedStore(storeId)||
