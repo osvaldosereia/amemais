@@ -40,7 +40,7 @@ function itemRow(o,scope,ctx){
   ctx.button('Imprimir 80 mm','order-print-thermal',
    'data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"','small'):'';
  return '<div class="sh-order-line">'+
-  '<div class="sh-order-identity"><strong>'+label+' #'+esc(o.id.slice(0,8).toUpperCase())+'</strong>'+
+  '<div class="sh-order-identity"><strong>'+label+' #'+esc(o.code||'—')+'</strong>'+
    '<small>'+esc(o.kind==='avulso'?o.target:o.kind==='evento'?'Loja temporária':o.origin+' → '+o.target)+
      ' · '+esc(ctx.time(o.created_at))+'</small></div>'+
   '<div class="sh-order-count">'+Number(o.total||0).toLocaleString('pt-BR')+' un.</div>'+
