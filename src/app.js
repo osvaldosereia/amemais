@@ -1729,15 +1729,19 @@ function eventCoverCard(e,compact=false){
  if(!e?.cover_path)return compact?'':'<div class="event-cover-placeholder">▧ <span>Sem capa</span></div>';
  return '<div class="event-cover'+(compact?' compact':'')+'"><img data-event-cover="'+h(e.cover_path)+'" alt="Capa do evento '+h(e.name)+'" loading="lazy"></div>';
 }
+function syncCoverFileField(form){
+ const label=form?.querySelector('[data-cover-file]');
+ if(label)label.hidden=form.elements.namedItem('cover_mode')?.value!=='upload';
+}
 function eventCoverModal(id){
  if(!hasPermission('events.manage'))return;
  const e=eventById(id);if(!e||e.deleted_at)return;
  formModal('Capa · '+e.name,
   eventCoverCard(e)+'<p class="help">Capa horizontal de 1600 × 900 pixels. Envie uma foto, gere com IA ou remova a atual.</p>'+
   selectField('O que deseja fazer','cover_mode',[['upload','Enviar nova imagem'],['generate','Gerar com OpenAI (econômico)'],['remove','Remover capa']])+
-  '<label class="field"><span>Selecionar imagem (caso escolha envio)</span><input type="file" name="event_cover_file" accept="image/*"></label>',
+  '<label class="field" data-cover-file><span>Selecionar imagem (caso escolha envio)</span><input type="file" name="event_cover_file" accept="image/*"></label>',
   'event-cover-update','Aplicar');
- const f=document.querySelector('.modalback form[data-form="event-cover-update"]');if(f)f.dataset.eventId=id;
+ const f=document.querySelector('.modalback form[data-form="event-cover-update"]');if(f){f.dataset.eventId=id;syncCoverFileField(f);}
  hydrateImages();
 }
 function eventModal(){
@@ -1752,9 +1756,10 @@ function eventModal(){
   selectField('Responsável','responsible_id',people.map(u=>[u.id,u.full_name]),state.user.id,'required')+
   textareaField('Local, observações e informações básicas','notes')+
   selectField('Imagem de capa','cover_mode',[['none','Criar sem capa'],['upload','Enviar imagem'],['generate','Gerar imagem com OpenAI (low)']])+
-  '<label class="field"><span>Arquivo de imagem (caso escolha Enviar)</span><input type="file" name="event_cover_file" accept="image/*"></label>'+
+  '<label class="field" data-cover-file><span>Arquivo de imagem (caso escolha Enviar)</span><input type="file" name="event_cover_file" accept="image/*"></label>'+
   '</div><p class="help">Após criar, monte a lista de separação, imprima em A4 e confirme o envio físico.</p>',
   'event-create','Criar e preparar');
+ syncCoverFileField(document.querySelector('.modalback form[data-form="event-create"]'));
 }
 function eventMove(action){
   const eid=state.activeEvent;
@@ -3974,6 +3979,7 @@ document.addEventListener('change',event=>{
     }
   }
   if(event.target.matches('select[name="apparel_type"]'))apparelSyncCategory(event.target,state,{categoryFull});
+  if(event.target.matches('select[name="cover_mode"]'))syncCoverFileField(event.target.closest('form'));
   if(event.target.matches('input[name="camera_file"],input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
   if(event.target.matches('input[name="gallery_replace_file"]')){
    const input=event.target,form=input.closest('form'),file=input.files?.[0];
