@@ -23,7 +23,12 @@ export async function uploadEventCover(db,eventId,file){
 }
 export async function generateEventCover(db,eventId){
  const response=await db.functions.invoke('generate-event-cover',{body:{event_id:eventId}});
- if(response.error)throw Error('Geração de capa indisponível: '+response.error.message);
+ if(response.error){
+  let message=response.error.message;
+  try{const info=await response.error.context?.json?.();if(info?.error)message=info.error;}
+  catch{}
+  throw Error('Geração de capa indisponível: '+message);
+ }
  if(!response.data?.base64)throw Error(response.data?.error||'Não foi possível gerar a imagem.');
  const binary=atob(response.data.base64),bytes=new Uint8Array(binary.length);
  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
