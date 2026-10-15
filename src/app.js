@@ -11,7 +11,7 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015categorymetadata2';
 import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015categorymetadata2';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015photogallery1';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015shelf1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
@@ -24,6 +24,7 @@ import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lot
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
+import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261015shelf1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -548,7 +549,8 @@ function productGroupCard(group){
     canManageSku:()=>!isFranchisePortal()&&['stock.entry','stock.exit','stock.balance','products.edit'].some(hasPermission),
     canQuickCount:()=>!isFranchisePortal()&&hasPermission('stock.balance')&&['admin','gerente','estoquista'].includes(state.profile?.role),
     canDeleteWholeModel:()=>isAdmin()&&hasPermission('system.force_delete'),
-    expanded:state.expandedProductGroups.has(group.key),canShare:canRegisterProducts()
+    expanded:state.expandedProductGroups.has(group.key),canShare:canRegisterProducts(),
+    canLabel:!isFranchisePortal()
   });
 }
 function dashboard(){
@@ -655,7 +657,8 @@ function productModelManager(modelId){
     '<div><strong>'+h([p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||p.name)+'</strong>'+
       '<small>SKU: '+h(p.sku||'—')+' · EAN: '+h(p.ean||'—')+'</small>'+
       (!p.active?'<small>Variação inativa</small>':'')+'</div>'+
-    '<div class="actions">'+button('Editar','product-edit','data-id="'+h(p.id)+'"','small')+
+    '<div class="actions">'+button('Etiqueta','shelf-label-one','data-id="'+h(p.id)+'"','small')+
+      button('Editar','product-edit','data-id="'+h(p.id)+'"','small')+
       (hasPermission('products.delete')||hasPermission('system.force_delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
     '</div></div>').join('');
   overlay.innerHTML='<section class="modal" role="dialog" aria-modal="true" aria-label="Editar '+h(model.name)+'">'+
@@ -665,6 +668,7 @@ function productModelManager(modelId){
       '<p>Escolha o tamanho que deseja editar. Cada variação tem EAN, SKU e estoque independentes.</p>'+
       '<div class="product-model-manage-actions">'+
         button('Alterar foto','apparel-photo','data-id="'+h(modelId)+'"','small')+
+        button('Etiquetas 80 mm','shelf-label-open','data-id="'+h(variants[0].id)+'"','small')+
         button('+ Adicionar tamanhos','add-variants','data-id="'+h(modelId)+'"','small primary')+
         (isAdmin()&&hasPermission('system.force_delete')?
          button('Excluir produto completo','product-model-delete','data-id="'+h(modelId)+'"','small danger'):'')+
@@ -1597,7 +1601,9 @@ function productModal(item=null){
     '<input style="flex:1;min-width:145px" name="ean" type="text" inputmode="numeric" placeholder="8 a 14 dígitos" value="'+h(item?.ean||'')+'">'+
     button('📷 Ler','form-scan','data-target="ean"','small')+'</div></div></div>';
   const locations='<section class="form-section wide location-section">'+
-    '<div class="section-head"><strong>Localização na loja</strong><small>Opcional</small></div>'+
+    '<div class="section-head"><strong>Localização na loja</strong>'+(
+      item?button('Imprimir etiqueta 80 mm','shelf-label-one','data-id="'+h(item.id)+'"','small'):
+      '<small>Opcional</small>')+'</div>'+
     '<div class="location-fields">'+
     field('Gôndola','gondola','text',item?.gondola||'','maxlength="40" placeholder="Ex.: Gôndola 02"')+
     field('Prateleira','prateleira','text',item?.prateleira||'','maxlength="40" placeholder="Ex.: Prateleira B"')+
@@ -1620,6 +1626,29 @@ function productModal(item=null){
   if(item?.image_path||item?.image_paths?.length)hydrateImages();
 }
 
+function shelfLabelsModal(id){
+ if(isFranchisePortal())return toast('Etiquetas são exclusivas do estoque central.',true);
+ const item=product(id);
+ if(!item||item.force_archived_at)return toast('Produto não encontrado.',true);
+ const model=item.apparel_model_id?
+   state.apparelModels.find(m=>m.id===item.apparel_model_id):null;
+ const group=item.apparel_model_id?
+   state.items.filter(p=>p.apparel_model_id===item.apparel_model_id&&!p.force_archived_at):[item];
+ if(!group.length)return toast('Não há variações para imprimir.',true);
+ formModal('Etiquetas de gôndola · 80 mm',shelfLabelPicker(group,model?.name||''),'shelf-label-print',
+  'Imprimir etiquetas');
+ const form=document.querySelector('.modalback form[data-form="shelf-label-print"]');
+ if(form)form.dataset.productId=id;
+}
+function printShelfLabels(items){
+ const win=window.open('','_blank');
+ if(!win)return toast('Permita janelas pop-up para imprimir as etiquetas.',true);
+ try{
+  const html=shelfLabelsHTML(items);
+  win.document.open();win.document.write(html);win.document.close();
+  return true;
+ }catch(error){win.close();fail(error);return false;}
+}
 function shareProductModal(title,shareUrl){
   document.querySelector('.share-product-modal')?.remove();
   const layer=document.createElement('div');
@@ -3189,6 +3218,16 @@ async function handleClick(event){
       p_counted_available:newFree,p_note:'Conferência rápida · Produtos / tamanhos'
     })),'Saldo livre atualizado. Reservas preservadas e divergência auditada.');
   }
+  if(action==='shelf-label-open')return shelfLabelsModal(id);
+  if(action==='shelf-label-one'){
+    if(isFranchisePortal())return toast('Impressão permitida no estoque central.',true);
+    const item=product(id);
+    if(!item||item.force_archived_at)return toast('Produto não encontrado.',true);
+    const model=state.apparelModels.find(m=>m.id===item.apparel_model_id);
+    const label=shelfLabelData(item,model?.name||'');
+    if(!label.valid)return toast('Cadastre primeiro a gôndola e um EAN ou SKU válido.',true);
+    return printShelfLabels([label]);
+  }
   if(action==='product-card-edit'){
     if(!canRegisterProducts())return;
     return productModelManager(id);
@@ -3738,6 +3777,19 @@ async function handleSubmit(event){
       assertOk(await db.rpc('claim_initial_admin',{p_activation_code:code,p_name:name}));
       state.profile={id:state.user.id,full_name:name,email:state.user.email,role:'admin',active:true};
     },'Administrador ativado com sucesso.');
+    return;
+  }
+  if(type==='shelf-label-print'){
+    if(isFranchisePortal())return toast('Acesso indisponível.',true);
+    const source=product(form.dataset.productId);
+    if(!source)return toast('Produto não encontrado.',true);
+    const model=state.apparelModels.find(m=>m.id===source.apparel_model_id);
+    const group=source.apparel_model_id?
+      state.items.filter(p=>p.apparel_model_id===source.apparel_model_id&&!p.force_archived_at):[source];
+    try{
+      const selected=collectShelfLabels(group,form,model?.name||'');
+      if(printShelfLabels(selected))closeTopModal();
+    }catch(error){toast(error.message||'Verifique as etiquetas selecionadas.',true);}
     return;
   }
   if(type==='admin-order-delete'){
