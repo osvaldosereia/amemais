@@ -16,7 +16,8 @@ export function eventPickingRows(items,models,planItems=[],qtyAvailable=()=>0){
 }
 export function eventPlanForm(groups,{h=esc,additional=false}={}){
  return '<p class="help">Busque pelo modelo, tamanho, SKU ou EAN. Quantidades podem ser alteradas antes de confirmar o envio.</p>'+
- '<input type="search" class="search" data-plan-search placeholder="Buscar produto, tamanho ou EAN…" autocomplete="off" aria-label="Buscar na separação">'+
+ '<div class="event-plan-search"><input type="search" class="search" data-plan-search placeholder="Buscar produto, tamanho ou EAN…" autocomplete="off" aria-label="Buscar na separação">'+
+ '<button type="button" class="button" data-action="event-plan-scan">📷 Ler EAN</button></div>'+
  '<div class="event-plan-list">'+groups.map(group=>
   '<section class="event-plan-group" data-plan-group data-search="'+h([group.title,...group.products.flatMap(p=>[p.name,p.apparel_size,p.apparel_color,p.ean,p.sku])].join(' ').toLowerCase())+'">'+
     '<h3>'+h(group.title)+'</h3>'+group.products.map(p=>
@@ -61,11 +62,14 @@ export function eventCompactDetail(data){
  const active=e.status==='ativo',draft=e.status==='rascunho',closed=e.status==='encerrado';
  const current=balances.filter(b=>b.event_id===e.id&&Number(b.quantity)>0);
  const pending=current.reduce((sum,b)=>sum+Number(b.quantity),0);
- const shipped=movements.filter(m=>m.event_id===e.id&&m.action==='transferencia')
+ const actualShipments=shipments.filter(row=>row.event_id===e.id);
+ const shipped=actualShipments.length?actualShipments.reduce((sum,row)=>sum+(row.items||[])
+   .reduce((n,item)=>n+Number(item.quantity||0),0),0):
+   movements.filter(m=>m.event_id===e.id&&m.action==='transferencia')
    .reduce((sum,m)=>sum+Number(m.quantity||0),0);
  const planned=planItems.filter(x=>x.event_id===e.id).reduce((n,x)=>n+Number(x.quantity),0);
  const damaged=damageItems.filter(x=>x.origin_event_id===e.id)
-   .reduce((n,x)=>n+Number(x.quantity||0),0);
+   .reduce((n,x)=>n+Number(x.remaining||0),0);
  const groups=groupInventory(products.filter(p=>current.some(b=>b.product_id===p.id)),models);
  const status=draft?'Preparação':active?'Em operação':'Encerrada';
  const primary=draft?
