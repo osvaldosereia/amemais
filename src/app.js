@@ -1939,11 +1939,11 @@ async function handleClick(event){
     const w=window.open(wa,'_blank','noopener,noreferrer');if(!w)window.location.assign(wa);return;
   }
   if(action==='store-order-new')return storeOrderModal();
-  if(['store-order-approve','store-order-separate','store-order-dispatch',
+  if(action==='store-order-separate')return storePickingModal(id);
+  if(['store-order-approve','store-order-dispatch',
        'store-order-receive','store-order-cancel'].includes(action)){
     const order=state.storeOrders.find(x=>x.id===id);if(!order)return;
     const labels={'store-order-approve':['approve_store_order','Aprovado; unidades reservadas.','Aprovar e reservar as quantidades deste pedido?'],
-      'store-order-separate':['separate_store_order','Separação registrada; físico permanece na central.','Confirmar que os produtos foram fisicamente separados?'],
       'store-order-receive':['receive_store_order','Recebimento registrado.','Confirmar recebimento integral na unidade de destino?'],
       'store-order-cancel':['cancel_store_order','Pedido cancelado e reservas liberadas.','Cancelar pedido e liberar as reservas?']};
     if(action==='store-order-dispatch'){
