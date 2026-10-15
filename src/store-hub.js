@@ -100,11 +100,19 @@ function group(title,description,items,orders,ctx,empty){
 export function renderStoreHub({stores=[],events=[],orders=[],context={}}){
  const ctx={button:()=>'',time:x=>x,canBrowseOrders:false,canManageEvent:false,canManageStores:false,
   showCentral:true,showFranchises:true,showEvents:true,showBranches:false,portal:false,canOpenEvent:false,...context};
- const central=stores.find(s=>s.is_primary)||null;
- const centralItems=ctx.showCentral?[{type:'central',id:central?.id||'central',primary:true,
-  kicker:'Estoque e expedição',name:central?.name||'Loja Central',subtitle:'Fila geral de separação e pedidos'}]:[];
  const eligibleStore=s=>ctx.canSeeStore?ctx.canSeeStore(s):true;
- const franchiseItems=ctx.showFranchises?stores.filter(s=>s.kind==='franquia'&&!s.force_archived_at&&eligibleStore(s))
+ // CDSB é um centro de distribuição, não uma loja. "is_primary" identifica o CDSB
+ // na base de estoque e NUNCA deve ser usado para definir a loja central comercial.
+ const christStore=stores.find(s=>s.code==='CRISTOREICBA'&&!s.is_primary&&
+  s.ownership_type==='propria'&&!s.force_archived_at)||
+  stores.find(s=>s.kind==='filial'&&s.ownership_type==='propria'&&!s.is_primary&&
+   !s.force_archived_at)||null;
+ const centralItems=ctx.showCentral&&christStore&&eligibleStore(christStore)?[{
+  type:'store',id:christStore.id,primary:false,kicker:'Loja própria · central',
+  name:christStore.name,subtitle:'Cristo Rei · pedidos e abastecimento da loja'
+ }]:[];
+ const franchiseItems=ctx.showFranchises?stores.filter(s=>s.kind==='franquia'&&s.id!==christStore?.id&&
+  !s.force_archived_at&&eligibleStore(s))
   .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
   .map(s=>({type:'store',id:s.id,kicker:s.active?'Franquia ativa':'Franquia inativa',
     name:s.name,subtitle:s.code||''})):[];
@@ -112,7 +120,8 @@ export function renderStoreHub({stores=[],events=[],orders=[],context={}}){
   .sort((a,b)=>String(b.starts_at||'').localeCompare(String(a.starts_at||'')))
   .map(e=>({type:'event',id:e.id,kicker:e.status==='ativo'?'Loja temporária ativa':'Loja temporária encerrada',
    name:e.name,subtitle:[e.starts_at,e.ends_at].filter(Boolean).join(' até '),coverPath:e.cover_path})):[];
- const branchItems=ctx.showBranches?stores.filter(s=>s.kind==='filial'&&!s.force_archived_at&&eligibleStore(s))
+ const branchItems=ctx.showBranches?stores.filter(s=>s.kind==='filial'&&s.id!==christStore?.id&&
+  !s.force_archived_at&&eligibleStore(s))
   .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
   .map(s=>({type:'store',id:s.id,kicker:'Filial própria',name:s.name,subtitle:s.code||''})):[];
  const actions=[
@@ -121,9 +130,10 @@ export function renderStoreHub({stores=[],events=[],orders=[],context={}}){
   ctx.canManageStores?ctx.button('Administrar cadastros','store-hub-admin','','small'):''
  ].filter(Boolean).join('');
  return '<div class="sh-page"><header class="pagehead"><div><h1>Lojas</h1>'+
-  '<p>Central, franquias e lojas temporárias. Pedidos pendentes e histórico por unidade.</p></div>'+
+  '<p>Lojas próprias, franquias e lojas temporárias. Pedidos e histórico de cada unidade.</p></div>'+
   '<div class="actions">'+actions+'</div></header>'+
-  (ctx.showCentral?group('Loja Central','Fila geral: pedidos para separação, envio e conferência.',centralItems,orders,ctx,'Central indisponível.'):'')+
+  (ctx.showCentral?group('Loja Central','Unidade Cristo Rei · pedidos e histórico exclusivos da loja.',centralItems,orders,ctx,
+    'Loja Cristo Rei não cadastrada ou sem acesso.'):'')+
   (ctx.showFranchises?group('Franquias','Pedidos enviados à central e histórico de atendimento.',franchiseItems,orders,ctx,'Nenhuma franquia cadastrada ou acessível.'):'')+
   (ctx.showEvents?group('Lojas Temporárias','Lotes de reposição e envios para cada evento.',eventItems,orders,ctx,'Nenhuma loja temporária cadastrada ou acessível.'):'')+
   (branchItems.length?group('Filiais próprias','Movimentações e pedidos das filiais próprias.',branchItems,orders,ctx,''):'')+
