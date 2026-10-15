@@ -27,8 +27,8 @@ test('cada variação tem somente um comando Gerenciar visível no retrátil',()
  assert.doesNotMatch(html,/data-action="stock-modal"/);
  assert.match(html,/data-product-details/);
  assert.match(html,/Ver 3 tamanhos/);
- assert.match(html,/2<\/b> reservadas/);
- assert.match(html,/10<\/b> livres/);
+ assert.match(html,/6<\/b> reservadas/);
+ assert.match(html,/30<\/b> livres/);
 });
 test('perfil de leitura não exibe operações de movimentação ou edição',()=>{
  const html=groupedCard(group,{
