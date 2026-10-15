@@ -24,7 +24,7 @@ export function pickerHome(orders,{button,time}){
    return '<article class="cdsb-queue-item"><div><strong>'+h(o.target)+'</strong>'+
     '<small>Pedido #'+h(o.id.slice(0,8).toUpperCase())+' · '+Number(o.total||0)+' unidades · '+h(time(o.created_at))+'</small></div>'+
     '<span class="cdsb-status">'+status+'</span><div class="cdsb-queue-actions">'+
-     (o.lines?.length?button('Imprimir A4','order-print-a4','data-kind="'+h(o.kind)+'" data-id="'+h(o.id)+'"','small'):'')+
+     (o.lines?.length?button('Imprimir 80 mm','order-print-thermal','data-kind="'+h(o.kind)+'" data-id="'+h(o.id)+'"','small'):'')+
      (eligible?button('Separar',''+action,'data-kind="'+h(o.kind)+'" data-id="'+h(o.id)+'"','primary'):'')+
     '</div></article>';
   }).join(''):'<p class="cdsb-empty">Nenhum pedido pendente.</p>')+'</section></div>';
