@@ -19,6 +19,7 @@ import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, st
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015eventphoto3';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015printphoto5';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
+import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015access1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -55,8 +56,8 @@ const h = v => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&l
 const niceDate = value => value ? new Intl.DateTimeFormat('pt-BR', { timeZone:'America/Cuiaba' }).format(new Date(value.length === 10 ? value + 'T12:00:00' : value)) : '—';
 const niceTime = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short', timeZone:'America/Cuiaba' }).format(new Date(value)) : '—';
 const actionNames = {entrada:'Entrada',venda_loja:'Baixa (loja)',saida_loja:'Saída para filial / franquia',saida_pedido:'Saída de pedido avulso',transferencia:'Enviado ao evento',venda_evento:'Baixa antiga (evento)',devolucao:'Retornou à loja',baixa_evento:'Não retornou ao estoque',ajuste_loja:'Ajuste'};
-const roles = {admin:'Administrador',gerente:'Gerente',estoquista:'Estoquista',evento:'Equipe de evento',consulta:'Consulta',franquia:'Franquia (somente pedidos)'};
-const profileLabel = u => u?.role==='admin'?'Administrador':u?.role==='franquia'?'Franquia':u?.permissions_customized?'Personalizado':(roles[u?.role]||u?.role||'—');
+const roles = {admin:'Administrador CDSB',gerente:'Gerente CDSB',estoquista:'Separador CDSB',evento:'Responsável por loja temporária',consulta:'Consulta',franquia:'Loja permanente'};
+const profileLabel = u => u?.role==='admin'?'Administrador CDSB':u?.role==='franquia'?'Loja permanente':u?.role==='estoquista'?'Separador CDSB':u?.role==='evento'?'Loja temporária':(roles[u?.role]||u?.role||'—');
 const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
@@ -80,17 +81,17 @@ let db = null;
 let notifyTimer;
 const permissionDefaults = {
  gerente:['products.read','products.create','products.edit','products.delete','stock.entry','stock.exit','stock.balance','stock.destinations','events.read','events.manage','events.separate','events.return','events.sell','events.close','orders.read','orders.internal','orders.assign','orders.central','orders.franchise','orders.separate','orders.receive','orders.cancel','movements.read','movements.export','categories.manage','tags.manage','catalog.manage','products.share','stores.read','stores.manage'],
- estoquista:['products.read','products.create','products.edit','stock.balance','products.share','stores.read'],
- evento:['products.read','events.read','events.return','events.sell'],
+ estoquista:['products.read','orders.read','orders.separate'],
+ evento:['products.read','events.read','events.request'],
  consulta:['products.read','events.read','orders.read','movements.read','stores.read'],
  franquia:['products.read','orders.franchise']
 };
 const permissionCatalog=[
  ['products.read','Consultar produtos'],['products.create','Cadastrar produtos'],['products.edit','Editar produtos'],['products.delete','Excluir produtos'],
  ['stock.entry','Registrar entrada'],['stock.exit','Registrar saída'],['stock.balance','Realizar balanço'],['stock.destinations','Gerenciar destinos'],
- ['events.read','Consultar eventos'],['events.manage','Administrar eventos'],['events.separate','Separar para eventos'],['events.return','Devolver de eventos'],['events.sell','Baixar no evento'],['events.close','Encerrar eventos'],
+ ['events.read','Consultar lojas temporárias'],['events.request','Solicitar produtos para evento'],['events.manage','Administrar eventos'],['events.separate','Separar para eventos'],['events.return','Conferir devoluções'],['events.close','Aprovar encerramento'],
  ['orders.read','Consultar todos os pedidos'],['orders.internal','Criar pedidos avulsos'],['orders.assign','Vincular pedidos a eventos'],
- ['orders.central','Pedir para loja central'],['orders.franchise','Pedir para franquia'],['orders.separate','Separar pedidos de lojas'],['orders.receive','Receber pedidos'],['orders.cancel','Cancelar pedidos'],
+ ['orders.central','Pedido para loja própria'],['orders.franchise','Solicitar produtos para loja permanente'],['orders.separate','Separar e conferir'],['orders.dispatch','Confirmar saída física do CDSB'],['orders.receive','Conferir entrega'],['orders.cancel','Cancelar pedidos'],
  ['movements.read','Consultar movimentações'],['movements.export','Exportar relatórios'],
  ['categories.manage','Gerenciar categorias'],['tags.manage','Gerenciar tags'],
  ['catalog.manage','Gerenciar catálogos de clientes'],['products.share','Compartilhar produtos'],
@@ -104,7 +105,12 @@ const canRegisterProducts = () => hasPermission('products.create') || hasPermiss
 const canQuickBalance = () => hasPermission('stock.balance');
 const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',balanco:'stock.balance',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
 const permittedView = v => {
- if(isFranchisePortal())return v==='produtos'||v==='pedidos'||v==='lojas';
+ if(isFranchisePortal())return v==='minha-loja'||v==='pedidos';
+ if(state.profile?.role==='evento'&&hasPermission('events.request'))return v==='meu-evento'||v==='eventos';
+ if(state.profile?.role==='estoquista'&&hasPermission('orders.separate'))return v==='separador'||v==='pedidos';
+ if(v==='minha-loja')return isFranchisePortal();
+ if(v==='meu-evento')return state.profile?.role==='evento';
+ if(v==='separador')return hasPermission('orders.separate');
  if(v==='inicio')return true;
  if(v==='saida'||v==='balanco')return false; // Operações e conferência ficam em Produtos.
  if(v==='pedidos-lojas')return false;
@@ -446,9 +452,17 @@ function render(){
   if(!state.user){loginScreen();return;}
   if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
   if(!state.profile.active){pendingAccessScreen();return;}
-  if(!permittedView(state.view))state.view=isFranchisePortal()?'pedidos':'inicio';
+  if(state.view==='inicio'){
+  if(isFranchisePortal())state.view='minha-loja';
+  else if(state.profile?.role==='estoquista'&&hasPermission('orders.separate'))state.view='separador';
+  else if(state.profile?.role==='evento'&&hasPermission('events.request'))state.view='meu-evento';
+ }
+ if(!permittedView(state.view))state.view=isFranchisePortal()?'minha-loja':state.profile?.role==='estoquista'?'separador':state.profile?.role==='evento'?'meu-evento':'inicio';
   const mark='<img class="ame-brand-logo" src="./ame-plus-logo.svg" alt="Ame+ Store" width="132" height="70">';
-  const menu=nav.filter(x=>permittedView(x.id))
+  const sectionNav=isFranchisePortal()?[{id:'minha-loja',label:'Minha Loja',ico:'home'},{id:'pedidos',label:'Meus pedidos',ico:'clipboard'}]:
+  state.profile?.role==='evento'&&hasPermission('events.request')?[{id:'meu-evento',label:'Meu Evento',ico:'calendar'},{id:'eventos',label:'Detalhes',ico:'clipboard'}]:
+  state.profile?.role==='estoquista'&&hasPermission('orders.separate')?[{id:'separador',label:'Separação',ico:'clipboard'},{id:'pedidos',label:'Todos os pedidos',ico:'package'}]:nav;
+ const menu=sectionNav.filter(x=>permittedView(x.id))
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+((state.view===x.id||(state.view==='entrada'&&x.id==='produtos')||(['eventos','lojas-admin'].includes(state.view)&&x.id==='lojas'))?'active':'')+'">'+
       uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('');
   const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
@@ -458,7 +472,7 @@ function render(){
     '<br><button class="plain" data-action="my-password">Minha senha</button>'+
     '<br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
     '<div class="main"><header class="topbar"><div class="topbar-brand">'+mark+
-    '<span class="ame-header-title">ESTOQUE</span></div>'+
+    '<span class="ame-header-title">CDSB</span></div>'+
     '<div class="topbar-right"><span class="userpill">'+h(state.profile.full_name)+' · '+h(profileLabel(state.profile))+'</span>'+
     '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-expanded="false" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>';
@@ -466,7 +480,10 @@ function render(){
 }
 
 function pageContent(){
-  if(state.view==='entrada'||state.view==='saida')return renderStockOperationPage();
+  if(state.view==='minha-loja')return permanentPage();
+ if(state.view==='meu-evento')return temporaryPage();
+ if(state.view==='separador')return separationHomePage();
+ if(state.view==='entrada'||state.view==='saida')return renderStockOperationPage();
   if(state.view==='balanco')return quickBalancePage();
   if(state.view==='inventario')return inventoryPage();
   if(state.view==='avarias')return damageStockPage();
@@ -482,6 +499,20 @@ function pageContent(){
   if(state.view==='lojas-admin')return storesAdminPage();
   if(state.view==='pedidos-lojas')return ordersPage();
   return dashboard();
+}
+function permanentPage(){
+ const units=state.stores.filter(s=>!s.is_primary&&assignedStore(s.id)&&s.kind==='franquia'&&s.active);
+ const ids=new Set(units.map(s=>s.id));
+ const orders=state.storeOrders.filter(o=>ids.has(o.to_store_id)).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+ return permanentHome({stores:units,orders,button,time:niceTime,userId:state.user?.id});
+}
+function temporaryPage(){
+ const events=state.events.filter(e=>!e.deleted_at&&memberRole(e.id)).sort((a,b)=>
+   String(b.starts_at||'').localeCompare(String(a.starts_at||'')));
+ return temporaryHome({events,balances:state.balances,batches:state.eventPickBatches,button,time:niceTime});
+}
+function separationHomePage(){
+ return pickerHome(unifiedOrderRecords(),{button,time:niceTime});
 }
 function panel(title,content,buttonMarkup=''){
   return '<section class="panel"><div class="panelhead"><h2>'+h(title)+'</h2>'+buttonMarkup+'</div>'+content+'</section>';
@@ -1161,7 +1192,7 @@ function unifiedOrderRecords(){
   eventBatches:state.eventPickBatches,eventBatchItems:state.eventBatchItems,events:state.events,models:state.apparelModels,
   reservations:state.stockReservations,stores:state.stores,
   products:state.items,adjustments:state.unifiedOrderAdjustments,
-  portal:isFranchisePortal(),userId:state.user?.id
+  portal:false,userId:state.user?.id
  });
 }
 function ordersPage(separationOnly=false){
@@ -1180,7 +1211,7 @@ function ordersPage(separationOnly=false){
  const scope=state.ordersContext;
  const allRecords=unifiedOrderRecords();
  const records=scope?locationOrders(allRecords,scope,scope.mode||'all'):allRecords;
- const contextTitle=scope?.type==='central'?'Loja Central':
+ const contextTitle=scope?.type==='central'?'Centro de Distribuição São Bento':
    scope?.type==='store'?(state.stores.find(s=>s.id===scope.id)?.name||'Loja'):
    scope?.type==='event'?(eventById(scope.id)?.name||'Loja temporária'):'';
  const contextHeader=scope?
@@ -1193,7 +1224,7 @@ function ordersPage(separationOnly=false){
   canProcess:o=>!portal&&(
     o.kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
     hasPermission('orders.separate')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id))),
-  canDispatch:o=>o.kind==='evento'&&!portal&&isManager()&&hasPermission('events.separate'),
+  canDispatch:o=>o.kind==='evento'&&!portal&&isManager()&&hasPermission('orders.dispatch'),
   canCancel:o=>o.kind==='evento'?(!portal&&isManager()&&hasPermission('events.separate')):
     (portal&&o.kind==='loja'&&o.isOwner&&
      ['solicitado','pendente_estoque','aprovado'].includes(o.status))||
