@@ -74,7 +74,8 @@ export function renderSkuPanel({item,model,physical,reserved,can,history=[],rese
   '<details class="sku-panel-details"><summary>Reservas / pedidos ('+reservations.length+')</summary>'+
     (linked?'<ul>'+linked+'</ul>':'<p>Nenhuma reserva ativa neste tamanho.</p>')+'</details>'+
   '<details class="sku-panel-details" data-sku-history><summary>Histórico recente do SKU</summary>'+
-    (historyHTML?'<ul class="sku-history-list">'+historyHTML+'</ul>':'<p>Não há movimentos recentes acessíveis ao seu perfil.</p>')+
+    '<ul class="sku-history-list">'+historyHTML+'</ul>'+
+    (!historyHTML?'<p data-sku-history-empty>Não há movimentos recentes acessíveis ao seu perfil.</p>':'')+
     '<small>Últimos movimentos disponíveis. Consulte Movimentações para o histórico completo.</small></details>'+
  '</div>';
 }
