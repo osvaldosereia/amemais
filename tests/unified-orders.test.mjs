@@ -151,6 +151,8 @@ test('uma foto do modelo atende todos os tamanhos no card, na conferência e no 
  assert.equal((card.match(/class="uo-model-photo"/g)||[]).length,1);
  assert.equal((picking.match(/class="uo-model-photo"/g)||[]).length,1);
  assert.equal((html.match(/class="lot-photo"/g)||[]).length,1);
+ assert.equal((html.match(/class="print-model-card"/g)||[]).length,1);
+ assert.match(html,/grid-template-columns:32mm/);
  for(const size of ['P','M','G'])assert.match(picking,new RegExp('Branco · '+size));
  assert.match(html,/Gôndola 01/);
  assert.match(html,/document.images/);
