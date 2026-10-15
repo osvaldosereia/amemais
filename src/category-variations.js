@@ -1,0 +1,109 @@
+// Variações por categoria. null = herdar da categoria superior; [] = produto sem variações.
+export const defaultNoVariations=[];
+export const escapeVariant = value=>String(value??'').replace(/[&<>"']/g,c=>({
+ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+}[c]));
+const normalize=value=>String(value||'').trim().toLocaleLowerCase('pt-BR');
+export function parseCategoryVariations(value){
+ const entries=String(value??'').split(/[,;\n\r]+/).map(s=>s.trim()).filter(Boolean);
+ if(entries.length>32)throw new Error('Limite de 32 variações por categoria.');
+ const seen=new Set();
+ for(const entry of entries){
+  if(entry.length>16)throw new Error('Cada variação pode ter até 16 caracteres: '+entry);
+  const key=normalize(entry);
+  if(seen.has(key))throw new Error('Variação repetida: '+entry);
+  seen.add(key);
+ }
+ return entries;
+}
+export function resolveCategoryVariations(categories,categoryId){
+ const map=new Map((categories||[]).map(c=>[c.id,c]));
+ let c=map.get(categoryId),steps=0;
+ const seen=new Set();
+ while(c&&!seen.has(c.id)&&steps<15){
+  seen.add(c.id);steps++;
+  if(Array.isArray(c.variation_options))return {
+   options:c.variation_options,source:c.id,inherited:c.id!==categoryId
+  };
+  c=map.get(c.parent_id);
+ }
+ return {options:[],source:null,inherited:false};
+}
+export function categoryVariationLabel(categories,categoryId){
+ const found=resolveCategoryVariations(categories,categoryId);
+ return found.options.length?found.options.join(' · '):'Sem variações configuradas';
+}
+export function renderCategoryVariationFields(category,categories){
+ const h=escapeVariant;
+ const inherited=resolveCategoryVariations(categories,category?.parent_id||'');
+ const mode=category?.variation_options===null||category?.variation_options===undefined?'inherit':
+  category?.variation_options?.length?'custom':'none';
+ const inheritAllowed=Boolean(category?.parent_id);
+ return '<section class="category-variants-form form-section wide">'+
+  '<div class="section-head"><strong>Variações dos produtos</strong></div>'+
+  '<p class="help">Configure uma vez por categoria ou subcategoria. Ex.: Camiseta — P, M, G, GG, XGG; Chapéu — Tamanho 10, Tamanho 12, Tamanho 14.</p>'+
+  '<label class="field"><span>Como configurar</span><select name="variation_mode" data-variation-mode>'+
+   (inheritAllowed?'<option value="inherit"'+(mode==='inherit'?' selected':'')+'>Herdar da categoria superior</option>':'')+
+   '<option value="custom"'+(mode==='custom'||(!inheritAllowed&&mode==='inherit')?' selected':'')+'>Definir variações nesta categoria</option>'+
+   '<option value="none"'+(mode==='none'?' selected':'')+'>Sem variações</option></select></label>'+
+  '<label class="field" data-variation-custom'+(mode==='custom'||(!inheritAllowed&&mode==='inherit')?'':' hidden')+'>'+
+   '<span>Variações (separe por vírgula ou uma por linha)</span>'+
+   '<textarea name="variation_labels" rows="3" maxlength="700" placeholder="P, M, G, GG, XGG">'+
+     h((category?.variation_options||[]).join(', '))+'</textarea>'+
+  '</label>'+
+  (inheritAllowed?'<p class="help">Da categoria superior: '+h(inherited.options.join(' · ')||'Nenhuma opção')+'</p>':'')+
+  '<p class="help">Alterações valem para novos tamanhos. Os SKUs e estoques já cadastrados são preservados.</p></section>';
+}
+export function variationOptionsToSave(form){
+ const mode=form.querySelector('[name="variation_mode"]')?.value||'inherit';
+ if(mode==='inherit')return null;
+ if(mode==='none')return [];
+ if(mode==='custom'){
+  const options=parseCategoryVariations(form.querySelector('[name="variation_labels"]')?.value||'');
+  if(!options.length)throw new Error('Informe pelo menos uma variação ou escolha Sem variações.');
+  return options;
+ }
+ throw new Error('Modo de variações inválido.');
+}
+export function makeVariationCards(options){
+ const h=escapeVariant;
+ return options.map(label=>'<div class="size-variant-card" data-size-variant="'+h(label)+'" hidden>'+
+  '<div class="size-variant-heading"><strong>'+h(label)+'</strong>'+
+    '<button type="button" class="button small" data-action="size-remove" data-size="'+h(label)+'">Remover</button></div>'+
+  '<div class="size-fields">'+
+   '<label class="field"><span>SKU (opcional)</span><input name="size_sku" maxlength="80" disabled placeholder="Gerado automaticamente"></label>'+
+   '<label class="field"><span>EAN (opcional)</span><div class="inline apparel-ean">'+
+    '<input name="size_ean" inputmode="numeric" maxlength="14" disabled placeholder="Código de barras">'+
+    '<button type="button" class="button small" data-action="size-scan">📷</button></div></label>'+
+   '<label class="field"><span>Estoque inicial</span><input name="size_qty" type="number" step="1" min="0" max="1000000" value="0" disabled required inputmode="numeric"></label>'+
+  '</div></div>').join('');
+}
+export function makeVariationChips(options){
+ const h=escapeVariant;
+ return options.map(label=>'<button type="button" class="size-chip" aria-pressed="false" data-action="size-toggle" data-size="'+h(label)+'">'+h(label)+'</button>').join('');
+}
+export function refreshCategorySizeOptions(form,categories){
+ const picker=form?.querySelector('[data-variant-panel]');
+ if(!picker)return;
+ const categoryId=form.querySelector('input[name="category_id"]')?.value||'';
+ const found=resolveCategoryVariations(categories,categoryId);
+ const options=found.options;
+ const chips=picker.querySelector('.size-chip-group');
+ const list=picker.querySelector('.size-variant-list');
+ if(!chips||!list)return;
+ chips.innerHTML=makeVariationChips(options);list.innerHTML=makeVariationCards(options);
+ const toggle=form.querySelector('[data-use-sizes]');
+ if(toggle){
+  toggle.disabled=!options.length;
+  if(!options.length&&toggle.checked){toggle.checked=false;toggle.dispatchEvent(new Event('change',{bubbles:true}));}
+ }
+ const caption=form.querySelector('[data-variation-selection-caption]');
+ if(caption)caption.textContent=options.length?
+  options.join(' · ')+(found.inherited?' (herdadas)':''):
+  'Selecione uma categoria com variações configuradas para ativar esta opção.';
+ const quick=picker.querySelector('[data-action="size-common"]');
+ if(quick)quick.disabled=!options.length;
+}
+export function getVariationChoices(form){
+ return [...(form?.querySelectorAll('[data-action="size-toggle"]')||[])].map(el=>el.dataset.size);
+}
