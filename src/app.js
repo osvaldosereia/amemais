@@ -3474,7 +3474,10 @@ async function handleSubmit(event){
           p_initial_quantity:initial
         }));
       }
-      if(!editing)assertOk(await db.from('products').update(procurementValues(form)).eq('id',productId));
+      if(!editing){const procurement=procurementValues(form);
+       assertOk(await db.rpc('set_product_procurement',{
+        p_product:productId,p_supplier:procurement.supplier_id,p_min_stock:procurement.min_stock
+       }));}
       if(galleryHasChanges(form)){
         try{
           const existing=editing?product(id):null;
