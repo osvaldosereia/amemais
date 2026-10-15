@@ -11,6 +11,7 @@ import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, up
 import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014stock1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014orders2';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
+import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015eventsimple1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -53,7 +54,6 @@ const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
   {id:'balanco',label:'Balanço rápido',ico:'clipboard'},
-  {id:'inventario',label:'Inventário formal',ico:'clipboard'},
   {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
   {id:'pedidos',label:'Pedidos Avulsos',ico:'clipboard'},
   {id:'pedidos-lojas',label:'Solicitações de lojas',ico:'arrows'},
@@ -66,6 +66,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],
+  eventPickPlans:[],eventPickItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
@@ -106,7 +107,9 @@ const permittedView = v => {
  if(v==='pedidos')return hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
  if(v==='usuarios')return isAdmin();
  if(v==='lojas')return hasPermission('stores.read')||hasPermission('stores.manage');
- if(v==='inventario')return hasPermission('stock.balance')||hasPermission('stores.manage')||hasPermission('events.manage');
+ if(v==='avarias')return !isFranchisePortal()&&(hasPermission('stock.balance')||hasPermission('stock.entry'));
+
+ if(v==='inventario')return isAdmin()&&hasPermission('stock.balance');
  if(v==='eventos')return hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.separate');
  return Boolean(viewPermission[v]&&hasPermission(viewPermission[v]));
 };
@@ -186,6 +189,16 @@ async function loadData(){
   if(hasPermission('stock.balance')||hasPermission('stores.manage')||hasPermission('events.manage')){
    resources.push(['inventorySessions',db.from('inventory_sessions').select('*').order('created_at',{ascending:false}).limit(100)]);
    resources.push(['inventoryItems',db.from('inventory_session_items').select('*').limit(10000)]);
+  }
+  if(hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.close')){
+    resources.push(['eventPickPlans',db.from('event_pick_plans').select('*').limit(1000)]);
+    resources.push(['eventPickItems',db.from('event_pick_plan_items').select('*').limit(10000)]);
+    resources.push(['eventShipments',db.from('event_shipments').select('*').order('created_at',{ascending:false}).limit(1000)]);
+    resources.push(['eventSettlements',db.from('event_settlement_drafts').select('*').limit(1000)]);
+  }
+  if(hasPermission('stock.balance')||hasPermission('events.manage')||hasPermission('events.close')){
+    resources.push(['damages',db.from('stock_damages').select('*').order('created_at',{ascending:false}).limit(1000)]);
+    resources.push(['damageActions',db.from('stock_damage_actions').select('*').order('created_at',{ascending:false}).limit(2000)]);
   }
   if(hasPermission('events.manage')||hasPermission('events.close'))resources.push(['consignationClosures',db.from('consignation_closures').select('*').limit(500)]);
   resources.push(['storeBalances',db.from('store_stock').select('store_id,product_id,quantity').limit(10000)]);
@@ -444,6 +457,7 @@ function pageContent(){
   if(state.view==='entrada'||state.view==='saida')return renderStockOperationPage();
   if(state.view==='balanco')return quickBalancePage();
   if(state.view==='inventario')return inventoryPage();
+  if(state.view==='avarias')return damageStockPage();
   if(state.view==='produtos')return productsPage();
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):eventsPage();
   if(state.view==='movimentacoes')return movementsPage();
@@ -602,7 +616,8 @@ function productsPage(){
   const pageSize=20,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.min(state.page,totalPages-1);
   const list=groups.slice(state.page*pageSize,(state.page+1)*pageSize);
-  const add=(hasPermission('stock.entry')?button('↓ Receber remessa','stock-receive-shipment','',''):'')+
+  const add=((hasPermission('stock.balance')||hasPermission('stock.entry'))?button('Avarias em análise','view','data-view="avarias"','small'):'')+
+    (hasPermission('stock.entry')?button('↓ Receber remessa','stock-receive-shipment','',''):'')+
     (hasPermission('products.create')?button('+ Novo produto','product-new','','primary'):'');
   return '<header class="pagehead products-pagehead"><div><h1>Produtos</h1>'+
     '<p>Catálogo e estoque</p></div><div class="actions">'+add+'</div></header>'+
@@ -720,7 +735,8 @@ function quickBalancePage(){
   const filtered=groups.filter(g=>!query||[g.title,...g.products.flatMap(p=>
     [p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira])].join(' ').toLocaleLowerCase('pt-BR').includes(query));
   const cards=filtered.slice(0,50).map(g=>quickBalanceCard(g,{photoButton,qtyStore,qtyReserved,h})).join('');
-  return tabHead('Balanço rápido','Um produto por card; conte os tamanhos sem sair da tela.')+
+  return tabHead('Balanço rápido','Um produto por card; conte os tamanhos sem sair da tela.',
+    isAdmin()?button('Conferência formal','view','data-view="inventario"','small'):'')+
     '<section class="quick-balance-intro"><div class="quick-balance-search">'+
     '<input id="quick-search" type="search" class="search" placeholder="Produto, tamanho, SKU ou EAN…" aria-label="Buscar para contagem" value="'+h(state.search)+'">'+
     button('📷 Ler EAN','quick-scan','','primary')+'</div>'+
@@ -750,49 +766,172 @@ function returnWorkflowPage(){
   return eventReturnPage(e,state.items,state.apparelModels,state.balances,photoButton);
 }
 function eventDetails(){
-  const e=eventById(state.activeEvent);
-  if(!e){state.activeEvent=null;return eventsPage();}
-  const mem=state.members.filter(m=>m.event_id===e.id);
-  // Todo o histórico é vinculado aos IDs originais; arquivamentos não somem da contagem.
-  const entries=state.movements.filter(m=>m.event_id===e.id);
-  const transfers=entries.filter(m=>m.action==='transferencia').reduce((n,m)=>n+m.quantity,0);
-  const returned=entries.filter(m=>m.action==='devolucao').reduce((n,m)=>n+m.quantity,0);
-  const sold=entries.filter(m=>m.action==='venda_evento').reduce((n,m)=>n+m.quantity,0);
-  const classifiedLoss=m=>m.action==='baixa_evento'&&/^(PERDA|AVARIA|CONSUMO|OUTRO): /.test(String(m.note||''));
-  const losses=entries.filter(classifiedLoss).reduce((n,m)=>n+m.quantity,0);
-  const historicalUnclassified=entries.filter(m=>m.action==='baixa_evento'&&!classifiedLoss(m)).reduce((n,m)=>n+m.quantity,0);
-  const pending=state.balances.filter(b=>b.event_id===e.id).reduce((n,b)=>n+b.quantity,0);
-  const closure=state.consignationClosures.find(c=>c.event_id===e.id);
-  const inventoryVariances=state.inventorySessions.filter(i=>i.location_type==='temporaria'&&i.location_id===e.id&&i.status==='aplicada');
-  const canModify=e.status==='ativo';
-  const actions=(hasPermission('events.manage')&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
-    (hasPermission('events.separate')&&canModify?button('Enviar mercadorias','event-transfer','','primary'):'')+
-    (canModify&&canSell(e.id)?button('Registrar venda','event-sale','','primary'):'')+
-    (canModify&&hasPermission('events.close')?button('Perda / avaria','event-loss','','small'):'')+
-    (canModify&&canReturn(e.id)?button('Devolução rápida por EAN','event-return','','primary'):'')+
-    (canModify&&hasPermission('events.close')?button('Encerrar consignação','event-close','data-id="'+h(e.id)+'"'):'')+
-    (canModify&&hasPermission('events.manage')?button('Inventariar loja','event-inventory','data-id="'+h(e.id)+'"','small'):'');
-  const history=eventHistoryCards({
-    movements:entries,products:state.items,models:state.apparelModels,
-    balances:state.balances.filter(b=>b.event_id===e.id),
-    photoButton,groupInventory
+ const e=eventById(state.activeEvent);
+ if(!e){state.activeEvent=null;return eventsPage();}
+ const members=state.members.filter(m=>m.event_id===e.id);
+ return eventCompactDetail({
+  event:e,members,plan:state.eventPickPlans.find(x=>x.event_id===e.id),
+  planItems:state.eventPickItems,shipments:state.eventShipments,
+  balances:state.balances,movements:state.movements,
+  damageItems:state.damages,closure:state.consignationClosures.find(x=>x.event_id===e.id),
+  products:state.items,models:state.apparelModels,groupInventory,photoButton,
+  h,button,niceDate,username,
+  canPlan:hasPermission('events.separate')&&isManager(),
+  canClose:hasPermission('events.close')&&(hasPermission('events.manage')||memberRole(e.id)==='responsavel'),
+  canManage:hasPermission('events.manage')
+ });
+}
+function damageStockPage(){
+ if(!permittedView('avarias'))return '<div class="muteblock">Sem autorização.</div>';
+ return damageListHTML(state.damages,state.items,state.events,state.damageActions,{h,button});
+}
+function eventPlanModal(additional=false){
+ const e=eventById(state.activeEvent);
+ if(!e||!(additional?e.status==='ativo':e.status==='rascunho')||
+    !hasPermission('events.separate')||!isManager())return;
+ const planned=additional?[]:state.eventPickItems.filter(x=>x.event_id===e.id);
+ const groups=eventPickingRows(state.items,state.apparelModels,planned,qtyAvailable);
+ formModal((additional?'Envio adicional':'Lista de separação')+' · '+e.name,
+   eventPlanForm(groups,{h,additional}),
+   additional?'event-supplement-send':'event-plan-save',
+   additional?'Confirmar envio adicional':'Salvar lista de separação');
+ const form=document.querySelector('.modalback form');
+ if(form){form.dataset.event=e.id;form.dataset.mode=additional?'additional':'initial';}
+}
+function collectEventPlan(form){
+ const rows=[...form.querySelectorAll('[data-plan-qty]')],items=[];
+ for(const input of rows){
+  if(input.value.trim()==='')continue;
+  const qty=Number(input.value);
+  if(!Number.isInteger(qty)||qty<0||qty>1000000)throw Error('Quantidade inválida. Use números inteiros de 0 a 1.000.000.');
+  if(qty>0)items.push({product_id:input.dataset.id,quantity:qty});
+ }
+ if(items.length>150)throw Error('O limite é 150 variações por remessa.');
+ return items;
+}
+function eventSettlementModal(){
+ const e=eventById(state.activeEvent);
+ if(!e||e.status!=='ativo'||!hasPermission('events.close')||
+   !(hasPermission('events.manage')||memberRole(e.id)==='responsavel'))return;
+ const balances=state.balances.filter(b=>b.event_id===e.id&&Number(b.quantity)>0);
+ if(!balances.length)return toast('Nenhuma unidade pendente. Encerre a loja diretamente.',true);
+ const groups=groupInventory(state.items.filter(p=>balances.some(b=>b.product_id===p.id)),state.apparelModels);
+ const draft=state.eventSettlements.find(x=>x.event_id===e.id);
+ formModal('Conferir fechamento · '+e.name,
+   eventSettlementForm(groups,balances,draft,{h}),
+   'event-settlement-save','Salvar conferência');
+ const form=document.querySelector('.modalback form[data-form="event-settlement-save"]');
+ if(form){
+  form.dataset.event=e.id;
+  const footer=form.querySelector('.modalfooter');
+  footer?.insertAdjacentHTML('beforeend',
+   '<button class="button primary" type="button" data-action="event-settlement-save-finish">Salvar e concluir loja</button>');
+  updateEventSettlementPreview(form);
+ }
+}
+function collectEventSettlement(form){
+ const rows=[...form.querySelectorAll('[data-settle-row]')],items=[];
+ let missing=0,hasIssue=false;
+ for(const row of rows){
+  const expected=Number(row.dataset.expected),line={product_id:row.dataset.id,expected};
+  let count=0;
+  for(const key of ['good','sold','damaged','lost']){
+   const el=row.querySelector('[data-settle-field="'+key+'"]');
+   const value=String(el?.value??'').trim(),quantity=Number(value);
+   if(value===''||!Number.isInteger(quantity)||quantity<0||quantity>1000000)
+    throw Error('Informe uma quantidade válida em todos os campos, inclusive zero.');
+   line[key]=quantity;count+=quantity;
+  }
+  if(count>expected)throw Error('Quantidades acima das enviadas para '+(product(row.dataset.id)?.name||'o produto')+'.');
+  if(count<expected)missing+=expected-count;
+  if(line.damaged||line.lost)hasIssue=true;
+  items.push(line);
+ }
+ const note=String(form.querySelector('[name="note"]')?.value||'').trim();
+ if(hasIssue&&(note.length<5||note.length>250))
+  throw Error('Justifique as avarias ou perdas com 5 a 250 caracteres.');
+ return {items,note,missing};
+}
+function updateEventSettlementPreview(form){
+ let checked=0,expectedTotal=0,invalid=false;
+ for(const row of form.querySelectorAll('[data-settle-row]')){
+  const expected=Number(row.dataset.expected),qty=[...row.querySelectorAll('[data-settle-field]')]
+   .map(el=>Number(el.value||0));
+  expectedTotal+=expected;checked+=qty.reduce((a,b)=>a+b,0);
+  const missing=expected-qty.reduce((a,b)=>a+b,0);
+  invalid=invalid||missing<0||qty.some(v=>!Number.isInteger(v)||v<0);
+  const target=row.querySelector('[data-settle-remaining]');
+  if(target){
+   target.textContent=missing<0?'Excedeu '+Math.abs(missing)+' un.':
+    missing===0?'Conferido ✓':'Pendente: '+missing;
+   target.classList.toggle('event-settle-error',missing<0);
+  }
+ }
+ const summary=form.querySelector('[data-settle-summary]');
+ if(summary)summary.textContent='Conferido: '+checked+' / '+expectedTotal+
+   ' · '+(invalid?'Corrija quantidades excedidas.':expectedTotal-checked+' unidade(s) pendente(s).');
+ const finish=form.querySelector('[data-action="event-settlement-save-finish"]');
+ if(finish)finish.disabled=invalid||checked!==expectedTotal;
+}
+async function submitEventSettlement(form,finish=false){
+ const e=eventById(form.dataset.event);
+ if(!e||e.status!=='ativo'||state.loading)return;
+ let payload;
+ try{payload=collectEventSettlement(form);}catch(error){return toast(error.message,true);}
+ if(finish&&payload.missing) return toast('Confira o destino de todas as unidades antes de concluir.',true);
+ if(finish&&!window.confirm('Concluir a prestação de contas? As unidades boas voltam à central, as avarias ficam em análise e as vendas/perdas são baixadas definitivamente. Qualquer inventário formal antigo pendente será arquivado como substituído, sem aplicar seus ajustes.'))return;
+ return exec(async()=>{
+  assertOk(await db.rpc('save_event_settlement',{
+   p_event:e.id,p_items:payload.items,p_note:payload.note||null
+  }));
+  if(finish)assertOk(await db.rpc('finalize_event_settlement',{p_event:e.id}));
+ },finish?'Loja temporária encerrada com estoque conciliado.':'Conferência salva. Continue depois ou conclua a loja.');
+}
+async function printEventA4(id){
+ const e=eventById(id);if(!e)return;
+ const win=window.open('','_blank');
+ if(!win)return toast('O navegador bloqueou a janela. Habilite pop-ups para imprimir.',true);
+ try{
+  let items=[],status='Planejado',version='';
+  if(e.status==='rascunho'){
+   const plan=state.eventPickPlans.find(x=>x.event_id===id);
+   items=state.eventPickItems.filter(x=>x.event_id===id);
+   version='Revisão '+(plan?.revision||0);
+  }else{
+   status='Enviado';
+   const rows=assertOk(await db.from('stock_movements')
+    .select('product_id,quantity').eq('event_id',id).eq('action','transferencia').limit(10000))||[];
+   const map=new Map();
+   for(const row of rows)map.set(row.product_id,(map.get(row.product_id)||0)+Number(row.quantity||0));
+   items=[...map].map(([product_id,quantity])=>({product_id,quantity}));
+   version='Separação confirmada';
+  }
+  if(!items.length){
+   win.close();toast('Não há quantidades para imprimir.',true);return;
+  }
+  const responsible=state.members.filter(m=>m.event_id===id&&m.role==='responsavel')
+    .map(m=>username(m.user_id)).join(', ');
+  const html=a4PickingHTML({
+   event:e,items,products:state.items,models:state.apparelModels,responsible,
+   version,status,printedAt:new Date().toLocaleString('pt-BR')
   });
-  return '<div class="crumb"><button class="plain" data-action="back-events">← Lojas temporárias</button></div>'+
-    tabHead(e.name,'Data: '+niceDate(e.starts_at)+(e.ends_at?' a '+niceDate(e.ends_at):''),pill(e.status))+
-    '<div class="cards">'+[['Enviados',closure?.sent_units??transfers],['Vendidos',closure?.sold_units??sold],['Devolvidos',closure?.returned_units??returned],['Perdas justificadas',closure?.loss_units??losses],...(historicalUnclassified?[['Baixas antigas sem classificação',historicalUnclassified]]:[]),['Ainda no local',pending]].map(([name,value])=>
-      '<div class="card"><div class="metric-label">'+name+'</div><div class="metric">'+value+'</div></div>').join('')+'</div>'+
-    '<div class="actions" style="margin-bottom:18px">'+actions+'</div>'+
-    (e.status==='ativo'&&pending>0?'<div class="note">Há '+pending+
-      ' unidade(s) na loja temporária. Registre vendas ou baixas justificadas e devolva o restante antes do encerramento.</div>':'')+
-    panel('Produtos e histórico da consignação',history)+
-    panel('Equipe responsável','<div class="panelbody">'+(mem.length?mem.map(m=>
-      '<div class="inline" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid #edf1ee">'+
-      '<div><strong>'+h(username(m.user_id))+'</strong> <span class="pill">'+
-      (m.role==='responsavel'?'Responsável':'Operador')+'</span></div>'+
-      (hasPermission('events.manage')?button('Remover','member-remove','data-user="'+h(m.user_id)+'" data-event="'+h(e.id)+'"','small'):'')+
-      '</div>').join(''):'<p class="muted">Nenhum usuário associado.</p>')+
-      (hasPermission('events.manage')&&e.status!=='encerrado'?'<div style="margin-top:13px">'+
-        button('+ Adicionar usuário','member-add','data-id="'+h(e.id)+'"','small')+'</div>':'')+'</div>');
+  win.document.open();win.document.write(html);win.document.close();
+ }catch(error){win.close();fail(error);}
+}
+function resolveDamageModal(id){
+ if(!permittedView('avarias')||!isManager())return;
+ const d=state.damages.find(x=>x.id===id);
+ if(!d||d.remaining<=0)return;
+ const p=product(d.product_id);
+ formModal('Resolver avaria · '+(p?.name||'Produto'),
+  '<p class="help">'+d.remaining+' unidade(s) fora do estoque livre. Apenas as recuperadas voltarão à central.</p>'+
+  '<div class="formgrid">'+
+  selectField('Decisão','resolution',[['recuperado','Recuperado · voltar ao estoque'],['descartado','Descartado · baixa definitiva']])+
+  field('Quantidade','quantity','number',String(d.remaining),'required min="1" max="'+d.remaining+'" step="1"')+
+  textareaField('Justificativa obrigatória','note')+'</div>',
+  'damage-resolution','Confirmar decisão');
+ const form=document.querySelector('.modalback form[data-form="damage-resolution"]');
+ if(form){form.dataset.damage=id;form.dataset.request=crypto.randomUUID();}
 }
 function movementTable(rows){
   if(!rows.length)return '<div class="muteblock">Nenhuma movimentação registrada.</div>';
@@ -1259,7 +1398,7 @@ function stockModal(id=null,groupKey=null){
         ])+
         '<div data-single-recipient hidden>'+field('Quem recebeu?','recipient','text','','maxlength="120" placeholder="Nome ou identificação"')+'</div>'+
         textareaField('Justificativa obrigatória','details')+
-        '<p class="help">A baixa é definitiva, não representa venda ou transferência. Não é permitido utilizar unidades reservadas.</p>'+
+        '<p class="help">Avarias ficam em análise, fora do estoque disponível; podem ser recuperadas ou descartadas. Demais motivos geram baixa definitiva. Unidades reservadas não podem sair.</p>'+
       '</div>'+
     '</div>','stock-single-movement','Confirmar movimentação');
   const form=document.querySelector('.modalback form[data-form="stock-single-movement"]');
@@ -1289,12 +1428,18 @@ function stockModal(id=null,groupKey=null){
   sync();
 }
 function eventModal(){
-  if(!hasPermission('events.manage'))return;
-  formModal('Criar loja temporária','<div class="formgrid">'+field('Nome do local / evento','name','text','','required maxlength="150"')+
-    field('Data de início','starts_at','date',dateToday(),'required')+
-    field('Data de término (opcional)','ends_at','date')+
-    textareaField('Observações','notes')+'</div><div class="note">A loja temporária começa como rascunho. Associe responsáveis, ative e envie os produtos consignados.</div>',
-    'event-create','Criar loja temporária');
+ if(!hasPermission('events.manage'))return;
+ const people=state.users.filter(u=>u.active&&u.role!=='franquia');
+ if(!people.length)return toast('Cadastre um responsável ativo antes de criar a loja.',true);
+ formModal('Criar loja temporária',
+  '<div class="formgrid">'+
+  field('Nome da loja / evento','name','text','','required maxlength="150"')+
+  field('Data de início','starts_at','date',dateToday(),'required')+
+  field('Data de término (opcional)','ends_at','date')+
+  selectField('Responsável','responsible_id',people.map(u=>[u.id,u.full_name]),state.user.id,'required')+
+  textareaField('Local, observações e informações básicas','notes')+
+  '</div><p class="help">Após criar, monte a lista de separação, imprima em A4 e confirme o envio físico.</p>',
+  'event-create','Criar e preparar');
 }
 function eventMove(action){
   const eid=state.activeEvent;
@@ -1329,7 +1474,7 @@ function eventLossModal(){
 function memberModal(eid){
   if(!hasPermission('events.manage'))return;
   const occupied=new Set(state.members.filter(m=>m.event_id===eid).map(m=>m.user_id));
-  const users=state.users.filter(u=>u.active&&!occupied.has(u.id));
+  const users=state.users.filter(u=>u.active&&u.role!=='franquia'&&!occupied.has(u.id));
   if(!users.length){toast('Nenhum usuário ativo disponível. Cadastre usuários primeiro.',true);return;}
   formModal('Adicionar responsável / operador','<div class="formgrid">'+selectField('Usuário','user_id',users.map(u=>[u.id,u.full_name+' · '+u.email]))+
     selectField('Papel neste evento','role',[['responsavel','Responsável'],['operador','Operador']])+'</div>'+
@@ -2083,6 +2228,27 @@ async function handleClick(event){
   if(action==='stock-overview-close'){target.closest('.stock-overview-overlay')?.remove();return;}
   if(action==='stock-group-modal')return stockModal(null,target.dataset.cardKey);
   if(action==='stock-modal')return stockModal(id);
+  if(action==='event-plan-scan')return scanInto('[data-plan-search]',target.closest('form'));
+  if(action==='event-plan')return eventPlanModal(false);
+  if(action==='event-supplement')return eventPlanModal(true);
+  if(action==='event-settle')return eventSettlementModal();
+  if(action==='event-print')return printEventA4(state.activeEvent);
+  if(action==='event-dispatch'){
+    const e=eventById(state.activeEvent);
+    if(!e||e.status!=='rascunho'||!hasPermission('events.separate'))return;
+    if(!window.confirm('Confirmar envio físico da lista separada? Após o envio, ajustes serão movimentações adicionais auditadas.'))return;
+    return exec(async()=>assertOk(await db.rpc('dispatch_event_pick_plan',{p_event:e.id})),
+      'Mercadorias enviadas. A loja temporária está ativa.');
+  }
+  if(action==='event-fill-sold'){
+    const row=target.closest('[data-settle-row]');if(!row)return;
+    const expected=Number(row.dataset.expected);
+    const rest=['good','damaged','lost'].reduce((n,key)=>n+Number(row.querySelector('[data-settle-field="'+key+'"]')?.value||0),0);
+    row.querySelector('[data-settle-field="sold"]').value=String(Math.max(0,expected-rest));
+    updateEventSettlementPreview(row.closest('form'));return;
+  }
+  if(action==='event-settlement-save-finish')return submitEventSettlement(target.closest('form'),true);
+  if(action==='damage-resolve')return resolveDamageModal(id);
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
   if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
@@ -2523,13 +2689,17 @@ async function handleSubmit(event){
       if(['diretoria','doacao'].includes(reason)&&(recipient.length<2||recipient.length>120))
         return toast('Identifique quem recebeu o produto.',true);
     }
-    const action=kind==='entrada'?'entrada':'baixa definitiva';
+    const action=kind==='entrada'?'entrada':reason==='avaria'?'envio para análise':'baixa definitiva';
     if(!window.confirm('Confirmar '+action+' de '+qty+' unidade(s) de '+p.name+'?'))return;
     return exec(async()=>{
       if(kind==='entrada'){
         assertOk(await db.rpc('stock_operation_batch',{
           p_operation:'entrada',p_items:[{product_id:id,quantity:qty,expected}],
           p_destination_id:null,p_note:note||null,p_request_id:requestId
+        }));
+      }else if(reason==='avaria'){
+        assertOk(await db.rpc('quarantine_central_stock',{
+          p_product:id,p_quantity:qty,p_expected:expected,p_note:details,p_request:requestId
         }));
       }else{
         assertOk(await db.rpc('record_stock_exception',{
@@ -2539,7 +2709,8 @@ async function handleSubmit(event){
           p_request_id:requestId
         }));
       }
-    },kind==='entrada'?'Entrada de fornecedor registrada.':'Baixa excepcional registrada com motivo e justificativa.');
+    },kind==='entrada'?'Entrada de fornecedor registrada.':
+      reason==='avaria'?'Avaria em análise: unidade fora do estoque disponível.':'Baixa excepcional registrada com motivo e justificativa.');
   }
   if(type==='stock-operation'){
     return saveStockOperation(form);
@@ -2597,14 +2768,50 @@ async function handleSubmit(event){
     finally{state.loading=false;}
     return;
   }
+  if(type==='event-plan-save'||type==='event-supplement-send'){
+    const eid=form.dataset.event,e=eventById(eid);
+    if(!e)return;
+    let items;
+    try{items=collectEventPlan(form);}catch(error){return toast(error.message,true);}
+    if(type==='event-plan-save'){
+      if(!items.length)return toast('Inclua ao menos um SKU na separação.',true);
+      return exec(async()=>assertOk(await db.rpc('save_event_pick_plan',{
+       p_event:eid,p_items:items
+      })),'Lista de separação salva. Imprima A4 e confirme quando o material estiver pronto.');
+    }
+    if(!items.length)return toast('Escolha ao menos um SKU para complemento.',true);
+    const note=String(values.reason||'').trim();
+    if(note.length<5)return toast('Justifique o envio adicional.',true);
+    if(!window.confirm('Enviar fisicamente '+items.reduce((n,x)=>n+x.quantity,0)+' unidades adicionais?'))return;
+    return exec(async()=>assertOk(await db.rpc('event_send_additional',{
+      p_event:eid,p_items:items,p_note:note
+    })),'Envio adicional registrado e auditado.');
+  }
+  if(type==='event-settlement-save')return submitEventSettlement(form,false);
+  if(type==='damage-resolution'){
+    if(!permittedView('avarias')||!isManager())return;
+    const damage=state.damages.find(x=>x.id===form.dataset.damage);
+    const quantity=Number(values.quantity),reason=String(values.note||'').trim();
+    if(!damage||!Number.isInteger(quantity)||quantity<1||quantity>damage.remaining||
+      reason.length<5)return toast('Quantidade e justificativa obrigatórias.',true);
+    if(!window.confirm((values.resolution==='recuperado'?'Devolver ao estoque':'Descartar definitivamente')+
+      ' '+quantity+' unidade(s)?'))return;
+    return exec(async()=>assertOk(await db.rpc('resolve_stock_damage',{
+      p_damage:damage.id,p_action:values.resolution,p_quantity:quantity,
+      p_note:reason,p_request:form.dataset.request
+    })),values.resolution==='recuperado'?'Produto recuperado e disponível.':'Descarte registrado no histórico.');
+  }
   if(type==='event-create'){
     if(!hasPermission('events.manage'))return;
     if(values.ends_at&&values.ends_at<values.starts_at){toast('A data final não pode ser anterior ao início.',true);return;}
-    await exec(async()=>assertOk(await db.from('events').insert({
-      name:String(values.name).trim(),starts_at:values.starts_at,ends_at:values.ends_at||null,
-      notes:values.notes||null,created_by:state.user.id
-    })),'Loja temporária cadastrada.');
-    return;
+    return exec(async()=>{
+      const eventId=assertOk(await db.rpc('create_temporary_store',{
+       p_name:String(values.name||'').trim(),p_start:values.starts_at,
+       p_end:values.ends_at||null,p_notes:String(values.notes||'').trim()||null,
+       p_responsible:values.responsible_id
+      }));
+      state.activeEvent=eventId;state.view='eventos';
+    },'Loja criada. Prepare a lista de separação e imprima antes do envio.');
   }
   if(type==='event-loss'){
     const quantity=Number(values.quantity),note=String(values.note||'').trim();
@@ -2941,6 +3148,19 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-plan-search]')){
+    const q=event.target.value.trim().toLocaleLowerCase('pt-BR'),form=event.target.closest('form');
+    for(const group of form.querySelectorAll('[data-plan-group]')){
+      const rows=[...group.querySelectorAll('[data-plan-row]')];
+      const matchGroup=group.dataset.search.includes(q);
+      for(const row of rows)row.hidden=Boolean(q)&&!matchGroup&&!row.dataset.search.includes(q);
+      group.hidden=rows.every(row=>row.hidden);
+    }
+  }
+  if(event.target.matches('[data-settle-field]')){
+    const form=event.target.closest('form');
+    if(form)updateEventSettlementPreview(form);
+  }
   if(event.target.matches('[data-store-order-search]')){
     const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
     event.target.closest('form')?.querySelectorAll('[data-store-row]').forEach(el=>{
