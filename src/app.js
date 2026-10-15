@@ -2587,8 +2587,43 @@ async function handleClick(event){
   if(action==='stock-group-modal')return stockModal(null,target.dataset.cardKey);
   if(action==='stock-modal')return stockModal(id);
   if(action==='event-plan-scan')return scanInto('[data-plan-search]',target.closest('form'));
-  if(action==='event-plan')return eventPlanModal(false);
-  if(action==='event-supplement')return eventPlanModal(true);
+  if(action==='event-batch-new')return eventBatchModal(target.dataset.event||state.activeEvent);
+  if(action==='event-batch-edit')return eventBatchModal(
+    state.eventPickBatches.find(b=>b.id===id)?.event_id,id);
+  if(action==='event-batch-pick')return eventBatchPickModal(id);
+  if(action==='event-batch-finish-pick')return saveEventBatchPicking(target.closest('form'),true);
+  if(action==='event-batch-cancel')return eventBatchCancelModal(id);
+  if(action==='event-batch-go'){
+    if(!permittedView('separacao'))return toast('Sem permissão de separação.',true);
+    state.view='separacao';state.activeEvent=null;render();
+    const card=document.querySelector('[data-order-id="'+id+'"]');
+    card?.scrollIntoView({block:'center',behavior:'smooth'});
+    card?.querySelector('details.uo-details')?.setAttribute('open','');
+    return;
+  }
+  if(action==='event-batch-dispatch'){
+    const b=state.eventPickBatches.find(x=>x.id===id);
+    if(!b||b.status!=='separado'||!isManager()||!hasPermission('events.separate'))return;
+    if(!window.confirm('Confirmar saída física do lote '+b.sequence+'? O estoque central será baixado agora.'))return;
+    return exec(async()=>assertOk(await db.rpc('dispatch_event_pick_batch',{p_batch:id})),
+      'Lote enviado. Saída física registrada e reservas consumidas.');
+  }
+  if(action==='event-batch-scan'){
+    return scanEAN(code=>{
+      const form=document.querySelector('.modalback form[data-form="event-batch-picking"]');
+      if(!form)return;
+      const matches=state.items.filter(p=>p.active&&(p.ean===code||p.sku===code));
+      if(matches.length!==1)return toast('EAN/SKU não encontrado ou ambíguo.',true);
+      const input=[...form.querySelectorAll('[data-pick-qty]')].find(el=>el.dataset.id===matches[0].id);
+      if(!input)return toast('Produto não consta deste lote.',true);
+      const current=Number(input.value||0),maximum=Number(input.dataset.expected);
+      if(current>=maximum)return toast('Este tamanho já está totalmente conferido.',true);
+      input.value=String(current+1);updateUnifiedPickingTotal(form);
+      toast('Conferido '+(current+1)+' de '+maximum+' unidades.');
+    });
+  }
+  if(action==='event-plan')return eventBatchModal(state.activeEvent);
+  if(action==='event-supplement')return eventBatchModal(state.activeEvent);
   if(action==='event-settle')return eventSettlementModal();
   if(action==='event-print')return printEventA4(state.activeEvent);
   if(action==='event-dispatch'){
@@ -2612,17 +2647,7 @@ async function handleClick(event){
   if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;render();return;}
   if(action==='event-sale'){return eventMove('venda_evento');}
   if(action==='event-loss'){return eventLossModal();}
-  if(action==='event-transfer'){
-    if(!hasPermission('events.separate')||eventStatus(state.activeEvent)!=='ativo')return;
-    const eligible=state.items.filter(p=>p.active&&qtyAvailable(p.id)>0);
-    if(!eligible.length)return toast('Nenhum produto com saldo na loja.',true);
-    formModal('Transferência para loja temporária',eventBatchContent(eligible,state.apparelModels,qtyAvailable,photoButton),
-      'event-batch','Confirmar transferência');
-    const form=document.querySelector('.modalback form[data-form="event-batch"]');
-    form.dataset.event=state.activeEvent;
-    document.querySelector('.modalback .modalhead [data-action="modal-close"]')?.focus({preventScroll:true});
-    hydrateImages();return;
-  }
+  if(action==='event-transfer')return eventBatchModal(state.activeEvent);
   // Registro de venda foi retirado do gerenciador: só há separação, devolução e baixa final.
   if(action==='event-return'){
     if(!canReturn(state.activeEvent)||eventStatus(state.activeEvent)!=='ativo')return;
@@ -3183,6 +3208,34 @@ async function handleSubmit(event){
     finally{state.loading=false;}
     return;
   }
+  if(type==='event-batch-write'){
+    const eid=form.dataset.event,batchId=form.dataset.batch;
+    if(!isManager()||!hasPermission('events.separate'))return;
+    let items;try{items=collectEventPlan(form);}catch(error){return toast(error.message,true);}
+    const models=selectedEventModels(items,state.items);
+    if(!items.length||models>10)return toast('Selecione entre 1 e 10 modelos diferentes por lote. Variações não contam como modelos adicionais.',true);
+    const note=String(values.note||'').trim();
+    if(note.length>180)return toast('Observação longa demais.',true);
+    if(batchId){
+      if(!window.confirm('Revisar lote? Quantidades já conferidas serão zeradas para uma nova separação.'))return;
+      return exec(async()=>assertOk(await db.rpc('revise_event_pick_batch',{
+        p_batch:batchId,p_items:items,p_note:note||null
+      })),'Lote revisado e reservas recalculadas. A separação precisará ser conferida novamente.');
+    }
+    return exec(async()=>assertOk(await db.rpc('create_event_pick_batch',{
+      p_event:eid,p_items:items,p_note:note||null
+    })),'Lote criado! Aparecerá em Pedidos e Separação, com reserva automática.');
+  }
+  if(type==='event-batch-picking')return saveEventBatchPicking(form,false);
+  if(type==='event-batch-cancel'){
+    if(!isManager()||!hasPermission('events.separate'))return;
+    const reason=String(values.reason||'').trim();
+    if(reason.length<5||reason.length>250)return toast('Justificativa de 5 a 250 caracteres obrigatória.',true);
+    if(!window.confirm('Cancelar este lote, liberando as reservas ainda ativas?'))return;
+    return exec(async()=>assertOk(await db.rpc('cancel_event_pick_batch',{
+      p_batch:form.dataset.batch,p_reason:reason
+    })),'Lote cancelado e estoque reservado liberado.');
+  }
   if(type==='event-plan-save'||type==='event-supplement-send'){
     const eid=form.dataset.event,e=eventById(eid);
     if(!e)return;
@@ -3620,8 +3673,10 @@ document.addEventListener('input',event=>{
     filterUnifiedOrders(container,event.target.value,
       container?.querySelector('[data-unified-status]')?.value||'todos');
   }
-  if(event.target.matches('form[data-form="avulso-picking"] [data-pick-qty]'))
+  if(event.target.matches('form[data-form="avulso-picking"] [data-pick-qty],form[data-form="event-batch-picking"] [data-pick-qty]'))
     updateUnifiedPickingTotal(event.target.closest('form'));
+  if(event.target.matches('form[data-form="event-batch-write"] [data-plan-qty]'))
+    refreshEventLotCounter(event.target.closest('form'));
   if(event.target.closest('form[data-form="sku-manage"]')){
     syncSkuManagerPreview(event.target.closest('form[data-form="sku-manage"]'));
   }
