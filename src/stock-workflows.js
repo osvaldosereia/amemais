@@ -5,6 +5,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const bySize=(a,b)=>{
   const ai=sizes.indexOf(a.apparel_size),bi=sizes.indexOf(b.apparel_size);
   return (ai<0?100:ai)-(bi<0?100:bi)||
+    (ai<0&&bi<0?String(a.apparel_size||'').localeCompare(String(b.apparel_size||''),'pt-BR',{numeric:true}):0)||
     String(a.apparel_color||'').localeCompare(String(b.apparel_color||''),'pt-BR');
 };
 export function groupInventory(items,models){
@@ -55,7 +56,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const groupReserved=isProducts?active.reduce((sum,p)=>sum+qtyReserved(p.id),0):0;
   const groupAvailable=isProducts?active.reduce((sum,p)=>sum+qtyAvailable(p.id),0):count;
   const stockLabel=mode==='event'?'Na loja temporária':'Físico na central';
-  const colors=[...new Set(active.map(p=>(p.apparel_color||'').trim()).filter(Boolean))];
+  const colors=[...new Set(active.map(p=>(p.apparel_color||'').trim()).filter(c=>c&&c!=='Única'))];
   const description=group.modelId
     ?(colors.length===1?colors[0]+' · ':colors.length>1?colors.length+' cores · ':'')+
       active.length+' tamanho(s)/variação(ões)'
