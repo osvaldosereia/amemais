@@ -198,7 +198,7 @@ async function loadData(){
     ['members',db.from('event_members').select('*').limit(2000)],
     ['balances',db.from('stock_balances').select('*').limit(10000)],
     ['movements',db.from('stock_movements').select('*').order('created_at',{ascending:false}).limit(1000)],
-    ['users',db.from('staff_profiles').select('id,full_name,username,role,active,permissions_customized,created_at').order('full_name').limit(1000)]
+    ['users',db.from('staff_profiles').select('id,full_name,username,role,active,archived_at,permissions_customized,created_at').order('full_name').limit(1000)]
   ];
   resources.push(['stores',db.from('stores').select('*').order('name')]);
   if(hasPermission('products.edit')||hasPermission('purchases.manage'))
