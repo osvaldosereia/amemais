@@ -95,7 +95,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   // Apenas uma delas fica visível por CSS, para evitar listas visuais duplicadas.
   const moreOptions=(canShare?'<button type="button" data-action="share-product" data-id="'+h(main.id)+'">'+
       'Compartilhar no WhatsApp</button>':'')+
-    (manage?'<button type="button" data-action="stock-modal" data-id="'+h(main.id)+'">Movimentar estoque</button>':'')+
+
     (group.modelId&&canEdit?'<button type="button" data-action="add-variants" data-id="'+h(group.modelId)+'">+ Adicionar tamanhos</button>':'')+
     (manage?'<button type="button" class="product-menu-danger" data-action="'+
       (group.modelId?'product-card-edit':'product-delete')+'" data-id="'+h(groupEditId)+'">'+
