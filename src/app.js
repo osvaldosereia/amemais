@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery2';
-import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015cover1';
+import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015cover2';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
@@ -16,7 +16,7 @@ import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQu
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015eventphoto3';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015orderphoto2';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015printphoto5';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
@@ -61,7 +61,7 @@ const nav = [
   {id:'produtos',label:'Produtos',ico:'package'},
   {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
   {id:'pedidos',label:'Pedidos',ico:'clipboard'},
-  {id:'movimentacoes',label:'Movimentações',ico:'arrows'},
+  {id:'movimentacoes',label:'Atividades',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
   {id:'tags',label:'Tags',ico:'more'},
   {id:'usuarios',label:'Usuários',ico:'users'},
@@ -1094,7 +1094,7 @@ function movementsPage(){
    .sort((a,b)=>String(b.time).localeCompare(String(a.time))).slice(0,120);
  const filterUsers=[...new Set([...state.users.map(u=>u.id),...entries.map(e=>e.user)].filter(Boolean))];
  return tabHead('Atividades','Quem fez o quê no sistema, em ordem de data.',
-  button('Exportar histórico CSV','export-csv','','small'))+
+  button('Exportar estoque CSV','export-csv','','small'))+
   '<section class="panel activity-panel">'+
   '<div class="activity-filters">'+
    '<input class="search" id="movement-search" type="search" value="'+h(state.search)+'" placeholder="Buscar usuário, produto ou ação…">'+
