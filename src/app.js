@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery2';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015cover2';
-import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015force1';
+import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015cristorei1';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
@@ -2349,9 +2349,11 @@ function storesPage(){
 }
 function storesAdminPage(){
  const manage=hasPermission('stores.manage');
- return tabHead('Administração de lojas','Cadastros de unidades, filiais e franquias.',button('← Voltar para Lojas','view','data-view="lojas"','small')+(manage?button('+ Nova loja','store-new','','primary'):''))+
- panel('Unidades',state.stores.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Status</th><th></th></tr></thead><tbody>'+
- state.stores.filter(x=>!x.force_archived_at).map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.kind)+(x.is_primary?' · Principal':'')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.kind==='franquia'?'Não controlado':(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.')+'</td><td>'+
+ // O CDSB é gerenciado como centro de distribuição, não como loja comercial.
+ const managedStores=state.stores.filter(x=>!x.force_archived_at&&!x.is_primary&&x.kind!=='central');
+ return tabHead('Administração de lojas','Cadastros de lojas próprias e franquias.',button('← Voltar para Lojas','view','data-view="lojas"','small')+(manage?button('+ Nova loja','store-new','','primary'):''))+
+ panel('Unidades',managedStores.length?'<div class="tablewrap"><table class="table"><thead><tr><th>Loja</th><th>Código</th><th>Tipo</th><th>Status</th><th></th></tr></thead><tbody>'+
+ managedStores.map(x=>'<tr><td><strong>'+h(x.name)+'</strong></td><td>'+h(x.code)+'</td><td>'+h(x.code==='CRISTOREICBA'?'Loja Central':x.kind==='filial'?'Loja própria / filial':'Franquia')+'</td><td>'+(x.active?'Ativa':'Inativa')+' · '+(x.kind==='franquia'?'Não controlado':(x.is_primary?state.balances.filter(b=>!b.event_id).reduce((n,b)=>n+b.quantity,0):state.storeBalances.filter(b=>b.store_id===x.id).reduce((n,b)=>n+b.quantity,0))+' un.')+'</td><td>'+
  ((x.kind==='filial'&&x.active&&assignedStore(x.id)&&(hasPermission('stores.manage')||hasPermission('orders.receive'))?button('Movimentar','branch-stock-new','data-id="'+h(x.id)+'"','small primary')+button('Devolver à central','branch-return-new','data-id="'+h(x.id)+'"','small'):'')+
  (manage?button('Editar','store-edit','data-id="'+h(x.id)+'"','small')+(x.is_primary?'':button(x.active?'Desativar':'Ativar','store-toggle','data-id="'+h(x.id)+'"','small')+button('Excluir','store-delete','data-id="'+h(x.id)+'"','small')):''))+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Nenhuma loja cadastrada.</p>')+
  '<div class="note">A exclusão é bloqueada quando existem vínculos ou saldos. Franquias somente solicitam mercadorias; não têm estoque físico controlado.</div>'+ 
@@ -2535,7 +2537,7 @@ function storeModal(item=null){
  formModal(item?'Editar loja':'Nova loja','<div class="formgrid">'+
  field('Código','code','text',item?.code||'','required maxlength="30"')+
  field('Nome','name','text',item?.name||'','required maxlength="120"')+
- selectField('Tipo','kind',[['central','Loja central'],['filial','Filial'],['franquia','Franquia']],item?.kind||'filial')+
+ selectField('Tipo','kind',[['filial','Loja própria / filial'],['franquia','Franquia']],item?.kind||'filial')+
  field('CNPJ','document','text',item?.document||'')+
  field('Telefone','phone','text',item?.phone||'')+
  field('Responsável','manager_name','text',item?.manager_name||'')+
@@ -4346,7 +4348,11 @@ async function handleSubmit(event){
   }
   if(type==='store-save'){
     if(!hasPermission('stores.manage'))return;
-    const payload={code:String(values.code||'').trim(),name:String(values.name||'').trim(),kind:values.kind,
+    if(!['filial','franquia'].includes(values.kind))return toast('Escolha loja própria ou franquia.',true);
+    if(form.dataset.id&&state.stores.some(x=>x.id===form.dataset.id&&x.is_primary))
+      return toast('O CDSB deve permanecer como centro de distribuição.',true);
+    const payload={code:String(values.code||'').trim(),name:String(values.name||'').trim(),
+      kind:values.kind,ownership_type:values.kind==='filial'?'propria':'terceiro',
       document:String(values.document||'').trim()||null,phone:String(values.phone||'').trim()||null,
       manager_name:String(values.manager_name||'').trim()||null,address:String(values.address||'').trim()||null};
     await exec(async()=>{
