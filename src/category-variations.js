@@ -29,6 +29,42 @@ export function resolveCategoryVariations(categories,categoryId){
  }
  return {options:[],source:null,inherited:false};
 }
+// Metadados técnicos do modelo vêm da hierarquia de categorias, sem repedir informações no cadastro.
+export function inferApparelMetadata(categories,categoryId){
+ const map=new Map((categories||[]).map(cat=>[cat.id,cat]));
+ const parents=[],seen=new Set();let current=map.get(categoryId);
+ while(current&&!seen.has(current.id)&&parents.length<20){
+  parents.push(String(current.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim());
+  seen.add(current.id);current=map.get(current.parent_id);
+ }
+ const match=(regex)=>parents.find(name=>regex.test(name));
+ const garmentTypes=[
+  [/^(camiseta|camisetas|baby look|babylook)\b/,'Camiseta'],
+  [/^camisa(s)?\b/,'Camisa'],
+  [/^polo(s)?\b/,'Polo'],
+  [/^blusa(s)?\b/,'Blusa'],
+  [/^vestido(s)?\b/,'Vestido'],
+  [/^(casaco|casacos|jaqueta|jaquetas)\b/,'Casaco']
+ ];
+ const type=garmentTypes.find(([pattern])=>match(pattern))?.[1]||'Outro';
+ const audience=match(/^(masculino|masculina|masculinos)\b/)?'Masculino':
+  match(/^(feminino|feminina|femininos)\b/)?'Feminino':'Unissex';
+ const ageGroup=match(/^(bebe|baby)\b/)?'Bebê':match(/^(infantil|crianca|juvenil)\b/)?'Infantil':'Adulto';
+ return {type,audience,ageGroup};
+}
+export function syncApparelCategoryMetadata(form,categories){
+ if(!form)return;
+ const panel=form.querySelector('[data-variant-panel]');
+ if(!panel)return;
+ const id=form.querySelector('input[name="category_id"]')?.value||'';
+ const meta=inferApparelMetadata(categories,id);
+ for(const [name,val] of [['apparel_type',meta.type],['apparel_audience',meta.audience],['apparel_age',meta.ageGroup]]){
+  const input=panel.querySelector('[name="'+name+'"]');
+  if(input)input.value=val;
+ }
+ const desc=panel.querySelector('[data-apparel-category-summary]');
+ if(desc)desc.textContent=id?'Classificação pela categoria: '+[meta.type,meta.audience,meta.ageGroup].join(' · ')+'.':'Selecione uma categoria para definir a classificação do produto.';
+}
 export function categoryVariationLabel(categories,categoryId){
  const found=resolveCategoryVariations(categories,categoryId);
  return found.options.length?found.options.join(' · '):'Sem variações configuradas';
@@ -86,6 +122,7 @@ export function makeVariationChips(options){
 export function refreshCategorySizeOptions(form,categories){
  const picker=form?.querySelector('[data-variant-panel]');
  if(!picker)return;
+ syncApparelCategoryMetadata(form,categories);
  const categoryId=form.querySelector('input[name="category_id"]')?.value||'';
  const found=resolveCategoryVariations(categories,categoryId);
  const options=found.options;
