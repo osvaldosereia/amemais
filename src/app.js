@@ -802,6 +802,88 @@ function damageStockPage(){
  if(!permittedView('avarias'))return '<div class="muteblock">Sem autorização.</div>';
  return damageListHTML(state.damages,state.items,state.events,state.damageActions,{h,button});
 }
+function eventBatchModal(eventId=state.activeEvent,batchId=null){
+ const e=eventById(eventId),batch=batchId?state.eventPickBatches.find(x=>x.id===batchId):null;
+ if(!e||!['rascunho','ativo'].includes(e.status)||!isManager()||
+  !hasPermission('events.separate'))return;
+ if(batch&&!['aguardando','pendente_estoque','em_separacao','separado'].includes(batch.status))
+  return toast('Este lote já saiu ou foi cancelado.',true);
+ const saved=batch?state.eventBatchItems.filter(x=>x.batch_id===batch.id):[];
+ const groups=eventPickingRows(state.items,state.apparelModels,saved,qtyAvailable);
+ formModal((batch?'Editar lote '+String(batch.sequence).padStart(2,'0'):'Novo lote')+' · '+e.name,
+  eventLotForm(eventPlanForm(groups,{h}),{edit:Boolean(batch),number:batch?.sequence,note:batch?.note||''}),
+  'event-batch-write',batch?'Salvar nova revisão':'Enviar à separação');
+ const form=document.querySelector('.modalback form[data-form="event-batch-write"]');
+ if(form){form.dataset.event=e.id;form.dataset.batch=batch?.id||'';
+  refreshEventLotCounter(form);}
+}
+function refreshEventLotCounter(form){
+ const items=[...form.querySelectorAll('[data-plan-qty]')].map(el=>({
+  product_id:el.dataset.id,quantity:Math.max(0,Number(el.value)||0)
+ }));
+ const models=selectedEventModels(items,state.items);
+ const total=items.reduce((n,x)=>n+x.quantity,0);
+ const target=form.querySelector('[data-event-lot-counter]');
+ if(target){
+  target.textContent=models+' de 10 modelos · '+total+' unidades selecionadas';
+  target.classList.toggle('is-over-limit',models>10);
+ }
+ const submit=form.querySelector('button[type="submit"]');
+ if(submit)submit.disabled=models<1||models>10;
+}
+function eventBatchPickModal(id){
+ const o=unifiedOrderById('evento',id);
+ if(!o||!['aguardando','em_separacao','separado'].includes(o.status)||
+ isFranchisePortal()||!(hasPermission('orders.separate')||hasPermission('events.separate')))return;
+ formModal('Separação · Lote '+String(o.sequence).padStart(2,'0')+' · '+o.target,
+  pickingOrderRows(o,{h}),'event-batch-picking','Salvar progresso');
+ const form=document.querySelector('.modalback form[data-form="event-batch-picking"]');
+ if(form){
+  form.dataset.batch=id;
+  form.querySelector('.modalfooter')?.insertAdjacentHTML('beforeend',
+   '<button type="button" class="button primary" data-action="event-batch-finish-pick">Concluir separação</button>');
+  updateUnifiedPickingTotal(form);
+ }
+}
+function collectEventBatchPicking(form){
+ const order=unifiedOrderById('evento',form.dataset.batch);
+ if(!order)throw Error('Lote não encontrado');
+ const inputs=[...form.querySelectorAll('[data-pick-qty]')];
+ if(inputs.length!==order.lines.length)throw Error('Nem todos os SKUs foram conferidos');
+ return inputs.map(el=>{
+  const raw=el.value.trim(),quantity=raw===''?0:Number(raw);
+  if(!Number.isInteger(quantity)||quantity<0||quantity>Number(el.dataset.expected))
+    throw Error('Quantidade de separação inválida ou acima do solicitado');
+  return {product_id:el.dataset.id,picked:quantity};
+ });
+}
+async function saveEventBatchPicking(form,finish=false){
+ if(!form||state.loading)return;
+ let items;try{items=collectEventBatchPicking(form);}catch(error){return toast(error.message,true);}
+ const order=unifiedOrderById('evento',form.dataset.batch);
+ if(!order)return;
+ const complete=items.every((x,i)=>x.picked===order.lines.find(l=>l.id===x.product_id)?.quantity);
+ if(finish&&!complete)return toast('Confira todas as unidades. Se faltarem peças, peça ao gerente para revisar o lote.',true);
+ return exec(async()=>{
+  const status=assertOk(await db.rpc('save_event_batch_picking',{
+    p_batch:form.dataset.batch,p_items:items
+  }));
+  return status;
+ },finish?'Lote totalmente separado. Aguardando confirmação da saída.':
+    'Progresso salvo. Pode continuar a separação mais tarde.');
+}
+function eventBatchCancelModal(id){
+ if(!isManager()||!hasPermission('events.separate'))return;
+ const batch=state.eventPickBatches.find(b=>b.id===id);
+ if(!batch||['enviado','cancelado'].includes(batch.status))return;
+ formModal('Cancelar lote '+String(batch.sequence).padStart(2,'0'),
+  '<p class="help">O lote será cancelado, suas reservas liberadas e o histórico preservado.</p>'+
+  '<label class="field"><span>Justificativa obrigatória</span>'+
+  '<textarea name="reason" required minlength="5" maxlength="250" placeholder="Motivo do cancelamento"></textarea></label>',
+  'event-batch-cancel','Cancelar lote');
+ const form=document.querySelector('.modalback form[data-form="event-batch-cancel"]');
+ if(form)form.dataset.batch=id;
+}
 function eventPlanModal(additional=false){
  const e=eventById(state.activeEvent);
  if(!e||!(additional?e.status==='ativo':e.status==='rascunho')||
