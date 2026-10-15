@@ -41,9 +41,38 @@ export function recentInventoryGroups(items,models,limit=6){
       a.group.key.localeCompare(b.group.key))
     .slice(0,max).map(entry=>entry.group);
 }
+// Fotos ordenadas da galeria do modelo (ou do produto, quando mais completa).
+// Use somente um conjunto de fotos por card: nunca mistura imagens de SKUs distintos.
+export function productGalleryPaths(group){
+ const getPaths=record=>{
+  if(!record)return [];
+  const paths=Array.isArray(record.image_paths)?record.image_paths.filter(v=>typeof v==='string'&&v.trim()):[];
+  if(typeof record.image_path==='string'&&record.image_path.trim()&&!paths.includes(record.image_path))
+   paths.push(record.image_path);
+  return [...new Set(paths)];
+ };
+ const choices=[group.model,...group.products];
+ let selected=[];
+ for(const candidate of choices){
+  const paths=getPaths(candidate);
+  if(paths.length>selected.length)selected=paths;
+ }
+ return selected;
+}
 export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canShare=false,expanded=false,mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
-  const main=group.products.find(p=>p.image_path)||group.main;
+  const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
+  const galleryPaths=productGalleryPaths(group);
+  const photo=galleryPaths.length?
+    '<div class="product-photo-gallery" data-product-gallery data-gallery-paths="'+h(JSON.stringify(galleryPaths))+
+     '" data-gallery-index="0">'+
+       '<button type="button" class="product-photo" data-action="product-gallery-zoom" aria-label="Ampliar foto de '+h(group.title)+'">'+
+         '<img class="thumb" data-photo-path="'+h(galleryPaths[0])+'" alt="Foto de '+h(group.title)+'" loading="lazy">'+
+       '</button>'+
+       (galleryPaths.length>1?'<button type="button" class="product-gallery-arrow prev" data-action="product-gallery-prev" aria-label="Foto anterior de '+h(group.title)+'">‹</button>'+
+        '<button type="button" class="product-gallery-arrow next" data-action="product-gallery-next" aria-label="Próxima foto de '+h(group.title)+'">›</button>'+
+        '<span class="product-gallery-count" data-gallery-count aria-live="polite">1 / '+galleryPaths.length+'</span>':'')+
+     '</div>':photoButton(main);
   const active=group.products.filter(p=>p.active);
   const isProducts=mode==='products';
   const canEdit=isProducts&&canRegisterProducts();
@@ -65,8 +94,9 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const locations=[...new Set(active.map(p=>
     [p.gondola?'Gôndola '+p.gondola:'',p.prateleira?'Prateleira '+p.prateleira:'']
     .filter(Boolean).join(' · ')).filter(Boolean))];
-  const location=locations.length>1?'Localização por tamanho'
-    :locations[0]||'Localização não informada';
+  const location=locations.length>1?'Gôndolas por variação'
+    :locations[0]||'Gôndola não informada';
+  const locationMissing=locations.length===0;
   const groupEdit=group.modelId?'product-card-edit':'product-edit';
   const groupEditId=group.modelId?group.modelId:main.id;
   const sizeCount=group.products.length;
@@ -95,7 +125,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
           '<div class="group-variant-description"><strong>'+h(group.modelId?
             ((p.apparel_color||'')==='Única'?label:(p.apparel_color||label)):(p.name||'Produto'))+'</strong>'+
           '<small class="variant-code">SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small>'+
-          (loc?'<small class="group-variant-location">'+h(loc)+'</small>':'')+
+          (loc?'<span class="group-variant-location"><span aria-hidden="true">⌖</span>'+h(loc)+'</span>':'')+
           (!p.active?'<small class="product-variant-disabled">Inativo</small>':'')+
           '<small class="stock-variant-physical">Físico: <b>'+fmt(physical)+'</b> un.</small>'+
           '</div></div>'+stockHtml+
@@ -125,13 +155,15 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     '</div>':'';
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
     '<div class="grouped-inventory-top">'+
-      '<div class="grouped-inventory-photo">'+photoButton(main)+'</div>'+
+      '<div class="grouped-inventory-photo">'+photo+'</div>'+
       '<div class="grouped-inventory-info">'+
         '<strong class="product-card-name">'+h(group.title)+'</strong>'+
         '<small class="product-card-description">'+h(description)+'</small>'+
         '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
           '<small>'+stockLabel+'</small><span><b>'+fmt(count)+'</b> un.</span></div>'+
-        '<small class="product-card-location">'+h(location)+'</small>'+
+        '<div class="product-card-location'+(locationMissing?' is-unknown':'')+'" aria-label="Localização do produto">'+
+           '<span class="product-location-icon" aria-hidden="true">⌖</span>'+
+           '<strong>'+h(location)+'</strong></div>'+
       '</div>'+
       (isProducts?'<div class="stock-total-breakdown">'+
           '<div class="stock-total-metric reserved"><small>Reservado</small><strong>'+fmt(groupReserved)+'</strong><span>un.</span></div>'+
