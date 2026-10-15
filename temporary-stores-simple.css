@@ -45,6 +45,9 @@
 .event-audit-list small,.event-plan-preview small{color:#728578}
 .event-team-list>div:last-child,.event-audit-list>div:last-child{border-bottom:0}
 .event-simple-secondary>.button{margin:8px 16px 14px}
+.event-plan-search{display:flex;align-items:center;gap:8px;min-width:0}
+.event-plan-search .search{min-width:0;flex:1}
+.event-plan-search .button{white-space:nowrap;min-height:43px;font-size:.78rem;padding:8px 10px}
 .event-plan-list,.event-settle-groups{display:flex;flex-direction:column;gap:12px;max-height:min(55vh,560px);overflow-y:auto;min-width:0;padding:2px 3px}
 .event-plan-group,.event-settle-group{border:1px solid #e0ebe2;background:#fff;border-radius:11px;overflow:hidden;min-width:0}
 .event-plan-group h3,.event-settle-group h3{margin:0;padding:11px 13px;background:#f0f6f1;color:#1c593c;font-size:.9rem}
