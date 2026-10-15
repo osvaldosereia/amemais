@@ -40,12 +40,13 @@ export function recentInventoryGroups(items,models,limit=6){
       a.group.key.localeCompare(b.group.key))
     .slice(0,max).map(entry=>entry.group);
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canShare=false,mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canShare=false,mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path)||group.main;
   const active=group.products.filter(p=>p.active);
   const isProducts=mode==='products';
   const canEdit=isProducts&&canRegisterProducts();
+  const canMove=isProducts&&canMoveStock();
   const manage=isProducts&&isManager();
   const quantity=p=>mode==='event'?qtyEvent(p.id,eventId):qtyStore(p.id);
   const count=active.reduce((sum,p)=>sum+quantity(p),0);
@@ -83,6 +84,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
           '</div></div>'+
         '<span class="group-variant-stock '+(qty===0?'stock-zero':'')+'"><b>'+fmt(qty)+'</b><small>un.</small></span>'+
         (isProducts?'<div class="group-variant-actions">'+
+          (canMove&&p.active?button('Movimentar','stock-modal','data-id="'+h(p.id)+'"','small primary'):'')+
           button('Local','stock-overview','data-id="'+h(p.id)+'"','small')+
           (canEdit?button('Editar SKU','product-edit','data-id="'+h(p.id)+'"','small'):'')+
           '</div>':'')+
@@ -100,6 +102,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       (group.modelId?'Gerenciar / excluir tamanhos':'Excluir produto')+'</button>':'');
   const actions=isProducts?
     '<div class="grouped-inventory-actions">'+
+      (canMove?'<button type="button" class="product-card-move" data-action="stock-group-modal" data-card-key="'+h(group.key)+'">↕ Movimentar</button>':'')+
       (canEdit?'<button type="button" class="product-card-edit" data-action="'+groupEdit+
         '" data-id="'+h(groupEditId)+'">✎ Editar produto</button>':'')+
       '<button type="button" class="product-card-sizes" data-action="product-card-sizes" data-card-key="'+h(group.key)+'"'+
