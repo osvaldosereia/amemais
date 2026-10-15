@@ -176,8 +176,9 @@ export function onLotQuantityInput(form,input){
  if(!key)return {ok:false,error:'Variação inválida'};
  const raw=input.value.trim(),value=raw===''?0:Number(raw);
  if(!Number.isInteger(value)||value<0||value>1000000){
-  store.invalid=true;input.setCustomValidity('Informe uma quantidade inteira de 0 a 1.000.000.');
-  return {ok:false,error:'Quantidade inválida'};
+  input.value=String(store.selected.get(id)||0);
+  input.setCustomValidity('');
+  return {ok:false,error:'Use uma quantidade inteira de 0 a 1.000.000.'};
  }
  store.invalid=false;input.setCustomValidity('');
  const previous=store.selected.get(id)||0;
