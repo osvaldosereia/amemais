@@ -131,3 +131,27 @@ test('filtro mostra somente os cartões visíveis e mensagem de lista vazia',()=
  assert.equal(filterUnifiedOrders(container,'não existe','todos'),0);
  assert.equal(empty.hidden,false);
 });
+
+test('uma foto do modelo atende todos os tamanhos no card, na conferência e no A4',()=>{
+ const modelId='model-x';
+ const products=['P','M','G'].map((size,i)=>({
+  id:'p-'+i,name:'Camiseta',apparel_model_id:modelId,apparel_size:size,
+  apparel_color:'Branco',sku:'SKU'+i,gondola:'01',
+  image_path:i===0?'foto/modelo.jpg':null
+ }));
+ const id='pedido-fotos';
+ const order=makeUnifiedOrders({
+  avulsoOrders:[{id,source:'interno',customer_name:'Teste',fulfillment_status:'reservado'}],
+  avulsoItems:products.map(p=>({order_id:id,product_id:p.id,quantity:1})),
+  products,models:[{id:modelId,name:'Camiseta',image_path:'foto/modelo.jpg'}]
+ })[0];
+ const card=unifiedOrderCard(order);
+ const picking=pickingOrderRows(order);
+ const html=pickingA4HTML(order,{photoUrls:{'foto/modelo.jpg':'https://example.com/modelo.jpg'}});
+ assert.equal((card.match(/class="uo-model-photo"/g)||[]).length,1);
+ assert.equal((picking.match(/class="uo-model-photo"/g)||[]).length,1);
+ assert.equal((html.match(/class="lot-photo"/g)||[]).length,1);
+ for(const size of ['P','M','G'])assert.match(picking,new RegExp('Branco · '+size));
+ assert.match(html,/Gôndola 01/);
+ assert.match(html,/document.images/);
+});
