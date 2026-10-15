@@ -124,7 +124,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  }
  if(canDelete&&!portal)actions.push(button('Excluir pedido','admin-order-delete-open',data,'small danger'));
  if(!portal&&o.lines.length&&!waiting&&!['legado','solicitado','cancelado','expirado'].includes(o.status))
-  actions.push(button('Imprimir lote A4','order-print-a4',data,'small'));
+  actions.push(button('Imprimir 80 mm','order-print-thermal',data,'small'));
  const originLabel=event?'Loja temporária · Lote '+String(o.sequence).padStart(2,'0'):
   o.kind==='avulso'?(o.raw.source==='cliente'?'Cliente catálogo':
    o.raw.source==='compartilhado'?'Cliente link':'Pedido avulso'):
