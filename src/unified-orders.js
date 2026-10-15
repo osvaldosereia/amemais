@@ -239,11 +239,11 @@ export function pickingOrderRows(order,{h=esc}={}){
  (isEvent?'<p class="help">Você pode salvar quantidades parciais e voltar depois. Cada leitura soma uma unidade, até o limite solicitado.</p>':'');
 }
 export function shortageEditRows(order,{h=esc}={}){
- return '<p class="help">Se o estoque não atender ao pedido, você pode reduzir quantidades justificadamente ou aguardar reposição. A quantidade original fica no histórico. Zero retira o SKU deste atendimento.</p>'+
+ return '<p class="help">Você pode simplesmente aguardar: quando entrar mercadoria, a reserva será completada automaticamente. Se precisar enviar menos, informe abaixo quanto poderá ser atendido e explique o motivo. A solicitação original permanece no histórico.</p>'+
  '<div class="uo-picking">'+order.lines.map(l=>'<div class="store-picking-line">'+
  '<div><strong>'+h(l.name)+'</strong><small>'+h([l.color,l.size,l.sku,l.ean].filter(Boolean).join(' · '))+
  '</small><small>Solicitado '+l.quantity+' · Reservado '+l.reserved+' · Falta '+l.missing+'</small></div>'+
- '<label>Atender<input type="number" data-shortage-qty data-id="'+h(l.id)+'" data-original="'+l.quantity+
+ '<label>Enviar<input type="number" data-shortage-qty data-id="'+h(l.id)+'" data-original="'+l.quantity+
  '" min="0" max="'+l.quantity+'" step="1" inputmode="numeric" value="'+l.quantity+'"></label></div>').join('')+'</div>'+
  '<label class="field">Justificativa obrigatória<textarea name="reason" minlength="5" maxlength="250" required placeholder="Ex.: furo identificado na separação"></textarea></label>';
 }
