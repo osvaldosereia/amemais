@@ -17,9 +17,9 @@ import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQu
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015eventphoto3';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015printphoto5';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015cdsb2';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
-import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015access1';
+import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015access2';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
 const iconPaths = {
@@ -1228,6 +1228,7 @@ function ordersPage(separationOnly=false){
     o.kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
     hasPermission('orders.separate')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id))),
   canDispatch:o=>o.kind==='evento'&&!portal&&isManager()&&hasPermission('orders.dispatch'),
+  canDispatchStock:o=>!portal&&hasPermission('orders.dispatch')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id)),
   canCancel:o=>o.kind==='evento'?(!portal&&isManager()&&hasPermission('events.separate')):
     (portal&&o.kind==='loja'&&o.isOwner&&
      ['solicitado','pendente_estoque','aprovado'].includes(o.status))||
@@ -2976,7 +2977,7 @@ async function handleClick(event){
   if(action==='avulso-pick')return avulsoPickingModal(id);
   if(action==='avulso-dispatch'){
     const order=unifiedOrderById('avulso',id);
-    if(!order||order.status!=='separado'||!hasPermission('orders.separate'))return;
+    if(!order||order.status!=='separado'||!hasPermission('orders.dispatch'))return;
     if(!window.confirm('Confirmar entrega/saída física de '+order.total+' unidade(s)? A reserva será consumida e o estoque físico diminuirá agora.'))return;
     return exec(async()=>assertOk(await db.rpc('dispatch_avulso_order',{p_order:id})),
       'Pedido entregue, reserva consumida e baixa física registrada.');
@@ -3043,6 +3044,13 @@ async function handleClick(event){
     const wa='https://wa.me/?text='+encodeURIComponent('Ame+ Store — acesso ao catálogo para montar pedidos:\n'+url+
       '\nEste catálogo não informa saldos de estoque.');
     const w=window.open(wa,'_blank','noopener,noreferrer');if(!w)window.location.assign(wa);return;
+  }
+  if(action==='commercial-confirm-delivery'){
+   const order=state.storeOrders.find(o=>o.id===id);
+   if(!order||order.status!=='despachado'||!assignedStore(order.to_store_id)||!hasPermission('orders.franchise'))return;
+   if(!window.confirm('Confirmar recebimento do pedido? Isso não cria estoque interno na sua loja.'))return;
+   return exec(async()=>assertOk(await db.rpc('confirm_commercial_order_delivery',{p_order:id})),
+    'Entrega confirmada. Pedido movido para o histórico.');
   }
   if(action==='store-order-new')return storeOrderModal();
   if(action==='store-order-separate')return storePickingModal(id);
