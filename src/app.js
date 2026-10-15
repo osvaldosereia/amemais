@@ -73,7 +73,7 @@ const state = {
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
-  search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
+  search:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
@@ -1053,18 +1053,65 @@ function movementTable(rows){
     '<td>'+h(username(m.actor_id))+'</td><td>'+h(m.note||'—')+'</td></tr>').join('')+'</tbody></table></div>';
 }
 function movementsPage(){
-  const q=state.search.toLocaleLowerCase('pt-BR').trim();
-  const list=state.movements.filter(m=>(!state.eventFilter||m.event_id===state.eventFilter)&&
-    (!state.movementFilter||m.action===state.movementFilter)&&
-    (!q||[product(m.product_id)?.name,m.note,m.actor_id,username(m.actor_id)].join(' ').toLocaleLowerCase('pt-BR').includes(q)));
-  return tabHead('Movimentações','Histórico imutável, registrado por usuário e horário.',button('Exportar CSV','export-csv','','small'))+
-    '<section class="panel"><div class="toolbar"><input class="search" id="movement-search" placeholder="Buscar produto ou responsável…" value="'+h(state.search)+'" type="search"/>'+
-    '<select id="event-filter" class="filter" style="max-width:210px" aria-label="Filtrar por evento">'+eventOptions().map(([v,t])=>'<option value="'+h(v)+'" '+(v===state.eventFilter?'selected':'')+'>'+h(t)+'</option>').join('')+'</select>'+
-    '<select id="movement-filter" class="filter" style="max-width:185px" aria-label="Filtrar operação">'+[['','Todas as operações'],...Object.entries(actionNames)].map(([v,t])=>'<option value="'+h(v)+'" '+(v===state.movementFilter?'selected':'')+'>'+h(t)+'</option>').join('')+'</select></div>'+
-    movementTable(list)+'<div class="panelbody"><small>Mostrando até 1.000 lançamentos recentes. O banco preserva todo o histórico.</small></div></section>'+
-    (hasPermission('movements.read')?panel('Auditoria de cadastros','<div class="panelbody"><p class="muted">Últimas alterações de produtos, categorias, eventos, acessos e responsáveis.</p>'+
-      '<div class="tablewrap"><table class="table"><thead><tr><th>Data</th><th>Área</th><th>Ação</th><th>Autor</th></tr></thead><tbody>'+
-      state.audits.map(a=>'<tr><td>'+niceTime(a.created_at)+'</td><td>'+h(a.entity)+'</td><td>'+h(a.action)+'</td><td>'+h(username(a.actor_id))+'</td></tr>').join('')+'</tbody></table></div></div>'):'');
+ // Histórico humano para conferência administrativa; a trilha original permanece intacta.
+ const now=Date.now(),days=Number(state.movementPeriod||30);
+ const within=date=>days===0||now-new Date(date).getTime()<=days*86400000;
+ const labelAction={
+  entrada:'Registrou entrada',venda_loja:'Registrou saída',saida_loja:'Enviou mercadoria',
+  transferencia:'Enviou para evento',devolucao:'Devolveu ao estoque',
+  ajuste_loja:'Ajustou estoque',baixa_evento:'Registrou baixa',
+  venda_evento:'Registrou venda'
+ };
+ const auditLabel={
+  GALLERY_UPDATED:'Alterou fotos',TEMPORARY_STORE_DELETED:'Excluiu evento',
+  EVENT_BATCH_CREATED:'Criou lote de evento',EVENT_BATCH_REVISED:'Revisou lote',
+  EVENT_BATCH_CANCELED:'Cancelou lote',CLOSED_RECONCILED:'Encerrou evento',
+  REQUESTED:'Criou pedido',CREATED:'Cadastrou',UPDATED:'Alterou cadastro',
+  DELETED:'Excluiu cadastro'
+ };
+ const entityNames={products:'produto',apparel_models:'modelo',categories:'categoria',
+  tags:'tag',events:'evento',store_orders:'pedido',staff_profiles:'usuário',
+  inventory_sessions:'inventário'};
+ const entries=[
+  ...state.movements.map(m=>{
+   const p=product(m.product_id);
+   const title=labelAction[m.action]||'Movimentou estoque';
+   const detail=[p?.name||'Produto',p?.apparel_color,p?.apparel_size,
+     m.event_id?eventById(m.event_id)?.name:''].filter(Boolean).join(' · ');
+   const qty=m.action==='ajuste_loja'?Number(m.quantity):Number(m.quantity);
+   return {time:m.created_at,user:m.actor_id,title,detail,
+    note:String(m.note||'').slice(0,130),qty,action:m.action};
+  }),
+  ...state.audits.map(a=>({
+   time:a.created_at,user:a.actor_id,
+   title:auditLabel[a.action]||(a.action?.includes('DELETE')?'Excluiu registro':'Alterou '+(entityNames[a.entity]||'registro')),
+   detail:entityNames[a.entity]||'Sistema',note:'',qty:null,action:'audit'
+  }))
+ ].filter(x=>within(x.time)&&(!state.movementUser||x.user===state.movementUser));
+ const query=state.search.trim().toLocaleLowerCase('pt-BR');
+ const filtered=entries.filter(x=>!query||
+   [x.title,x.detail,x.note,username(x.user)].join(' ').toLocaleLowerCase('pt-BR').includes(query))
+   .sort((a,b)=>String(b.time).localeCompare(String(a.time))).slice(0,120);
+ const filterUsers=[...new Set([...state.users.map(u=>u.id),...entries.map(e=>e.user)].filter(Boolean))];
+ return tabHead('Atividades','Quem fez o quê no sistema, em ordem de data.',
+  button('Exportar histórico CSV','export-csv','','small'))+
+  '<section class="panel activity-panel">'+
+  '<div class="activity-filters">'+
+   '<input class="search" id="movement-search" type="search" value="'+h(state.search)+'" placeholder="Buscar usuário, produto ou ação…">'+
+   '<select id="movement-user" class="filter" aria-label="Filtrar usuário"><option value="">Todos os usuários</option>'+
+    filterUsers.map(id=>'<option value="'+h(id)+'" '+(state.movementUser===id?'selected':'')+'>'+h(username(id))+'</option>').join('')+'</select>'+
+   '<select id="movement-period" class="filter" aria-label="Filtrar período">'+
+    [[7,'Últimos 7 dias'],[30,'Últimos 30 dias'],[90,'Últimos 90 dias'],[0,'Todo o histórico carregado']].map(([v,t])=>
+     '<option value="'+v+'" '+(days===v?'selected':'')+'>'+t+'</option>').join('')+'</select></div>'+
+  '<div class="activity-list">'+(filtered.length?filtered.map(x=>
+   '<article class="activity-item"><span class="activity-dot" aria-hidden="true">•</span>'+
+   '<div class="activity-content"><strong>'+h(username(x.user))+'</strong>'+
+    '<span>'+h(x.title)+'</span><small>'+h(x.detail)+'</small>'+
+    (x.note?'<small>'+h(x.note)+'</small>':'')+'</div>'+
+   (x.qty!==null?'<b class="activity-qty">'+(x.action==='entrada'?'+':'')+x.qty+' un.</b>':'')+
+   '<time>'+h(niceTime(x.time))+'</time></article>').join(''):
+    '<p class="muted activity-empty">Nenhuma atividade encontrada neste período.</p>')+'</div>'+
+  '<div class="activity-footer">Exibindo até 120 registros recentes. O histórico original não foi alterado.</div></section>';
 }
 function renderCatalogTree(){
   return catalogCategoryRows({
@@ -3925,6 +3972,8 @@ document.addEventListener('change',event=>{
   if(event.target.matches('input[name="camera_file"],input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
   if(event.target.id==='event-filter'){state.eventFilter=event.target.value;render();}
   if(event.target.id==='movement-filter'){state.movementFilter=event.target.value;render();}
+  if(event.target.id==='movement-user'){state.movementUser=event.target.value;render();}
+  if(event.target.id==='movement-period'){state.movementPeriod=Number(event.target.value);render();}
 });
 async function start(){
   if(!cfg.supabaseUrl||!cfg.supabasePublishableKey){render();return;}
