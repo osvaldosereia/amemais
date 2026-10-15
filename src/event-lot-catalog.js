@@ -51,8 +51,8 @@ export function lotCatalogMarkup(groups,categories=[],models=[],{showAvailable=t
      categoriesWithProducts.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('')+'</select></label>'+
    '<label>Tag<select data-lot-tag><option value="">Todas as tags</option>'+
      tags.map(t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join('')+'</select></label>'+
-   '<label>Estoque<select data-lot-stock><option value="all">Todos</option>'+
-     '<option value="available">Com saldo livre</option><option value="unavailable">Sem saldo livre</option></select></label>'+
+   (showAvailable?'<label>Estoque<select data-lot-stock><option value="all">Todos</option>'+
+     '<option value="available">Com saldo livre</option><option value="unavailable">Sem saldo livre</option></select></label>':'')+
    '<label>Ordenar<select data-lot-sort><option value="name">Nome A–Z</option>'+
      '<option value="stock">Maior disponibilidade</option><option value="variety">Mais variações</option></select></label>'+
   '</div>'+
