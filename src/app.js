@@ -1365,6 +1365,102 @@ async function saveModelProcurement(modelId,form){
  const v=procurementValues(form);
  assertOk(await db.rpc('set_apparel_procurement',{p_model:modelId,p_supplier:v.supplier_id,p_min_stock:v.min_stock}));
 }
+function supplierManagerModal(){
+ if(!hasPermission('purchases.manage'))return;
+ formModal('Fornecedores',supplierListHTML(state.suppliers,button)+
+  '<div class="actions">'+button('+ Novo fornecedor','buy-supplier-new','','primary')+'</div>',
+  'buy-supplier-list','Fechar');
+}
+function supplierFormModal(supplier=null){
+ if(!hasPermission('purchases.manage'))return;
+ formModal(supplier?'Editar fornecedor':'Novo fornecedor','<div class="formgrid">'+
+  field('Nome do fornecedor','name','text',supplier?.name||'','required maxlength="150" minlength="2"')+
+  field('Contato','contact_name','text',supplier?.contact_name||'','maxlength="140"')+
+  field('Telefone / WhatsApp','phone','text',supplier?.phone||'','maxlength="60"')+
+  field('Email','email','email',supplier?.email||'','maxlength="180"')+
+  field('CNPJ / documento','document','text',supplier?.document||'','maxlength="35"')+
+  textareaField('Observações','notes',supplier?.notes||'')+
+  (supplier?selectField('Situação','active',[['true','Ativo'],['false','Inativo']],String(supplier.active)):'')+
+  '</div>','buy-supplier-save','Salvar fornecedor');
+ const form=document.querySelector('.modalback form[data-form="buy-supplier-save"]');
+ if(form)form.dataset.id=supplier?.id||'';
+}
+function syncPurchaseForm(form){
+ if(!form)return;
+ const selected=form.querySelector('[data-buy-modal-supplier]')?.value;
+ const q=(form.querySelector('[data-buy-search]')?.value||'').toLocaleLowerCase('pt-BR').trim();
+ let visible=0;
+ for(const row of form.querySelectorAll('[data-buy-product]')){
+  row.hidden=!(row.dataset.supplier===selected&&(!q||row.dataset.search.includes(q)));
+  if(!row.hidden)visible++;
+ }
+ const counter=form.querySelector('[data-buy-count]');
+ if(counter)counter.textContent=visible+' variação(ões) encontradas';
+}
+function purchaseNewModal(selected=null){
+ if(!hasPermission('purchases.manage'))return;
+ const suppliers=state.suppliers.filter(s=>s.active);
+ if(!suppliers.length)return toast('Cadastre um fornecedor antes de montar a compra.',true);
+ const supplierId=selected&&suppliers.some(s=>s.id===selected)?selected:suppliers[0].id;
+ const rows=purchaseOrderRows(state.items,suppliers,state.balances,state.stockReservations,state.purchaseOrders,state.purchaseItems);
+ formModal('Montar pedido de compra','<div class="formgrid">'+
+  selectField('Fornecedor','supplier_id',suppliers.map(s=>[s.id,s.name]),supplierId,'data-buy-modal-supplier')+
+  '<label class="field wide"><span>Buscar produto, EAN ou SKU</span><input type="search" data-buy-search placeholder="Buscar produtos do fornecedor"></label>'+
+  '<div class="buy-product-list wide">'+rows+'</div>'+
+  '<small class="wide help" data-buy-count></small>'+
+  textareaField('Observações para o fornecedor','note')+'</div>'+
+  '<div class="note">As sugestões consideram estoque mínimo, reservas e compras em aberto. Quantidades podem ser editadas. A emissão não movimenta estoque.</div>',
+  'buy-order-create','Criar pedido de compra');
+ syncPurchaseForm(document.querySelector('.modalback form[data-form="buy-order-create"]'));
+}
+function printHTML(html){
+ const popup=window.open('','_blank');
+ if(!popup)return toast('Seu navegador bloqueou a impressão. Permita janelas para este site.',true);
+ popup.document.open();popup.document.write(html);popup.document.close();
+}
+function printStockReport(){
+ if(!hasPermission('stock.balance'))return;
+ const rows=state.items.filter(p=>p.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(p=>
+  '<tr><td>'+h(p.name)+'</td><td>'+h([p.apparel_color,p.apparel_size,p.sku].filter(Boolean).join(' · '))+'</td>'+
+  '<td class="num">'+qtyStore(p.id)+'</td><td class="num">'+qtyReserved(p.id)+'</td>'+
+  '<td class="num">'+qtyAvailable(p.id)+'</td><td class="num">'+Number(p.min_stock||0)+'</td></tr>').join('');
+ printHTML(printPage('Posição de estoque · CDSB','<p>Saldo físico no Centro de Distribuição São Bento, reservas e disponibilidade por SKU.</p>'+
+  '<table><thead><tr><th>Produto</th><th>Variação / SKU</th><th>Físico</th><th>Reservado</th><th>Livre</th><th>Mínimo</th></tr></thead><tbody>'+rows+'</tbody></table>'));
+}
+function printCommercialOrder(orderId){
+ if(!isFranchisePortal()&&!hasPermission('orders.read'))return;
+ const order=state.storeOrders.find(x=>x.id===orderId);
+ if(!order||(!hasPermission('orders.read')&&!assignedStore(order.to_store_id)))return;
+ const lines=state.storeOrderItems.filter(x=>x.order_id===orderId);
+ const destination=state.stores.find(s=>s.id===order.to_store_id)?.name||'Unidade';
+ const rows=lines.map(x=>{
+  const p=product(x.product_id);
+  return '<tr><td>'+h(p?.name||'Produto')+'</td><td>'+
+  h([p?.apparel_color,p?.apparel_size,p?.sku].filter(Boolean).join(' · '))+'</td>'+
+  '<td class="num">'+Number(x.quantity||0)+'</td></tr>';
+ }).join('');
+ printHTML(printPage('Comprovante de pedido #'+h(orderId.slice(0,8).toUpperCase()),
+  '<p><b>Loja:</b> '+h(destination)+' · <b>Data:</b> '+niceTime(order.created_at)+
+  ' · <b>Situação:</b> '+h(order.status)+'</p>'+
+  '<table><thead><tr><th>Produto</th><th>Variação / SKU</th><th>Quantidade</th></tr></thead><tbody>'+
+  rows+'</tbody></table><p><strong>Total: '+lines.reduce((n,i)=>n+Number(i.quantity||0),0)+
+  ' unidades</strong></p><p>Documento de acompanhamento; não representa controle do estoque interno da loja.</p>'));
+}
+function printEventSummary(eventId){
+ const e=eventById(eventId);
+ if(!e||!((hasPermission('events.manage'))||Boolean(memberRole(eventId))))return;
+ const balances=state.balances.filter(b=>b.event_id===eventId&&Number(b.quantity)>0);
+ const rows=balances.map(b=>{
+  const p=product(b.product_id);
+  return '<tr><td>'+h(p?.name||'Produto')+'</td><td>'+h([p?.apparel_color,p?.apparel_size,p?.sku].filter(Boolean).join(' · '))+
+   '</td><td class="num">'+Number(b.quantity)+'</td></tr>';
+ }).join('');
+ printHTML(printPage('Conferência de retorno · '+e.name,'<p>Loja temporária: '+h(e.name)+
+  '. Este documento registra mercadorias e não vendas.</p>'+
+  '<table><thead><tr><th>Produto</th><th>Variação / SKU</th><th>Saldo a conferir</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+  '<p>Marque o que será devolvido ao CDSB, avariado ou não devolvido. A aprovação final ocorre no sistema.</p>'+
+  '<div class="print-signatures"><span>Responsável pelo evento</span><span>Conferente CDSB</span></div>'));
+}
 function productModal(item=null){
   if(!canRegisterProducts())return;
   const single='<div data-single-fields class="single-fields wide">'+
