@@ -74,7 +74,7 @@ export function apparelModal(state,{h,formModal,photoChooser,categorySelector,pr
     select('apparel_audience','Público',audiences,'Unissex')+
     '</div></section>'+
     categorySelector({category_id:initialCategory.id})+
-    photoChooser(null)+productTagChooser(null)+procurementFields(null)+
+    photoChooser(null)+productTagChooser(null)+(procurementFields?procurementFields(null):'')+
     '<section class="form-section wide"><div class="section-head"><strong>2. Tamanhos, cores e quantidades</strong></div>'+
     '<p class="help">Cada combinação de cor e tamanho é uma variação independente. Comece por uma e toque em Adicionar variação para incluir outras.</p>'+
     '<div data-apparel-rows>'+apparelRowHTML(h,'Branco',true)+'</div>'+
@@ -144,7 +144,7 @@ export async function submitApparel(form,{
     p_tags:productTagValues(form),
     p_variants:variants
   }));
-  await saveProcurement(created,form);
+  if(saveProcurement)await saveProcurement(created,form);
   let photoWarning=false;
   if(hasGallery){
    try{await saveGallery(form,{db,assertOk,modelId:created});}
@@ -200,7 +200,7 @@ export function apparelVariantEditModal(p,{h,formModal,variationOptions=[],procu
     '<button type="button" class="button small" data-action="apparel-scan">📷</button></div></label>'+
     '<label class="field"><span>Gôndola</span><input name="gondola" maxlength="40" value="'+h(p.gondola||'')+'"></label>'+
     '<label class="field"><span>Prateleira</span><input name="prateleira" maxlength="40" value="'+h(p.prateleira||'')+'"></label>'+
-    procurementFields(p)+
+    (procurementFields?procurementFields(p):'')+
      '<label class="field"><span>Situação</span><select name="active"><option value="true" '+(p.active?'selected':'')+'>Ativa</option>'+
     '<option value="false" '+(!p.active?'selected':'')+'>Inativa</option></select></label>'+
     '</div><div class="note">Esta edição não altera saldos. Para conferir o estoque livre, abra os tamanhos no card do produto.</div>',
@@ -219,7 +219,7 @@ export async function saveApparelVariant(form,{db,assertOk,loadData,closeTopModa
     p_sku:sku||null,p_ean:ean||null,p_active:v('active')==='true'
   }));
   assertOk(await db.from('products').update({
-    gondola:v('gondola')||null,prateleira:v('prateleira')||null,...procurementValues(form)
+    gondola:v('gondola')||null,prateleira:v('prateleira')||null,...(procurementValues?procurementValues(form):{})
   }).eq('id',form.dataset.productId));
   closeTopModal();
   await loadData();
