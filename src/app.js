@@ -1264,7 +1264,8 @@ function orderEventModal(orderId){
   document.querySelector('form[data-form="order-associate"]').dataset.id=orderId;
 }
 function usersPage(){
-  return tabHead('Usuários','Cada pessoa utiliza sua própria senha e permissões.',button('+ Novo usuário','user-new','','primary'))+
+  return tabHead('Usuários','Perfis do CDSB, unidades vinculadas e permissões.',
+    button('Preparar 6 contas CDSB','users-provision','','small')+button('+ Novo usuário','user-new','','primary'))+
     panel('Equipe','<div class="tablewrap"><table class="table"><thead><tr><th>Nome</th><th>Usuário</th><th>Função</th><th>Status</th><th></th></tr></thead><tbody>'+
     state.users.map(u=>'<tr><td><strong>'+h(u.full_name)+'</strong></td><td>'+h(u.username)+'</td><td>'+h(profileLabel(u))+'</td><td><span class="pill '+(u.active?'ativo':'encerrado')+'">'+(u.active?'Ativo':'Bloqueado')+'</span></td><td>'+
       (u.id!==state.user.id?'<div class="inline">'+button('Funções e lojas','user-role','data-id="'+h(u.id)+'"','small')+
@@ -3125,6 +3126,34 @@ async function handleClick(event){
     if(!hasPermission('stores.manage')||!window.confirm('Excluir esta loja sem histórico?'))return;
     await exec(async()=>assertOk(await db.from('stores').delete().eq('id',id)),'Loja excluída.');return;
   }
+  if(action==='users-provision'){
+   if(!isAdmin()||state.loading)return;
+   if(!window.confirm('Criar as 6 contas-padrão do CDSB com senhas temporárias fortes? Usuários atuais não serão bloqueados nem apagados. As senhas serão mostradas uma única vez nesta tela.'))return;
+   state.loading=true;
+   try{
+    const {data,error}=await db.functions.invoke('cdsb-provision-users',{
+     body:{action:'provision-defaults',confirm:'CRIAR_CONTAS_CDSB'}
+    });
+    if(error)throw error;
+    if(!data?.success)throw Error(data?.error||'Não foi possível preparar contas.');
+    await loadData();
+    const list=(data.accounts||[]).map(a=>a.full_name+' | '+a.username+
+      (a.password?' | SENHA TEMPORÁRIA: '+a.password:' | '+a.status)).join('\n');
+    formModal('Credenciais iniciais do CDSB',
+     '<p class="help">Copie agora e entregue as senhas individualmente por canal seguro. O sistema não permite recuperá-las depois. Contas existentes não são redefinidas.</p>'+
+     '<textarea readonly data-provision-result rows="11" class="cdsb-secret-list">'+h(list)+'</textarea>'+
+     '<div class="actions">'+button('Copiar credenciais','users-copy-access','','small')+'</div>',
+     'users-provision-receipt','Fechar');
+   }catch(error){fail(error);}finally{state.loading=false;}
+   return;
+  }
+  if(action==='users-copy-access'){
+   const field=target.closest('form')?.querySelector('[data-provision-result]');
+   if(!field)return;
+   try{await navigator.clipboard.writeText(field.value);toast('Credenciais copiadas. Guarde com segurança.');}
+   catch{field.focus();field.select();toast('Selecione e copie as credenciais.');}
+   return;
+  }
   if(action==='user-new')return userModal();
   if(action==='user-role')return userRoleModal(id);
   if(action==='search-scan'){
@@ -3788,6 +3817,7 @@ async function handleSubmit(event){
     await exec(async()=>assertOk(await db.from('staff_profiles').update({role:values.role}).eq('id',form.dataset.id)),'Função atualizada.');
     return;
   }
+  if(type==='users-provision-receipt'){closeTopModal();return;}
   if(type==='user-new'){
     if(!isAdmin())return;
     let password;
