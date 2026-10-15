@@ -36,7 +36,7 @@ export function finalVerificationMarkup(order,rows=[]){
     '<span>'+esc(label)+'</span>'+
     '<small>EAN '+esc(x.ean||'—')+' · SKU '+esc(x.sku||'—')+'</small>'+
     '<small>'+esc([x.gondola?'Gôndola '+x.gondola:'Sem gôndola',x.prateleira?'Prateleira '+x.prateleira:''].filter(Boolean).join(' · '))+'</small>'+
-    '<div class="verify-line-bottom"><b>'+esc(badge)+'</b><span>'+(x.actual===null?'Aguardando leitura':x.actual+' / '+x.quantity+' un.')+'</span></div>'+
+    '<div class="verify-line-bottom"><b>'+esc(badge)+'</b><span>'+(x.actual===null?x.quantity+' un. solicitadas':x.actual+' / '+x.quantity+' un.')+'</span></div>'+
    '</div></div>';
  }).join('');
  return '<section class="verify-workflow">'+
