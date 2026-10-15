@@ -71,7 +71,7 @@ test('impressão A4 compacta tem gôndola, identificação, modelo e campos em b
  assert.match(html,/Camiseta Masculina HDH/);
  assert.match(html,/000100001129/);
  assert.match(html,/class="write"/);
- assert.match(html,/class="check"/);
+ assert.match(html,/class="center check"/);
  assert.doesNotMatch(html,/>0<\/td>/);
 });
 test('separação mostra apenas trabalho em aberto, sem lotes enviados',()=>{
