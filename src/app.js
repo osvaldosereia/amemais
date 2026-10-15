@@ -18,7 +18,7 @@ import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, st
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015finalverify1';
 import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,findVerificationProduct} from './final-verification.js?v=20261015finalverify2';
-import {pickingThermalHTML} from './thermal-picking.js?v=20261015shortcodes1';
+import {pickingThermalHTML} from './thermal-picking.js?v=20261015nophoto1';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015shortcodes1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261015catalog2';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
@@ -2500,15 +2500,14 @@ function updateUnifiedPickingTotal(form){
  for(const input of inputs)input.closest('[data-picking-row]')?.classList.toggle('is-picked',
    Number(input.value)===Number(input.dataset.expected));
 }
-async function printUnifiedOrder(kind,id){
+function printUnifiedOrder(kind,id){
  const order=unifiedOrderById(kind,id);
  if(!order||isFranchisePortal()||!order.lines.length)return;
  const popup=window.open('','_blank');
  if(!popup)return toast('O navegador bloqueou a janela de impressão.',true);
  try{
-  const photoUrls=await signedPhotoUrls(order.lines.map(line=>line.imagePath));
   popup.document.open();popup.document.write(pickingThermalHTML(order,{
-   printedAt:new Date().toLocaleString('pt-BR'),photoUrls
+   printedAt:new Date().toLocaleString('pt-BR')
   }));popup.document.close();
  }catch(error){popup.close();fail(error);}
 }
