@@ -673,7 +673,9 @@ function inventoryPage(){
   return '<article class="panel"><div class="panelbody"><strong>'+h(x.title)+'</strong><p class="muted">'+
    h(types[x.location_type]||x.location_type)+' · '+h(local||'Local')+' · '+h(x.status)+
    '</p><p>Contados: '+counted+'/'+items.length+' SKUs · Divergências: '+divergent+'</p>'+
-   (active?button(x.status==='aberta'?'Continuar contagem':'Revisar divergências','inventory-open','data-id="'+h(x.id)+'"','primary'):'')+
+   (active?button(x.status==='aberta'?'Continuar contagem':'Revisar divergências','inventory-open','data-id="'+h(x.id)+'"','primary')+
+    (x.status==='aberta'&&counted===items.length?button('Enviar para revisão','inventory-submit','data-id="'+h(x.id)+'"','small'):'')+
+    (x.status==='revisao'?button('Rejeitar sessão','inventory-reject','data-id="'+h(x.id)+'"','small'):''):'')+
    '</div></article>';
  }).join('');
  return tabHead('Inventário formal','Contagem completa por local, revisão de divergências e aprovação auditada.',
@@ -759,13 +761,16 @@ function eventDetails(){
   const losses=entries.filter(classifiedLoss).reduce((n,m)=>n+m.quantity,0);
   const historicalUnclassified=entries.filter(m=>m.action==='baixa_evento'&&!classifiedLoss(m)).reduce((n,m)=>n+m.quantity,0);
   const pending=state.balances.filter(b=>b.event_id===e.id).reduce((n,b)=>n+b.quantity,0);
+  const closure=state.consignationClosures.find(c=>c.event_id===e.id);
+  const inventoryVariances=state.inventorySessions.filter(i=>i.location_type==='temporaria'&&i.location_id===e.id&&i.status==='aplicada');
   const canModify=e.status==='ativo';
   const actions=(hasPermission('events.manage')&&e.status==='rascunho'?button('Ativar evento','event-activate','data-id="'+h(e.id)+'"','primary'):'')+
     (hasPermission('events.separate')&&canModify?button('Enviar mercadorias','event-transfer','','primary'):'')+
     (canModify&&canSell(e.id)?button('Registrar venda','event-sale','','primary'):'')+
     (canModify&&hasPermission('events.close')?button('Perda / avaria','event-loss','','small'):'')+
     (canModify&&canReturn(e.id)?button('Devolução rápida por EAN','event-return','','primary'):'')+
-    (canModify&&hasPermission('events.close')?button('Encerrar consignação','event-close','data-id="'+h(e.id)+'"'):'');
+    (canModify&&hasPermission('events.close')?button('Encerrar consignação','event-close','data-id="'+h(e.id)+'"'):'')+
+    (canModify&&hasPermission('events.manage')?button('Inventariar loja','event-inventory','data-id="'+h(e.id)+'"','small'):'');
   const history=eventHistoryCards({
     movements:entries,products:state.items,models:state.apparelModels,
     balances:state.balances.filter(b=>b.event_id===e.id),
@@ -773,7 +778,7 @@ function eventDetails(){
   });
   return '<div class="crumb"><button class="plain" data-action="back-events">← Lojas temporárias</button></div>'+
     tabHead(e.name,'Data: '+niceDate(e.starts_at)+(e.ends_at?' a '+niceDate(e.ends_at):''),pill(e.status))+
-    '<div class="cards">'+[['Enviados',transfers],['Vendidos',sold],['Devolvidos',returned],['Perdas justificadas',losses],...(historicalUnclassified?[['Baixas antigas sem classificação',historicalUnclassified]]:[]),['Ainda no local',pending]].map(([name,value])=>
+    '<div class="cards">'+[['Enviados',closure?.sent_units??transfers],['Vendidos',closure?.sold_units??sold],['Devolvidos',closure?.returned_units??returned],['Perdas justificadas',closure?.loss_units??losses],...(historicalUnclassified?[['Baixas antigas sem classificação',historicalUnclassified]]:[]),['Ainda no local',pending]].map(([name,value])=>
       '<div class="card"><div class="metric-label">'+name+'</div><div class="metric">'+value+'</div></div>').join('')+'</div>'+
     '<div class="actions" style="margin-bottom:18px">'+actions+'</div>'+
     (e.status==='ativo'&&pending>0?'<div class="note">Há '+pending+
@@ -2160,6 +2165,7 @@ async function handleClick(event){
     if(!window.confirm(confirmation))return;
     await exec(async()=>assertOk(await db.rpc(rpc,{p_order:id})),msg);return;
   }
+  if(action==='event-inventory'){switchView('inventario');return inventoryStartModal();}
   if(action==='inventory-new')return inventoryStartModal();
   if(action==='inventory-open')return inventorySessionModal(id);
   if(action==='inventory-submit'){
