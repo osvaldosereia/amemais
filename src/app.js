@@ -55,9 +55,9 @@ const nav = [
   {id:'entrada',label:'Entrada',ico:'arrow-down-to-line'},
   {id:'saida',label:'Saída',ico:'arrow-up-from-line'},
   {id:'balanco',label:'Balanço rápido',ico:'clipboard'},
-  {id:'eventos',label:'Eventos',ico:'calendar'},
+  {id:'eventos',label:'Lojas temporárias',ico:'calendar'},
   {id:'pedidos',label:'Pedidos Avulsos',ico:'clipboard'},
-  {id:'pedidos-lojas',label:'Pedidos entre lojas',ico:'arrows'},
+  {id:'pedidos-lojas',label:'Solicitações de lojas',ico:'arrows'},
   {id:'movimentacoes',label:'Movimentações',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
   {id:'tags',label:'Tags',ico:'more'},
@@ -67,7 +67,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],
-  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],storeOrders:[],storeOrderItems:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],storeOrders:[],storeOrderItems:[],stockReservations:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',page:0,eventFilter:'',movementFilter:'',categoryFilter:'',tagFilter:'',
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -99,6 +99,7 @@ const canRegisterProducts = () => hasPermission('products.create') || hasPermiss
 const canQuickBalance = () => hasPermission('stock.balance');
 const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',balanco:'stock.balance',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
 const permittedView = v => {
+ if(isFranchisePortal())return v==='produtos'||v==='pedidos-lojas';
  if(v==='inicio')return true;
  if(v==='pedidos-lojas')return canUseStoreOrders();
  if(v==='pedidos')return hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign');
@@ -108,6 +109,12 @@ const permittedView = v => {
  return Boolean(viewPermission[v]&&hasPermission(viewPermission[v]));
 };
 const isAdmin = () => state.profile?.role === 'admin';
+const isFranchisePortal = () => !isAdmin() && hasPermission('orders.franchise') &&
+  !hasPermission('stock.entry') && !hasPermission('stores.manage') &&
+  state.stores.some(x=>x.kind==='franquia'&&assignedStore(x.id));
+const qtyReserved = id => state.stockReservations.filter(x=>x.product_id===id&&x.status==='ativa')
+  .reduce((sum,x)=>sum+Number(x.quantity||0),0);
+const qtyAvailable = id => Math.max(0,qtyStore(id)-qtyReserved(id));
 const isReader = () => state.profile?.role === 'consulta';
 const product = id => state.items.find(x => x.id === id);
 const eventById = id => state.events.find(x => x.id === id);
@@ -177,6 +184,10 @@ async function loadData(){
   ];
   resources.push(['stores',db.from('stores').select('*').order('name')]);
   resources.push(['storeBalances',db.from('store_stock').select('store_id,product_id,quantity').limit(10000)]);
+  if(hasPermission('orders.separate')||hasPermission('stock.entry')||hasPermission('stock.exit')||hasPermission('stock.balance')||hasPermission('products.read')){
+    resources.push(['stockReservations',db.from('stock_reservations')
+      .select('order_id,product_id,quantity,status').eq('status','ativa').limit(10000)]);
+  }
   if(canUseStoreOrders() || hasPermission('orders.read')){
     resources.push(['storeOrders',db.from('store_orders').select('*').order('created_at',{ascending:false}).limit(500)]);
     resources.push(['storeOrderItems',db.from('store_order_items').select('*').limit(5000)]);
@@ -397,7 +408,7 @@ function render(){
   if(!state.user){loginScreen();return;}
   if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
   if(!state.profile.active){pendingAccessScreen();return;}
-  if(!permittedView(state.view))state.view='inicio';
+  if(!permittedView(state.view))state.view=isFranchisePortal()?'pedidos-lojas':'inicio';
   const mark='<img class="ame-brand-logo" src="./ame-plus-logo.svg" alt="Ame+ Store" width="132" height="70">';
   const menu=nav.filter(x=>permittedView(x.id))
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+(state.view===x.id?'active':'')+'">'+
@@ -437,7 +448,9 @@ function dashboard(){
   const all=state.items.filter(p=>p.active);
   const total=state.balances.filter(b=>!b.event_id).reduce((sum,b)=>sum+b.quantity,0);
   const eventTotal=state.balances.filter(b=>b.event_id).reduce((sum,b)=>sum+b.quantity,0);
-  const zero=all.filter(p=>qtyStore(p.id)===0).length;
+  const zero=all.filter(p=>qtyAvailable(p.id)===0).length;
+  const reserved=state.stockReservations.reduce((sum,x)=>sum+Number(x.quantity||0),0);
+  const available=Math.max(0,total-reserved);
   const activeEvents=state.events.filter(e=>e.status==='ativo').length;
   const movementsToday=state.movements.filter(m=>m.created_at&&new Intl.DateTimeFormat('en-CA',{
     timeZone:'America/Cuiaba',year:'numeric',month:'2-digit',day:'2-digit'
@@ -454,11 +467,11 @@ function dashboard(){
   const productCards=recent.map(p=>'<article class="c-feature-product">'+
     '<div class="c-feature-image">'+photoButton(p)+'</div>'+
     '<div class="c-feature-body"><strong>'+h(p.name)+'</strong><small>'+h(categoryFull(p.category_id))+'</small>'+
-    '<span class="c-feature-qty">Loja: <b>'+qtyStore(p.id)+'</b> un.</span>'+
+    '<span class="c-feature-qty">Livre: <b>'+qtyAvailable(p.id)+'</b> · Físico: '+qtyStore(p.id)+'</span>'+
     '<button type="button" class="c-feature-open" data-action="home-product" data-id="'+h(p.id)+'">Ver produto '+uiIcon('arrow',14)+'</button></div></article>').join('');
   const cards=[
     {label:'Produtos ativos',value:all.length,icon:'package',tone:'green',hint:'Cadastrados'},
-    {label:'Sem estoque',value:zero,icon:'alert',tone:'red',hint:'Na loja'},
+    {label:'Sem disponibilidade',value:zero,icon:'alert',tone:'red',hint:'Livre na central'},
     {label:'Movimentações',value:movementsToday,icon:'arrows',tone:'blue',hint:'Hoje'},
     {label:'Eventos ativos',value:activeEvents,icon:'calendar',tone:'orange',hint:'Em andamento'}
   ];
@@ -466,9 +479,9 @@ function dashboard(){
     '<div class="c-welcome"><span class="c-eyebrow">PAINEL DO ESTOQUE</span>'+
     '<h1>Olá, '+h(firstName)+'!</h1><p>Acompanhe seu estoque em um só lugar.</p></div>'+
     '<section class="c-hero" aria-label="Resumo das unidades na loja"><div class="c-hero-main">'+
-    '<span class="c-hero-label">'+uiIcon('package',19)+' Unidades na loja</span>'+
+    '<span class="c-hero-label">'+uiIcon('package',19)+' Físico na central</span>'+
     '<strong class="c-hero-number">'+total.toLocaleString('pt-BR')+'</strong>'+
-    '<span class="c-hero-sub">'+eventTotal.toLocaleString('pt-BR')+' unidade(s) em eventos</span></div>'+
+    '<span class="c-hero-sub">'+available.toLocaleString('pt-BR')+' disponíveis · '+reserved.toLocaleString('pt-BR')+' reservadas · '+eventTotal.toLocaleString('pt-BR')+' em lojas temporárias</span></div>'+
     '<div class="c-hero-art" aria-hidden="true"><span></span><span></span><span></span><span></span></div></section>'+
     '<div class="c-metric-grid">'+cards.map(c=>'<div class="c-metric c-metric-'+c.tone+'">'+
       '<div class="c-metric-icon">'+uiIcon(c.icon,21)+'</div>'+
@@ -513,8 +526,9 @@ function mobileProductCard(p){
     '<small>'+h(p.sku||p.ean||'Sem código')+'</small>'+ 
     '<small>'+h([p.gondola,p.prateleira].filter(Boolean).join(' · '))+'</small>'+
     '<div class="product-tags">'+(p.tags||[]).slice(0,3).map(t=>'<span class="tag">'+h(t)+'</span>').join('')+'</div>'+
-    '<div class="mobile-product-actions"><span class="qty">Loja: '+qtyStore(p.id)+'</span>'+
-    ((hasPermission('stock.entry')||hasPermission('stock.exit'))?button('Estoque','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
+    '<div class="mobile-product-actions"><span class="qty">Livre: '+qtyAvailable(p.id)+' · Físico: '+qtyStore(p.id)+'</span>'+
+    (hasPermission('products.read')?button('Detalhar estoque','stock-overview','data-id="'+h(p.id)+'"','small'):'')+
+    ((hasPermission('stock.entry')||hasPermission('stock.exit'))?button('Movimentar','stock-modal','data-id="'+h(p.id)+'"','small'):'')+
     (hasPermission('products.edit')?button('Editar','product-edit','data-id="'+h(p.id)+'"','small primary'):'')+
     (hasPermission('products.delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+'</div></div></article>';
 }
@@ -556,6 +570,7 @@ function productModelManager(modelId){
 }
 
 function productsPage(){
+  if(isFranchisePortal())return franchiseCatalogPage();
   const q=state.search.toLocaleLowerCase('pt-BR').trim();
   const matched=state.items.filter(p=>(state.showInactiveProducts||p.active)&&
     (!q||[p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira,...(p.tags||[])].join(' ').toLocaleLowerCase('pt-BR').includes(q))&&
@@ -595,7 +610,7 @@ function productsPage(){
       '</div>'+
     '</div>'+
     '<div class="grouped-inventory-grid">'+(list.length?list.map(g=>groupedCard(g,{
-      h,photoButton,qtyStore,qtyEvent,button,isManager,canRegisterProducts,
+      h,photoButton,qtyStore,qtyEvent,qtyReserved,qtyAvailable,button,isManager,canRegisterProducts,
       canShare:canRegisterProducts()
     })).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
       (filtersApplied?'<p>Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.</p>'+
@@ -608,6 +623,29 @@ function productsPage(){
     button('Próxima','product-next',state.page+1>=totalPages?'disabled':'','small')+'</div></div></section>';
 }
 
+function franchiseCatalogPage(){
+  const q=state.search.toLocaleLowerCase('pt-BR').trim();
+  const matches=state.items.filter(p=>p.active&&(!q||
+    [p.name,p.sku,p.ean,p.apparel_size,p.apparel_color].join(' ').toLocaleLowerCase('pt-BR').includes(q)));
+  const keys=new Set(matches.map(p=>p.apparel_model_id?'m:'+p.apparel_model_id:'p:'+p.id));
+  const products=state.items.filter(p=>p.active&&keys.has(p.apparel_model_id?'m:'+p.apparel_model_id:'p:'+p.id));
+  const groups=groupInventory(products,state.apparelModels);
+  const pages=Math.max(1,Math.ceil(groups.length/24));state.page=Math.min(state.page,pages-1);
+  const cards=groups.slice(state.page*24,(state.page+1)*24).map(g=>
+    '<article class="franchise-catalog-card">'+
+    '<div class="franchise-catalog-photo">'+photoButton(g.main)+'</div>'+
+    '<div><strong>'+h(g.title)+'</strong><small>'+g.products.length+' variação(ões)</small>'+
+    '<ul>'+g.products.map(p=>'<li>'+h([p.apparel_color,p.apparel_size,p.sku].filter(Boolean).join(' · ')||p.name)+'</li>').join('')+
+    '</ul></div></article>').join('');
+  return tabHead('Catálogo da franquia','Consulte o catálogo e monte sua solicitação.',
+    button('+ Montar pedido','store-order-new','','primary'))+
+    '<section class="panel"><div class="panelbody">'+
+    '<input id="product-search" class="search" type="search" placeholder="Buscar por nome, EAN ou tamanho" value="'+h(state.search)+'" aria-label="Buscar catálogo">'+
+    '<p class="help">Saldos internos não são compartilhados. A central confirma o atendimento após receber o pedido.</p>'+
+    '<div class="franchise-catalog-grid">'+(cards||'<p>Nenhum produto encontrado.</p>')+'</div>'+
+    '<div class="actions">'+button('Anterior','product-prev',state.page===0?'disabled':'','small')+
+    button('Próxima','product-next',state.page>=pages-1?'disabled':'','small')+'</div></div></section>';
+}
 function quickBalancePage(){
   if(!canQuickBalance())return '<div class="muteblock">Sem acesso.</div>';
   const groups=groupInventory(state.items.filter(p=>p.active),state.apparelModels);
@@ -1080,11 +1118,42 @@ async function saveStockOperation(form){
   }
 }
 
+function stockOverviewModal(id){
+ if(isFranchisePortal()||!hasPermission('products.read'))return;
+ const p=product(id);if(!p)return;
+ const physical=qtyStore(id),reserved=qtyReserved(id),available=qtyAvailable(id);
+ const linked=state.stockReservations.filter(r=>r.product_id===id&&r.status==='ativa');
+ const central=state.stores.find(s=>s.is_primary);
+ const others=state.stores.filter(s=>s.active&&!s.is_primary&&s.kind!=='franquia')
+   .map(x=>({label:x.name,qty:state.storeBalances.find(b=>b.store_id===x.id&&b.product_id===id)?.quantity||0}));
+ const events=state.events.filter(e=>e.status!=='encerrado').map(e=>({
+   label:'Temporária · '+e.name,qty:qtyEvent(id,e.id)
+ })).filter(x=>x.qty>0);
+ const overlay=document.createElement('div');
+ overlay.className='modalback stock-overview-overlay';
+ overlay.innerHTML='<section class="modal stock-overview-modal" role="dialog" aria-modal="true" aria-label="Estoque de '+h(p.name)+'">'+
+   '<div class="modalhead"><h2>'+h(p.name)+'</h2>'+
+   '<button type="button" class="plain" data-action="stock-overview-close" aria-label="Fechar">✕</button></div>'+
+   '<div class="stock-overview-body"><p class="muted">SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</p>'+
+   '<div class="stock-overview-metrics">'+
+    '<div><small>Físico central</small><strong>'+physical+'</strong></div>'+
+    '<div><small>Reservado / separado</small><strong>'+reserved+'</strong></div>'+
+    '<div><small>Disponível central</small><strong>'+available+'</strong></div></div>'+
+   '<h3>Compromissos da central</h3>'+
+   (linked.length?'<ul>'+linked.map(r=>'<li>Pedido #'+h(r.order_id.slice(0,8).toUpperCase())+' · '+r.quantity+' un.</li>').join('')+'</ul>':'<p class="muted">Nenhum pedido reservado.</p>')+
+   '<h3>Locais controlados</h3><table class="table"><tbody>'+
+   '<tr><td>'+h(central?.name||'Estoque central')+'</td><td>'+physical+' físico</td></tr>'+
+   [...others,...events].map(x=>'<tr><td>'+h(x.label)+'</td><td>'+x.qty+' físico</td></tr>').join('')+
+   '</tbody></table><p class="help">Franquias não possuem saldo controlado pela AME MAIS. Separar não altera o físico; somente a saída confirmada o reduz.</p>'+
+   '</div></section>';
+ document.body.append(overlay);
+ overlay.querySelector('[data-action="stock-overview-close"]')?.focus({preventScroll:true});
+}
 function stockModal(id){
   if(!(hasPermission('stock.entry')||hasPermission('stock.exit')))return;
   const p=product(id);if(!p)return;
   formModal('Movimentar · '+p.name,
-    '<div class="note">Saldo atual na loja: <strong>'+qtyStore(id)+' unidade(s)</strong></div>'+
+    '<div class="note">Físico na central: <strong>'+qtyStore(id)+'</strong> · Reservado: <strong>'+qtyReserved(id)+'</strong> · Livre: <strong>'+qtyAvailable(id)+'</strong></div>'+
     '<p class="help">Entradas e saídas têm processos independentes, com histórico e destino obrigatório nas saídas.</p>'+
     selectField('O que deseja fazer?','operation_kind',[...(hasPermission('stock.entry')?[['entrada','Entrada · receber mercadoria']]:[]),...(hasPermission('stock.exit')?[['saida','Saída · encaminhar a um destino']]:[])]),
     'stock-choose-direction','Continuar');
@@ -1715,6 +1784,8 @@ async function handleClick(event){
     if(state.stockSelectedDestination===id)state.stockSelectedDestination='';
     return exec(async()=>assertOk(await db.rpc('deactivate_stock_destination',{p_id:id})),'Destino desativado; histórico preservado.');
   }
+  if(action==='stock-overview')return stockOverviewModal(id);
+  if(action==='stock-overview-close'){target.closest('.stock-overview-overlay')?.remove();return;}
   if(action==='stock-modal')return stockModal(id);
   if(action==='event-new')return eventModal();
   if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
