@@ -59,7 +59,7 @@ export function productGalleryPaths(group){
  }
  return selected;
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canShare=false,expanded=false,mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canShare=false,canLabel=false,expanded=false,mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
   const galleryPaths=productGalleryPaths(group);
@@ -148,6 +148,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const actions=isProducts?
     '<div class="grouped-inventory-actions">'+
       (sizeCount===1&&skuAccess?button('Gerenciar SKU','sku-manage','data-id="'+h(main.id)+'"','primary'):'')+
+      (canLabel?button('Etiqueta 80 mm','shelf-label-open','data-id="'+h(main.id)+'"','small'):'')+
       '<button type="button" class="product-card-sizes" data-action="product-card-sizes" data-card-key="'+h(group.key)+'"'+
       ' aria-expanded="'+String(Boolean(expanded))+'">'+(sizeCount===1?'Ver detalhes':(expanded?'Ocultar':'Ver')+' '+sizeCount+' tamanhos')+' <span aria-hidden="true">⌄</span></button>'+
       (moreOptions?'<details class="product-card-more"><summary aria-label="Mais opções do produto" title="Mais opções">⋯</summary>'+
