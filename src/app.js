@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
-import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery1';
+import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery1';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015cover1';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
@@ -2389,6 +2389,11 @@ async function handleClick(event){
    if(image?.src)return photoLightbox(image.src,'Foto do produto');
    return;
   }
+  if(action==='gallery-replace'){
+   const form=target.closest('form');if(!form)return;
+   form.__replaceIndex=Number(target.dataset.index);
+   form.querySelector('input[name="gallery_replace_file"]')?.click();return;
+  }
   if(action==='gallery-remove'){galleryRemove(target.closest('form'),Number(target.dataset.index));hydrateImages();return;}
   if(action==='gallery-primary'){galleryMain(target.closest('form'),Number(target.dataset.index));hydrateImages();return;}
   if(action==='preview-zoom'){
@@ -3970,6 +3975,11 @@ document.addEventListener('change',event=>{
   }
   if(event.target.matches('select[name="apparel_type"]'))apparelSyncCategory(event.target,state,{categoryFull});
   if(event.target.matches('input[name="camera_file"],input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
+  if(event.target.matches('input[name="gallery_replace_file"]')){
+   const input=event.target,form=input.closest('form'),file=input.files?.[0];
+   if(form&&file)galleryReplaceFile(form,form.__replaceIndex,file,compressPhoto)
+     .then(()=>hydrateImages()).catch(fail).finally(()=>{input.value='';});
+  }
   if(event.target.id==='event-filter'){state.eventFilter=event.target.value;render();}
   if(event.target.id==='movement-filter'){state.movementFilter=event.target.value;render();}
   if(event.target.id==='movement-user'){state.movementUser=event.target.value;render();}
