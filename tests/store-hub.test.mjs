@@ -84,7 +84,7 @@ test('lojas permitem atuar em pedidos próprios; CDSB fica somente na fila geral
  assert.doesNotMatch(html,/data-action="avulso-pick"/);
  assert.match(html,/data-action="store-order-separate"/);
  assert.match(html,/data-action="event-batch-pick"/);
- assert.match(html,/data-action="order-print-a4"/);
+ assert.match(html,/data-action="order-print-thermal"/);
  assert.doesNotMatch(html,/Centro de Distribuição São Bento/);
 });
 test('capa, nomes e informações de unidades são escapados',()=>{
