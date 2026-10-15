@@ -2528,6 +2528,16 @@ function passwordsValid(values){
   if(p!==repeat)throw new Error('As senhas digitadas são diferentes.');
   return p;
 }
+async function invokeManageUser(action,body){
+ const {data,error}=await db.functions.invoke('cdsb-manage-users',{body:{action,...body}});
+ if(error){
+  let message=error.message||'Não foi possível alterar a conta.';
+  try{const detail=await error.context?.json?.();if(detail?.error)message=detail.error;}catch{}
+  throw Error(message);
+ }
+ if(!data?.success)throw Error(data?.error||'Não foi possível alterar a conta.');
+ return data;
+}
 async function invokeUserAdmin(action,body){
   const {data:{session}}=await db.auth.getSession();
   if(!session?.access_token)throw new Error('Sessão expirada. Entre novamente.');
@@ -3461,6 +3471,28 @@ async function handleClick(event){
    catch{field.focus();field.select();toast('Selecione e copie as credenciais.');}
    return;
   }
+  if(action==='users-archived-toggle'){
+   if(!isAdmin())return;
+   state.usersAdminArchived=!state.usersAdminArchived;render();return;
+  }
+  if(action==='user-edit')return userEditModal(id);
+  if(action==='user-delete'){
+   if(!isAdmin()||id===state.user?.id)return;
+   const u=state.users.find(x=>x.id===id);
+   if(!u||u.archived_at)return;
+   const confirmation=window.prompt('EXCLUIR '+u.full_name+' da equipe? O login será bloqueado e os registros históricos preservados. Digite EXCLUIR para confirmar:','');
+   if(confirmation===null)return;
+   if(confirmation.trim()!=='EXCLUIR')return toast('Exclusão cancelada: confirmação incorreta.',true);
+   return exec(async()=>{await invokeManageUser('archive',{user_id:id,confirm:'EXCLUIR'});},
+    'Usuário excluído da equipe e acesso bloqueado. Histórico preservado.');
+  }
+  if(action==='user-restore'){
+   if(!isAdmin())return;
+   const u=state.users.find(x=>x.id===id&&x.archived_at);
+   if(!u||!window.confirm('Restaurar a conta '+u.full_name+' e liberar o login novamente?'))return;
+   return exec(async()=>{await invokeManageUser('restore',{user_id:id});},
+    'Conta restaurada. As permissões anteriores foram preservadas.');
+  }
   if(action==='user-new')return userModal();
   if(action==='user-role')return userRoleModal(id);
   if(action==='search-scan'){
@@ -3490,7 +3522,7 @@ async function handleClick(event){
   }
   if(action==='user-toggle'){
     const u=state.users.find(x=>x.id===id);
-    if(!u||!window.confirm((u.active?'Bloquear':'Reativar')+' o usuário '+u.full_name+'?'))return;
+    if(!u||u.archived_at||!window.confirm((u.active?'Bloquear':'Reativar')+' o usuário '+u.full_name+'?'))return;
     await exec(async()=>assertOk(await db.from('staff_profiles').update({active:!u.active}).eq('id',id)),'Permissão atualizada.');
   }
 }
@@ -4154,14 +4186,24 @@ async function handleSubmit(event){
     if(!isAdmin()||form.dataset.id===state.user?.id)return;
     const uid=form.dataset.id,perms=[...form.querySelectorAll('[name="perm"]:checked')].map(x=>x.value);
     const stores=[...form.querySelectorAll('[name="store"]:checked')].map(x=>x.value);
-    if(!perms.every(p=>permissionCatalog.some(([key])=>p===key)))throw Error('Permissão inválida.');
-    if(!perms.length)throw Error('Selecione ao menos uma autorização.');
+    const eventIds=[...form.querySelectorAll('[name="event_member"]:checked')].map(x=>x.value);
+    if(!perms.every(p=>permissionCatalog.some(([key])=>p===key)))return toast('Permissão inválida.',true);
+    if(!perms.length)return toast('Selecione ao menos uma autorização.',true);
     assertFranchiseProfile(form,values.role,perms,stores);
     await exec(async()=>{
-      assertOk(await db.rpc('set_staff_access',{
-        p_user_id:uid,p_role:values.role,p_permissions:perms,p_store_ids:stores
+      assertOk(await db.rpc('set_staff_access_v2',{
+        p_user_id:uid,p_role:values.role,p_permissions:perms,p_store_ids:stores,p_event_ids:eventIds
       }));
     },'Autorizações atualizadas.');return;
+  }
+  if(type==='user-edit'){
+    if(!isAdmin())return;
+    const name=String(values.full_name||'').trim(),username=String(values.username||'').trim();
+    if(name.length<2||name.length>120||!/^[A-Za-z][A-Za-z0-9._-]{2,31}$/.test(username))
+     return toast('Informe nome e usuário válidos.',true);
+    return exec(async()=>{await invokeManageUser('edit',{
+     user_id:form.dataset.id,full_name:name,username
+    });},'Dados cadastrais atualizados.');
   }
   if(type==='user-role'){
     if(!isAdmin() || form.dataset.id===state.user.id)return;
@@ -4179,11 +4221,16 @@ async function handleSubmit(event){
       const store_ids=[...form.querySelectorAll('[name="store"]:checked')].map(x=>x.value);
       if(!permissions.length)throw new Error('Selecione ao menos uma permissão.');
       assertFranchiseProfile(form,values.role,permissions,store_ids);
-      await invokeUserAdmin('create',{
+      const created=await invokeUserAdmin('create',{
         full_name:String(values.full_name||'').trim(),
         username:String(values.username||'').trim(),
         role:values.role,password,permissions,store_ids
       });
+      const eventIds=[...form.querySelectorAll('[name="event_member"]:checked')].map(x=>x.value);
+      if(values.role==='evento'&&eventIds.length&&created?.user_id)
+       assertOk(await db.rpc('set_staff_access_v2',{
+         p_user_id:created.user_id,p_role:'evento',p_permissions:permissions,p_store_ids:[],p_event_ids:eventIds
+       }));
     },'Usuário cadastrado. Entregue a senha ao colaborador por um canal seguro.');
     return;
   }
@@ -4329,6 +4376,7 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-users-search]'))applyUserListFilter();
   if(event.target.matches('[data-buy-search]'))syncPurchaseForm(event.target.closest('form'));
   if(event.target.matches('[data-count-free]')){
     const input=event.target,row=input.closest('[data-product-id]');
@@ -4450,6 +4498,7 @@ document.addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('[data-users-filter-role]'))applyUserListFilter();
   if(event.target.matches('[data-buy-modal-supplier]'))syncPurchaseForm(event.target.closest('form'));
   if(event.target.matches('[data-buy-filter]')){state.purchaseSupplierFilter=event.target.value;render();return;}
   if(event.target.matches('[data-unified-status]')){
