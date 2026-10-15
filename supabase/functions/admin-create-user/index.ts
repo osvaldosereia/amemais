@@ -73,7 +73,7 @@ Deno.serve(async (request) => {
       'stock.entry','stock.exit','stock.balance','stock.destinations',
       'events.read','events.request','events.manage','events.separate','events.return','events.sell','events.close',
       'orders.read','orders.internal','orders.assign','orders.central','orders.franchise',
-      'orders.separate','orders.dispatch','orders.receive','orders.cancel','movements.read','movements.export',
+      'orders.separate','orders.dispatch','orders.receive','orders.cancel','movements.read','movements.export','purchases.manage',
       'categories.manage','tags.manage','catalog.manage','products.share','stores.read','stores.manage','users.manage'
     ]);
     if (!/^[A-Za-z][A-Za-z0-9._-]{2,31}$/.test(username) ||
@@ -103,17 +103,25 @@ Deno.serve(async (request) => {
         return respond({error:'O usuário deve estar vinculado a uma franquia ativa.'},400);
       }
     }
-    // Compatibilidade com verificações de perfil das rotinas legadas.
-    // O acesso real é restringido pelas permissões individuais e pelos gatilhos SQL.
-    const legacyManagerActions = new Set([
-      'stock.entry','stock.exit','stock.destinations','events.manage','events.separate',
-      'orders.internal','orders.assign','products.delete','categories.manage',
-      'tags.manage','catalog.manage','products.share'
-    ]);
-    const technicalRole = role === 'admin' ? 'admin'
-      : permissions.some(p => legacyManagerActions.has(p)) ? 'gerente'
-      : permissions.some(p => ['products.create','products.edit','stock.balance'].includes(p)) ? 'estoquista'
-      : role;
+    // Perfis explícitos: não promover automaticamente separador/consulta para gerente.
+    const same=(allowed:string[])=>permissions.length===allowed.length&&
+      allowed.every(x=>permissions.includes(x));
+    if(role==='estoquista'){
+      if(!same(['products.read','orders.read','orders.separate'])||storeIds.length!==1)
+        return respond({error:'Separador precisa de acesso exclusivo à unidade CDSB e de três permissões de conferência.'},400);
+      const {data:central,error:cdError}=await admin.from('stores').select('id')
+        .eq('id',storeIds[0]).eq('is_primary',true).eq('active',true).maybeSingle();
+      if(cdError||!central)return respond({error:'Selecione o Centro de Distribuição São Bento para o separador.'},400);
+    }
+    if(role==='evento'&&(!same(['products.read','events.read','events.request'])||storeIds.length))
+      return respond({error:'Responsável de evento deve ter apenas catálogo e solicitações de eventos.'},400);
+    if(role==='consulta'&&permissions.some(p=>[
+      'users.manage','stores.manage','stock.entry','stock.exit','stock.balance','orders.separate',
+      'orders.dispatch','events.manage','events.close','events.sell','products.edit','products.create'
+    ].includes(p)))return respond({error:'Consulta não pode modificar o CDSB.'},400);
+    if(role==='gerente'&&permissions.some(p=>['users.manage','events.sell'].includes(p)))
+      return respond({error:'Gerente não pode administrar usuários nem registrar vendas de eventos.'},400);
+    const technicalRole=role;
     const {data: duplicate,error: duplicateError} = await admin.from('staff_profiles')
       .select('id').ilike('username',username).limit(2);
     if (duplicateError) return respond({error:'Não foi possível verificar o cadastro.'},500);
