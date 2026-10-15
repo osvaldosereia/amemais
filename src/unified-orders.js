@@ -6,6 +6,8 @@ const statuses={
  legado:['Antigo · sem reserva','pending'],
  solicitado:['Aguardando reserva','pending'],
  pendente_estoque:['Com falta','shortage'],
+ aguardando:['A separar','ready'],em_separacao:['Em separação','picked'],
+ enviado:['Enviado','complete'],
  reservado:['A separar','ready'],aprovado:['A separar','ready'],
  separado:['Separado','picked'],despachado:['Despachado','picked'],
  concluido:['Concluído','complete'],recebido:['Recebido','complete'],
@@ -13,46 +15,74 @@ const statuses={
  cancelado:['Cancelado','closed'],expirado:['Reserva expirada','closed']
 };
 export function makeUnifiedOrders({avulsoOrders=[],avulsoItems=[],storeOrders=[],storeItems=[],
+ eventBatches=[],eventBatchItems=[],events=[],models=[],
  reservations=[],stores=[],products=[],adjustments=[],portal=false,userId=null}){
- const storeById=new Map(stores.map(s=>[s.id,s]));
- const prodById=new Map(products.map(p=>[p.id,p]));
- const reserves=new Map();
+ const storeById=new Map(stores.map(x=>[x.id,x]));
+ const eventById=new Map(events.map(x=>[x.id,x]));
+ const productById=new Map(products.map(x=>[x.id,x]));
+ const modelById=new Map(models.map(x=>[x.id,x]));
+ const held=new Map();
  for(const r of reservations.filter(x=>x.status==='ativa')){
-  const parent=r.avulso_order_id?'avulso:'+r.avulso_order_id:'loja:'+r.order_id;
+  const parent=r.event_batch_id?'evento:'+r.event_batch_id:
+   r.avulso_order_id?'avulso:'+r.avulso_order_id:'loja:'+r.order_id;
   const key=parent+':'+r.product_id;
-  reserves.set(key,(reserves.get(key)||0)+Number(r.quantity||0));
+  held.set(key,(held.get(key)||0)+Number(r.quantity||0));
  }
- const build=(kind,order,lines,origin,target)=>{
-  const mapped=lines.map(line=>{
-   const p=prodById.get(line.product_id);
-   const quantity=Number(line.quantity||0);
-   const reserved=reserves.get(kind+':'+order.id+':'+line.product_id)||0;
-   return {id:line.product_id,name:p?.name||line.product_name||'Produto',
+ const rows=(kind,orderId,lines)=>lines.map(line=>{
+  const p=productById.get(line.product_id),model=p?.apparel_model_id?modelById.get(p.apparel_model_id):null;
+  const quantity=Number(line.quantity||0);
+  const reserved=held.get(kind+':'+orderId+':'+line.product_id)||0;
+  return {id:line.product_id,name:p?.name||line.product_name||'Produto',
+    modelId:p?.apparel_model_id||p?.id||line.product_id,
+    modelTitle:model?.name||p?.name||line.product_name||'Produto',
     color:p?.apparel_color??line.color??'',size:p?.apparel_size??line.size??'',
     sku:p?.sku||line.sku||'',ean:p?.ean||line.ean||'',
-    gondola:p?.gondola||'',quantity,reserved,missing:Math.max(0,quantity-reserved)};
-  });
-  const status=kind==='avulso'?order.fulfillment_status||'legado':order.status;
-  return {kind,id:order.id,created_at:order.created_at,status,
-    origin,target,source:order.source||order.request_type,
-    customerPhone:kind==='avulso'?order.customer_phone:'',
-    externalReference:order.external_reference||'',
-    expires_at:order.expires_at,
-    lines:mapped,total:mapped.reduce((s,x)=>s+x.quantity,0),
-    reserved:mapped.reduce((s,x)=>s+x.reserved,0),
-    missing:['pendente_estoque','reservado','aprovado','separado'].includes(status)?
-      mapped.reduce((s,x)=>s+x.missing,0):0,
-    adjustments:adjustments.filter(a=>a.order_kind===kind&&a.order_id===order.id),
-    isOwner:order.created_by===userId,
-    raw:order};
+    gondola:p?.gondola||'',prateleira:p?.prateleira||'',
+    quantity,reserved,picked:Number(line.picked||0),
+    missing:Math.max(0,quantity-reserved)};
+ });
+ const common=(kind,order,lines,origin,target,status)=>{
+  const mapped=rows(kind,order.id,lines);
+  const terminal=['enviado','despachado','concluido','recebido','recebido_divergente','cancelado','expirado'].includes(status);
+  const unchecked=['legado','solicitado'].includes(status);
+  return {kind,id:order.id,eventId:order.event_id||null,
+   sequence:order.sequence||null,created_at:order.created_at,status,
+   origin,target,source:order.source||order.request_type||kind,
+   customerPhone:kind==='avulso'?order.customer_phone:'',
+   externalReference:order.external_reference||'',expires_at:order.expires_at,
+   lines:mapped,total:mapped.reduce((n,l)=>n+l.quantity,0),
+   reserved:mapped.reduce((n,l)=>n+l.reserved,0),
+   missing:terminal||unchecked?0:mapped.reduce((n,l)=>n+l.missing,0),
+   adjustments:adjustments.filter(a=>a.order_kind===kind&&a.order_id===order.id),
+   isOwner:order.created_by===userId,raw:order};
  };
- const av=portal?[]:avulsoOrders.map(o=>build('avulso',o,
-  avulsoItems.filter(x=>x.order_id===o.id),'Central',o.customer_name));
+ const av=portal?[]:avulsoOrders.map(o=>common('avulso',o,
+  avulsoItems.filter(x=>x.order_id===o.id),'Central',o.customer_name,
+  o.fulfillment_status||'legado'));
  const lojas=storeOrders.filter(o=>!portal||o.created_by===userId).map(o=>
-  build('loja',o,storeItems.filter(x=>x.order_id===o.id),
+  common('loja',o,storeItems.filter(x=>x.order_id===o.id),
    storeById.get(o.from_store_id)?.name||'Central',
-   storeById.get(o.to_store_id)?.name||'Loja'));
- return [...av,...lojas].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+   storeById.get(o.to_store_id)?.name||'Loja',o.status));
+ const batches=portal?[]:eventBatches.map(b=>{
+  const event=eventById.get(b.event_id);
+  return common('evento',b,eventBatchItems.filter(x=>x.batch_id===b.id),
+   'Estoque central',event?.name||'Loja temporária',b.status);
+ });
+ return [...av,...lojas,...batches].sort((a,b)=>
+  String(b.created_at||'').localeCompare(String(a.created_at||'')));
+}
+export function groupedOrderLines(lines){
+ const groups=new Map();
+ for(const line of lines){
+  const key=String(line.modelId||line.id);
+  if(!groups.has(key))groups.set(key,{key,title:line.modelTitle||line.name,lines:[]});
+  groups.get(key).lines.push(line);
+ }
+ return [...groups.values()].map(g=>({
+  ...g,total:g.lines.reduce((n,l)=>n+l.quantity,0),
+  reserved:g.lines.reduce((n,l)=>n+l.reserved,0),
+  missing:g.lines.reduce((n,l)=>n+l.missing,0)
+ }));
 }
 export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canReceive=false,portal=false,time=x=>x}={}){
  const info=statuses[o.status]||[o.status,'pending'];
