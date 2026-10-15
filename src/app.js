@@ -1366,6 +1366,144 @@ function stockOverviewModal(id){
  document.body.append(overlay);
  overlay.querySelector('[data-action="stock-overview-close"]')?.focus({preventScroll:true});
 }
+// Ações de uma variação no painel inferior (celular) ou lateral (desktop).
+function canOpenSkuManager(){
+ return !isFranchisePortal()&&['stock.entry','stock.exit','stock.balance','products.edit'].some(hasPermission);
+}
+function manageSku(id,requestedMode=''){
+ const p=product(id);
+ if(!p||!canOpenSkuManager())return;
+ const model=state.apparelModels.find(m=>m.id===p.apparel_model_id);
+ const availableModes=skuPanelModes.filter(m=>hasPermission(m.permission));
+ if(!availableModes.length)return;
+ const mode=availableModes.some(m=>m.key===requestedMode)?requestedMode:availableModes[0].key;
+ const physical=qtyStore(id),reserved=qtyReserved(id);
+ const history=state.movements.filter(m=>m.product_id===id&&!m.event_id)
+  .slice(0,15);
+ const reservations=state.stockReservations.filter(r=>r.product_id===id&&r.status==='ativa');
+ formModal('Gerenciar SKU · '+(p.apparel_size||'Único'),
+   renderSkuPanel({item:p,model,physical,reserved,can:hasPermission,history,reservations}),
+   'sku-manage','Confirmar operação');
+ const form=document.querySelector('.modalback form[data-form="sku-manage"]');
+ if(!form)return;
+ form.dataset.id=id;
+ form.dataset.expected=String(physical);
+ form.dataset.reserved=String(reserved);
+ form.dataset.request=crypto.randomUUID();
+ form.closest('.modalback').classList.add('sku-panel-backdrop');
+ setSkuMode(form,mode);
+ // A lista global contém até 1000 movimentos; esta consulta traz os últimos
+ // movimentos do SKU mesmo que estejam fora dos carregados na página.
+ if(hasPermission('movements.read')){
+   db.from('stock_movements').select('action,quantity,note,created_at')
+    .eq('product_id',id).is('event_id',null)
+    .order('created_at',{ascending:false}).limit(20).then(({data,error})=>{
+      if(error||!Array.isArray(data)||!form.isConnected)return;
+      const details=form.querySelector('[data-sku-history]');
+      const list=details?.querySelector('.sku-history-list');
+      if(!list)return;
+      list.innerHTML=data.map(m=>'<li><span>'+h(m.action||'Movimento')+
+        '<small>'+h(m.note||'Sem observação')+'</small></span><span><b>'+
+        Number(m.quantity||0).toLocaleString('pt-BR')+' un.</b><small>'+
+        (m.created_at?new Date(m.created_at).toLocaleDateString('pt-BR'):'')+
+        '</small></span></li>').join('');
+    }).catch(()=>{});
+ }
+}
+function setSkuMode(form,mode){
+ const p=product(form.dataset.id);
+ if(!p||!skuPanelModes.some(m=>m.key===mode&&hasPermission(m.permission)))return;
+ form.dataset.mode=mode;
+ form.dataset.request=crypto.randomUUID();
+ for(const tab of form.querySelectorAll('[data-action="sku-mode"]')){
+   const selected=tab.dataset.mode===mode;
+   tab.setAttribute('aria-selected',String(selected));
+   tab.classList.toggle('is-active',selected);
+ }
+ for(const section of form.querySelectorAll('[data-sku-section]'))
+  section.hidden=section.dataset.skuSection!==mode;
+ const label={entrada:'Confirmar entrada',saida:'Confirmar saída',
+  contagem:'Salvar conferência',edicao:'Salvar cadastro'}[mode];
+ const submit=form.querySelector('button[type="submit"]');
+ if(submit)submit.textContent=label||'Salvar';
+ syncSkuManagerPreview(form);
+}
+function syncSkuManagerPreview(form){
+ const id=form?.dataset.id,p=product(id);
+ if(!p)return;
+ const physical=Number(form.dataset.expected),reserved=Number(form.dataset.reserved),
+  mode=form.dataset.mode,values=Object.fromEntries(new FormData(form).entries());
+ const recipient=form.querySelector('[data-sku-recipient]');
+ if(recipient)recipient.hidden=!['diretoria','doacao'].includes(values.exit_reason);
+ const box=form.querySelector('[data-sku-preview]');
+ const submit=form.querySelector('button[type="submit"]');
+ if(!box)return;
+ if(!p.active){box.textContent='SKU inativo: nenhuma operação permitida.';box.dataset.valid='false';if(submit)submit.disabled=true;return;}
+ try{
+  const result=validateSkuAction({mode,values,physical,reserved});
+  if(mode==='edicao')box.textContent='Os dados de cadastro serão atualizados. O saldo não será alterado.';
+  else{
+   const future=mode==='entrada'?physical+result.quantity:
+    mode==='saida'?physical-result.quantity:result.quantity;
+   const delta=future-physical;
+   box.textContent='Físico: '+physical+' → '+future+' un. · Reservado: '+reserved+
+     ' · Livre após: '+(future-reserved)+' un.'+
+     (mode==='contagem'?' · Ajuste: '+(delta>0?'+':'')+delta:'');
+  }
+  box.dataset.valid='true';
+  if(submit)submit.disabled=false;
+ }catch(error){
+  box.textContent=error.message;box.dataset.valid='false';
+  if(submit)submit.disabled=true;
+ }
+}
+async function saveSkuManager(form){
+ const p=product(form.dataset.id);if(!p||!p.active||isFranchisePortal())return;
+ const mode=form.dataset.mode;
+ const permission={entrada:'stock.entry',saida:'stock.exit',contagem:'stock.balance',
+  edicao:'products.edit'}[mode];
+ if(!permission||!hasPermission(permission))return;
+ const physical=Number(form.dataset.expected),reserved=Number(form.dataset.reserved),
+  values=Object.fromEntries(new FormData(form).entries());
+ let op;
+ try{op=validateSkuAction({mode,values,physical,reserved});}
+ catch(error){toast(error.message,true);return;}
+ const confirmation=mode==='edicao'?'Confirmar a atualização do cadastro deste SKU?':
+   mode==='contagem'?'Confirmar contagem de '+op.quantity+' unidade(s) de '+p.name+
+    '? A diferença será registrada no histórico.':
+   'Confirmar '+(mode==='entrada'?'entrada':'saída')+' de '+op.quantity+' unidade(s) de '+p.name+'?';
+ if(!window.confirm(confirmation))return;
+ return exec(async()=>{
+   if(mode==='edicao'){
+     const changed=assertOk(await db.from('products').update(op).eq('id',p.id).select('id').maybeSingle());
+     if(!changed)throw new Error('Cadastro não atualizado. Verifique sua permissão.');
+   }else if(mode==='contagem'){
+     assertOk(await db.rpc('quick_stock_count',{
+       p_product_id:p.id,p_expected:physical,p_counted:op.quantity,
+       p_note:op.note||null
+     }));
+   }else if(mode==='entrada'){
+     assertOk(await db.rpc('stock_operation_batch',{
+       p_operation:'entrada',p_items:[{product_id:p.id,quantity:op.quantity,expected:physical}],
+       p_destination_id:null,p_note:op.note||null,p_request_id:form.dataset.request
+     }));
+   }else if(op.reason==='avaria'){
+     assertOk(await db.rpc('quarantine_central_stock',{
+       p_product:p.id,p_quantity:op.quantity,p_expected:physical,
+       p_note:op.note,p_request:form.dataset.request
+     }));
+   }else{
+     assertOk(await db.rpc('record_stock_exception',{
+       p_product_id:p.id,p_quantity:op.quantity,p_expected:physical,
+       p_reason:op.reason,p_details:op.note,p_recipient:op.recipient,
+       p_request_id:form.dataset.request
+     }));
+   }
+ },mode==='edicao'?'Cadastro do SKU atualizado.':
+   mode==='contagem'?'Contagem registrada com histórico e reservas protegidas.':
+   mode==='entrada'?'Entrada de fornecedor registrada.':
+   op.reason==='avaria'?'Avaria suspensa do estoque disponível.':'Saída excepcional registrada.');
+}
 // Operação pontual diretamente no card, sempre em SKU real e sem simular pedidos.
 function stockModal(id=null,groupKey=null){
   if(isFranchisePortal()||!(hasPermission('stock.entry')||hasPermission('stock.exit')))return;
