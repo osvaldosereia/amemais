@@ -677,6 +677,7 @@ function productsPage(){
   const add=(isAdmin()&&hasPermission('stock.balance')?button('Conferência formal','view','data-view="inventario"','small'):'')+
     ((hasPermission('stock.balance')||hasPermission('stock.entry'))?button('Avarias em análise','view','data-view="avarias"','small'):'')+
     (hasPermission('stock.entry')?button('↓ Receber remessa','stock-receive-shipment','',''):'')+
+    (hasPermission('stock.balance')?button('Imprimir estoque','buy-print-stock','','small'):'')+
     (hasPermission('products.create')?button('+ Novo produto','product-new','','primary'):'');
   return '<header class="pagehead products-pagehead"><div><h1>Produtos</h1>'+
     '<p>Catálogo e estoque</p></div><div class="actions">'+add+'</div></header>'+
@@ -2785,6 +2786,38 @@ async function handleClick(event){
     if(input)input.value=ean;
     return;
   }
+  if(action==='buy-suppliers')return supplierManagerModal();
+  if(action==='buy-supplier-new')return supplierFormModal();
+  if(action==='buy-supplier-edit'){
+   const supplier=state.suppliers.find(s=>s.id===id);
+   if(supplier)return supplierFormModal(supplier);
+   return;
+  }
+  if(action==='buy-new')return purchaseNewModal(target.dataset.supplier||null);
+  if(action==='buy-print-alerts'){
+   if(!hasPermission('purchases.manage'))return;
+   const suggestions=purchaseSuggestions(state.items,state.balances,state.stockReservations,
+    state.purchaseOrders,state.purchaseItems).filter(p=>!state.purchaseSupplierFilter||p.supplier_id===state.purchaseSupplierFilter);
+   return printHTML(replenishmentDocument(suggestions,state.suppliers));
+  }
+  if(action==='buy-print-order'){
+   if(!hasPermission('purchases.manage'))return;
+   const order=state.purchaseOrders.find(x=>x.id===id);
+   if(!order)return toast('Pedido de compra não encontrado.',true);
+   return printHTML(purchaseOrderDocument(order,state.suppliers.find(s=>s.id===order.supplier_id),
+     state.purchaseItems.filter(x=>x.purchase_order_id===id)));
+  }
+  if(action==='buy-status'){
+   if(!hasPermission('purchases.manage'))return;
+   const order=state.purchaseOrders.find(o=>o.id===id),status=target.dataset.status;
+   if(!order||!['enviado','finalizado','cancelado'].includes(status))return;
+   if(!window.confirm('Alterar compra #'+order.number+' para '+status+'? Isso não altera o estoque; registre o recebimento na Entrada.'))return;
+   return exec(async()=>assertOk(await db.rpc('set_purchase_order_status',{p_id:id,p_status:status})),
+    'Situação da compra atualizada. O saldo físico não foi alterado.');
+  }
+  if(action==='buy-print-stock')return printStockReport();
+  if(action==='commercial-order-print')return printCommercialOrder(id);
+  if(action==='event-print-summary')return printEventSummary(id);
   if(action==='product-new')return productModal();
   if(action==='products-toggle-inactive'){state.showInactiveProducts=!state.showInactiveProducts;state.page=0;render();return;}
   if(action==='products-clear-filters'){
@@ -3361,6 +3394,46 @@ async function handleSubmit(event){
       state.profile={id:state.user.id,full_name:name,email:state.user.email,role:'admin',active:true};
     },'Administrador ativado com sucesso.');
     return;
+  }
+  if(type==='buy-suppliers-list'){closeTopModal();return;}
+  if(type==='buy-supplier-save'){
+   if(!hasPermission('purchases.manage'))return;
+   const name=String(values.name||'').trim();
+   if(name.length<2||name.length>150)return toast('Informe o nome do fornecedor.',true);
+   const payload={
+    name,contact_name:String(values.contact_name||'').trim().slice(0,140)||null,
+    phone:String(values.phone||'').trim().slice(0,60)||null,
+    email:String(values.email||'').trim().slice(0,180)||null,
+    document:String(values.document||'').trim().slice(0,35)||null,
+    notes:String(values.notes||'').trim().slice(0,1500)||null
+   };
+   if(form.dataset.id)payload.active=values.active==='true';
+   return exec(async()=>{
+    const response=form.dataset.id?
+      db.from('suppliers').update(payload).eq('id',form.dataset.id):
+      db.from('suppliers').insert(payload);
+    assertOk(await response);
+   },'Fornecedor salvo.');
+  }
+  if(type==='buy-order-create'){
+   if(!hasPermission('purchases.manage'))return;
+   const supplier=String(values.supplier_id||''),rows=[...form.querySelectorAll('[data-buy-product]')]
+    .filter(row=>row.dataset.supplier===supplier);
+   const lines=[];
+   for(const row of rows){
+    const input=row.querySelector('[data-buy-quantity]');
+    const raw=input?.value??'0',qty=Number(raw);
+    if(raw===''||!Number.isInteger(qty)||qty<0||qty>1000000){
+     return toast('Revise as quantidades da compra (0 a 1.000.000).',true);
+    }
+    if(qty)lines.push({product_id:input.dataset.product,quantity:qty});
+   }
+   if(!lines.length)return toast('Informe pelo menos uma quantidade.',true);
+   if(!window.confirm('Criar pedido para '+(state.suppliers.find(x=>x.id===supplier)?.name||'fornecedor')+
+     ' com '+lines.length+' SKU(s)? O estoque não será alterado.'))return;
+   return exec(async()=>assertOk(await db.rpc('save_purchase_order',{
+    p_supplier:supplier,p_items:lines,p_note:String(values.note||'').slice(0,1500)
+   })),'Pedido de compra criado. Imprima a ficha e marque como enviado após encaminhar ao fornecedor.');
   }
   if(type==='product-new'||type==='product-edit'){
     if(!canRegisterProducts())return;
