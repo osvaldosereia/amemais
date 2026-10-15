@@ -1064,6 +1064,8 @@ function closeTopModal(){
   if(form?.__previewUrl)URL.revokeObjectURL(form.__previewUrl);
   current.remove();
   const previous=backdrops[backdrops.length-2];if(previous)previous.inert=false;
+  const focus=current.__returnFocus;
+  if(focus?.isConnected)focus.focus({preventScroll:true});
 }
 function formModal(title,contents,formName,submitLabel='Salvar',stack=false){
   if(!stack){
@@ -1073,13 +1075,15 @@ function formModal(title,contents,formName,submitLabel='Salvar',stack=false){
     if(previous)previous.inert=true;
   }
   const backdrop=document.createElement('div');
+  backdrop.__returnFocus=document.activeElement;
   backdrop.className='modalback';backdrop.style.zIndex=String(50+document.querySelectorAll('.modalback').length*5);
   backdrop.innerHTML='<section class="modal" role="dialog" aria-modal="true" aria-label="'+h(title)+'">'+
     '<div class="modalhead"><h2>'+h(title)+'</h2><button class="plain" type="button" data-action="modal-close" aria-label="Fechar">✕</button></div>'+
     '<form data-form="'+h(formName)+'">'+contents+'<div class="modalfooter"><button class="button" type="button" data-action="modal-close">Cancelar</button>'+
     '<button class="button primary" type="submit">'+h(submitLabel)+'</button></div></form></section>';
   document.body.append(backdrop);
-  backdrop.querySelector('[name]:not([type="file"])')?.focus();
+  if(formName==='sku-manage')backdrop.querySelector('.modalhead [data-action="modal-close"]')?.focus({preventScroll:true});
+  else backdrop.querySelector('[name]:not([type="file"])')?.focus();
 }
 function photoLightbox(url,caption){
   document.querySelector('.photo-lightbox')?.remove();
@@ -3305,6 +3309,13 @@ document.addEventListener('click',event=>{
   handleClick(event).catch(fail);
 });
 document.addEventListener('keydown',event=>{
+  if(event.key==='Enter'&&event.target.id==='product-search'&&canOpenSkuManager()){
+    const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
+    const matched=state.items.find(p=>p.active&&(
+      String(p.ean||'').toLocaleLowerCase('pt-BR')===q||
+      String(p.sku||'').toLocaleLowerCase('pt-BR')===q));
+    if(matched){event.preventDefault();manageSku(matched.id);return;}
+  }
   if(event.key==='Escape'){
     if(document.querySelector('.share-product-modal'))document.querySelector('.share-product-modal').remove();
     else if(document.querySelector('.tax-backdrop'))closeTaxonomyPicker();
@@ -3414,6 +3425,9 @@ document.addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.closest('form[data-form="sku-manage"]')){
+    syncSkuManagerPreview(event.target.closest('form[data-form="sku-manage"]'));
+  }
   if(event.target.matches('form[data-form="user-new"] select[name="role"]')){
     const defaults=permissionDefaults[event.target.value]||[];
     event.target.closest('form').querySelectorAll('[name="perm"]').forEach(el=>el.checked=defaults.includes(el.value));
