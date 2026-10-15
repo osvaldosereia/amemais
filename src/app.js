@@ -1898,28 +1898,53 @@ async function saveTaxonomyFromProduct(form,table,data,success){
 }
 
 function permissionFields(userId){
+ const user=state.users.find(x=>x.id===userId);
  const explicit=state.userPermissions.filter(x=>x.user_id===userId).map(x=>x.permission);
- const chosen=explicit.length?explicit:(state.users.find(x=>x.id===userId)?.role==='admin'?permissionCatalog.map(([key])=>key):(permissionDefaults[state.users.find(x=>x.id===userId)?.role||'evento']||[]));
- return '<section class="form-section wide"><strong>Autorizações individuais</strong><p class="help">Marque cada operação permitida. As permissões são cumulativas.</p>'+
- permissionCatalog.map(([key,label])=>'<label class="field"><span><input type="checkbox" name="perm" value="'+h(key)+'" '+(chosen.includes(key)?'checked':'')+'> '+h(label)+'</span></label>').join('')+
- '</section><section class="form-section wide"><strong>Lojas autorizadas</strong><p class="help">Sem seleção, o acesso a estoques de outras lojas não é liberado.</p>'+
- state.stores.filter(x=>x.active).map(x=>'<label class="field"><span><input type="checkbox" name="store" value="'+h(x.id)+'" '+((state.staffStores.some(ss=>ss.user_id===userId&&ss.store_id===x.id)||(!userId&&x.is_primary))?'checked':'')+'> '+h(x.name)+'</span></label>').join('')+'</section>';
+ const chosen=explicit.length?explicit:(user?.role==='admin'?permissionCatalog.map(([key])=>key):
+   (permissionDefaults[user?.role||'evento']||[]));
+ return '<section class="form-section wide"><strong>Vinculação às unidades</strong>'+
+ '<p class="help">Loja permanente: selecione somente uma unidade. Separador: CDSB. Temporária: vínculo pelo evento.</p>'+
+ state.stores.filter(x=>x.active).map(x=>'<label class="field"><span>'+
+  '<input type="checkbox" name="store" value="'+h(x.id)+'" data-store-kind="'+h(x.kind)+'" '+
+  ((state.staffStores.some(ss=>ss.user_id===userId&&ss.store_id===x.id)||(!userId&&x.is_primary))?'checked':'')+
+  '> '+h(x.name)+'</span></label>').join('')+'</section>'+
+ '<details class="access-advanced wide"><summary>Permissões avançadas · somente administradores</summary>'+
+ '<p class="help">O perfil escolhido define as permissões automáticas. Personalize somente quando necessário; o backend valida o acesso.</p>'+
+ permissionCatalog.map(([key,label])=>'<label class="field"><span><input type="checkbox" name="perm" value="'+h(key)+'" '+
+  (chosen.includes(key)?'checked':'')+'> '+h(label)+'</span></label>').join('')+'</details>';
 }
 function setupFranchiseProfile(form){
- const role=form?.querySelector('[name="role"]');
- if(!role)return;
- role.addEventListener('change',()=>{
-   if(role.value!=='franquia')return;
-   const allowed=new Set(permissionDefaults.franquia);
-   for(const box of form.querySelectorAll('input[name="perm"]'))box.checked=allowed.has(box.value);
-   const activeFranchises=state.stores.filter(x=>x.kind==='franquia'&&x.active);
-   for(const box of form.querySelectorAll('input[name="store"]'))box.checked=false;
-   if(activeFranchises.length===1){
-     const one=form.querySelector('input[name="store"][value="'+activeFranchises[0].id+'"]');
-     if(one)one.checked=true;
-   }
-   toast('Perfil de franquia configurado. Selecione uma única unidade franqueada.');
+ const role=form?.querySelector('[name="role"]');if(!role)return;
+ const choose=(current)=>{
+  const profiles={
+   franquia:['products.read','orders.franchise'],
+   estoquista:['products.read','orders.read','orders.separate'],
+   evento:['products.read','events.read','events.request'],
+   admin:permissionCatalog.map(([p])=>p)
+  };
+  const selected=profiles[current]||permissionDefaults[current]||[];
+  for(const input of form.querySelectorAll('input[name="perm"]'))input.checked=selected.includes(input.value);
+  const choices=[...form.querySelectorAll('input[name="store"]')];
+  for(const input of choices){
+   input.checked=current==='estoquista'&&state.stores.some(s=>s.id===input.value&&s.is_primary);
+   const store=state.stores.find(s=>s.id===input.value);
+   const shown=current==='franquia'?store?.kind==='franquia':
+     current==='estoquista'?store?.is_primary:
+     current==='evento'?false:true;
+   const label=input.closest('label');if(label)label.hidden=!shown;
+  }
+  if(current==='franquia'){
+   const active=choices.filter(x=>!x.closest('label')?.hidden);
+   if(active.length===1)active[0].checked=true;
+  }
+ };
+ role.addEventListener('change',()=>choose(role.value));
+ form.addEventListener('change',event=>{
+  if(event.target.matches('input[name="store"]')&&role.value==='franquia'&&event.target.checked)
+   for(const other of form.querySelectorAll('input[name="store"]'))
+    if(other!==event.target)other.checked=false;
  });
+ if(!form.dataset.id&&!form.dataset.existingUser)choose(role.value);
 }
 function assertFranchiseProfile(form,role,perms,storeIds){
  if(role!=='franquia')return;
@@ -2204,9 +2229,9 @@ function userModal(){
     field('Usuário','username','text','','required minlength="3" maxlength="32" autocapitalize="none"')+
     selectField('Função','role',Object.entries(roles),'evento')+
     permissionFields('')+
-    field('Senha inicial','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"',
-      'Mínimo de 6 caracteres. A senha não será enviada por email.')+
-    field('Confirmar senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+    field('Senha inicial','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"',
+      'Mínimo de 12 caracteres. A senha não será enviada por email.')+
+    field('Confirmar senha','password_confirm','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
     '</div><div class="note">O administrador entrega a senha ao funcionário por um canal seguro. O acesso é liberado imediatamente, sem confirmação por email.</div>',
     'user-new','Cadastrar usuário');
   setupFranchiseProfile(document.querySelector('.modal form[data-form="user-new"]'));
@@ -2215,8 +2240,8 @@ function adminPasswordModal(id){
   if(!isAdmin()||id===state.user?.id)return;
   const target=state.users.find(x=>x.id===id);if(!target)return;
   formModal('Definir senha · '+target.full_name,'<div class="formgrid">'+
-    field('Nova senha','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
-    field('Confirmar nova senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+    field('Nova senha','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    field('Confirmar nova senha','password_confirm','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
     '</div><p class="help">Não será enviado email de confirmação. Informe a nova senha diretamente ao colaborador.</p>',
     'user-password','Salvar senha');
   document.querySelector('.modalback form').dataset.id=id;
@@ -2231,7 +2256,7 @@ function myPasswordModal(){
 }
 function passwordsValid(values){
   const p=String(values.password||''),repeat=String(values.password_confirm||'');
-  if(p.length<6||p.length>128)throw new Error('Utilize uma senha de 6 a 128 caracteres.');
+  if(p.length<12||p.length>128)throw new Error('Utilize uma senha de 12 a 128 caracteres.');
   if(p!==repeat)throw new Error('As senhas digitadas são diferentes.');
   return p;
 }
