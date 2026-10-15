@@ -879,7 +879,7 @@ async function submitEventSettlement(form,finish=false){
  let payload;
  try{payload=collectEventSettlement(form);}catch(error){return toast(error.message,true);}
  if(finish&&payload.missing) return toast('Confira o destino de todas as unidades antes de concluir.',true);
- if(finish&&!window.confirm('Concluir a prestação de contas? As unidades boas voltam à central, as avarias ficam em análise e as vendas/perdas são baixadas definitivamente.'))return;
+ if(finish&&!window.confirm('Concluir a prestação de contas? As unidades boas voltam à central, as avarias ficam em análise e as vendas/perdas são baixadas definitivamente. Qualquer inventário formal antigo pendente será arquivado como substituído, sem aplicar seus ajustes.'))return;
  return exec(async()=>{
   assertOk(await db.rpc('save_event_settlement',{
    p_event:e.id,p_items:payload.items,p_note:payload.note||null
