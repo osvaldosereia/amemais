@@ -50,8 +50,8 @@ export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE',photoU
        '<span>CONFERIDO: <i aria-hidden="true"></i> ____</span></div>'+
     '</article>';
   }).join('')+'</section>').join('');
- const code=String(order.id||'').slice(0,8).toUpperCase();
- const title=order.kind==='evento'?'LOTE '+String(order.sequence||'').padStart(2,'0'):'PEDIDO';
+ const code=String(order.code||'—');
+ const title=order.kind==='evento'?'LOTE':'PEDIDO';
  const units=locations.reduce((sum,group)=>sum+group.units,0);
  const skuCount=locations.reduce((sum,group)=>sum+group.lines.length,0);
  const css=[
@@ -127,7 +127,7 @@ export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE',photoU
  '<div class="summary">'+skuCount+' SKU(s) · '+fmt(units)+' unidades · '+locations.length+' local(is)</div>'+
  markup+
  '<footer><strong>TOTAL: '+fmt(units)+' UNIDADES</strong>'+
- '<div>Pedido: '+esc(order.id||'')+'</div>'+
+ '<div>Pedido: '+esc(code)+'</div>'+
  '<div>Observações: __________________________</div>'+
  '<div class="signature">Separador / conferente</div></footer>'+
  '</main>'+autoPrint+'</body></html>';
