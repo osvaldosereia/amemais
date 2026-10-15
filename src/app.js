@@ -1928,7 +1928,7 @@ function storeOrderModal(){
   selectField('Unidade solicitante','to_store_id',targets.map(x=>[x.id,x.name]))+
   '<div class="field wide"><span>Buscar por nome, SKU ou EAN</span><input type="search" data-store-order-search placeholder="Buscar produtos…"></div>'+
   '<section class="wide store-order-products">'+rows+'</section>'+
-  textareaField('Observação (opcional)','note')+'</div><div class="note">Enviar o pedido não reserva nem baixa unidades. A central analisará a solicitação.</div>',
+  textareaField('Observação (opcional)','note')+'</div><div class="note">O pedido reserva imediatamente as unidades livres. Faltas são registradas sem reduzir silenciosamente a quantidade solicitada. A saída física acontece após conferência.</div>',
   'store-order-create','Enviar solicitação');
 }
 function storeModal(item=null){
@@ -2543,6 +2543,45 @@ async function handleClick(event){
     const form=target.closest('form');
     form?.querySelector(action==='take-photo'?'input[name="camera_file"]':'input[name="gallery_file"]')?.click();return;
   }
+  if(action==='order-retry'){
+    const kind=target.dataset.kind,order=unifiedOrderById(kind,id);
+    if(!order||!hasPermission('orders.separate')||isFranchisePortal())return;
+    if(kind==='loja'&&!assignedStore(order.raw.from_store_id))return;
+    return exec(async()=>assertOk(await db.rpc('retry_unified_order_reservation',{
+      p_kind:kind,p_order:id
+    })),'Disponibilidade reavaliada. Consulte as faltas no pedido.');
+  }
+  if(action==='order-shortage-adjust')return unifiedShortageModal(target.dataset.kind,id);
+  if(action==='order-print-a4')return printUnifiedOrder(target.dataset.kind,id);
+  if(action==='avulso-pick')return avulsoPickingModal(id);
+  if(action==='avulso-dispatch'){
+    const order=unifiedOrderById('avulso',id);
+    if(!order||order.status!=='separado'||!hasPermission('orders.separate'))return;
+    if(!window.confirm('Confirmar entrega/saída física de '+order.total+' unidade(s)? A reserva será consumida e o estoque físico diminuirá agora.'))return;
+    return exec(async()=>assertOk(await db.rpc('dispatch_avulso_order',{p_order:id})),
+      'Pedido entregue, reserva consumida e baixa física registrada.');
+  }
+  if(action==='avulso-cancel'){
+    const order=unifiedOrderById('avulso',id);
+    if(!order||!hasPermission('orders.cancel')||!window.confirm('Cancelar este pedido e liberar suas reservas?'))return;
+    return exec(async()=>assertOk(await db.rpc('cancel_avulso_order',{p_order:id})),
+      'Pedido cancelado e estoque liberado.');
+  }
+  if(action==='order-scan-ean'){
+    return scanEAN(code=>{
+      const form=document.querySelector('.modalback form[data-form="avulso-picking"]');
+      if(!form)return;
+      const matches=state.items.filter(p=>p.active&&(p.ean===code||p.sku===code));
+      if(matches.length!==1)return toast('EAN/SKU não encontrado ou ambíguo.',true);
+      const input=[...form.querySelectorAll('[data-pick-qty]')].find(el=>el.dataset.id===matches[0].id);
+      if(!input)return toast('Produto não pertence ao pedido.',true);
+      const counted=Number(input.value||0),max=Number(input.dataset.expected);
+      if(counted>=max)return toast('Todas as unidades deste SKU já foram conferidas.',true);
+      input.value=String(counted+1);
+      updateUnifiedPickingTotal(form);
+      toast('EAN conferido: '+(counted+1)+' / '+max);
+    });
+  }
   if(action==='order-new'){
     if(!hasPermission('orders.internal'))return;
     formModal('Criar Pedido Avulso',createInternalOrderForm({
@@ -2965,7 +3004,7 @@ async function handleSubmit(event){
     await exec(async()=>assertOk(await db.rpc('create_internal_avulso_order',{
       p_name:name,p_phone:phone,p_items:items,
       p_event_id:values.event_id||null,p_request_id:crypto.randomUUID()
-    })),'Pedido registrado. Nenhuma quantidade de estoque foi alterada.');
+    })),'Pedido registrado e reserva automática realizada. O físico não foi alterado.');
     return;
   }
   if(type==='order-associate'){
@@ -3107,6 +3146,36 @@ async function handleSubmit(event){
     return exec(async()=>assertOk(await db.rpc(rpc,args)),
       type==='store-order-adjust'?'Quantidades ajustadas.':'Recebimento conferido; divergências registradas.');
   }
+  if(type==='avulso-picking'){
+    const order=unifiedOrderById('avulso',form.dataset.order);
+    if(!order||order.status!=='reservado'||!hasPermission('orders.separate'))return;
+    const inputs=[...form.querySelectorAll('[data-pick-qty]')];
+    if(inputs.length!==order.lines.length)return toast('Itens do pedido incompletos.',true);
+    const items=inputs.map(el=>({product_id:el.dataset.id,quantity:Number(el.value)}));
+    if(items.some((x,i)=>!Number.isInteger(x.quantity)||x.quantity!==Number(inputs[i].dataset.expected)))
+      return toast('Conferência incompleta ou divergente. Confira todos os SKUs.',true);
+    if(!window.confirm('Marcar todos os SKUs como separados? O estoque físico permanece na central até confirmar a saída.'))return;
+    return exec(async()=>assertOk(await db.rpc('confirm_avulso_order_picking',{
+      p_order:order.id,p_items:items
+    })),'Separação conferida. Agora confirme a saída física.');
+  }
+  if(type==='unified-shortage'){
+    const kind=form.dataset.kind,order=unifiedOrderById(kind,form.dataset.order);
+    if(!order||!hasPermission('orders.separate'))return;
+    const inputs=[...form.querySelectorAll('[data-shortage-qty]')];
+    const items=inputs.map(el=>({product_id:el.dataset.id,quantity:Number(el.value)}));
+    if(items.length!==order.lines.length||items.some((x,i)=>!Number.isInteger(x.quantity)||
+      x.quantity<0||x.quantity>Number(inputs[i].dataset.original)))
+      return toast('Quantidades inválidas. Não é possível aumentar o pedido neste ajuste.',true);
+    if(!items.some(x=>x.quantity>0))return toast('Para retirar todos os itens use Cancelar pedido.',true);
+    if(!items.some((x,i)=>x.quantity<Number(inputs[i].dataset.original)))return toast('Nenhuma quantidade foi reduzida.',true);
+    const reason=String(values.reason||'').trim();
+    if(reason.length<5||reason.length>250)return toast('Explique o motivo da diferença.',true);
+    if(!window.confirm('Registrar redução justificada de quantidades e atualizar reservas?'))return;
+    return exec(async()=>assertOk(await db.rpc('adjust_unified_order_shortage',{
+      p_kind:kind,p_order:order.id,p_items:items,p_reason:reason
+    })),'Quantidades ajustadas com justificativa e reservas recalculadas.');
+  }
   if(type==='store-order-picking'){
     const orderId=form.dataset.order;
     const order=state.storeOrders.find(x=>x.id===orderId);
@@ -3140,7 +3209,7 @@ async function handleSubmit(event){
       p_from_store:main.id,p_to_store:values.to_store_id,
       p_type:state.stores.find(x=>x.id===values.to_store_id)?.kind==='franquia'?'franquia':'central',
       p_items:items,p_note:values.note||null
-    })),'Solicitação criada. A separação ainda não movimentou estoque.');return;
+    })),'Pedido criado com reserva automática. A saída física ocorrerá após a conferência.');return;
   }
   if(type==='inventory-start'){
     const [locationType,locationId]=String(values.location||'').split('|');
@@ -3377,6 +3446,13 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-unified-search]')){
+    const container=event.target.closest('.uo-page');
+    filterUnifiedOrders(container,event.target.value,
+      container?.querySelector('[data-unified-status]')?.value||'todos');
+  }
+  if(event.target.matches('form[data-form="avulso-picking"] [data-pick-qty]'))
+    updateUnifiedPickingTotal(event.target.closest('form'));
   if(event.target.closest('form[data-form="sku-manage"]')){
     syncSkuManagerPreview(event.target.closest('form[data-form="sku-manage"]'));
   }
@@ -3475,6 +3551,11 @@ document.addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('[data-unified-status]')){
+    const container=event.target.closest('.uo-page');
+    filterUnifiedOrders(container,container?.querySelector('[data-unified-search]')?.value||'',
+      event.target.value);
+  }
   if(event.target.closest('form[data-form="sku-manage"]')){
     syncSkuManagerPreview(event.target.closest('form[data-form="sku-manage"]'));
   }
