@@ -1,4 +1,4 @@
-import {makeVariationCards,makeVariationChips,resolveCategoryVariations} from './category-variations.js?v=20261015variants1';
+import {makeVariationCards,makeVariationChips,resolveCategoryVariations} from './category-variations.js?v=20261015categorymetadata2';
 // Cadastro único de produtos: variações de roupas sem outra seção de navegação.
 export const STANDARD_SIZES=['P','M','G','GG','XGG','XXGG','EXGG'];
 const safe=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -19,13 +19,12 @@ export function sizesSection(){
   '<span class="variation-switch-indicator"></span><span><strong>Cadastrar variações?</strong>'+
   '<small data-variation-selection-caption>Escolha a categoria para ver as variações disponíveis.</small></span></label>'+
   '<div data-variant-panel hidden>'+
-  '<div class="size-common-fields">'+
-   '<label class="field"><span>Tipo do produto</span><select name="apparel_type" disabled>'+
-    ['Outro','Camiseta','Camisa','Polo','Blusa','Vestido','Casaco'].map(x=>'<option>'+x+'</option>').join('')+'</select></label>'+
-   '<label class="field"><span>Público (opcional para identificação)</span><select name="apparel_audience" disabled>'+
-    ['Unissex','Feminino','Masculino'].map(x=>'<option>'+x+'</option>').join('')+'</select></label>'+
-   '<label class="field"><span>Faixa etária</span><select name="apparel_age" disabled>'+
-    ['Adulto','Infantil','Bebê'].map(x=>'<option>'+x+'</option>').join('')+'</select></label></div>'+
+  '<div class="size-inherited-fields">'+
+   '<input type="hidden" name="apparel_type" value="Outro" disabled>'+
+   '<input type="hidden" name="apparel_audience" value="Unissex" disabled>'+
+   '<input type="hidden" name="apparel_age" value="Adulto" disabled>'+
+   '<p class="help" data-apparel-category-summary>Os dados gerais serão herdados da categoria do produto.</p>'+
+   '</div>'+
   '<div class="size-selector-title"><strong>Escolha as variações disponíveis</strong>'+
    '<button type="button" class="button small" data-action="size-common" disabled>Selecionar primeiras 4</button></div>'+
   '<div class="size-chip-group" role="group" aria-label="Variações para cadastrar"></div>'+
