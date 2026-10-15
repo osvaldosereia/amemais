@@ -65,6 +65,25 @@ test('portal da franquia lista somente os seus pedidos sem exibir saldo central'
  assert.doesNotMatch(html,/6 reservadas/);
  assert.doesNotMatch(html,/Confirmar saída/);
 });
+test('concluídos, cancelados e expirados não exibem falsas faltas após consumir reserva',()=>{
+ for(const status of ['concluido','cancelado','expirado','despachado']){
+  const result=makeUnifiedOrders({...props,avulsoOrders:[{...props.avulsoOrders[0],
+   fulfillment_status:status}],reservations:[]});
+  const order=result.find(x=>x.kind==='avulso');
+  assert.equal(order.missing,0);
+  const html=unifiedOrderCard(order,{button});
+  assert.doesNotMatch(html,/\d+ em falta/);
+  assert.match(html,/Reserva encerrada/);
+ }
+});
+test('pedidos legados ficam sem avaliação, em vez de falta confirmada',()=>{
+ const order=makeUnifiedOrders({...props,avulsoOrders:[{...props.avulsoOrders[0],
+  fulfillment_status:'legado'}],reservations:[]}).find(x=>x.kind==='avulso');
+ assert.equal(order.missing,0);
+ const html=unifiedOrderCard(order,{button,canProcess:true});
+ assert.match(html,/Pedido antigo preservado/);
+ assert.match(html,/Reserva não avaliada/);
+});
 test('conferência EAN apresenta campos e não baixa estoque ao separar',()=>{
  const order=makeUnifiedOrders(props)[0];
  const html=pickingOrderRows(order);
