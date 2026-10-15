@@ -2134,7 +2134,7 @@ function permissionFields(userId){
    '<span><strong>'+h(e.name)+'</strong><small>'+h(e.status)+'</small></span></label>').join('')+
   '</div></section>';
  const advanced=permissionCatalog.filter(([p])=>!['events.sell'].includes(p)).map(([key,label])=>
-   '<label class="um-perm"><input type="checkbox" name="perm" value="'+h(key)+'" '+(chosen.includes(key)?'checked':'')+'><span>'+h(label)+'</span></label>').join('');
+   '<label class="um-perm" data-permission="'+h(key)+'"><input type="checkbox" name="perm" value="'+h(key)+'" '+(chosen.includes(key)?'checked':'')+'><span>'+h(label)+'</span></label>').join('');
  return '<section class="um-access-group"><h3>1. Perfil de referência</h3>'+
   '<p class="um-role-description" data-access-profile-help>'+h(profileDescriptions[role]||'')+'</p></section>'+
   storeGroup+eventsGroup+
@@ -2160,6 +2160,14 @@ function setupFranchiseProfile(form){
   if(eventSection)eventSection.hidden=current!=='evento';
   const advanced=form.querySelector('[data-access-advanced]');
   if(advanced){advanced.hidden=!['gerente','consulta'].includes(current);if(advanced.hidden)advanced.open=false;}
+  const readerAllowed=new Set(['products.read','orders.read','stores.read','movements.read','movements.export','events.read']);
+  for(const input of form.querySelectorAll('input[name="perm"]')){
+   const item=input.closest('[data-permission]');
+   const showPerm=current==='consulta'?readerAllowed.has(input.value):
+     current==='gerente'? !['users.manage','events.sell'].includes(input.value):true;
+   if(item)item.hidden=!showPerm;
+   if(!showPerm)input.checked=false;
+  }
   for(const input of form.querySelectorAll('input[name="store"]')){
    const item=input.closest('.um-choice');
    const store=state.stores.find(s=>s.id===input.value);
