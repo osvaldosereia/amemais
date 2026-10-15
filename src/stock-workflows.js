@@ -98,9 +98,9 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
           (!p.active?'<small class="product-variant-disabled">Inativo</small>':'')+
           '<small class="stock-variant-physical">Físico: <b>'+fmt(physical)+'</b> un.</small>'+
           '</div></div>'+stockHtml+
-        ((skuAccess||canCount)?'<div class="group-variant-actions">'+
+        (((skuAccess&&sizeCount>1)||canCount)?'<div class="group-variant-actions">'+
           (canCount?button('✓ Salvar','stock-free-save','data-id="'+h(p.id)+'" hidden','small primary variant-count-save'):'')+
-          (skuAccess?button('Gerenciar','sku-manage','data-id="'+h(p.id)+'"','small'):'')+
+          (skuAccess&&sizeCount>1?button('Gerenciar','sku-manage','data-id="'+h(p.id)+'"','small'):'')+
           '</div>':'')+
         '</div>';
     }).join('')+'</div>';
