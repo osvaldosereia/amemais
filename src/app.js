@@ -65,7 +65,7 @@ const nav = [
   {id:'lojas',label:'Lojas',ico:'home'}
 ];
 const state = {
-  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
+  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],
   eventPickPlans:[],eventPickItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],inventorySessions:[],inventoryItems:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
@@ -481,7 +481,8 @@ function productGroupCard(group){
     h,photoButton,qtyStore,qtyEvent,qtyReserved,qtyAvailable,button,isManager,canRegisterProducts,
     canMoveStock:()=>!isFranchisePortal()&&(hasPermission('stock.entry')||hasPermission('stock.exit')),
     canManageSku:()=>!isFranchisePortal()&&['stock.entry','stock.exit','stock.balance','products.edit'].some(hasPermission),
-    canShare:canRegisterProducts()
+    canQuickCount:()=>!isFranchisePortal()&&hasPermission('stock.balance')&&['admin','gerente','estoquista'].includes(state.profile?.role),
+    expanded:state.expandedProductGroups.has(group.key),canShare:canRegisterProducts()
   });
 }
 function dashboard(){
@@ -2378,8 +2379,34 @@ async function handleClick(event){
     const details=card?.querySelector('[data-product-details]');
     if(!details)return;
     details.open=!details.open;
+    const key=card.getAttribute('data-product-card');
+    if(details.open)state.expandedProductGroups.add(key);
+    else state.expandedProductGroups.delete(key);
     target.setAttribute('aria-expanded',String(details.open));
+    const sizeCount=details.querySelectorAll('[data-product-id]').length;
+    target.innerHTML=(details.open?'Ocultar ': 'Ver ')+sizeCount+' tamanhos <span aria-hidden="true">⌄</span>';
     return;
+  }
+  if(action==='stock-free-save'){
+    if(!hasPermission('stock.balance')||!['admin','gerente','estoquista'].includes(state.profile?.role)
+       ||isFranchisePortal())return;
+    const row=target.closest('[data-product-id]'),p=product(id);
+    const input=row?.querySelector('[data-count-free]');
+    if(!p?.active||!row||!input||row.dataset.productId!==id)return;
+    const raw=input.value.trim();
+    if(!/^(0|[1-9][0-9]{0,6})$/.test(raw)||Number(raw)>1000000)
+     return toast('Informe um saldo livre de 0 a 1.000.000 unidades.',true);
+    const newFree=Number(raw),physical=Number(row.dataset.expectedPhysical),
+      reserved=Number(row.dataset.expectedReserved);
+    if(!Number.isInteger(physical)||!Number.isInteger(reserved)||reserved<0||
+       qtyStore(id)!==physical||qtyReserved(id)!==reserved)
+     return toast('Os saldos foram alterados. Atualize a lista antes de salvar.',true);
+    if(newFree+reserved>1000000)return toast('O total físico excederia 1.000.000.',true);
+    if(newFree===physical-reserved)return toast('Nenhuma alteração no saldo livre.');
+    return exec(async()=>assertOk(await db.rpc('quick_count_available',{
+      p_product_id:id,p_expected_physical:physical,p_expected_reserved:reserved,
+      p_counted_available:newFree,p_note:'Conferência rápida · Produtos / tamanhos'
+    })),'Saldo livre atualizado. Reservas preservadas e divergência auditada.');
   }
   if(action==='product-card-edit'){
     if(!canRegisterProducts())return;
@@ -3472,6 +3499,14 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-count-free]')){
+    const input=event.target,row=input.closest('[data-product-id]');
+    const save=row?.querySelector('[data-action="stock-free-save"]');
+    const current=Number(input.dataset.initial);
+    const changed=input.value!==''&&Number(input.value)!==current;
+    if(save)save.hidden=!changed;
+    row?.classList.toggle('is-count-dirty',changed);
+  }
   if(event.target.matches('[data-variation-mode]')){
     const form=event.target.closest('form');
     const field=form?.querySelector('[data-variation-custom]');
