@@ -60,7 +60,7 @@ test('modelos exibem a foto principal e a categoria hierárquica',()=>{
 test('catálogo de centenas usa carregamento incremental e filtra categorias descendentes',()=>{
  const {form,nodes}=makeForm();
  lot.filterLotCatalog(form);
- assert.equal((nodes['[data-lot-results-list]'].innerHTML.match(/class="lot-card/g)||[]).length,18);
+ assert.equal((nodes['[data-lot-results-list]'].innerHTML.match(/<article class="lot-card(?: selected)?"/g)||[]).length,18);
  assert.equal(nodes['[data-action="lot-more"]'].hidden,false);
  nodes['[data-lot-category]'].value='clothing';
  lot.filterLotCatalog(form,{resetPage:true});
