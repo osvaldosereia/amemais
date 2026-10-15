@@ -39,14 +39,15 @@ export function renderCategoryVariationFields(category,categories){
  const mode=category?.variation_options===null||category?.variation_options===undefined?'inherit':
   category?.variation_options?.length?'custom':'none';
  const inheritAllowed=Boolean(category?.parent_id);
+ const chosenMode=!inheritAllowed&&mode==='inherit'?'none':mode;
  return '<section class="category-variants-form form-section wide">'+
   '<div class="section-head"><strong>Variações dos produtos</strong></div>'+
   '<p class="help">Configure uma vez por categoria ou subcategoria. Ex.: Camiseta — P, M, G, GG, XGG; Chapéu — Tamanho 10, Tamanho 12, Tamanho 14.</p>'+
   '<label class="field"><span>Como configurar</span><select name="variation_mode" data-variation-mode>'+
-   (inheritAllowed?'<option value="inherit"'+(mode==='inherit'?' selected':'')+'>Herdar da categoria superior</option>':'')+
-   '<option value="custom"'+(mode==='custom'||(!inheritAllowed&&mode==='inherit')?' selected':'')+'>Definir variações nesta categoria</option>'+
-   '<option value="none"'+(mode==='none'?' selected':'')+'>Sem variações</option></select></label>'+
-  '<label class="field" data-variation-custom'+(mode==='custom'||(!inheritAllowed&&mode==='inherit')?'':' hidden')+'>'+
+   (inheritAllowed?'<option value="inherit"'+(chosenMode==='inherit'?' selected':'')+'>Herdar da categoria superior</option>':'')+
+   '<option value="custom"'+(chosenMode==='custom'?' selected':'')+'>Definir variações nesta categoria</option>'+
+   '<option value="none"'+(chosenMode==='none'?' selected':'')+'>Sem variações</option></select></label>'+
+  '<label class="field" data-variation-custom'+(chosenMode==='custom'?'':' hidden')+'>'+
    '<span>Variações (separe por vírgula ou uma por linha)</span>'+
    '<textarea name="variation_labels" rows="3" maxlength="700" placeholder="P, M, G, GG, XGG">'+
      h((category?.variation_options||[]).join(', '))+'</textarea>'+
