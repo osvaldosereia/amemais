@@ -66,6 +66,11 @@ function locationCard(loc,all,ctx,{primary=false}={}){
   actions.push(ctx.button(ctx.canManageEvent?'Gerenciar local':'Ver local','event-detail','data-id="'+esc(loc.id)+'"','small'));
  if(loc.type==='store'&&ctx.canManageStores&&!primary)
   actions.push(ctx.button('Editar loja','store-edit','data-id="'+esc(loc.id)+'"','small'));
+ if(ctx.canForceDelete&&!primary){
+  const kind=loc.type==='store'?'store':loc.type==='event'?'event':null;
+  if(kind)actions.push(ctx.button('Excluir cadastro','force-delete-preview',
+   'data-kind="'+kind+'" data-id="'+esc(loc.id)+'"','small danger'));
+ }
  const cover=loc.coverPath?'<div class="sh-event-cover"><img data-event-cover="'+esc(loc.coverPath)+
   '" alt="Capa de '+esc(loc.name)+'" loading="lazy"></div>':'';
  return '<article class="sh-location" data-location="'+esc(key)+'">'+cover+
@@ -99,7 +104,7 @@ export function renderStoreHub({stores=[],events=[],orders=[],context={}}){
  const centralItems=ctx.showCentral?[{type:'central',id:central?.id||'central',primary:true,
   kicker:'Estoque e expedição',name:central?.name||'Loja Central',subtitle:'Fila geral de separação e pedidos'}]:[];
  const eligibleStore=s=>ctx.canSeeStore?ctx.canSeeStore(s):true;
- const franchiseItems=ctx.showFranchises?stores.filter(s=>s.kind==='franquia'&&eligibleStore(s))
+ const franchiseItems=ctx.showFranchises?stores.filter(s=>s.kind==='franquia'&&!s.force_archived_at&&eligibleStore(s))
   .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
   .map(s=>({type:'store',id:s.id,kicker:s.active?'Franquia ativa':'Franquia inativa',
     name:s.name,subtitle:s.code||''})):[];
@@ -107,7 +112,7 @@ export function renderStoreHub({stores=[],events=[],orders=[],context={}}){
   .sort((a,b)=>String(b.starts_at||'').localeCompare(String(a.starts_at||'')))
   .map(e=>({type:'event',id:e.id,kicker:e.status==='ativo'?'Loja temporária ativa':'Loja temporária encerrada',
    name:e.name,subtitle:[e.starts_at,e.ends_at].filter(Boolean).join(' até '),coverPath:e.cover_path})):[];
- const branchItems=ctx.showBranches?stores.filter(s=>s.kind==='filial'&&eligibleStore(s))
+ const branchItems=ctx.showBranches?stores.filter(s=>s.kind==='filial'&&!s.force_archived_at&&eligibleStore(s))
   .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
   .map(s=>({type:'store',id:s.id,kicker:'Filial própria',name:s.name,subtitle:s.code||''})):[];
  const actions=[
