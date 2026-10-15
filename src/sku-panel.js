@@ -16,7 +16,8 @@ export function renderSkuPanel({item,model,physical,reserved,can,history=[],rese
  const historyHTML=history.slice(0,15).map(m=>'<li><span>'+safe(m.action||'Movimento')+
   '<small>'+safe(m.note||'Sem observação')+'</small></span>'+
   '<span><b>'+fmt(m.quantity)+' un.</b><small>'+safe(m.created_at?new Date(m.created_at).toLocaleDateString('pt-BR'):'')+'</small></span></li>').join('');
- const linked=reservations.map(r=>'<li>'+(r.avulso_order_id?'Cliente / avulso':'Loja')+' #'+safe(String(r.avulso_order_id||r.order_id||'').slice(0,8).toUpperCase())+
+ const linked=reservations.map(r=>'<li>Pedido #'+safe(String(r.avulso_order_id||r.order_id||'').slice(0,8).toUpperCase())+
+  ' ('+(r.avulso_order_id?'cliente / avulso':'loja')+')'+
   ' · '+fmt(r.quantity)+' un.</li>').join('');
  return '<div class="sku-manage-sheet">'+
   '<header class="sku-manage-title"><strong>'+safe(title)+'</strong>'+
