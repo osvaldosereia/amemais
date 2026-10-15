@@ -2544,7 +2544,7 @@ function searchQuickCards(query){
   }).slice(0,25);
   if(more.length){
     const empty=container.querySelector('[data-quick-empty]');
-    const html=more.map(group=>quickBalanceCard(group,{photoButton,qtyStore,h})).join('');
+    const html=more.map(group=>quickBalanceCard(group,{photoButton,qtyStore,qtyReserved,h})).join('');
     if(empty)empty.insertAdjacentHTML('beforebegin',html);
     else container.insertAdjacentHTML('beforeend',html);
     hydrateImages();
