@@ -483,7 +483,10 @@ function render(){
   state.profile?.role==='estoquista'&&hasPermission('orders.separate')?[{id:'separador',label:'Separação',ico:'clipboard'},{id:'pedidos',label:'Todos os pedidos',ico:'package'}]:nav;
  const menu=sectionNav.filter(x=>permittedView(x.id))
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+((state.view===x.id||(state.view==='entrada'&&x.id==='produtos')||(['eventos','lojas-admin'].includes(state.view)&&x.id==='lojas'))?'active':'')+'">'+
-      uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('');
+      uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('')+
+  (['admin','gerente'].includes(state.profile?.role)?
+    '<button type="button" data-action="open-tv" class="tv-nav-link">'+uiIcon('trend',19)+
+    '<span>Painel TV</span></button>':'');
   const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
   root.innerHTML='<div class="app-shell mobile-c-app"><aside class="sidebar">'+desktopIdentity+
     '<nav class="nav" aria-label="Menu principal">'+menu+'</nav>'+
@@ -592,7 +595,10 @@ function dashboard(){
         uiIcon('plus',20)+' Novo produto</button>':'')+
       (hasPermission('stock.entry')?'<button type="button" class="c-action-outline" data-action="stock-receive-shipment">'+
         uiIcon('arrow-down-to-line',20)+' Receber remessa</button>':'')+
-      '<button type="button" class="c-action-outline" data-action="global-scan">'+uiIcon('scan',20)+' Ler EAN</button></div>'+
+      '<button type="button" class="c-action-outline" data-action="global-scan">'+uiIcon('scan',20)+' Ler EAN</button>'+
+      (['admin','gerente'].includes(state.profile?.role)?
+        '<button type="button" class="c-action-outline" data-action="open-tv">'+uiIcon('trend',20)+
+        ' Abrir Painel TV</button>':'')+'</div>'+
     '<section class="c-dashboard-section"><div class="c-section-heading"><h2>Categorias</h2>'+
     '<button type="button" data-action="view" data-view="produtos">Ver produtos '+uiIcon('chevron',17)+'</button></div>'+
     (categoryCards?'<div class="c-category-grid">'+categoryCards+'</div>':
@@ -2789,6 +2795,13 @@ async function handleClick(event){
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id,view,user,event:eventId,target:scanTarget}=target.dataset;
   if(action==='view'){closeMobileNavigation(false);switchView(view);return;}
+  if(action==='open-tv'){
+    if(!state.profile?.active||!['admin','gerente'].includes(state.profile.role))
+      return toast('Acesso exclusivo do gerente e administrador.',true);
+    closeMobileNavigation(false);
+    window.open('./painel-tv.html','_blank','noopener,noreferrer');
+    return;
+  }
   if(action==='global-scan'){
     closeMobileNavigation(false);
     try {return scanEAN(code=>{
