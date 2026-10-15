@@ -1,0 +1,39 @@
+/* AME MAIS: estoque físico, comprometido, disponível e portal da franquia */
+.product-stock-total { margin-bottom: 6px; }
+.stock-total-breakdown { display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 6px;font-size:.84rem;color:var(--muted,#63726b); }
+.stock-total-breakdown span:first-child { color:#146348;font-weight:700; }
+.stock-variant-breakdown { display:block;margin-top:3px;font-size:.77rem;color:#476658; }
+.group-variant-actions { display:flex;gap:6px;flex-wrap:wrap;align-items:center; }
+.stock-overview-overlay { position:fixed;inset:0;z-index:4000;padding:16px;display:flex;align-items:center;justify-content:center;background:rgba(10,33,23,.60);overflow-y:auto; }
+.stock-overview-modal { display:flex;flex-direction:column;width:min(100%,650px);max-height:calc(100dvh - 32px);overflow:hidden; }
+.stock-overview-body { padding:16px;overflow-y:auto;overscroll-behavior:contain; }
+.stock-overview-body h3 { margin:18px 0 8px;font-size:1rem; }
+.stock-overview-body ul { margin:6px 0;padding-left:20px; }
+.stock-overview-body li { padding:3px 0; }
+.stock-overview-body table { width:100%; }
+.stock-overview-metrics { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0; }
+.stock-overview-metrics>div { display:flex;flex-direction:column;gap:6px;background:#f1f6f3;padding:12px;border-radius:12px;min-width:0; }
+.stock-overview-metrics small {font-size:.75rem;color:#64786c;}
+.stock-overview-metrics strong {font-size:1.55rem;color:#153c2b;font-variant-numeric:tabular-nums;}
+.stock-overview-metrics>div:last-child strong{color:#16764b;}
+.franchise-catalog-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin:18px 0;}
+.franchise-catalog-card {background:#fff;border:1px solid #dde7df;border-radius:14px;padding:14px;display:flex;gap:12px;align-items:flex-start;min-width:0;}
+.franchise-catalog-card strong{display:block;font-size:.95rem;}
+.franchise-catalog-card small{display:block;color:#6b776f;margin-top:4px;}
+.franchise-catalog-card ul{padding-left:17px;margin:9px 0 0;font-size:.8rem;color:#456556;}
+.franchise-catalog-photo {width:82px;height:82px;flex-shrink:0;overflow:hidden;border-radius:10px;background:#f5f7f5;}
+.franchise-catalog-photo img{width:100%;height:100%;object-fit:cover;}
+.store-order-lines {list-style:disc;padding-left:20px;display:grid;gap:4px;margin:10px 0;color:#45574b;font-size:.9rem;}
+.store-order-card .inline { flex-wrap:wrap; }
+@media(max-width:640px){
+ .stock-overview-overlay{padding:0;align-items:stretch;}
+ .stock-overview-modal{border-radius:0;width:100%;max-height:100dvh;height:100dvh;}
+ .stock-overview-body{padding-bottom:max(24px,env(safe-area-inset-bottom));}
+ .stock-overview-metrics{gap:6px;}
+ .stock-overview-metrics>div{padding:9px;}
+ .stock-overview-metrics strong{font-size:1.25rem;}
+ .stock-overview-metrics small{font-size:.7rem;}
+ .franchise-catalog-grid{grid-template-columns:1fr;}
+ .franchise-catalog-photo{width:72px;height:72px;}
+ .stock-total-breakdown{gap:4px 10px;}
+}
