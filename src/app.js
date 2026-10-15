@@ -767,7 +767,9 @@ function eventsPage(){
       const remaining=state.balances.filter(b=>b.event_id===e.id).reduce((s,b)=>s+b.quantity,0);
       return '<article class="panel event-card">'+pill(e.status)+'<h3>'+h(e.name)+'</h3><p class="muted">'+niceDate(e.starts_at)+(e.ends_at?' até '+niceDate(e.ends_at):'')+'</p>'+
         '<div class="statsline"><div class="statline">Na loja temporária <b>'+remaining+'</b> un.</div></div>'+
-        button('Gerenciar local','event-detail','data-id="'+h(e.id)+'"','primary')+'</article>';
+        button('Gerenciar local','event-detail','data-id="'+h(e.id)+'"','primary')+
+        (isManager()&&hasPermission('events.close')&&hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente')?
+         button('Excluir','event-delete','data-id="'+h(e.id)+'"','small danger'):'')+'</article>';
     }).join('')+'</div>'+(state.events.some(e=>!e.deleted_at)?'':'<div class="panel muteblock">Nenhum evento cadastrado.</div>');
 }
 function returnWorkflowPage(){
@@ -3258,7 +3260,7 @@ async function handleSubmit(event){
     }
     return exec(async()=>assertOk(await db.rpc('create_event_pick_batch',{
       p_event:eid,p_items:items,p_note:note||null
-    })),'Lote criado! Aparecerá em Pedidos e Separação, com reserva automática.');
+    })),'Lote criado! Aparecerá em Pedidos, com reserva automática.');
   }
   if(type==='event-batch-picking')return saveEventBatchPicking(form,false);
   if(type==='event-batch-cancel'){
