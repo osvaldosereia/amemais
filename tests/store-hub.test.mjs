@@ -25,6 +25,15 @@ test('central tem fila completa; franquia e evento somente seus próprios pedido
  assert.equal(hub.locationOrders(sample,{type:'event',id:'event-b'}).length,1);
  assert.equal(hub.locationOrders(sample,{type:'store',id:'unknown'}).length,0);
 });
+test('loja temporária inclui pedido de cliente vinculado ao evento',()=>{
+ const customer={id:'customer-event',kind:'avulso',eventId:'event-a',
+  status:'reservado',created_at:'2026-10-15',target:'Cliente no evento',origin:'Central',
+  total:1,raw:{}};
+ const scoped=hub.locationOrders([...sample,customer],{type:'event',id:'event-a'});
+ assert.equal(scoped.length,3);
+ assert.ok(scoped.some(o=>o.id===customer.id));
+ assert.equal(hub.locationOrders([...sample,customer],{type:'event',id:'event-b'}).length,1);
+});
 test('separa pendentes de histórico incluindo cancelados',()=>{
  assert.deepEqual(hub.locationOrders(sample,{type:'event',id:'event-a'},'pending').map(x=>x.id),['event-1']);
  assert.deepEqual(hub.locationOrders(sample,{type:'event',id:'event-a'},'history').map(x=>x.id),['event-2']);
