@@ -18,7 +18,8 @@ import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectIn
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015cdsb3';
-import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotqueue1';
+import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotcatalog1';
+import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261015catalog1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015print1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
@@ -868,26 +869,35 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
   return toast('Este lote já saiu ou foi cancelado.',true);
  const saved=batch?state.eventBatchItems.filter(x=>x.batch_id===batch.id):[];
  const groups=eventPickingRows(state.items,state.apparelModels,saved,qtyAvailable);
+ const canSeeAvailable=isManager();
  formModal((batch?'Editar lote '+String(batch.sequence).padStart(2,'0'):'Novo lote')+' · '+e.name,
-  eventLotForm(eventPlanForm(groups,{h,showAvailable:isManager()}),{edit:Boolean(batch),number:batch?.sequence,note:batch?.note||''}),
+  eventLotForm(lotCatalogMarkup(groups,state.categories,state.apparelModels,{showAvailable:canSeeAvailable}),
+   {edit:Boolean(batch),number:batch?.sequence,note:batch?.note||''}),
   'event-batch-write',batch?'Salvar nova revisão':'Enviar à separação');
  const form=document.querySelector('.modalback form[data-form="event-batch-write"]');
- if(form){form.dataset.event=e.id;form.dataset.batch=batch?.id||'';
-  refreshEventLotCounter(form);}
+ if(form){
+  form.dataset.event=e.id;form.dataset.batch=batch?.id||'';
+  form.closest('.modal')?.classList.add('lot-catalog-modal');
+  mountLotCatalog(form,{groups,categories:state.categories,models:state.apparelModels,
+    showAvailable:canSeeAvailable,onRender:()=>{hydrateImages();}});
+  refreshEventLotCounter(form);
+ }
 }
 function refreshEventLotCounter(form){
- const items=[...form.querySelectorAll('[data-plan-qty]')].map(el=>({
-  product_id:el.dataset.id,quantity:Math.max(0,Number(el.value)||0)
- }));
- const models=selectedEventModels(items,state.items);
- const total=items.reduce((n,x)=>n+x.quantity,0);
+ if(!form)return;
+ const {models,units:total}=form.__lotPicker?selectedLotCount(form):(()=>{
+  const items=[...form.querySelectorAll('[data-plan-qty]')].map(el=>({
+   product_id:el.dataset.id,quantity:Math.max(0,Number(el.value)||0)
+  }));
+  return {models:selectedEventModels(items,state.items),units:items.reduce((n,x)=>n+x.quantity,0)};
+ })();
  const target=form.querySelector('[data-event-lot-counter]');
  if(target){
   target.textContent=models+' de 10 modelos · '+total+' unidades selecionadas';
   target.classList.toggle('is-over-limit',models>10);
  }
  const submit=form.querySelector('button[type="submit"]');
- if(submit)submit.disabled=models<1||models>10;
+ if(submit)submit.disabled=models<1||models>10||Boolean(form.__lotPicker?.invalid);
 }
 function eventBatchPickModal(id){
  const o=unifiedOrderById('evento',id);
@@ -957,6 +967,7 @@ function eventPlanModal(additional=false){
  if(form){form.dataset.event=e.id;form.dataset.mode=additional?'additional':'initial';}
 }
 function collectEventPlan(form){
+ if(form.__lotPicker)return collectLotItems(form);
  const rows=[...form.querySelectorAll('[data-plan-qty]')],items=[];
  for(const input of rows){
   if(input.value.trim()==='')continue;
@@ -3185,6 +3196,12 @@ async function handleClick(event){
   if(action==='stock-overview-close'){target.closest('.stock-overview-overlay')?.remove();return;}
   if(action==='stock-group-modal')return stockModal(null,target.dataset.cardKey);
   if(action==='stock-modal')return stockModal(id);
+  if(action.startsWith('lot-')){
+    const form=target.closest('form[data-form="event-batch-write"]');
+    if(!form)return;
+    if(lotCatalogAction(form,target))refreshEventLotCounter(form);
+    return;
+  }
   if(action==='event-plan-scan')return scanInto('[data-plan-search]',target.closest('form'));
   if(action==='event-batch-new')return eventBatchModal(target.dataset.event||state.activeEvent);
   if(action==='event-batch-edit')return eventBatchModal(
@@ -4503,18 +4520,26 @@ document.addEventListener('input',event=>{
   }
   if(event.target.matches('form[data-form="avulso-picking"] [data-pick-qty],form[data-form="event-batch-picking"] [data-pick-qty]'))
     updateUnifiedPickingTotal(event.target.closest('form'));
-  if(event.target.matches('form[data-form="event-batch-write"] [data-plan-qty]'))
-    refreshEventLotCounter(event.target.closest('form'));
+  if(event.target.matches('form[data-form="event-batch-write"] [data-plan-qty]')){
+    const form=event.target.closest('form');
+    const result=onLotQuantityInput(form,event.target);
+    if(!result.ok&&result.error)toast(result.error,true);
+    refreshEventLotCounter(form);
+  }
   if(event.target.closest('form[data-form="sku-manage"]')){
     syncSkuManagerPreview(event.target.closest('form[data-form="sku-manage"]'));
   }
   if(event.target.matches('[data-plan-search]')){
-    const q=event.target.value.trim().toLocaleLowerCase('pt-BR'),form=event.target.closest('form');
-    for(const group of form.querySelectorAll('[data-plan-group]')){
-      const rows=[...group.querySelectorAll('[data-plan-row]')];
-      const matchGroup=group.dataset.search.includes(q);
-      for(const row of rows)row.hidden=Boolean(q)&&!matchGroup&&!row.dataset.search.includes(q);
-      group.hidden=rows.every(row=>row.hidden);
+    const form=event.target.closest('form');
+    if(form?.__lotPicker)filterLotCatalog(form,{resetPage:true});
+    else {
+      const q=event.target.value.trim().toLocaleLowerCase('pt-BR');
+      for(const group of form.querySelectorAll('[data-plan-group]')){
+        const rows=[...group.querySelectorAll('[data-plan-row]')];
+        const matchGroup=group.dataset.search.includes(q);
+        for(const row of rows)row.hidden=Boolean(q)&&!matchGroup&&!row.dataset.search.includes(q);
+        group.hidden=rows.every(row=>row.hidden);
+      }
     }
   }
   if(event.target.matches('[data-settle-field]')){
@@ -4603,6 +4628,10 @@ document.addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('[data-lot-category],[data-lot-tag],[data-lot-stock],[data-lot-sort]')){
+    const form=event.target.closest('form[data-form="event-batch-write"]');
+    if(form?.__lotPicker)filterLotCatalog(form,{resetPage:true});
+  }
   if(event.target.matches('[data-users-filter-role]'))applyUserListFilter();
   if(event.target.matches('[data-buy-modal-supplier]'))syncPurchaseForm(event.target.closest('form'));
   if(event.target.matches('[data-buy-filter]')){state.purchaseSupplierFilter=event.target.value;render();return;}
