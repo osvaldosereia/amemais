@@ -16,7 +16,7 @@ import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=2
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015cdsb3';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261015admindelete1';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015lotcatalog1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261015catalog2';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015print1';
@@ -73,7 +73,7 @@ const nav = [
 ];
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
-  balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],
+  balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
@@ -201,6 +201,7 @@ async function loadData(){
     ['users',db.from('staff_profiles').select('id,full_name,username,role,active,archived_at,permissions_customized,created_at').order('full_name').limit(1000)]
   ];
   resources.push(['stores',db.from('stores').select('*').order('name')]);
+  resources.push(['removedOrders',db.from('admin_removed_orders').select('kind,order_id').limit(10000)]);
   if(hasPermission('products.edit')||hasPermission('purchases.manage'))
    resources.push(['suppliers',db.from('suppliers').select('*').order('name').limit(1000)]);
   if(hasPermission('purchases.manage')){
@@ -262,6 +263,10 @@ async function loadData(){
   }
   const results=await Promise.all(resources.map(async ([key,request])=>[key,await request]));
   for(const [key,result] of results) state[key]=assertOk(result)||[];
+  const hiddenOrders=new Set(state.removedOrders.map(x=>x.kind+':'+x.order_id));
+  state.orders=state.orders.filter(x=>!hiddenOrders.has('avulso:'+x.id));
+  state.storeOrders=state.storeOrders.filter(x=>!hiddenOrders.has('loja:'+x.id));
+  state.eventPickBatches=state.eventPickBatches.filter(x=>!hiddenOrders.has('evento:'+x.id));
   const updated=state.users.find(x=>x.id===state.user.id);
   if(updated)state.profile=updated;
   if(!state.profile?.active)throw new Error('Seu usuário está desativado.');
@@ -1189,6 +1194,7 @@ function ordersPage(separationOnly=false){
   canDispatch:o=>o.kind==='evento'&&!portal&&isManager()&&hasPermission('orders.dispatch'),
   canDispatchStock:o=>!portal&&hasPermission('orders.dispatch')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id)),
   canAdjust:o=>!portal&&hasPermission('orders.dispatch'),
+  canDelete:o=>!portal&&isAdmin(),
   canCancel:o=>o.kind==='evento'?(!portal&&isManager()&&hasPermission('events.separate')):
     (portal&&o.kind==='loja'&&o.isOwner&&
      ['solicitado','pendente_estoque','aprovado'].includes(o.status))||
@@ -3327,6 +3333,20 @@ async function handleClick(event){
     const form=target.closest('form');
     form?.querySelector(action==='take-photo'?'input[name="camera_file"]':'input[name="gallery_file"]')?.click();return;
   }
+  if(action==='admin-order-delete-open'){
+    if(!isAdmin()||isFranchisePortal())return toast('Somente administradores podem excluir pedidos.',true);
+    const kind=target.dataset.kind,order=unifiedOrderById(kind,id);
+    if(!order||!['avulso','loja','evento'].includes(kind))return toast('Pedido não encontrado.',true);
+    const code=String(order.id).slice(0,8).toUpperCase();
+    formModal('Excluir '+(kind==='evento'?'lote':'pedido')+' #'+code,
+      '<div class="note"><strong>Exclusão administrativa</strong><p>Este registro sairá da lista de Pedidos e das filas operacionais. Se ainda estiver em andamento, será cancelado e suas reservas serão liberadas. Movimentações de estoque já realizadas e registros de auditoria serão preservados.</p></div>'+
+      '<p class="help">Para confirmar, digite exatamente <strong>'+h(code)+'</strong>.</p>'+
+      field('Código de confirmação','confirmation','text','','required autocomplete="off" maxlength="8" autocapitalize="characters"'),
+      'admin-order-delete','Excluir pedido');
+    const form=document.querySelector('.modalback form[data-form="admin-order-delete"]');
+    if(form){form.dataset.order=id;form.dataset.kind=kind;}
+    return;
+  }
   if(action==='order-retry'){
     const kind=target.dataset.kind,order=unifiedOrderById(kind,id);
     if(!order||!hasPermission('orders.dispatch')||isFranchisePortal())return;
@@ -3602,6 +3622,17 @@ async function handleSubmit(event){
       state.profile={id:state.user.id,full_name:name,email:state.user.email,role:'admin',active:true};
     },'Administrador ativado com sucesso.');
     return;
+  }
+  if(type==='admin-order-delete'){
+    if(!isAdmin()||isFranchisePortal())return toast('Somente administradores podem excluir pedidos.',true);
+    const kind=form.dataset.kind,id=form.dataset.order,
+      code=String(id||'').slice(0,8).toUpperCase(),
+      confirmation=String(values.confirmation||'').trim().toUpperCase();
+    if(!['avulso','loja','evento'].includes(kind)||!id||confirmation!==code)
+      return toast('Digite o código do pedido para confirmar a exclusão.',true);
+    return exec(async()=>assertOk(await db.rpc('admin_remove_order',{
+      p_kind:kind,p_order_id:id,p_confirmation:confirmation
+    })),'Pedido excluído da operação. Histórico de estoque preservado.');
   }
   if(type==='buy-suppliers-list'){closeTopModal();return;}
   if(type==='buy-supplier-save'){
