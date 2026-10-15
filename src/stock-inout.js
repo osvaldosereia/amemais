@@ -13,18 +13,18 @@ export function stockOperationResults(products,models,query,groupInventory){
   const grouped=groupInventory(products.filter(p=>p.active&&keys.has(p.apparel_model_id?'m:'+p.apparel_model_id:'p:'+p.id)),models);
   return grouped.slice(0,16);
 }
-export function stockOperationSearchHTML({groups,h=esc,qtyStore}){
+export function stockOperationSearchHTML({groups,h=esc,qtyStore,qtyAvailable=qtyStore,kind='entrada'}){
   if(!groups.length)return '<p class="stock-no-results">Produto não localizado neste cadastro ativo.</p>';
   return groups.map(group=>
     '<section class="stock-search-group"><strong>'+h(group.title)+'</strong>'+
     group.products.map(p=>'<button type="button" class="stock-pick" data-action="stock-pick" data-id="'+h(p.id)+'">'+
       '<span class="stock-pick-name">'+h(group.modelId?[p.apparel_color,p.apparel_size].filter(Boolean).join(' · '):p.name)+
         '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small></span>'+
-      '<span class="stock-pick-quantity">'+qtyStore(p.id)+' un.</span>'+
+      '<span class="stock-pick-quantity">'+(kind==='saida'?qtyAvailable(p.id):qtyStore(p.id))+' un. '+(kind==='saida'?'livres':'físicas')+'</span>'+
       '<span aria-hidden="true" class="stock-pick-add">+ Adicionar</span></button>').join('')+
     '</section>').join('');
 }
-export function stockCartHTML({cart,items,models,qtyStore,groupInventory,kind,photoButton,h=esc}){
+export function stockCartHTML({cart,items,models,qtyStore,qtyAvailable=qtyStore,groupInventory,kind,photoButton,h=esc}){
   const grouped=groupInventory(items.filter(p=>p.active&&cart.has(p.id)),models);
   if(!grouped.length)return '<div class="stock-cart-empty">Nenhum item adicionado. Busque ou leia o EAN para começar.</div>';
   const type=kind==='entrada'?'Entrada':'Saída';
@@ -33,12 +33,12 @@ export function stockCartHTML({cart,items,models,qtyStore,groupInventory,kind,ph
       '<div class="stock-cart-title"><strong>'+h(group.title)+'</strong>'+
         '<small>'+group.products.length+' variação(ões) selecionada(s)</small></div></div>'+
     '<div class="stock-cart-variants">'+group.products.map(p=>{
-      const line=cart.get(p.id),qty=Number(line.quantity)||0,available=qtyStore(p.id);
-      const after=available+(kind==='entrada'?qty:-qty);
+      const line=cart.get(p.id),qty=Number(line.quantity)||0,physical=qtyStore(p.id),free=qtyAvailable(p.id);
+      const after=physical+(kind==='entrada'?qty:-qty);
       return '<div class="stock-cart-line" data-stock-line="'+h(p.id)+'">'+
         '<div class="stock-line-meta"><strong>'+h(group.modelId?[p.apparel_color,p.apparel_size].filter(Boolean).join(' · '):p.name)+'</strong>'+
         '<small>EAN '+h(p.ean||'—')+' · SKU '+h(p.sku||'—')+'</small>'+
-        '<small>Atual: <b>'+available+'</b> · Após '+type.toLowerCase()+': <b data-stock-projected>'+after+'</b> un.</small></div>'+
+        '<small>Físico: <b>'+physical+'</b> · Livre: <b>'+free+'</b> · Após '+type.toLowerCase()+': <b data-stock-projected>'+after+'</b> un. físicos</small></div>'+
         '<div class="stock-line-controls">'+
           '<button type="button" data-action="stock-minus" data-id="'+h(p.id)+'" aria-label="Diminuir uma unidade">−</button>'+
           '<input type="number" min="1" max="1000000" step="1" inputmode="numeric" data-stock-qty data-id="'+h(p.id)+'" aria-label="Quantidade de '+h(p.name)+'" value="'+qty+'">'+
@@ -72,7 +72,7 @@ export function stockOperationHistoryHTML({batches,destinations,lines=[],items=[
       '</details>';
   }).join('');
 }
-export function operationCartLines(cart,products,qtyStore,kind){
+export function operationCartLines(cart,products,qtyStore,kind,qtyAvailable=qtyStore){
   const byId=new Map(products.map(p=>[p.id,p])),arr=[];
   for(const [id,line] of cart){
     const p=byId.get(id),quantity=Number(line.quantity);
@@ -80,14 +80,14 @@ export function operationCartLines(cart,products,qtyStore,kind){
     if(!Number.isInteger(quantity)||quantity<1||quantity>1000000)
       throw Error('Informe quantidade entre 1 e 1.000.000 para cada item.');
     const current=qtyStore(id);
-    if(kind==='saida'&&quantity>current)throw Error('Estoque insuficiente para '+p.name+'. Disponível: '+current+'.');
+    if(kind==='saida'&&quantity>qtyAvailable(id))throw Error('Estoque livre insuficiente para '+p.name+'. Disponível: '+qtyAvailable(id)+'. Reservas não podem ser utilizadas.');
     arr.push({product_id:id,quantity,expected:line.expected});
   }
   if(!arr.length)throw Error('Adicione pelo menos um produto.');
   if(arr.length>100)throw Error('Limite de 100 variações por operação.');
   return arr;
 }
-export function stockOperationPage({kind,query,cart,items,models,destinations,batches,batchLines=[],selectedDestination='',qtyStore,groupInventory,photoButton,h=esc,button}){
+export function stockOperationPage({kind,query,cart,items,models,destinations,batches,batchLines=[],selectedDestination='',qtyStore,qtyAvailable=qtyStore,groupInventory,photoButton,h=esc,button}){
  const entry=kind==='entrada';
  const groups=stockOperationResults(items,models,query,groupInventory);
  const active=destinations.filter(d=>d.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
@@ -106,8 +106,8 @@ export function stockOperationPage({kind,query,cart,items,models,destinations,ba
      (d.active?button('Editar','stock-destination-edit','data-id="'+h(d.id)+'"','small')+
        button('Desativar','stock-destination-disable','data-id="'+h(d.id)+'"','small danger'):'')+
    '</div>').join(''):'<p>Nenhum destino cadastrado.</p>')+'</div></details></section>';
- const rows=stockCartHTML({cart,items,models,qtyStore,groupInventory,kind,photoButton,h});
- const search=query.trim()?stockOperationSearchHTML({groups,h,qtyStore}):
+ const rows=stockCartHTML({cart,items,models,qtyStore,qtyAvailable,groupInventory,kind,photoButton,h});
+ const search=query.trim()?stockOperationSearchHTML({groups,h,qtyStore,qtyAvailable,kind}):
     '<p class="stock-search-welcome">Pesquise pelo nome, SKU ou leia um código EAN.</p>';
  const stepSearch=entry?'1':'2',stepCart=entry?'2':'3';
  return '<div class="stock-op-v2 '+(entry?'stock-entry':'stock-exit')+'">'+
