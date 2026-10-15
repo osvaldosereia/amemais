@@ -37,7 +37,7 @@ function itemRow(o,scope,ctx){
  };
  const quickPrint=ctx.canPrint?.(o)&&o.lines?.length&&
   !['legado','solicitado','pendente_estoque','cancelado','expirado'].includes(o.status)?
-  ctx.button('Imprimir A4','order-print-a4',
+  ctx.button('Imprimir 80 mm','order-print-thermal',
    'data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"','small'):'';
  return '<div class="sh-order-line">'+
   '<div class="sh-order-identity"><strong>'+label+' #'+esc(o.id.slice(0,8).toUpperCase())+'</strong>'+
