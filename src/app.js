@@ -1963,6 +1963,21 @@ async function handleClick(event){
   }
   if(action==='store-order-new')return storeOrderModal();
   if(action==='store-order-separate')return storePickingModal(id);
+  if(action==='store-pick-scan'){
+    return scanEAN(code=>{
+      const form=document.querySelector('.modalback form[data-form="store-order-picking"]');
+      if(!form)return;
+      const matches=state.items.filter(p=>p.active&&(p.ean===code||p.sku===code));
+      if(matches.length!==1)return toast('EAN/SKU não localizado ou ambíguo.',true);
+      const input=[...form.querySelectorAll('[data-pick-qty]')].find(x=>x.dataset.id===matches[0].id);
+      if(!input)return toast('Produto não pertence ao pedido.',true);
+      const qty=Number(input.value||0),max=Number(input.dataset.expected);
+      if(qty>=max)return toast('Quantidade do SKU já conferida.',true);
+      input.value=String(qty+1);
+      input.closest('.store-picking-line')?.classList.toggle('is-picked',qty+1===max);
+      toast('Conferido: '+matches[0].name+' ('+(qty+1)+' / '+max+')');
+    });
+  }
   if(['store-order-approve','store-order-dispatch',
        'store-order-receive','store-order-cancel'].includes(action)){
     const order=state.storeOrders.find(x=>x.id===id);if(!order)return;
