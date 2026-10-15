@@ -41,7 +41,7 @@ export function recentInventoryGroups(items,models,limit=6){
       a.group.key.localeCompare(b.group.key))
     .slice(0,max).map(entry=>entry.group);
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canShare=false,expanded=false,mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canShare=false,expanded=false,mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path)||group.main;
   const active=group.products.filter(p=>p.active);
@@ -51,6 +51,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const skuAccess=isProducts&&canManageSku();
   const inlineCount=isProducts&&canQuickCount();
   const manage=isProducts&&isManager();
+  const canRemoveEntireModel=isProducts&&Boolean(group.modelId)&&canDeleteWholeModel();
   const quantity=p=>mode==='event'?qtyEvent(p.id,eventId):qtyStore(p.id);
   const count=active.reduce((sum,p)=>sum+quantity(p),0);
   const groupReserved=isProducts?active.reduce((sum,p)=>sum+qtyReserved(p.id),0):0;
@@ -112,7 +113,8 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     (group.modelId&&canEdit?'<button type="button" data-action="add-variants" data-id="'+h(group.modelId)+'">+ Adicionar variações</button>':'')+
     (manage?'<button type="button" class="product-menu-danger" data-action="'+
       (group.modelId?'product-card-edit':'product-delete')+'" data-id="'+h(groupEditId)+'">'+
-      (group.modelId?'Gerenciar / excluir tamanhos':'Excluir produto')+'</button>':'');
+      (group.modelId?'Gerenciar / excluir tamanhos':'Excluir produto')+'</button>':'')+
+    (canRemoveEntireModel?'<button type="button" class="product-menu-danger" data-action="product-model-delete" data-id="'+h(group.modelId)+'">Excluir produto completo · todas as variações</button>':'');
   const actions=isProducts?
     '<div class="grouped-inventory-actions">'+
       (sizeCount===1&&skuAccess?button('Gerenciar SKU','sku-manage','data-id="'+h(main.id)+'"','primary'):'')+
