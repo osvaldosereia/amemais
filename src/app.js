@@ -2389,7 +2389,7 @@ async function handleClick(event){
    if(image?.src)return photoLightbox(image.src,'Foto do produto');
    return;
   }
-  if(action==='gallery-remove'){galleryRemove(target.closest('form'),Number(target.dataset.index));return;}
+  if(action==='gallery-remove'){galleryRemove(target.closest('form'),Number(target.dataset.index));hydrateImages();return;}
   if(action==='gallery-primary'){galleryMain(target.closest('form'),Number(target.dataset.index));hydrateImages();return;}
   if(action==='preview-zoom'){
     const preview=target.querySelector('img');
