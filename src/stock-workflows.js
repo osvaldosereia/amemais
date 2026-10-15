@@ -128,12 +128,12 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<small class="product-card-description">'+h(description)+'</small>'+
         '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
           '<small>'+stockLabel+'</small><span><b>'+fmt(count)+'</b> un.</span></div>'+
-        (isProducts?'<div class="stock-total-breakdown">'+
-          '<div class="stock-total-metric reserved"><small>Reservado</small><strong>'+fmt(groupReserved)+'</strong><span>un.</span></div>'+
-          '<div class="stock-total-metric available"><small>Livre</small><strong>'+fmt(groupAvailable)+'</strong><span>un.</span></div>'+
-          '</div>':'')+
         '<small class="product-card-location">'+h(location)+'</small>'+
       '</div>'+
+      (isProducts?'<div class="stock-total-breakdown">'+
+          '<div class="stock-total-metric reserved"><small>Reservado</small><strong>'+fmt(groupReserved)+'</strong><span>un.</span></div>'+
+          '<div class="stock-total-metric available"><small>Livre</small><strong>'+fmt(groupAvailable)+'</strong><span>un.</span></div>'+
+        '</div>':'')+
     '</div>'+
 
     (isProducts?actions:'')+
