@@ -78,7 +78,7 @@ export function shelfLabelPicker(products,modelName=''){
  return '<div class="shelf-label-picker">'+
  '<p>Escolha os tamanhos e a quantidade de etiquetas para cada variação. Cada etiqueta terá seu próprio código de barras e a gôndola cadastrada.</p>'+
  '<div class="shelf-label-preview-title">Prévia da etiqueta (bobina de 80 mm)</div>'+
- '<div class="shelf-label-preview">'+(items.length?shelfLabelArticle(items[0]):'Nenhum produto cadastrado.')+'</div>'+
+ '<div class="shelf-label-preview">'+(items.length?shelfLabelArticle(items.find(x=>x.valid)||items[0]):'Nenhum produto cadastrado.')+'</div>'+
  '<div class="shelf-label-variant-head"><strong>Etiquetas a imprimir</strong><small>1 por variação, por padrão</small></div>'+
  '<div class="shelf-label-variants">'+items.map((x,i)=>{
   const eligible=Boolean(products[i]?.active)&&x.valid;
@@ -97,7 +97,7 @@ export function shelfLabelPicker(products,modelName=''){
       '" min="1" max="20" step="1" inputmode="numeric" value="1" '+(!eligible?'disabled':'')+'></label>'+
   '</div>';
  }).join('')+'</div>'+
- '<p class="shelf-label-help">Formato de impressão: <b>80 mm de largura × 56 mm por etiqueta</b>, sem fotos, preço ou quantidade em estoque. Não confundir o código impresso com o código do pedido.</p>'+
+ '<p class="shelf-label-help">Formato de impressão: <b>80 mm de largura × 56 mm por etiqueta</b> (até 40 por impressão), sem fotos, preço ou quantidade em estoque. Não confundir o código impresso com o código do pedido.</p>'+
  '</div>';
 }
 export function collectShelfLabels(products,form,modelName=''){
@@ -109,7 +109,7 @@ export function collectShelfLabels(products,form,modelName=''){
   const copiesRaw=form.querySelector('[data-shelf-label-copies="'+item.id+'"]')?.value||'1';
   if(!/^(?:[1-9]|1\d|20)$/.test(copiesRaw))throw Error('Informe de 1 a 20 cópias por variação.');
   for(let n=0;n<Number(copiesRaw);n++){
-   if(output.length>=100)throw Error('Limite de 100 etiquetas por impressão.');
+   if(output.length>=40)throw Error('Limite de 40 etiquetas por impressão.');
    output.push(item);
   }
  }
@@ -117,8 +117,8 @@ export function collectShelfLabels(products,form,modelName=''){
  return output;
 }
 export function shelfLabelsHTML(items){
- if(!Array.isArray(items)||!items.length||items.length>100)
-  throw Error('Selecione de 1 a 100 etiquetas.');
+ if(!Array.isArray(items)||!items.length||items.length>40)
+  throw Error('Selecione de 1 a 40 etiquetas.');
  if(items.some(item=>!item?.valid))throw Error('Etiqueta sem gôndola ou código válido.');
  const css=[
  '<style>',
@@ -165,10 +165,10 @@ export function shelfLabelsHTML(items){
  '<script>',
  'window.printLabels80=()=>{',
  'const sheet=document.querySelector(".label-sheet");if(!sheet)return;',
- 'const mm=Math.ceil(sheet.getBoundingClientRect().height*25.4/96+2);',
+ 'const mm=sheet.querySelectorAll(".shelf-label").length*56+2;',
  'let tag=document.getElementById("shelf-page-size");',
  'if(!tag){tag=document.createElement("style");tag.id="shelf-page-size";document.head.append(tag);}',
- 'tag.textContent="@page{size:80mm "+Math.max(56,Math.min(6000,mm))+"mm;margin:0}";',
+ 'tag.textContent="@page{size:80mm "+Math.max(56,Math.min(2250,mm))+"mm;margin:0}";',
  'window.focus();window.print();',
  '};',
  'window.addEventListener("load",()=>window.printLabels80());',
