@@ -2706,7 +2706,7 @@ async function handleClick(event){
     if(!canRegisterProducts())return;
     try{const p=product(id),m=state.apparelModels.find(x=>x.id===p?.apparel_model_id);
       return apparelVariantEditModal(p,{h,formModal,
-        variationOptions:resolveCategoryVariations(state.categories,m?.category_id||p?.category_id).options});
+        variationOptions:resolveCategoryVariations(state.categories,m?.category_id||p?.category_id).options,procurementFields});
     }catch(error){fail(error);return;}
   }
   if(action==='apparel-photo'){
@@ -3506,7 +3506,7 @@ async function handleSubmit(event){
   if(type==='apparel-edit-variant'){
     if(!canRegisterProducts())return;
     state.loading=true;
-    try{await saveApparelVariant(form,{db,assertOk,loadData,closeTopModal,toast});}
+    try{await saveApparelVariant(form,{db,assertOk,loadData,closeTopModal,toast,procurementValues});}
     catch(error){fail(error);}finally{state.loading=false;}
     return;
   }
@@ -4187,6 +4187,7 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-buy-search]'))syncPurchaseForm(event.target.closest('form'));
   if(event.target.matches('[data-count-free]')){
     const input=event.target,row=input.closest('[data-product-id]');
     const save=row?.querySelector('[data-action="stock-free-save"]');
@@ -4307,6 +4308,8 @@ document.addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('[data-buy-modal-supplier]'))syncPurchaseForm(event.target.closest('form'));
+  if(event.target.matches('[data-buy-filter]')){state.purchaseSupplierFilter=event.target.value;render();return;}
   if(event.target.matches('[data-unified-status]')){
     const container=event.target.closest('.uo-page');
     filterUnifiedOrders(container,container?.querySelector('[data-unified-search]')?.value||'',
