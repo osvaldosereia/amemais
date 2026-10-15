@@ -54,7 +54,7 @@ export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE',photoU
  const skuCount=locations.reduce((sum,group)=>sum+group.lines.length,0);
  const css=[
  '<style>',
- '@page{size:80mm auto;margin:0}',
+ '@page{margin:0}',
  '*{box-sizing:border-box}',
  'html,body{padding:0;margin:0;background:#fff;color:#000}',
  'body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
@@ -94,18 +94,27 @@ export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE',photoU
  ].join('');
  const autoPrint=[
  '<script>',
+ 'window.printSlip80=()=>{',
+ 'const slip=document.querySelector(".slip");',
+ 'if(!slip)return;',
+ 'const heightMM=Math.ceil(slip.getBoundingClientRect().height*25.4/96+5);',
+ 'let page=document.getElementById("thermal-page-size");',
+ 'if(!page){page=document.createElement("style");page.id="thermal-page-size";document.head.append(page);}',
+ 'page.textContent="@page{size:80mm "+Math.min(3000,Math.max(40,heightMM))+"mm;margin:0}";',
+ 'window.focus();window.print();',
+ '};',
  'window.addEventListener("load",async()=>{',
  'const pending=Array.from(document.images,img=>img.complete?Promise.resolve():new Promise(resolve=>{',
  'img.addEventListener("load",resolve,{once:true});img.addEventListener("error",resolve,{once:true});}));',
  'await Promise.race([Promise.all(pending),new Promise(resolve=>setTimeout(resolve,7000))]);',
- 'window.focus();window.print();',
+ 'window.printSlip80();',
  '});',
  '</script>'
  ].join('');
  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'+
  '<meta name="viewport" content="width=device-width, initial-scale=1">'+
  '<title>Separação térmica '+esc(title)+' #'+esc(code)+'</title>'+css+'</head><body>'+
- '<div class="screen-actions"><button onclick="window.print()">Imprimir bobina 80 mm</button>'+
+ '<div class="screen-actions"><button onclick="window.printSlip80()">Imprimir bobina 80 mm</button>'+
  '<button onclick="window.close()">Fechar</button></div>'+
  '<main class="slip"><header><div class="brand">'+esc(brand)+'</div>'+
   '<h1>LISTA DE SEPARAÇÃO</h1></header>'+
