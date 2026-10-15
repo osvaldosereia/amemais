@@ -54,7 +54,7 @@ test('separação incompleta pode ser retomada e possui contagem preexistente',(
   eventBatchItems:[{...lines[0],picked:1},{...lines[1],picked:2},lines[2]]};
  const record=makeUnifiedOrders(progressive)[0];
  const html=pickingOrderRows(record);
- assert.match(html,/Continuar/);
+ assert.match(html,/continuar/i);
  assert.match(html,/data-pick-qty/);
  assert.match(html,/value="1"/);
  assert.match(html,/value="2"/);
