@@ -63,7 +63,7 @@ test('permite separar e imprimir A4 diretamente na fila das lojas',()=>{
   stores:[{id:'central',name:'Central',is_primary:true,kind:'central'},
    {id:'fran-a',name:'Franquia A',kind:'franquia',active:true}],
   events:[{id:'event-a',name:'Evento A',status:'ativo'}],
-  orders:sample.map(x=>({...x,lines:[{id:'sku-1',quantity:1}]})),
+  orders:sample.map(x=>({...x,status:x.id==='store-1'?'aprovado':x.status,lines:[{id:'sku-1',quantity:1}]})),
   context:{...ctx,canProcess:()=>true,canPrint:()=>true}
  });
  assert.match(html,/data-action="avulso-pick"/);
