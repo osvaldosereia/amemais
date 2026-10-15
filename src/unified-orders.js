@@ -207,8 +207,8 @@ export function filterUnifiedOrders(container,query,status){
  for(const card of container.querySelectorAll('[data-order-card]')){
   const s=card.dataset.orderStatus;
   const match=status==='todos'||!status||
-    (status==='pendentes'&&['legado','solicitado','reservado','aprovado','separado','despachado'].includes(s))||
-    (status==='concluidos'&&['concluido','recebido','recebido_divergente'].includes(s))||
+    (status==='pendentes'&&['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado','despachado'].includes(s))||
+    (status==='concluidos'&&['enviado','concluido','recebido','recebido_divergente'].includes(s))||
     (status==='encerrados'&&['cancelado','expirado'].includes(s))||
     status===s;
   card.hidden=!match||!card.dataset.search.includes(q);
@@ -219,15 +219,24 @@ export function filterUnifiedOrders(container,query,status){
  return visible;
 }
 export function pickingOrderRows(order,{h=esc}={}){
- return '<p class="help">Confira cada tamanho por leitura EAN ou quantidade manual. A separação não reduz o físico.</p>'+
- '<div class="uo-pick-toolbar"><button type="button" class="button" data-action="order-scan-ean">📷 Ler EAN</button>'+
- '<span>Conferido: <b data-picked-total>0</b> de '+n(order.total)+' unidades</span></div>'+
- '<div class="uo-picking">'+order.lines.map(l=>
- '<div class="store-picking-line" data-picking-row="'+h(l.id)+'">'+
- '<div><strong>'+h(l.name)+'</strong><small>'+h([l.color,l.size,l.sku,l.ean].filter(Boolean).join(' · '))+
- '</small><small>Reservadas: '+l.reserved+' un. · Gôndola '+h(l.gondola||'—')+'</small></div>'+
- '<label>Conferido<input type="number" data-pick-qty data-id="'+h(l.id)+'" data-expected="'+l.quantity+
- '" min="0" max="'+l.quantity+'" step="1" inputmode="numeric" value="0"></label></div>').join('')+'</div>';
+ const isEvent=order.kind==='evento';
+ return '<p class="help">Separe por gôndola e confira pelo EAN ou quantidade. Salve a conferência para continuar em outro momento. O estoque físico só sai na expedição.</p>'+
+ '<div class="uo-pick-toolbar"><button type="button" class="button" data-action="'+
+ (isEvent?'event-batch-scan':'order-scan-ean')+'">📷 Ler EAN</button>'+
+ '<span>Separadas: <b data-picked-total>'+n(order.lines.reduce((a,l)=>a+(l.picked||0),0))+
+ '</b> / '+n(order.total)+' unidades</span></div>'+
+ '<div class="uo-picking">'+groupedOrderLines(order.lines).map(group=>
+  '<section class="uo-pick-model"><h3>'+h(group.title)+' <small>'+group.lines.length+' variações</small></h3>'+
+   group.lines.map(l=>'<div class="store-picking-line" data-picking-row="'+h(l.id)+'">'+
+    '<div><strong>'+h([l.color,l.size].filter(x=>x&&x!=='Única').join(' · ')||'Único')+
+    '</strong><small>SKU '+h(l.sku||'—')+' · EAN '+h(l.ean||'—')+'</small>'+
+    '<small>'+h(l.gondola?'Gôndola '+l.gondola:'Local não informado')+
+     (l.prateleira?' · Prateleira '+h(l.prateleira):'')+'</small></div>'+
+    '<label>Separado<input type="number" data-pick-qty data-id="'+h(l.id)+'" data-expected="'+l.quantity+
+     '" min="0" max="'+l.quantity+'" step="1" inputmode="numeric"'+
+     (l.picked>0?' value="'+l.picked+'"':' placeholder="—"')+'></label></div>').join('')+
+  '</section>').join('')+'</div>'+
+ (isEvent?'<p class="help">Você pode salvar quantidades parciais e voltar depois. Cada leitura soma uma unidade, até o limite solicitado.</p>':'');
 }
 export function shortageEditRows(order,{h=esc}={}){
  return '<p class="help">Se o estoque não atender ao pedido, você pode reduzir quantidades justificadamente ou aguardar reposição. A quantidade original fica no histórico. Zero retira o SKU deste atendimento.</p>'+
@@ -239,26 +248,51 @@ export function shortageEditRows(order,{h=esc}={}){
  '<label class="field">Justificativa obrigatória<textarea name="reason" minlength="5" maxlength="250" required placeholder="Ex.: furo identificado na separação"></textarea></label>';
 }
 export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE'}={}){
- const rows=order.lines.map(l=>'<tr><td>'+esc(l.name)+'</td><td>'+esc([l.color,l.size].filter(Boolean).join(' · '))+
- '</td><td>'+esc(l.sku||'—')+'</td><td>'+esc(l.ean||'—')+'</td>'+
- '<td class="center"><b>'+l.quantity+'</b></td><td class="center">'+l.reserved+'</td>'+
- '<td class="hand"></td><td class="center">□</td></tr>').join('');
- return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Separação '+esc(order.id)+'</title>'+
- '<style>@page{size:A4 portrait;margin:12mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#192d22}'+
- 'header{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #176747;padding-bottom:12px;margin-bottom:16px}'+
- 'h1{font-size:19px;margin:4px 0}.brand{font-size:22px;color:#176747;font-weight:900}'+
- 'table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{border:1px solid #afc5b7;padding:7px 5px;word-break:break-word}'+
- 'th{background:#ecf5ed}th,td{font-size:9px}.center{text-align:center}.hand{height:28px}'+
- '.summary{margin-top:15px;border:1px solid #bad2bf;padding:12px}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:40px}'+
- '.signatures>div{border-top:1px solid #476453;padding:7px;text-align:center}'+
- '@media print{tr{break-inside:avoid}}</style></head><body>'+
- '<header><div><div class="brand">'+esc(brand)+'</div><h1>LISTA DE SEPARAÇÃO</h1>'+
- '<span>Pedido #'+esc(order.id.slice(0,8).toUpperCase())+'</span></div>'+
- '<div><b>'+esc(order.target)+'</b><p>Origem: '+esc(order.origin)+'</p><p>Impresso em: '+esc(printedAt)+'</p></div></header>'+
- '<table><thead><tr><th>Produto</th><th>Cor / tam.</th><th>SKU</th><th>EAN</th>'+
- '<th>Pedido</th><th>Reserv.</th><th>Separado</th><th>Conf.</th></tr></thead><tbody>'+rows+'</tbody></table>'+
- '<div class="summary"><b>Total solicitado: '+n(order.total)+' unidades · Reservado: '+n(order.reserved)+
- ' · Faltando: '+n(order.missing)+'</b><p>Observações e divergências: _______________________________________________</p></div>'+
- '<div class="signatures"><div>Separado por / Data</div><div>Conferido por / Data</div></div>'+
- '<script>window.addEventListener("load",()=>{window.focus();window.print()});<\/script></body></html>';
+ const groups=groupedOrderLines(order.lines);
+ const compactGroups=groups.map(g=>'<tbody class="lot-group"><tr class="lot-group-title"><td colspan="7">'+
+  esc(g.title)+' · '+g.lines.length+' variação(ões) · '+n(g.total)+' unidades</td></tr>'+
+  g.lines.map(l=>'<tr><td>'+esc([l.color,l.size].filter(x=>x&&x!=='Única').join(' · ')||'Único')+
+   '</td><td>'+esc(l.gondola?'Gôndola '+l.gondola:'Não informada')+
+    (l.prateleira?' / '+esc(l.prateleira):'')+
+   '</td><td>'+esc(l.sku||'—')+'</td><td>'+esc(l.ean||'—')+'</td>'+
+   '<td class="center"><b>'+n(l.quantity)+'</b></td>'+
+   '<td class="write"></td><td class="center check"></td></tr>').join('')+'</tbody>').join('');
+ const name=order.kind==='evento'?'LOTE DE EVENTO':'PEDIDO';
+ const code=order.kind==='evento'?'Lote '+String(order.sequence||'').padStart(2,'0'): 'Pedido';
+ const reserve=order.reserved>0?' · Reservado: '+n(order.reserved):'';
+ const shortage=order.missing>0?' · Faltando: '+n(order.missing):'';
+ return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'+
+  '<title>Separação '+esc(code)+' '+esc(order.id.slice(0,8))+'</title>'+
+  '<style>@page{size:A4 portrait;margin:10mm 10mm 12mm}*{box-sizing:border-box}'+
+  'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#192f24;margin:0}'+
+  'header{display:flex;justify-content:space-between;gap:14px;border-bottom:2px solid #155f42;padding-bottom:7px;margin-bottom:9px}'+
+  '.brand{font-size:13pt;color:#176747;font-weight:900;letter-spacing:.2pt}h1{font-size:13pt;margin:2px 0 4px}'+
+  '.reference{font-size:8pt;color:#66796d;overflow-wrap:anywhere}.meta{text-align:right;line-height:1.4;font-size:8pt}'+
+  '.header-note{font-size:8pt;margin:7px 0 11px;padding:6px;background:#f3f7f3;border:1px solid #dee8e0}'+
+  'table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}'+
+  'th,td{border:1px solid #bdcdc1;padding:4px 5px;vertical-align:middle;overflow-wrap:anywhere}'+
+  'th{background:#eaf2ec;font-size:7.5pt}td{font-size:7.7pt;line-height:1.2}'+
+  '.lot-group-title td{font-weight:800;background:#f0f6f1;color:#1a5036;padding:5px}'+
+  '.lot-group{break-inside:avoid-page}tr{break-inside:avoid}.center{text-align:center;font-variant-numeric:tabular-nums}'+
+  '.write{height:22px}.check{height:22px}.totals{font-size:8.5pt;margin-top:10px;padding:6px 0;border-top:1px solid #9cb7a3}'+
+  '.signatures{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:29px}'+
+  '.signatures>div{border-top:1px solid #53665a;text-align:center;padding-top:5px;font-size:8pt}'+
+  '.instructions{font-size:7.5pt;color:#526658;margin-top:9px}'+
+  '</style></head><body>'+
+  '<header><div><div class="brand">'+esc(brand)+'</div><h1>SEPARAÇÃO · '+name+'</h1>'+
+   '<div class="reference">'+esc(code)+' #'+esc(order.id.slice(0,8).toUpperCase())+'</div>'+
+   '<div class="reference">Identificador: '+esc(order.id)+'</div></div>'+
+   '<div class="meta"><b>DESTINO: '+esc(order.target)+'</b><div>Origem: '+esc(order.origin)+'</div>'+
+    '<div>Emissão: '+esc(printedAt)+'</div></div></header>'+
+  '<div class="header-note"><b>'+n(groups.length)+' modelo(s) · '+n(order.lines.length)+' variação(ões) · '+
+   n(order.total)+' unidades solicitadas</b>. Marque somente após encontrar cada item.</div>'+
+  '<table><thead><tr><th style="width:14%">Variação</th><th style="width:22%">Gôndola / local</th>'+
+  '<th style="width:15%">SKU</th><th style="width:21%">EAN</th>'+
+  '<th style="width:9%">Qtde</th><th style="width:12%">Separado</th><th style="width:7%">✓</th>'+
+  '</tr></thead>'+compactGroups+'</table>'+
+  '<div class="totals"><b>Total solicitado: '+n(order.total)+' unidades'+reserve+shortage+
+   '</b><div>Observações / divergências: _________________________________________________</div></div>'+
+  '<div class="signatures"><div>Separador · assinatura / hora</div><div>Conferente · assinatura / hora</div></div>'+
+  '<p class="instructions">Mantenha esta folha junto das mercadorias deste lote. O envio físico só será registrado após confirmação no sistema.</p>'+
+  '<script>window.addEventListener("load",()=>{window.focus();window.print()});<\\/script></body></html>';
 }
