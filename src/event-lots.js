@@ -16,7 +16,7 @@ export function eventLotForm(formHTML,{edit=false,number=null,note=''}={}){
   '<label class="field lot-note"><span>Identificação do lote (opcional)</span>'+
   '<input type="text" name="note" maxlength="180" value="'+esc(note)+'" placeholder="Ex.: reposição de sábado"></label>';
 }
-export function eventLotsOverview({event,batches,items,products,button,canCreate=false,time=x=>x}){
+export function eventLotsOverview({event,batches,items,products,button,canCreate=false,time=x=>x,codeForBatch=()=> '—'}){
  const scoped=batches.filter(b=>b.event_id===event.id).sort((a,b)=>a.sequence-b.sequence);
  const states={pendente_estoque:['Aguardando estoque','warning'],aguardando:['A separar','ready'],
   em_separacao:['Em separação','ready'],separado:['Separado','ready'],
@@ -30,8 +30,8 @@ export function eventLotsOverview({event,batches,items,products,button,canCreate
   const units=rows.reduce((n,l)=>n+Number(l.quantity),0);
   const count=selectedEventModels(rows,products);
   const picked=rows.reduce((n,l)=>n+Number(l.picked),0);
-  return '<div class="event-lot-row"><div><strong>Lote '+String(b.sequence).padStart(2,'0')+
-   '</strong><small>'+fmt(count)+' modelos · '+fmt(rows.length)+' variações · '+fmt(units)+' un.</small>'+
+  return '<div class="event-lot-row"><div><strong>Lote #'+esc(codeForBatch(b.id))+
+   '</strong><small>Remessa '+String(b.sequence).padStart(2,'0')+' · '+fmt(count)+' modelos · '+fmt(rows.length)+' variações · '+fmt(units)+' un.</small>'+
    '<small>'+fmt(picked)+' un. conferidas · '+esc(time(b.created_at))+'</small></div>'+
    '<span class="uo-pill '+info[1]+'">'+esc(info[0])+'</span>'+
    button('Ver na separação','event-batch-go','data-id="'+esc(b.id)+'"','small')+
