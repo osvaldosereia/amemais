@@ -889,6 +889,10 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
   mountLotCatalog(form,{groups,categories:state.categories,models:state.apparelModels,
     showAvailable:canSeeAvailable,onRender:()=>{hydrateImages();}});
   refreshEventLotCounter(form);
+  // O formulário padrão focaliza o primeiro campo com "name" (a observação no fim).
+  // Neste catálogo, a abertura deve começar pela busca e pela variedade de modelos.
+  form.scrollTop=0;
+  form.querySelector('[data-lot-search]')?.focus({preventScroll:true});
  }
 }
 function refreshEventLotCounter(form){
