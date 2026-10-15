@@ -84,6 +84,7 @@ export function validateSkuAction({mode,values,physical,reserved}){
   const raw=String(values[qtyField]??'').trim();
   if(!/^(0|[1-9][0-9]{0,6})$/.test(raw))throw Error('Informe uma quantidade inteira entre 0 e 1.000.000.');
   const qty=Number(raw);
+  if(!Number.isInteger(qty)||qty>1000000)throw Error('Quantidade acima do limite de 1.000.000.');
   if((mode==='entrada'||mode==='saida')&&qty<1)throw Error('Informe pelo menos uma unidade.');
   if(mode==='saida'&&qty>Math.max(0,physical-reserved))
    throw Error('Estoque livre insuficiente. Unidades reservadas não podem ser baixadas.');
