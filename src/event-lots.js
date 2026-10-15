@@ -11,15 +11,10 @@ export function selectedEventModels(items,products){
  return keys.size;
 }
 export function eventLotForm(formHTML,{edit=false,number=null,note=''}={}){
- return '<div class="event-lot-guidance"><strong>'+ (edit?'Editar':'Montar')+
-  ' lote'+(number?' '+String(number).padStart(2,'0'):'')+'</strong>'+
-  '<span>Até <b>10 modelos</b> por lote; tamanhos do mesmo modelo não contam novamente. '+ 
-  'Ao salvar, a separação aparece na fila de Pedidos / Separação.</span></div>'+
-  '<div class="event-lot-counter" data-event-lot-counter aria-live="polite">0 de 10 modelos selecionados</div>'+
+ return '<div class="event-lot-counter" data-event-lot-counter aria-live="polite">0 de 10 modelos · 0 unidades</div>'+
   formHTML+
-  '<label class="field"><span>Identificação / observação (opcional)</span>'+
-  '<input type="text" name="note" maxlength="180" value="'+esc(note)+'" placeholder="Ex.: reposição para o segundo dia"></label>'+
-  '<p class="help">Você pode criar outros lotes depois. O envio de cada lote será realizado e registrado separadamente.</p>';
+  '<label class="field lot-note"><span>Identificação do lote (opcional)</span>'+
+  '<input type="text" name="note" maxlength="180" value="'+esc(note)+'" placeholder="Ex.: reposição de sábado"></label>';
 }
 export function eventLotsOverview({event,batches,items,products,button,canCreate=false,time=x=>x}){
  const scoped=batches.filter(b=>b.event_id===event.id).sort((a,b)=>a.sequence-b.sequence);
