@@ -8,7 +8,7 @@ const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
 const sql=await readFile(new URL('../supabase/migrations/20261015_final_hybrid_barcode_verification.sql',import.meta.url),'utf8');
 const ui=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const mod=await import('data:text/javascript;base64,'+Buffer.from(uo).toString('base64'));
-const order={kind:'evento',id:'order-1',code:'AA003',status:'separado',lines:[
+const order={kind:'evento',id:'order-1',code:'AA003',status:'separado',adjustments:[],lines:[
  {id:'p1',ean:'000100005073',sku:'1000507',name:'Camiseta HDH preta',
   modelTitle:'Camiseta HDH preta',quantity:10,color:'Preta',size:'P',gondola:'3',imagePath:'item.webp'},
  {id:'p2',ean:'000100005074',sku:'1000508',name:'Camiseta HDH preta',
