@@ -36,7 +36,8 @@ export function permanentHome({stores=[],orders=[],button,time,userId}){
  const list=rows=>rows.slice(0,16).map(o=>
    '<article class="cdsb-order-row"><div><strong>Pedido #'+h(o.id.slice(0,8).toUpperCase())+'</strong>'+
    '<small>'+h(time(o.created_at))+' · '+h((stores.find(s=>s.id===o.to_store_id)?.name)||'Minha loja')+'</small></div>'+
-   '<span class="cdsb-status">'+h(labels[o.status]||o.status)+'</span>'+
+   '<span class="cdsb-status">'+h(labels[o.status]||o.status)+'</span>'+ 
+   button('Imprimir pedido','commercial-order-print','data-id="'+h(o.id)+'"','small')+
    (o.status==='despachado'?button('Confirmar entrega','commercial-confirm-delivery','data-id="'+h(o.id)+'"','small primary'):'')+
    '</article>').join('');
  return '<div class="cdsb-portal"><header class="cdsb-portal-head"><div><small>CDSB · Área da loja</small>'+
@@ -60,6 +61,7 @@ export function temporaryHome({events=[],balances=[],batches=[],button,time}){
     '<div class="cdsb-queue-actions">'+
     (e.status!=='encerrado'?button('Solicitar produtos','event-batch-new','data-event="'+h(e.id)+'"','primary'):'')+
     button('Pedidos e conferência','event-detail','data-id="'+h(e.id)+'"','small')+
+    button('Imprimir conferência','event-print-summary','data-id="'+h(e.id)+'"','small')+
     '</div></section>';
   }).join(''):'<section class="panel"><p class="cdsb-empty">Ainda não existe uma loja temporária vinculada à sua conta.</p></section>')+
   '<p class="cdsb-hint">Ao encerrar, informe apenas produtos bons devolvidos, avariados e quantidades não devolvidas. O CDSB não acompanha vendas.</p></div>';
