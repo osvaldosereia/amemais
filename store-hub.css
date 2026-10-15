@@ -68,3 +68,10 @@
  .sh-context{align-items:flex-start;flex-wrap:wrap;padding:12px}
 }
 @media(prefers-reduced-motion:reduce){.sh-history>summary span{transition:none}}
+
+.sh-order-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.sh-order-actions .button{min-height:34px;font-size:.72rem;white-space:nowrap}
+@media(max-width:760px){
+ .sh-order-actions{width:100%;justify-content:flex-start}
+ .sh-order-actions .button{margin-left:0;flex:1 1 auto}
+}
