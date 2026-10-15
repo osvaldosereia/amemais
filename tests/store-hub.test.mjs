@@ -69,8 +69,8 @@ test('franqueado vê somente franquias disponíveis e não a central nem tempor�
  });
  assert.match(html,/Franquia A/);
  assert.doesNotMatch(html,/Franquia B/);
- assert.doesNotMatch(html,/>Loja Central</h2>/);
- assert.doesNotMatch(html,/>Lojas Temporárias</h2>/);
+ assert.doesNotMatch(html,/>Loja Central<\/h2>/);
+ assert.doesNotMatch(html,/>Lojas Temporárias<\/h2>/);
 });
 test('lojas permitem atuar em pedidos próprios; CDSB fica somente na fila geral de Pedidos',()=>{
  const html=hub.renderStoreHub({
