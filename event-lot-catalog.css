@@ -1,0 +1,99 @@
+/* AME MAIS — catálogo visual para abastecer lojas temporárias. */
+.modalback:not(.tax-backdrop)>.modal.lot-catalog-modal{
+ width:min(970px,100vw);max-width:none;
+}
+.lot-catalog-modal .modalhead{background:#fff}
+.lot-catalog-modal .modalhead h2{font-size:1.07rem}
+.lot-catalog-modal form[data-form="event-batch-write"]{gap:13px}
+.lot-catalog-modal .event-lot-counter{
+ background:#e6f3e9;color:#16573c;border:1px solid #cfe6d5;border-radius:10px;
+ font-weight:850;font-size:.88rem;padding:11px 14px;
+}
+.lot-catalog-modal .event-lot-counter.is-over-limit{
+ background:#fff1eb;border-color:#edc4aa;color:#a3401c;
+}
+.lot-catalog{display:flex;flex-direction:column;gap:12px;min-width:0}
+.lot-search-line{display:flex;gap:9px;align-items:center;min-width:0}
+.lot-search-label{flex:1;min-width:0}
+.lot-search-line .search{
+ width:100%;height:48px;border:1px solid #cbded1;border-radius:11px;padding:0 14px;
+ font-size:.94rem;background:#fff;color:#254d36
+}
+.lot-search-line .button{flex:none;white-space:nowrap;min-height:46px}
+.lot-roots{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.lot-root{border:1px solid #d3e3d6;background:#f8faf8;border-radius:100px;padding:8px 13px;
+ font-size:.79rem;font-weight:740;color:#3d6950;cursor:pointer;min-height:36px}
+.lot-root.active{background:#185c40;border-color:#185c40;color:#fff}
+.lot-filters{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:9px}
+.lot-filters label{display:flex;flex-direction:column;gap:5px;font-weight:700;
+ font-size:.71rem;color:#59715f;min-width:0}
+.lot-filters select{width:100%;min-width:0;min-height:40px;padding:7px 8px;
+ border:1px solid #d3e2d8;border-radius:8px;color:#29543c;background:#fff;font-size:.81rem}
+.lot-catalog-tabs{display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2ebe3;
+ padding-bottom:9px;flex-wrap:wrap}
+.lot-tab{background:transparent;border:1px solid transparent;border-radius:8px;padding:9px 12px;
+ cursor:pointer;color:#5a7162;font-size:.86rem;font-weight:740;min-height:40px}
+.lot-tab.active{color:#155d3f;background:#eaf5ec;border-color:#cae1d0}
+.lot-tab b{margin-left:3px;font-size:.75rem;background:#d3eadd;border-radius:100px;padding:3px 7px}
+.lot-reset{margin-left:auto;background:transparent;border:0;color:#426f52;text-decoration:underline;
+ font-size:.79rem;cursor:pointer;padding:8px}
+.lot-results{font-size:.79rem;color:#698072;margin:0}
+.lot-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.lot-card{border:1px solid #dfe9e1;border-radius:13px;background:#fff;overflow:hidden;min-width:0}
+.lot-card.selected{border-color:#95cba6;box-shadow:0 0 0 1px #d3edda}
+.lot-card-main{display:flex;gap:11px;padding:12px;align-items:flex-start;min-width:0}
+.lot-card-photo{width:116px;min-width:116px;height:135px;border-radius:10px;background:#edf4ef;
+ overflow:hidden;display:flex;align-items:center;justify-content:center}
+.lot-card-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.lot-no-photo{text-align:center;color:#879a8b;font-size:.75rem;padding:7px}
+.lot-card-details{min-width:0;flex:1;display:flex;flex-direction:column;gap:6px}
+.lot-category{font-size:.68rem;color:#718679;line-height:1.35;overflow-wrap:anywhere}
+.lot-card-details h3{font-size:.91rem;color:#214d35;margin:0;line-height:1.32;overflow-wrap:anywhere}
+.lot-tags{display:flex;gap:4px;flex-wrap:wrap}
+.lot-tags span{border-radius:100px;padding:3px 7px;color:#456a50;background:#ecf5ed;font-size:.63rem}
+.lot-card-stats{font-size:.71rem;line-height:1.45;color:#687d6d;margin:0}
+.lot-card-stats b{color:#196348}
+.lot-card-stats .lot-zero,.lot-zero{color:#a15e2a!important}
+.lot-card-actions{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:2px}
+.lot-expand{border:1px solid #b7d7c0;color:#145b3d;background:#f6fbf7;font-weight:760;
+ font-size:.76rem;border-radius:8px;cursor:pointer;padding:8px 10px;min-height:38px}
+.lot-picked{font-size:.68rem;color:#185c40}
+.lot-variants{border-top:1px solid #e2ebe2;background:#f8fbf8;padding:4px 12px 10px}
+.lot-variants[hidden]{display:none!important}
+.lot-variant{display:grid;grid-template-columns:minmax(0,1fr) 90px;gap:11px;align-items:center;
+ padding:9px 0;border-bottom:1px solid #e5eee7}
+.lot-variant>div{min-width:0;display:flex;flex-direction:column;gap:4px}
+.lot-variant strong{font-size:.82rem;color:#254a36;overflow-wrap:anywhere}
+.lot-variant small{font-size:.7rem;color:#72877a;overflow-wrap:anywhere}
+.lot-variant label{display:flex;flex-direction:column;gap:4px;font-size:.67rem;
+ font-weight:700;color:#5a7766}
+.lot-variant input{min-width:0;width:100%;height:40px;text-align:center;
+ border-radius:8px;border:1px solid #cadccf;font-weight:800;font-variant-numeric:tabular-nums;
+ background:#fff;color:#164d36}
+.lot-variant input:focus{outline:2px solid #8bc59c;outline-offset:1px}
+.lot-remove{background:transparent;color:#9a4d32;border:0;cursor:pointer;font-size:.72rem;
+ padding:10px 0 0}
+.lot-more{border:1px solid #bad7c5;color:#1a6345;background:#f2f8f4;border-radius:9px;
+ min-height:44px;font-size:.84rem;font-weight:730;cursor:pointer}
+.lot-more[hidden]{display:none!important}
+.lot-empty{grid-column:1/-1;text-align:center;background:#f7faf7;color:#647b6c;
+ border:1px dashed #cdded2;padding:26px 12px;border-radius:12px;font-size:.85rem}
+.lot-note{margin-top:5px}
+@media(max-width:780px){
+ .modalback:not(.tax-backdrop)>.modal.lot-catalog-modal{width:100%;max-width:none}
+ .lot-card-grid{grid-template-columns:1fr}
+ .lot-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .lot-card-photo{width:110px;min-width:110px;height:120px}
+}
+@media(max-width:450px){
+ .lot-catalog{gap:11px}
+ .lot-search-line{gap:6px}
+ .lot-search-line .button{font-size:.74rem;padding:8px}
+ .lot-card-main{gap:10px;padding:10px}
+ .lot-card-photo{width:92px;min-width:92px;height:113px}
+ .lot-card-details h3{font-size:.83rem}
+ .lot-card-stats{font-size:.68rem}
+ .lot-expand{font-size:.72rem}
+ .lot-filters{gap:7px}
+ .lot-reset{margin-left:0}
+}
