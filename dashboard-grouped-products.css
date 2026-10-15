@@ -1,0 +1,93 @@
+/* Home / Produtos recentes: compartilha os cards da lista de Produtos.
+ * Neste contexto, o painel de variações fica retrátil também no desktop. */
+.c-dashboard .c-dashboard-recent-products{
+  min-width:0;
+  border:0;
+  background:transparent;
+  box-shadow:none;
+}
+.c-dashboard .c-dashboard-recent-products .grouped-inventory-grid{
+  gap:13px;
+  padding:0;
+  background:transparent;
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3{
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  min-width:0;
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-top{
+  grid-column:auto;
+  grid-row:auto;
+  width:100%;
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-variants-desktop{
+  display:none;
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-actions{
+  grid-column:auto;
+  grid-row:auto;
+  order:2;
+  width:100%;
+  min-height:0;
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-actions>.product-card-sizes{
+  display:inline-flex;
+  flex:1;
+  align-items:center;
+  justify-content:center;
+  background:#f5faf6;
+  color:#275c41;
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3 .product-card-sizes span{
+  display:inline-block;
+  transition:transform .16s;
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3:has(.grouped-variants-mobile[open]) .product-card-sizes span{
+  transform:rotate(180deg);
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-variants-mobile{
+  display:block;
+  order:3;
+  width:100%;
+  margin:0;
+  border-top:1px solid #e5eee7;
+  background:#fff;
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-variants-mobile>summary{
+  display:none;
+}
+.c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-variants-mobile:not([open]) .group-variant-list{
+  display:none;
+}
+@media(min-width:761px){
+  .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-top{
+    grid-template-columns:minmax(128px,190px) minmax(0,1fr);
+    gap:19px;
+  }
+  .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-photo{
+    aspect-ratio:1/1;
+    max-height:190px;
+  }
+  .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-actions{
+    padding:12px 16px;
+    justify-content:flex-start;
+  }
+  .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-actions>button{
+    flex:0 1 240px;
+  }
+}
+@media(max-width:760px){
+  .c-dashboard .c-dashboard-recent-products .grouped-inventory-grid{
+    gap:11px;
+  }
+  .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-actions{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .c-dashboard .c-dashboard-recent-products .product-card-sizes span{
+    transition:none;
+  }
+}

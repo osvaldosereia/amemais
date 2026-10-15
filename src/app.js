@@ -6,8 +6,8 @@ import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './cat
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js';
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261014codes1';
-import { groupInventory, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261014stock1';
+import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015recents1';
 import { quickBalanceCard, collectQuickCounts, updateQuickCountButtons, filterQuickCountCards } from './quick-balance.js?v=20261014stock1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014orders2';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261014stock1';
@@ -459,6 +459,13 @@ function pageContent(){
 function panel(title,content,buttonMarkup=''){
   return '<section class="panel"><div class="panelhead"><h2>'+h(title)+'</h2>'+buttonMarkup+'</div>'+content+'</section>';
 }
+// Reutilizado na lista completa e na home: mesmas informações, botões e retrátil.
+function productGroupCard(group){
+  return groupedCard(group,{
+    h,photoButton,qtyStore,qtyEvent,qtyReserved,qtyAvailable,button,isManager,canRegisterProducts,
+    canShare:canRegisterProducts()
+  });
+}
 function dashboard(){
   const all=state.items.filter(p=>p.active);
   const total=state.balances.filter(b=>!b.event_id).reduce((sum,b)=>sum+b.quantity,0);
@@ -471,7 +478,7 @@ function dashboard(){
     timeZone:'America/Cuiaba',year:'numeric',month:'2-digit',day:'2-digit'
   }).format(new Date(m.created_at))===dateToday()).length;
   const firstName=(state.profile.full_name||'').trim().split(/\s+/)[0]||'Olá';
-  const recent=[...all].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).slice(0,6);
+  const recentGroups=recentInventoryGroups(all,state.apparelModels,6);
   const roots=state.categories.filter(c=>!c.parent_id).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
   const categoryCards=roots.slice(0,8).map(c=>{
     const count=all.filter(p=>categoryChain(p.category_id).some(path=>path.id===c.id)).length;
@@ -479,11 +486,7 @@ function dashboard(){
       '<span class="c-category-icon">'+uiIcon('layers',21)+'</span>'+
       '<strong>'+h(c.name)+'</strong><small>'+count+' produto(s)</small></button>';
   }).join('');
-  const productCards=recent.map(p=>'<article class="c-feature-product">'+
-    '<div class="c-feature-image">'+photoButton(p)+'</div>'+
-    '<div class="c-feature-body"><strong>'+h(p.name)+'</strong><small>'+h(categoryFull(p.category_id))+'</small>'+
-    '<span class="c-feature-qty">Livre: <b>'+qtyAvailable(p.id)+'</b> · Físico: '+qtyStore(p.id)+'</span>'+
-    '<button type="button" class="c-feature-open" data-action="home-product" data-id="'+h(p.id)+'">Ver produto '+uiIcon('arrow',14)+'</button></div></article>').join('');
+  const productCards=recentGroups.map(productGroupCard).join('');
   const cards=[
     {label:'Produtos ativos',value:all.length,icon:'package',tone:'green',hint:'Cadastrados'},
     {label:'Sem disponibilidade',value:zero,icon:'alert',tone:'red',hint:'Livre na central'},
@@ -516,7 +519,7 @@ function dashboard(){
       '<p class="c-dash-empty">Cadastre categorias para organizar os produtos.</p>')+'</section>'+
     '<section class="c-dashboard-section"><div class="c-section-heading"><h2>Produtos recentes</h2>'+
     '<button type="button" data-action="view" data-view="produtos">Ver todos '+uiIcon('chevron',17)+'</button></div>'+
-    (productCards?'<div class="c-feature-grid">'+productCards+'</div>':
+    (productCards?'<div class="products-panel c-dashboard-recent-products"><div class="grouped-inventory-grid">'+productCards+'</div></div>':
       '<div class="c-dash-empty">'+uiIcon('package',28)+'<span>Nenhum produto cadastrado ainda.</span>'+
       (canRegisterProducts()?button('Cadastrar primeiro produto','product-new','','primary'):'')+'</div>')+'</section>'+
     (activeEvents?'<section class="c-dashboard-section c-event-shortcut"><div>'+
@@ -624,10 +627,7 @@ function productsPage(){
         (filtersApplied?button('Limpar filtros','products-clear-filters','','small'):'')+
       '</div>'+
     '</div>'+
-    '<div class="grouped-inventory-grid">'+(list.length?list.map(g=>groupedCard(g,{
-      h,photoButton,qtyStore,qtyEvent,qtyReserved,qtyAvailable,button,isManager,canRegisterProducts,
-      canShare:canRegisterProducts()
-    })).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
+    '<div class="grouped-inventory-grid">'+(list.length?list.map(productGroupCard).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
       (filtersApplied?'<p>Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.</p>'+
       button('Mostrar todos os produtos','products-clear-filters','','primary'):
       '<p>Cadastre um novo produto ou verifique a opção Mostrar inativos.</p>')+'</div>')+'</div>'+
