@@ -10,7 +10,7 @@ const create=(tag,text,klass)=>{const el=document.createElement(tag);if(text!==u
  const data=await r.json();if(!r.ok)throw Error(data.error||"Pedido não encontrado.");
  $("receipt-name").textContent=data.name||"—";
  $("receipt-phone").textContent=data.phone||"—";
- $("receipt-id").textContent=String(data.id||"").slice(0,8).toUpperCase();
+ $("receipt-id").textContent=String(data.code||"—");
  $("receipt-date").textContent=new Date(data.created_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"});
  const el=$("receipt-items");let total=0;
  for(const item of data.items||[]){
