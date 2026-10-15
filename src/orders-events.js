@@ -47,7 +47,7 @@ export function ordersPageMarkup({orders,items,events,photoButton,button,niceTim
    const variants=items.filter(x=>x.order_id===order.id);
    const total=variants.reduce((n,x)=>n+Number(x.quantity),0);
    return '<article class="avulso-order-card"><div class="avulso-order-head">'+
-     '<div><small>Pedido #'+esc(order.id.slice(0,8).toUpperCase())+'</small>'+
+     '<div><small>Pedido #'+esc(order.code||'—')+'</small>'+
      '<h3>'+esc(order.customer_name)+'</h3>'+
      '<a href="tel:'+esc(order.customer_phone)+'">'+esc(order.customer_phone)+'</a></div>'+
      '<div class="avulso-order-meta"><span>'+esc(niceTime(order.created_at))+'</span>'+
