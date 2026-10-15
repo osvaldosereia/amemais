@@ -142,7 +142,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
   'Faltam unidades. Você pode aguardar a reposição ou registrar uma redução justificada no pedido.';
  return '<article class="uo-card" data-order-card data-search="'+esc([
   o.id,o.target,o.origin,originLabel,...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
-  '" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'">'+
+  '" data-order-id="'+esc(o.id)+'" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'">'+
   '<header><div class="uo-head"><small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small>'+
    '<h3>'+(event?'Lote '+String(o.sequence).padStart(2,'0')+' · #':'Pedido #')+
     esc(o.id.slice(0,8).toUpperCase())+'</h3>'+
