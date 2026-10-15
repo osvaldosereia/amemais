@@ -47,8 +47,8 @@ const h = v => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&l
 const niceDate = value => value ? new Intl.DateTimeFormat('pt-BR', { timeZone:'America/Cuiaba' }).format(new Date(value.length === 10 ? value + 'T12:00:00' : value)) : '—';
 const niceTime = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short', timeZone:'America/Cuiaba' }).format(new Date(value)) : '—';
 const actionNames = {entrada:'Entrada',venda_loja:'Baixa (loja)',transferencia:'Enviado ao evento',venda_evento:'Baixa antiga (evento)',devolucao:'Retornou à loja',baixa_evento:'Não retornou ao estoque',ajuste_loja:'Ajuste'};
-const roles = {admin:'Administrador',gerente:'Gerente',estoquista:'Estoquista',evento:'Equipe de evento',consulta:'Consulta'};
-const profileLabel = u => u?.role==='admin'?'Administrador':u?.permissions_customized?'Personalizado':(roles[u?.role]||u?.role||'—');
+const roles = {admin:'Administrador',gerente:'Gerente',estoquista:'Estoquista',evento:'Equipe de evento',consulta:'Consulta',franquia:'Franquia (somente pedidos)'};
+const profileLabel = u => u?.role==='admin'?'Administrador':u?.role==='franquia'?'Franquia':u?.permissions_customized?'Personalizado':(roles[u?.role]||u?.role||'—');
 const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
@@ -78,7 +78,8 @@ const permissionDefaults = {
  gerente:['products.read','products.create','products.edit','products.delete','stock.entry','stock.exit','stock.balance','stock.destinations','events.read','events.manage','events.separate','events.return','events.sell','events.close','orders.read','orders.internal','orders.assign','orders.central','orders.franchise','orders.separate','orders.receive','orders.cancel','movements.read','movements.export','categories.manage','tags.manage','catalog.manage','products.share','stores.read','stores.manage'],
  estoquista:['products.read','products.create','products.edit','stock.balance','products.share','stores.read'],
  evento:['products.read','events.read','events.return','events.sell'],
- consulta:['products.read','events.read','orders.read','movements.read','stores.read']
+ consulta:['products.read','events.read','orders.read','movements.read','stores.read'],
+ franquia:['products.read','orders.franchise']
 };
 const permissionCatalog=[
  ['products.read','Consultar produtos'],['products.create','Cadastrar produtos'],['products.edit','Editar produtos'],['products.delete','Excluir produtos'],
@@ -109,9 +110,7 @@ const permittedView = v => {
  return Boolean(viewPermission[v]&&hasPermission(viewPermission[v]));
 };
 const isAdmin = () => state.profile?.role === 'admin';
-const isFranchisePortal = () => !isAdmin() && hasPermission('orders.franchise') &&
-  !hasPermission('stock.entry') && !hasPermission('stores.manage') &&
-  state.stores.some(x=>x.kind==='franquia'&&assignedStore(x.id));
+const isFranchisePortal = () => state.profile?.role === 'franquia';
 const qtyReserved = id => state.stockReservations.filter(x=>x.product_id===id&&x.status==='ativa')
   .reduce((sum,x)=>sum+Number(x.quantity||0),0);
 const qtyAvailable = id => Math.max(0,qtyStore(id)-qtyReserved(id));
@@ -1267,13 +1266,37 @@ function permissionFields(userId){
  '</section><section class="form-section wide"><strong>Lojas autorizadas</strong><p class="help">Sem seleção, o acesso a estoques de outras lojas não é liberado.</p>'+
  state.stores.filter(x=>x.active).map(x=>'<label class="field"><span><input type="checkbox" name="store" value="'+h(x.id)+'" '+((state.staffStores.some(ss=>ss.user_id===userId&&ss.store_id===x.id)||(!userId&&x.is_primary))?'checked':'')+'> '+h(x.name)+'</span></label>').join('')+'</section>';
 }
+function setupFranchiseProfile(form){
+ const role=form?.querySelector('[name="role"]');
+ if(!role)return;
+ role.addEventListener('change',()=>{
+   if(role.value!=='franquia')return;
+   const allowed=new Set(permissionDefaults.franquia);
+   for(const box of form.querySelectorAll('input[name="perm"]'))box.checked=allowed.has(box.value);
+   const activeFranchises=state.stores.filter(x=>x.kind==='franquia'&&x.active);
+   for(const box of form.querySelectorAll('input[name="store"]'))box.checked=false;
+   if(activeFranchises.length===1){
+     const one=form.querySelector('input[name="store"][value="'+activeFranchises[0].id+'"]');
+     if(one)one.checked=true;
+   }
+   toast('Perfil de franquia configurado. Selecione uma única unidade franqueada.');
+ });
+}
+function assertFranchiseProfile(form,role,perms,storeIds){
+ if(role!=='franquia')return;
+ const expected=permissionDefaults.franquia;
+ if(perms.length!==expected.length||!expected.every(x=>perms.includes(x))||
+   storeIds.length!==1||!state.stores.some(x=>x.id===storeIds[0]&&x.active&&x.kind==='franquia'))
+   throw new Error('O perfil Franquia exige apenas Consultar produtos e Solicitar para franquia, vinculado a uma única franquia ativa.');
+}
 function userRoleModal(id){
  if(!isAdmin()||id===state.user?.id)return;
  const target=state.users.find(x=>x.id===id);if(!target)return;
  formModal('Autorizações · '+target.full_name,
  '<div class="formgrid">'+selectField('Perfil de referência','role',Object.entries(roles),target.role)+permissionFields(id)+'</div>',
  'user-permissions','Salvar autorizações');
- document.querySelector('.modal form').dataset.id=id;
+ const form=document.querySelector('.modal form');form.dataset.id=id;
+ setupFranchiseProfile(form);
 }
 function storesPage(){
  const manage=hasPermission('stores.manage');
@@ -1395,6 +1418,7 @@ function userModal(){
     field('Confirmar senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
     '</div><div class="note">O administrador entrega a senha ao funcionário por um canal seguro. O acesso é liberado imediatamente, sem confirmação por email.</div>',
     'user-new','Cadastrar usuário');
+  setupFranchiseProfile(document.querySelector('.modal form[data-form="user-new"]'));
 }
 function adminPasswordModal(id){
   if(!isAdmin()||id===state.user?.id)return;
@@ -2394,6 +2418,7 @@ async function handleSubmit(event){
     const stores=[...form.querySelectorAll('[name="store"]:checked')].map(x=>x.value);
     if(!perms.every(p=>permissionCatalog.some(([key])=>p===key)))throw Error('Permissão inválida.');
     if(!perms.length)throw Error('Selecione ao menos uma autorização.');
+    assertFranchiseProfile(form,values.role,perms,stores);
     await exec(async()=>{
       assertOk(await db.rpc('set_staff_access',{
         p_user_id:uid,p_role:values.role,p_permissions:perms,p_store_ids:stores
@@ -2414,6 +2439,7 @@ async function handleSubmit(event){
       const permissions=[...form.querySelectorAll('[name="perm"]:checked')].map(x=>x.value);
       const store_ids=[...form.querySelectorAll('[name="store"]:checked')].map(x=>x.value);
       if(!permissions.length)throw new Error('Selecione ao menos uma permissão.');
+      assertFranchiseProfile(form,values.role,permissions,store_ids);
       await invokeUserAdmin('create',{
         full_name:String(values.full_name||'').trim(),
         username:String(values.username||'').trim(),
