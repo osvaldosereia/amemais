@@ -1,0 +1,84 @@
+/* AME MAIS — Galeria navegável nos cards de produtos e localização destacada. */
+.grouped-inventory-card .grouped-inventory-photo{position:relative}
+.grouped-inventory-card .product-photo-gallery{
+ position:relative;width:100%;height:100%;min-width:0;overflow:hidden;border-radius:inherit;
+ background:#eef3ef
+}
+.grouped-inventory-card .product-photo-gallery>.product-photo{
+ display:block;width:100%;height:100%;margin:0;padding:0;border:0;background:transparent;cursor:zoom-in
+}
+.grouped-inventory-card .product-photo-gallery>.product-photo .thumb{
+ display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:cover;object-position:center
+}
+.grouped-inventory-card .product-gallery-arrow{
+ position:absolute;top:50%;transform:translateY(-50%);z-index:2;
+ display:flex;align-items:center;justify-content:center;
+ width:36px;height:42px;padding:0;border:1px solid #ffffffa8;border-radius:11px;
+ color:#fff;background:#153a2bd9;box-shadow:0 2px 9px #081e1970;
+ cursor:pointer;font-family:Arial,sans-serif;font-size:30px;font-weight:400;line-height:1;
+ transition:background .15s,box-shadow .15s
+}
+.grouped-inventory-card .product-gallery-arrow.prev{left:7px}
+.grouped-inventory-card .product-gallery-arrow.next{right:7px}
+.grouped-inventory-card .product-gallery-arrow:hover{
+ background:#0a593c;box-shadow:0 3px 12px #07180d99
+}
+.grouped-inventory-card .product-gallery-arrow:focus-visible{
+ outline:3px solid #ffdb75;outline-offset:2px
+}
+.grouped-inventory-card .product-gallery-count{
+ position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:1;
+ color:#fff;background:#173e30df;border-radius:999px;padding:4px 9px;
+ font-size:.74rem;font-weight:800;font-variant-numeric:tabular-nums;
+ pointer-events:none;white-space:nowrap
+}
+.products-panel .product-card-v3 .product-card-location,
+.c-dashboard .product-card-v3 .product-card-location,
+.grouped-inventory-card .product-card-location{
+ display:inline-flex;align-items:center;gap:9px;align-self:flex-start;max-width:100%;
+ margin-top:7px;padding:9px 13px;border-radius:11px;
+ background:#e3f1e8;border:1px solid #b8d9c4;color:#155c3a;
+ font-size:.91rem;line-height:1.3;font-weight:780
+}
+.grouped-inventory-card .product-card-location strong{
+ font-weight:850;font-size:inherit;color:inherit;overflow-wrap:anywhere
+}
+.grouped-inventory-card .product-location-icon{
+ flex:none;display:inline-flex;align-items:center;justify-content:center;
+ width:27px;height:27px;border-radius:8px;background:#cbe6d4;color:#16573b;
+ font-size:1.3rem;font-weight:900;line-height:1
+}
+.grouped-inventory-card .product-card-location.is-unknown{
+ background:#f3f6f3;border-color:#e0e7e1;color:#6f8073;font-size:.78rem
+}
+.grouped-inventory-card .product-card-location.is-unknown .product-location-icon{
+ background:#e7ede8;color:#738676
+}
+.grouped-inventory-card .group-variant-description .group-variant-location{
+ display:inline-flex;align-items:center;gap:7px;align-self:flex-start;max-width:100%;
+ padding:5px 9px;margin-top:3px;border:1px solid #c6e1cf;border-radius:8px;
+ color:#185f40;background:#eef8f0;font-weight:760;font-size:.78rem;line-height:1.3;
+ overflow-wrap:anywhere
+}
+.grouped-inventory-card .group-variant-location>span{
+ font-size:1.13rem;line-height:1
+}
+@media(max-width:760px){
+ .grouped-inventory-card .product-gallery-arrow{
+  width:29px;height:36px;border-radius:9px;font-size:25px
+ }
+ .grouped-inventory-card .product-gallery-arrow.prev{left:4px}
+ .grouped-inventory-card .product-gallery-arrow.next{right:4px}
+ .grouped-inventory-card .product-gallery-count{
+  bottom:4px;font-size:.62rem;padding:3px 7px
+ }
+ .products-panel .product-card-v3 .product-card-location,
+ .c-dashboard .product-card-v3 .product-card-location,
+ .grouped-inventory-card .product-card-location{
+  font-size:.8rem;padding:7px 9px;gap:6px;margin-top:5px
+ }
+ .grouped-inventory-card .product-location-icon{width:23px;height:23px;font-size:1.1rem}
+}
+@media (prefers-reduced-motion:reduce){
+ .grouped-inventory-card .product-gallery-arrow{transition:none}
+}
