@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery2';
-import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015cover2';
+import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015covergrant1';
 import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261015cristorei1';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
