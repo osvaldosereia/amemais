@@ -16,7 +16,8 @@ const statuses={
 };
 export function makeUnifiedOrders({avulsoOrders=[],avulsoItems=[],storeOrders=[],storeItems=[],
  eventBatches=[],eventBatchItems=[],events=[],models=[],
- reservations=[],stores=[],products=[],adjustments=[],portal=false,userId=null}){
+ reservations=[],stores=[],products=[],adjustments=[],codes=[],portal=false,userId=null}){
+ const codeMap=new Map(codes.map(x=>[x.kind+':'+x.order_id,x.code]));
  const storeById=new Map(stores.map(x=>[x.id,x]));
  const eventById=new Map(events.map(x=>[x.id,x]));
  const productById=new Map(products.map(x=>[x.id,x]));
@@ -51,7 +52,7 @@ export function makeUnifiedOrders({avulsoOrders=[],avulsoItems=[],storeOrders=[]
   const mapped=rows(kind,order.id,lines);
   const terminal=['enviado','despachado','concluido','recebido','recebido_divergente','cancelado','expirado'].includes(status);
   const unchecked=['legado','solicitado'].includes(status);
-  return {kind,id:order.id,eventId:order.event_id||null,
+  return {kind,id:order.id,code:codeMap.get(kind+':'+order.id)||'—',eventId:order.event_id||null,
    sequence:order.sequence||null,created_at:order.created_at,status,
    origin,target,source:order.source||order.request_type||kind,
    customerPhone:kind==='avulso'?order.customer_phone:'',
@@ -151,11 +152,11 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
   'Este lote aguarda reposição. As unidades disponíveis já estão reservadas; assim que entrar mercadoria, o sistema completa a reserva.':
   'Faltam unidades. Você pode aguardar a reposição ou registrar uma redução justificada no pedido.';
  return '<article class="uo-card" data-order-card data-search="'+esc([
-  o.id,o.target,o.origin,originLabel,...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
+  o.id,o.code,o.target,o.origin,originLabel,...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
   '" data-order-id="'+esc(o.id)+'" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'">'+
   '<header><div class="uo-head"><small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small>'+
-   '<h3>'+(event?'Lote '+String(o.sequence).padStart(2,'0')+' · #':'Pedido #')+
-    esc(o.id.slice(0,8).toUpperCase())+'</h3>'+
+   '<h3>'+(event?'Lote #':'Pedido #')+
+    esc(o.code||'—')+'</h3>'+
    '<strong>'+esc(o.target)+'</strong></div>'+
    '<span class="uo-pill '+info[1]+'">'+esc(info[0])+'</span></header>'+
   '<div class="uo-metrics"><span>'+n(o.total)+' unidades · '+groups.length+' modelo(s)</span>'+
@@ -291,7 +292,7 @@ export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE',photoUrls={
  const reserve=order.reserved>0?' · Reservado: '+n(order.reserved):'';
  const shortage=order.missing>0?' · Faltando: '+n(order.missing):'';
  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'+
-  '<title>Separação '+esc(code)+' '+esc(order.id.slice(0,8))+'</title>'+
+  '<title>Separação '+esc(code)+' '+esc(order.code||'—')+'</title>'+
   '<style>@page{size:A4 portrait;margin:10mm 10mm 12mm}*{box-sizing:border-box}'+
   'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#192f24;margin:0}'+
   'header{display:flex;justify-content:space-between;gap:14px;border-bottom:2px solid #155f42;padding-bottom:7px;margin-bottom:9px}'+
@@ -314,8 +315,8 @@ export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE',photoUrls={
   '.instructions{font-size:7.5pt;color:#526658;margin-top:9px}'+
   '</style></head><body>'+
   '<header><div><div class="brand">'+esc(brand)+'</div><h1>SEPARAÇÃO · '+name+'</h1>'+
-  '<div class="reference">'+esc(code)+' #'+esc(order.id.slice(0,8).toUpperCase())+'</div>'+
-  '<div class="reference">Identificador: '+esc(order.id)+'</div></div>'+
+  '<div class="reference">'+esc(code)+' #'+esc(order.code||'—')+'</div>'+
+  '</div>'+
   '<div class="meta"><b>DESTINO: '+esc(order.target)+'</b><div>Origem: '+esc(order.origin)+'</div>'+
   '<div>Emissão: '+esc(printedAt)+'</div></div></header>'+
   '<div class="header-note"><b>'+n(groups.length)+' modelo(s) · '+n(order.lines.length)+' variação(ões) · '+
