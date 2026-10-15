@@ -178,7 +178,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
 export function unifiedOrdersPage(orders,{
  button=()=>'',time=x=>x,portal=false,separationOnly=false,
  canProcess=()=>false,canCancel=()=>false,canDelete=()=>false,canReceive=()=>false,canDispatch=()=>false,canDispatchStock=()=>false,canAdjust=()=>false,
- canAvulso=false,canStore=false,canLink=false,linksMarkup='',summaryLink=''
+ canAvulso=false,canStore=false,canEventBatch=false,eventId='',canLink=false,linksMarkup='',summaryLink=''
 }={}){
  const active=['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'];
  const visible=separationOnly?orders.filter(o=>active.includes(o.status)||o.status==='pendente_estoque'):orders;
@@ -189,11 +189,14 @@ export function unifiedOrdersPage(orders,{
   canProcess:canProcess(o),canCancel:canCancel(o),canDelete:canDelete(o),canReceive:canReceive(o),
   canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o),canAdjust:canAdjust(o)})).join('');
  const actions=!separationOnly?
-  (((canAvulso||canStore)?button(portal?'+ Montar pedido':'+ Novo pedido','unified-order-new','','primary'):'')+
-   (canLink?button('+ Link para cliente','customer-link-new','','small'):'')):'';
+   (eventId
+     ? (canEventBatch?button('+ Montar lote para esta loja','event-batch-new','data-event="'+esc(eventId)+'"','primary'):'')
+     : (((canAvulso||canStore)?button(portal?'+ Montar pedido':'+ Novo pedido','unified-order-new','','primary'):'')+
+       (canLink?button('+ Link para cliente','customer-link-new','','small'):''))):'';
  return '<section class="uo-page">'+
   '<div class="pagehead"><div><h1>'+(separationOnly?'Separação':'Pedidos')+'</h1>'+
-   '<p>'+(separationOnly?'Fila dos separadores · pedidos e lotes de lojas temporárias.':
+   '<p>'+(eventId?'Abastecimento desta loja temporária. Cada lote segue para separação no CDSB.':
+   separationOnly?'Fila dos separadores · pedidos e lotes de lojas temporárias.':
     'Todos os pedidos e remessas de lojas temporárias em uma fila única.')+'</p></div>'+
    '<div class="actions">'+actions+'</div></div>'+
   '<div class="uo-summary"><div><small>A separar</small><strong>'+backlog+'</strong></div>'+
@@ -206,9 +209,10 @@ export function unifiedOrdersPage(orders,{
   '<div class="uo-list">'+(visible.length?cards:
     '<p class="uo-no-work">Nenhum pedido ou lote aguardando separação.</p>')+'</div>'+
   '<p class="uo-empty-filter" data-unified-empty hidden>Nenhum item encontrado com estes filtros.</p>'+
-  (!separationOnly&&!portal&&canLink?'<details class="uo-customer-links"><summary>Links de acesso para clientes'+
+  (!separationOnly&&!portal&&!eventId&&canLink?'<details class="uo-customer-links"><summary>Links de acesso para clientes'+
    (summaryLink?' · '+esc(summaryLink):'')+'</summary>'+linksMarkup+'</details>':'')+
-  '<p class="help">A lista é uma fila de trabalho. A reserva não reduz o físico; a saída é registrada somente após a conferência completa. Lotes de eventos são enviados separadamente.</p>'+
+  '<p class="help">'+(eventId?'Monte lotes para esta loja, envie à separação e confirme o envio físico após conferir os produtos.':
+     'A reserva não reduz o estoque físico. A saída é registrada somente após a conferência completa.')+'</p>'+
  '</section>';
 }
 export function filterUnifiedOrders(container,query,status){
