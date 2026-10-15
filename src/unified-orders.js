@@ -121,8 +121,7 @@ export function unifiedOrdersPage(orders,{
  const missing=orders.filter(o=>o.status==='pendente_estoque').length;
  const done=orders.filter(o=>['concluido','recebido','recebido_divergente'].includes(o.status)).length;
  const cards=orders.map(o=>unifiedOrderCard(o,{button,time,portal,canProcess:canProcess(o),canCancel:canCancel(o),canReceive:canReceive(o)})).join('');
- const actions=(canAvulso?button('+ Pedido avulso','order-new','','primary'):'')+
-  (canStore?button('+ Pedido de loja','store-order-new','','primary'):'')+
+ const actions=((canAvulso||canStore)?button(portal?'+ Montar pedido':'+ Novo pedido','unified-order-new','','primary'):'')+
   (canLink?button('+ Link para cliente','customer-link-new','','small'):'');
  return '<section class="uo-page">'+
   '<div class="pagehead"><div><h1>Pedidos</h1><p>Recebimento, reserva, separação e saída em uma única fila.</p></div>'+
