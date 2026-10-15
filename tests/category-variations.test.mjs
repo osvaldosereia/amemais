@@ -55,7 +55,7 @@ test('novo cadastro apresenta seletor herdado e não exige Cor',async()=>{
  const html=sizesSection();
  assert.match(html,/data-use-sizes disabled/);
  assert.match(html,/data-variation-selection-caption/);
- assert.match(html,/data-size-variant/); // only dynamic from helper/source, not static HTML
+ assert.match(html,/class="size-variant-list"/); // lista preenchida após escolher a categoria
  assert.doesNotMatch(html,/name="apparel_color"/);
  assert.doesNotMatch(html,/Cor das variações/);
 });
