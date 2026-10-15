@@ -868,7 +868,14 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
  if(batch&&!['aguardando','pendente_estoque','em_separacao','separado'].includes(batch.status))
   return toast('Este lote já saiu ou foi cancelado.',true);
  const saved=batch?state.eventBatchItems.filter(x=>x.batch_id===batch.id):[];
- const groups=eventPickingRows(state.items,state.apparelModels,saved,qtyAvailable);
+ // Pré-calcula o saldo livre em O(produtos + reservas), mesmo com catálogos grandes.
+ const free=new Map();
+ for(const balance of state.balances)if(!balance.event_id)
+  free.set(balance.product_id,Number(balance.quantity)||0);
+ for(const hold of state.stockReservations)if(hold.status==='ativa')
+  free.set(hold.product_id,(free.get(hold.product_id)||0)-Number(hold.quantity||0));
+ const groups=eventPickingRows(state.items,state.apparelModels,saved,
+  id=>Math.max(0,free.get(id)||0));
  const canSeeAvailable=isManager();
  formModal((batch?'Editar lote '+String(batch.sequence).padStart(2,'0'):'Novo lote')+' · '+e.name,
   eventLotForm(lotCatalogMarkup(groups,state.categories,state.apparelModels,{showAvailable:canSeeAvailable}),
