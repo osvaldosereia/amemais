@@ -221,7 +221,7 @@ begin
  values('events',e.id::text,'EVENT_BATCH_DISPATCHED',auth.uid(),
  jsonb_build_object('batch',p_batch,'sequence',b.sequence,'units',v_total,'shipment_kind',kind));
  return v_total;
-end;$function$
+end;$function$;
 
 
 CREATE OR REPLACE FUNCTION public.dispatch_avulso_order(p_order uuid)
@@ -257,7 +257,7 @@ begin
   dispatched_by=auth.uid(),dispatched_at=now() where id=p_order;
  insert into public.audit_log(entity,entity_id,action,actor_id)
  values('avulso_orders',p_order::text,'DISPATCHED_COMPLETED',auth.uid());
-end;$function$
+end;$function$;
 
 
 CREATE OR REPLACE FUNCTION public.dispatch_store_order(p_order uuid, p_external_reference text DEFAULT NULL::text)
@@ -303,5 +303,4 @@ begin
  insert into public.audit_log(entity,entity_id,action,actor_id,details)
  values('store_orders',p_order::text,'DISPATCHED',auth.uid(),
    jsonb_build_object('destination_kind',v_target_kind,'external_reference',p_external_reference));
-end;$function$
-
+end;$function$;
