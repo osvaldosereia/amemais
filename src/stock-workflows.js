@@ -145,24 +145,30 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     '</article>';
 }
 function sizeLine(size){
-  return '<div class="add-size-row" data-extra-size="'+size+'" hidden>'+
+  return '<div class="add-size-row" data-extra-size="'+esc(size)+'" hidden>'+
     '<div class="add-size-title"><strong>'+size+'</strong><span>Nova variação</span></div>'+
     '<label>SKU <small>(automático se vazio)</small><input name="sku" maxlength="80" disabled placeholder="Gerar automaticamente"></label>'+
     '<label>EAN <small>(opcional)</small><input name="ean" inputmode="numeric" maxlength="14" disabled placeholder="8 a 14 dígitos"></label>'+
     '<label>Estoque inicial<input name="quantity" type="number" inputmode="numeric" min="0" max="1000000" step="1" value="0" disabled required></label></div>';
 }
-export function addSizesContent(model,variants){
-  const color=variants[0]?.apparel_color||'Branco';
-  const existing=new Set(variants.filter(p=>p.active&&String(p.apparel_color).toLowerCase()===color.toLowerCase()).map(p=>p.apparel_size));
-  return '<p class="muted">Adicione novos tamanhos ao mesmo produto. Os já cadastrados serão preservados, inclusive o histórico.</p>'+
-    '<div class="formgrid"><label class="field wide"><span>Cor</span><input type="text" name="new_color" required minlength="2" maxlength="40" value="'+esc(color)+'"></label></div>'+
-    '<div class="note">Escolha uma cor e marque os tamanhos que chegaram. O SKU será gerado automaticamente, se ficar vazio.</div>'+
-    '<div class="add-sizes-picker">'+sizes.map(s=>'<button type="button" data-action="extra-size-toggle" data-size="'+s+
-       '" class="size-chip" '+(existing.has(s)?'disabled title="Já cadastrado nessa cor"':'')+' aria-pressed="false">'+s+'</button>').join('')+'</div>'+
-    '<div class="extra-size-list">'+sizes.map(sizeLine).join('')+'</div>';
+export function addSizesContent(model,variants,choices=[]){
+  const color=variants.find(p=>p.active)?.apparel_color||'Única';
+  const existing=new Set(variants.filter(p=>p.active&&
+    String(p.apparel_color||'').toLocaleLowerCase('pt-BR')===color.toLocaleLowerCase('pt-BR'))
+    .map(p=>String(p.apparel_size||'').toLocaleLowerCase('pt-BR')));
+  const available=choices.filter(size=>!existing.has(String(size).toLocaleLowerCase('pt-BR')));
+  return '<p class="muted">Adicione novas variações permitidas pela categoria. As existentes e seu histórico serão preservados.</p>'+
+   '<input type="hidden" name="new_color" value="'+esc(color)+'">'+
+   (available.length?
+    '<div class="note">Selecione as variações a cadastrar. SKU e EAN podem ser informados individualmente.</div>'+
+    '<div class="add-sizes-picker">'+available.map(size=>
+      '<button type="button" data-action="extra-size-toggle" data-size="'+esc(size)+
+      '" class="size-chip" aria-pressed="false">'+esc(size)+'</button>').join('')+'</div>'+
+    '<div class="extra-size-list">'+available.map(sizeLine).join('')+'</div>':
+    '<p class="note">Todas as variações da categoria já estão cadastradas, ou a categoria ainda não possui variações. Atualize em Categorias.</p>');
 }
 export function updateExtraSizeButtons(form,products){
-  const color=(form.querySelector('[name="new_color"]')?.value||'').trim().toLowerCase();
+  const color=(form.querySelector('[name="new_color"]')?.value||'Única').trim().toLowerCase();
   for(const btn of form.querySelectorAll('[data-action="extra-size-toggle"]')){
     const taken=products.some(p=>p.active&&p.apparel_size===btn.dataset.size&&String(p.apparel_color).toLowerCase()===color);
     btn.disabled=taken;
@@ -186,7 +192,7 @@ export function toggleExtraSize(form,size){
   row.querySelectorAll('input').forEach(el=>el.disabled=!enable);
 }
 export function collectExtraSizes(form,products){
-  const color=(form.querySelector('[name="new_color"]')?.value||'').trim();
+  const color=(form.querySelector('[name="new_color"]')?.value||'Única').trim();
   if(color.length<2||color.length>40)throw new Error('Informe uma cor válida.');
   const selected=[...form.querySelectorAll('[data-extra-size]')].filter(row=>!row.hidden);
   if(!selected.length)throw new Error('Selecione pelo menos um novo tamanho.');
