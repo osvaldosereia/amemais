@@ -39,21 +39,22 @@ test('tira a impressão A4 da separação, usa 80 mm, largura útil de 72 mm e a
  assert.match(html,/slip\.getBoundingClientRect\(\)\.height/);
  assert.match(html,/Math\.min\(3000,Math\.max\(40,heightMM\)\)/);
  assert.match(html,/window\.printSlip80/);
- assert.match(html,/document\.images/);
+ assert.doesNotMatch(html,/document\.images/);
+ assert.match(html,/window\.addEventListener\("load",\(\)=>window\.printSlip80\(\)\)/);
  assert.match(html,/TOTAL: 10 UNIDADES/);
 });
-test('mostra foto, nome, EAN, SKU, variação, prateleira e quantidade por linha',()=>{
- const html=pickingThermalHTML(order,{
-  photoUrls:{'model/photo.webp':'https://example.com/photo.webp'}});
- assert.match(html,/class="pick-photo"/);
- assert.match(html,/src="https:\/\/example.com\/photo.webp"/);
+test('imprime sem fotos, aproveita a largura para nome, EAN, SKU, variação, prateleira e quantidade',()=>{
+ const html=pickingThermalHTML(order);
+ assert.doesNotMatch(html,/class="pick-photo"|<img\b|SEM FOTO|photo\.webp/);
+ assert.match(html,/\.pick-main\{display:block/);
+ assert.match(html,/\.pick-name\{font-size:11pt/);
  assert.match(html,/Camiseta HDH preta/);
  assert.match(html,/EAN 000100005073/);
  assert.match(html,/CÓD. T-03/);
  assert.match(html,/Preta · P/);
  assert.match(html,/PRATELEIRA A/);
  assert.match(html,/SEPARAR <b>3<\/b> UN\./);
- assert.match(html,/grayscale\(100%\)/);
+ assert.doesNotMatch(html,/grayscale|photoUrls/);
  assert.equal((html.match(/class="pick-item"/g)||[]).length,6);
 });
 test('ignora linhas com quantidade zero, mantém dados do pedido e escapa HTML',()=>{
@@ -65,7 +66,7 @@ test('ignora linhas com quantidade zero, mantém dados do pedido e escapa HTML',
  assert.doesNotMatch(html,/<script>alert\(1\)<\/script>|<svg\/onload/);
  assert.match(html,/&lt;script&gt;/);
  assert.match(html,/&lt;svg\/onload/);
- assert.match(html,/SEM FOTO/);
+ assert.doesNotMatch(html,/SEM FOTO|pick-photo|<img\b/);
  assert.match(html,/TOTAL: 1 UNIDADES/);
  assert.doesNotMatch(html,/SEM GÔNDOLA CADASTRADA/);
 });
