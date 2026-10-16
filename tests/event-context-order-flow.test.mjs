@@ -11,34 +11,28 @@ const eventId='756e4f3f-7dc9-428e-909f-0ed8f89b7a82';
 const button=(label,action,attrs='',style='')=>
   '<button data-action="'+action+'" '+attrs+' class="'+style+'">'+label+'</button>';
 
-test('na loja temporária o único caminho é montar lote para aquela loja',()=>{
- const html=unifiedOrdersPage([],{button,eventId,canEventBatch:true,
-  canAvulso:true,canStore:true,canLink:true});
- assert.match(html,/data-action="event-batch-new"/);
- assert.match(html,/Montar lote para esta loja/);
- assert.match(html,new RegExp('data-event="'+eventId+'"'));
- assert.doesNotMatch(html,/data-action="unified-order-new"/);
- assert.doesNotMatch(html,/data-action="customer-link-new"/);
- assert.match(html,/Abastecimento desta loja temporária/);
-});
-test('sem permissão de evento não mostra criação genérica por engano',()=>{
- const html=unifiedOrdersPage([],{button,eventId,canEventBatch:false,canAvulso:true,canStore:true});
- assert.doesNotMatch(html,/data-action="event-batch-new"|data-action="unified-order-new"/);
-});
-test('fora da loja temporária mantém criação de cliente e filial',()=>{
- const html=unifiedOrdersPage([],{button,canAvulso:true,canStore:true,canLink:true});
+test('loja temporária oferece novo pedido sem lotes nem link externo',()=>{
+ const html=unifiedOrdersPage([],{button,eventId,canEventBatch:true,canStore:false});
  assert.match(html,/data-action="unified-order-new"/);
- assert.match(html,/data-action="customer-link-new"/);
- assert.doesNotMatch(html,/data-action="event-batch-new"/);
+ assert.match(html,/Novo pedido/);
+ assert.doesNotMatch(html,/data-action="customer-link-new"|data-action="event-batch-new"/);
+ assert.match(html,/Pedidos desta loja temporária/);
 });
-test('o aplicativo usa a loja do contexto para encaminhar o pedido ao lote',()=>{
- assert.match(app,/const contextEvent=scope\?\.type==='event'\?eventById\(scope\.id\):null/);
- assert.match(app,/canEventBatch:canCreateContextLot/);
- assert.match(app,/eventId:contextEvent\?\.id\|\|''/);
- assert.match(app,/if\(contextEvent\)return eventBatchModal\(contextEvent\.id\)/);
- assert.match(app,/type==='event-batch-write'/);
+test('sem permissão de pedidos ou eventos não mostra criação',()=>{
+ const html=unifiedOrdersPage([],{button,eventId,canEventBatch:false,canAvulso:false,canStore:false});
+ assert.doesNotMatch(html,/data-action="unified-order-new"/);
+});
+test('fila central cria pedidos por unidade, nunca por cliente avulso',()=>{
+ const html=unifiedOrdersPage([],{button,canAvulso:false,canStore:true,canLink:true});
+ assert.match(html,/data-action="unified-order-new"/);
+ assert.doesNotMatch(html,/customer-link-new|Links de acesso para clientes/);
+});
+test('seleção de destinos abre a unidade correta, preservando o evento no banco',()=>{
+ assert.match(app,/function orderDestinationPicker\(/);
+ assert.match(app,/if\(type==='unified-order-destination'\)/);
+ assert.match(app,/return eventBatchModal\(destination\.slice\(6\)\)/);
+ assert.match(app,/return storeOrderModal\(destination\.slice\(6\)\)/);
  assert.match(app,/rpc\('create_event_pick_batch'/);
- assert.match(index,/src\/app\.js\?v=20261015eventorders2/);
 });
 test('a guarda do banco acessa cover_path apenas na tabela events em atualização',()=>{
  const start=migration.indexOf("if tg_table_name='events' and tg_op='UPDATE' then");
