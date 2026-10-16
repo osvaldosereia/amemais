@@ -36,3 +36,26 @@
  .verify-photo{width:75px;min-width:75px;height:94px}
  .verify-progress>div:first-child{font-size:.8rem}
 }
+
+/* Correção imediata de contagens previamente registradas, inclusive pelo celular. */
+.verify-item .verify-edit-button{
+ align-self:flex-start;margin-top:7px;min-height:40px;
+ border:1px solid #d5a17e;border-radius:9px;padding:8px 12px;
+ font:750 .78rem/1.25 inherit;cursor:pointer;background:#fff9f3;color:#95532d;
+ display:inline-flex;align-items:center;justify-content:center;max-width:100%;
+}
+.verify-item.verified .verify-edit-button{
+ background:#f5faf6;color:#235d3d;border-color:#b8d6bd;
+}
+.verify-item .verify-edit-button:focus-visible{
+ outline:3px solid #78b994;outline-offset:2px;
+}
+.verify-item .verify-edit-button:hover{filter:brightness(.97)}
+.verify-selected{scroll-margin:16px}
+.verify-selected-help{font-size:.81rem;line-height:1.45;color:#486855;margin:0}
+.verify-selected [data-verify-submit]{min-height:46px;padding:10px 13px}
+@media(max-width:650px){
+ .verify-item .verify-edit-button{width:100%;min-height:44px;font-size:.83rem}
+ .verify-item .verify-details{min-width:0}
+ .verify-selected [data-verify-submit]{width:100%;min-height:49px;font-size:.95rem}
+}
