@@ -24,5 +24,5 @@ test('balanço via Produtos e permissões continuam preservados',()=>{
  assert.match(stock,/stock-free-save/);
 });
 test('versão do aplicativo foi atualizada após a simplificação',()=>{
- assert.match(entry,/src\/secure-entry\.js\?v=20261016orderflow2/);
+ assert.match(entry,/src\/secure-entry\.js\?v=20261016partial1/);
 });
