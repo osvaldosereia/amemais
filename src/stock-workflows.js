@@ -59,7 +59,7 @@ export function productGalleryPaths(group){
  }
  return selected;
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canEditProduct=null,canBalance=()=>false,canShare=false,canLabel=false,expanded=false,historyForGroup=()=>[],categories=[],mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canEditProduct=null,canBalance=()=>false,canStockEntry=()=>false,canStockExit=()=>false,canShare=false,canLabel=false,expanded=false,historyForGroup=()=>[],categories=[],mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
   const galleryPaths=productGalleryPaths(group);
@@ -85,7 +85,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const count=active.reduce((sum,p)=>sum+quantity(p),0);
   const groupReserved=isProducts?active.reduce((sum,p)=>sum+qtyReserved(p.id),0):0;
   const groupAvailable=isProducts?active.reduce((sum,p)=>sum+qtyAvailable(p.id),0):count;
-  const stockLabel=mode==='event'?'Na loja temporária':'Total na central';
+  const stockLabel=mode==='event'?'Na loja temporária':'Disponível';
   const colors=[...new Set(active.map(p=>(p.apparel_color||'').trim()).filter(c=>c&&c!=='Única'))];
   const description=group.modelId
     ?(colors.length===1?colors[0]+' · ':colors.length>1?colors.length+' cores · ':'')+
@@ -239,14 +239,14 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<small class="product-card-description">'+h(description)+'</small>'+
         (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':'')+
         '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
-          '<small>Físico na central</small><span><b>'+fmt(count)+'</b> un.</span></div>'+
+          '<small>'+stockLabel+'</small><span><b>'+fmt(isProducts?groupAvailable:count)+'</b> un.</span></div>'+
         '<div class="product-card-location'+(locationMissing?' is-unknown':'')+'" aria-label="Localização do produto">'+
            '<span class="product-location-icon" aria-hidden="true">⌖</span>'+
            '<strong>'+h(location)+'</strong></div>'+
       '</div>'+
       (isProducts?'<div class="stock-total-breakdown">'+
-          '<div class="stock-total-metric reserved"><small>Reservado</small><strong>'+fmt(groupReserved)+'</strong><span>un.</span></div>'+
-          '<div class="stock-total-metric available"><small>Disponível</small><strong>'+fmt(groupAvailable)+'</strong><span>un.</span></div>'+
+          '<div class="stock-total-metric reserved"><small>Físico</small><strong>'+fmt(count)+'</strong><span>un.</span></div>'+
+          '<div class="stock-total-metric available"><small>Reservado</small><strong>'+fmt(groupReserved)+'</strong><span>un.</span></div>'+
         '</div>':'')+
     '</div>'+
 
