@@ -436,6 +436,7 @@ function oneDetail(operational,manage,rankings){
 }
 
 function shell(data){
+ const scrollBefore=document.querySelector('.tv-one-sheet-body')?.scrollTop||0;
  const generated=data?.generated_at||null;
  const live=!!data&&!state.error&&Date.now()-state.lastSuccess<90000;
  const warning=state.error||state.managementError||state.rankingsError;
@@ -453,6 +454,8 @@ function shell(data){
  '<footer class="tv-one-footer"><span>AME MAIS ESTOQUE · Atualização a cada 30 segundos · tela única, sem rotação</span>'+
  '<span>'+esc(live?'Dados atualizados':'Última atualização não confirmada')+'</span></footer>'+
  oneDetail(data,state.management,state.rankings)+'</main>';
+ const detailBody=document.querySelector('.tv-one-sheet-body');
+ if(detailBody)detailBody.scrollTop=scrollBefore;
 }
 function updateProgress(){
  const node=document.querySelector('[data-rotation-progress]');
