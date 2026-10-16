@@ -15,7 +15,7 @@ grant select on public.order_operational_progress to authenticated;
 drop policy if exists order_operational_progress_staff_select on public.order_operational_progress;
 create policy order_operational_progress_staff_select on public.order_operational_progress
  for select to authenticated using (
-  app_private.is_active() and (
+  app_private.is_active() and not app_private.role_in('franquia') and (
     app_private.has_permission('orders.read')
     or app_private.has_permission('orders.separate')
     or app_private.has_permission('events.separate')
@@ -186,7 +186,7 @@ begin
   v_reason:=btrim(coalesce(p_items->v_key->>'reason',''));
   if v_count<>v_picked or v_count<>v_requested then
    v_diff:=true;
-   if p_finish and length(v_reason)<5 and length(coalesce(v_item->>'pick_reason',''))<5 then
+   if p_finish and length(v_reason)<5 and (v_count<>v_picked or length(coalesce(v_item->>'pick_reason',''))<5) then
     raise exception 'Justifique divergência da conferência no SKU %',v_key;end if;
   end if;
   if length(v_reason)>250 then raise exception 'Motivo excede 250 caracteres';end if;
