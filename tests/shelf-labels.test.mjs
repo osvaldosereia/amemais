@@ -22,7 +22,7 @@ test('Code128 local mantém zeros à esquerda e representa EAN e SKU corretament
  const barcode=code128SVG(p.ean);
  assert.match(barcode,/<svg\b/);assert.match(barcode,/<rect\b/);
  assert.match(barcode,/000100005073/);
- assert.match(barcode,/width="72mm"/);
+ assert.match(barcode,/width="49mm"/);
  assert.ok(barcode.match(/<rect/g).length>20);
  assert.match(code128SVG('CAM-1'),/<svg/);
  assert.equal(code128SVG(''), '');
@@ -38,10 +38,10 @@ test('prévia imprime modelo, cor, tamanho, gôndola, prateleira, SKU e EAN',()=
  assert.match(html,/Preta · P/);
  assert.match(html,/1000507/);assert.match(html,/000100005073/);
  assert.match(html,/PRATELEIRA/);assert.match(html,/>A<\/strong>/);
- assert.match(html,/width:80mm/);assert.match(html,/height:85mm/);
- assert.match(html,/size:80mm /);
+ assert.match(html,/width:57mm/);assert.match(html,/height:70mm/);
+ assert.match(html,/size:57mm /);
  assert.match(html,/shelf-label-identifiers/);
- assert.match(html,/length\*85\+2/);assert.match(html,/const mm=sheet.querySelectorAll/);
+ assert.match(html,/length\*70\+2/);assert.match(html,/const mm=sheet.querySelectorAll/);
  assert.doesNotMatch(html,/<img\b|foto|preço|R\$/i);
 });
 test('o modal seleciona variações e suas cópias sem alterar EANs',()=>{
@@ -74,5 +74,5 @@ test('ação está disponível no catálogo e no editor, com módulo versionado'
  assert.match(app,/shelf-label-one/);
  assert.match(app,/shelf-label-print/);
  assert.match(app,/Salve as alterações do produto antes de imprimir a etiqueta/);
- assert.match(index,/shelf-labels\.css\?v=20261016label85/);
+ assert.match(index,/shelf-labels\.css\?v=20261016label57/);
 });
