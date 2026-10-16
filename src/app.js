@@ -13,7 +13,7 @@ import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVaria
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
   eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261016cards8';
 import {catalogSortOptions,availableGondolas,gondolaKey,catalogMatchesQuery,orderCatalogGroups,filterCatalogGondola} from './catalog-order.js?v=20261016sort1';
-import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
+import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261016damage-direct1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
