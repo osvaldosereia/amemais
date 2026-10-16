@@ -37,12 +37,12 @@ test('mesmo identificador na fila e no recibo térmico de 80 mm',()=>{
  assert.equal(order.id,uuid);
  assert.equal(order.code,fixed);
  const html=unifiedOrderCard(order,{button});
- assert.match(html,/Lote #AA003/);
+ assert.match(html,/Pedido #AA003/);
  assert.doesNotMatch(html,/#3CE6A4D5/);
  assert.match(html,/data-search="[^"]*aa003/);
  const print=pickingThermalHTML({...order,lines:[{modelTitle:'Camiseta',quantity:2,sku:'ABC',ean:'0123',gondola:'3'}]});
- assert.match(print,/<title>Separação térmica LOTE #AA003<\/title>/);
- assert.match(print,/LOTE #AA003/);
+ assert.match(print,/<title>Separação térmica PEDIDO #AA003<\/title>/);
+ assert.match(print,/PEDIDO #AA003/);
  assert.match(print,/Pedido: AA003/);
  assert.doesNotMatch(print,/3ce6a4d5-2d70-4d8c-8729-e6522991634a/i);
 });
@@ -52,8 +52,8 @@ test('continua igual em impressões sucessivas e ao reconstruir a lista de pedid
  assert.equal(again.code,fixed);
  const a=pickingThermalHTML({...order,lines:[]},{printedAt:'09:15'});
  const b=pickingThermalHTML({...again,lines:[]},{printedAt:'10:30'});
- assert.match(a,/LOTE #AA003/);
- assert.match(b,/LOTE #AA003/);
+ assert.match(a,/PEDIDO #AA003/);
+ assert.match(b,/PEDIDO #AA003/);
 });
 test('referência é mantida até no comprovante recebido por token',()=>{
  assert.match(sql,/'code',v_code/);
