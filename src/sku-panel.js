@@ -42,7 +42,7 @@ export function renderSkuPanel({item,model,physical,reserved,can,history=[],rese
     '<p class="sku-section-help">Saída excepcional. Não é possível usar unidades reservadas.</p>'+
     '<label class="field"><span>Unidades retiradas</span><input name="exit_qty" type="number" inputmode="numeric" min="1" max="'+Math.max(0,physical-reserved)+'" step="1" value="1"></label>'+
     '<label class="field"><span>Motivo</span><select name="exit_reason">'+
-      '<option value="avaria">Avaria — enviar para análise</option>'+
+      '<option value="avaria">Avaria — baixa imediata</option>'+
       '<option value="extravio">Perda / extravio</option>'+
       '<option value="diretoria">Uso da diretoria</option>'+
       '<option value="doacao">Doação</option>'+
@@ -51,7 +51,7 @@ export function renderSkuPanel({item,model,physical,reserved,can,history=[],rese
       '<input name="exit_recipient" type="text" maxlength="120" placeholder="Nome / identificação"></label>'+
     '<label class="field"><span>Justificativa obrigatória</span>'+
       '<textarea name="exit_note" maxlength="250" placeholder="Descreva o que aconteceu"></textarea></label>'+
-    '<p class="sku-section-help">Avarias ficam suspensas e podem ser recuperadas. Os outros motivos geram baixa definitiva.</p>'+
+    '<p class="sku-section-help">Avaria retira imediatamente a unidade do estoque e registra o motivo. Se houver reparo, faça uma nova entrada manual.</p>'+
   '</section>'+
   '<section class="sku-mode-section" data-sku-section="contagem" hidden>'+
     '<p class="sku-section-help">Conte fisicamente todas as unidades deste tamanho, inclusive as reservadas. Zero é uma contagem válida.</p>'+
