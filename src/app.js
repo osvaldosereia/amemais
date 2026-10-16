@@ -210,7 +210,7 @@ async function loadData(){
   resources.push(['orderCodes',db.from('order_public_codes').select('kind,order_id,code').limit(12000)]);
   if(hasPermission('orders.read')||hasPermission('orders.separate')||hasPermission('events.separate'))
     resources.push(['orderVerificationRows',db.from('order_final_verifications')
-      .select('kind,order_id,product_id,expected_quantity,counted_quantity,verified_by,verified_at')
+      .select('kind,order_id,product_id,expected_quantity,counted_quantity,scanned_code,verified_by,verified_at')
       .limit(15000)]);
   if(hasPermission('products.edit')||hasPermission('purchases.manage'))
    resources.push(['suppliers',db.from('suppliers').select('*').order('name').limit(1000)]);
@@ -889,40 +889,75 @@ function finalVerificationModal(kind,id){
  form.dataset.kind=kind;
  form.dataset.order=id;
  const submit=form.querySelector('button[type="submit"]');
- if(submit){submit.type='button';submit.dataset.action='modal-close';}
+ if(submit){submit.type='button';submit.dataset.action='modal-close';
+  if(p.complete)submit.textContent='Voltar ao pedido';}
  form.closest('.modal')?.classList.add('final-verify-modal');
  const reader=form.querySelector('[data-verify-scan]');
  reader?.focus({preventScroll:true});
  hydrateImages();
  if(p.complete)form.querySelector('[data-verify-feedback]').textContent=
-   'Conferência completa. Feche esta janela para confirmar a saída do pedido.';
+   'Conferência final concluída. Todos os SKUs estão corretos. Volte ao pedido para confirmar a saída.';
 }
-function verificationReadCode(form,code){
- const order=unifiedOrderById(form.dataset.kind,form.dataset.order);
- if(!order)return;
- const result=findVerificationProduct(order,code);
- const msg=form.querySelector('[data-verify-feedback]');
- if(result.error){
-  form.__verification=null;
-  form.querySelector('[data-verify-selected]').hidden=true;
-  if(msg){msg.textContent=result.error;msg.classList.add('is-error');}
-  form.querySelector('[data-verify-scan]')?.focus();
-  return;
- }
- const line=result.line;
- form.__verification={productId:line.id,scannedCode:String(code).trim()};
+function verificationSelectLine(form,line,code,previousCount=null){
+ form.__verification={
+  productId:line.id,scannedCode:String(code).trim(),
+  isCorrection:previousCount!==null
+ };
  const panel=form.querySelector('[data-verify-selected]');
+ if(!panel)return;
  panel.hidden=false;
  form.querySelector('[data-verify-selected-name]').textContent=
    (line.modelTitle||line.name)+' · '+(line.color||'')+' '+(line.size||'')+
    ' · Solicitado: '+line.quantity+' un.';
- const qty=form.querySelector('[data-verify-quantity]');
- qty.value='';qty.max='1000000';qty.focus({preventScroll:true});
- if(msg){msg.textContent='Produto identificado. Conte as unidades físicas e informe a quantidade encontrada.';
-  msg.classList.remove('is-error');}
+ const input=form.querySelector('[data-verify-quantity]');
+ input.value=previousCount===null?'':String(previousCount);
+ input.max='1000000';
+ const btn=panel.querySelector('[data-verify-submit]');
+ if(btn)btn.textContent=previousCount===null?'Confirmar quantidade deste SKU':'Salvar correção';
+ const help=panel.querySelector('[data-verify-selected-help]');
+ if(help)help.textContent=previousCount===null?
+  'Conte as unidades físicas e confirme a quantidade encontrada.':
+  'Quantidade registrada: '+previousCount+' un. · Solicitado: '+line.quantity+' un. Corrija a contagem e salve novamente.';
+ const feedback=form.querySelector('[data-verify-feedback]');
+ if(feedback){
+  feedback.textContent=previousCount===null?
+   'Produto identificado. Conte as unidades físicas e informe a quantidade encontrada.':
+   'Editando conferência anterior. Informe a quantidade correta para este SKU.';
+  feedback.classList.remove('is-error');
+ }
+ panel.scrollIntoView?.({behavior:'smooth',block:'nearest'});
+ input.focus({preventScroll:true});
+ if(previousCount!==null)input.select?.();
+}
+function verificationEditItem(form,productId){
+ const order=unifiedOrderById(form?.dataset.kind,form?.dataset.order);
+ if(!order||order.status!=='separado')return toast('Pedido indisponível para corrigir a conferência.',true);
+ const line=verificationProgress(order,state.orderVerificationRows).lines.find(x=>x.id===productId);
+ const stored=line?.verification;
+ if(!stored?.scanned_code)return toast('Leia novamente o EAN/SKU para conferir este produto.',true);
+ // Revalida o identificador salvo. Não permite corrigir outro SKU ou pular a validação do servidor.
+ const verified=findVerificationProduct(order,stored.scanned_code);
+ if(verified.error||verified.line.id!==line.id)
+  return toast('Código registrado não corresponde ao produto atual. Leia o EAN novamente.',true);
+ verificationSelectLine(form,line,stored.scanned_code,line.actual);
+}
+function verificationReadCode(form,code){
+ const order=unifiedOrderById(form?.dataset.kind,form?.dataset.order);
+ if(!order)return;
+ const result=findVerificationProduct(order,code);
+ if(result.error){
+  form.__verification=null;
+  const selected=form.querySelector('[data-verify-selected]');
+  if(selected)selected.hidden=true;
+  const feedback=form.querySelector('[data-verify-feedback]');
+  if(feedback){feedback.textContent=result.error;feedback.classList.add('is-error');}
+  form.querySelector('[data-verify-scan]')?.focus();
+  return;
+ }
+ verificationSelectLine(form,result.line,code);
 }
 async function saveFinalVerification(form){
- if(state.loading||!form?.__verification)return toast('Leia o EAN antes de informar a quantidade.',true);
+ if(state.loading||!form?.__verification)return toast('Selecione um SKU ou leia seu EAN para informar a quantidade.',true);
  const order=unifiedOrderById(form.dataset.kind,form.dataset.order);
  if(!order)return toast('Pedido não encontrado.',true);
  const raw=form.querySelector('[data-verify-quantity]')?.value?.trim()??'';
@@ -937,16 +972,16 @@ async function saveFinalVerification(form){
     p_scanned_code:item.scannedCode,p_counted:qty
   }));
   const saved=assertOk(await db.from('order_final_verifications')
-    .select('kind,order_id,product_id,expected_quantity,counted_quantity,verified_by,verified_at')
+    .select('kind,order_id,product_id,expected_quantity,counted_quantity,scanned_code,verified_by,verified_at')
     .eq('kind',order.kind).eq('order_id',order.id));
   state.orderVerificationRows=state.orderVerificationRows.filter(r=>!(
     r.kind===order.kind&&r.order_id===order.id)).concat(saved);
   // Atualiza os botões por trás do modal: "Confirmar saída" só aparece após 100%.
   render();
-  if(result.complete)toast('Conferência 100% concluída. Saída liberada.');
+  if(result.complete)toast('Conferência final concluída. Volte ao pedido para confirmar a saída.');
   else if(qty!==Number(order.lines.find(x=>x.id===item.productId)?.quantity))
-   toast('Divergência registrada. Verifique a separação antes da saída.',true);
-  else toast('SKU conferido. Pode ler o próximo.');
+   toast('Divergência salva. Confira a contagem e use Corrigir quantidade.',true);
+  else toast(item.isCorrection?'Correção salva. Continue a conferência.':'SKU conferido. Pode ler o próximo.');
   finalVerificationModal(order.kind,order.id);
  }catch(error){fail(error);}
  finally{state.loading=false;}
@@ -3608,6 +3643,7 @@ async function handleClick(event){
     const form=document.querySelector('.modalback form[data-form="order-final-verify"]');
     if(form)verificationReadCode(form,code);
   });
+  if(action==='verify-edit-item')return verificationEditItem(target.closest('form'),target.dataset.id);
   if(action==='verify-confirm-item')return saveFinalVerification(target.closest('form'));
   if(action==='order-shortage-adjust')return unifiedShortageModal(target.dataset.kind,id);
   if(action==='order-print-thermal'||action==='order-print-a4')return printUnifiedOrder(target.dataset.kind,id);
