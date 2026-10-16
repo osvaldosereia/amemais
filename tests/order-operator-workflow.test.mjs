@@ -51,7 +51,7 @@ test('gôndola 03 e gôndola 3 agrupam e ordenam naturalmente',()=>{
 test('filtro de fila combina etapa, destino e texto',()=>{
  const order=makeUnifiedOrders(args)[0];
  const page=unifiedOrdersPage([order],{button:btn,canVerify:()=>true,isVerified:()=>false});
- for(const label of ['A separar','Em separação','A conferir','Prontos para saída','Com falta','Destino'])
+ for(const label of ['A separar','Em separação','A conferir','Em expedição','Com falta','Destino'])
   assert.ok(page.includes(label),label);
  const cards=[{dataset:{orderStatus:'separado',orderDestination:'evento',
   orderVerified:'false',orderIssue:'true',search:'aa003 retiro'},hidden:false}];
