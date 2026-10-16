@@ -56,79 +56,92 @@ export function eventSettlementForm(groups,balances,draft=null,{h=esc}={}){
  '<div class="event-settle-summary" data-settle-summary aria-live="polite">Preencha a conferência de todos os tamanhos.</div>';
 }
 export function eventCompactDetail(data){
- const {event:e,members=[],plan=null,planItems=[],shipments=[],balances=[],movements=[],
-  damageItems=[],closure=null,groupInventory,products=[],models=[],photoButton=()=>'',h=esc,
-  button=()=>'',niceDate=x=>x,username=x=>x,canPlan=false,canClose=false,canManage=false,canDelete=false}=data;
+ const {event:e,members=[],balances=[],movements=[],damageItems=[],closure=null,
+   products=[],models=[],groupInventory=()=>[],h=esc,button=()=>'',
+   niceDate=x=>x,username=x=>x,canManage=false,canClose=false,canSettle=false,
+   canDelete=false,ordersMarkup='',tab='resumo'}=data;
  const active=e.status==='ativo',draft=e.status==='rascunho',closed=e.status==='encerrado';
- const current=balances.filter(b=>b.event_id===e.id&&Number(b.quantity)>0);
- const pending=current.reduce((sum,b)=>sum+Number(b.quantity),0);
- const actualShipments=shipments.filter(row=>row.event_id===e.id);
- const shipped=actualShipments.length?actualShipments.reduce((sum,row)=>sum+(row.items||[])
-   .reduce((n,item)=>n+Number(item.quantity||0),0),0):
-   movements.filter(m=>m.event_id===e.id&&m.action==='transferencia')
-   .reduce((sum,m)=>sum+Number(m.quantity||0),0);
- const planned=planItems.filter(x=>x.event_id===e.id).reduce((n,x)=>n+Number(x.quantity),0);
- const damaged=damageItems.filter(x=>x.origin_event_id===e.id)
-   .reduce((n,x)=>n+Number(x.remaining||0),0);
- const groups=groupInventory(products.filter(p=>current.some(b=>b.product_id===p.id)),models);
- const status=draft?'Preparação':active?'Em operação':'Encerrada';
- const primary=draft?
-   (canPlan?button(plan?'Editar separação':'Preparar mercadorias','event-plan','','primary')+
-    (planned?button('Imprimir A4','event-print','','small')+
-     button('Confirmar envio','event-dispatch','','primary'):''):''):
-   active?(pending?
-     (canClose?button('Conferir fechamento','event-settle','','primary'):'')+
-     (canPlan?button('Enviar complemento','event-supplement','','small'):''):
-     (canClose?button('Encerrar loja','event-close','data-id="'+h(e.id)+'"','primary'):'')+
-     (canPlan?button('Enviar complemento','event-supplement','','small'):''))
-     +(shipped?button('Imprimir A4','event-print','','small'):''):'';
- const summaries=draft?[['Para separar',planned],['Variações',planItems.filter(x=>x.event_id===e.id).length]]:
-  [['Enviadas',closure?.sent_units??shipped],['No local',pending],['Avariadas em análise',damaged]];
- const responsible=members.filter(x=>x.event_id===e.id&&x.role==='responsavel').map(x=>username(x.user_id)).join(', ')||'Não informado';
- const productsMarkup=groups.length?groups.map(g=>{
-  const count=g.products.reduce((n,p)=>n+Number(current.find(b=>b.product_id===p.id)?.quantity||0),0);
-  return '<details class="event-product-compact"><summary><div class="event-product-thumb">'+photoButton(g.main)+'</div>'+
-    '<div><strong>'+h(g.title)+'</strong><small>'+g.products.length+' tamanho(s) pendente(s)</small></div>'+
-    '<b>'+format(count)+' un.</b><span aria-hidden="true">▾</span></summary>'+
-    '<div class="event-product-variants">'+g.products.map(p=>'<div><span>'+h([p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||p.name)+
-      '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small></span>'+
-      '<b>'+format(current.find(b=>b.product_id===p.id)?.quantity||0)+' un.</b></div>').join('')+'</div></details>';
- }).join(''):'<p class="muted">'+(draft?'Defina as quantidades de cada tamanho na separação.':'Nenhuma unidade pendente no local.')+'</p>';
- return '<div class="event-simple">'+
- '<button type="button" class="event-back" data-action="back-events">← Lojas temporárias</button>'+
- '<header class="event-simple-head"><div><h1>'+h(e.name)+'</h1>'+
- '<p>'+h(niceDate(e.starts_at))+(e.ends_at?' a '+h(niceDate(e.ends_at)):'')+
- ' · Responsável: '+h(responsible)+'</p></div><span class="event-simple-status">'+status+'</span></header>'+
- '<div class="event-step-strip"><span class="'+(draft?'active':'done')+'">1. Separação</span>'+
- '<span class="'+(active?'active':closed?'done':'')+'">2. Envio</span>'+
- '<span class="'+(closed?'done':'')+'">3. Fechamento</span></div>'+
- '<div class="event-simple-metrics">'+summaries.map(([name,v])=>'<div><small>'+h(name)+'</small><strong>'+format(v)+'</strong></div>').join('')+'</div>'+
- '<div class="event-simple-actions">'+primary+
-  (canDelete?button('Excluir evento','event-delete','data-id="'+h(e.id)+'"','small danger'):'')+'</div>'+
- (draft?'<p class="event-simple-guidance">Monte sua lista, imprima em A4, confira o que foi encontrado e ajuste as quantidades antes de confirmar a saída física.</p>':
-  active&&pending?'<p class="event-simple-guidance">Na volta, informe quantos produtos retornaram bons, foram vendidos, ficaram avariados ou foram perdidos. O sistema só encerra quando tudo estiver conciliado.</p>':'')+
- (active&&pending?'<section class="event-simple-section"><header><h2>Produtos ainda no local</h2><small>'+pending+' unidades pendentes</small></header>'+productsMarkup+'</section>':
- draft?'<section class="event-simple-section"><header><h2>Lista de separação</h2><small>'+planned+' unidades previstas</small></header>'+
- (planItems.filter(x=>x.event_id===e.id).length?
-  planItems.filter(x=>x.event_id===e.id).map(x=>{
-   const p=products.find(p=>p.id===x.product_id);
-   return '<div class="event-plan-preview"><span>'+h(p?.name||'Produto')+
-   ' · '+h([p?.apparel_color,p?.apparel_size].filter(Boolean).join(' / '))+
-   '<small>SKU '+h(p?.sku||'—')+'</small></span><strong>'+x.quantity+' un.</strong></div>';
-  }).join(''):productsMarkup)+'</section>':'')+
- (closed?'<div class="event-simple-guidance">Prestação de contas encerrada. Os saldos e o histórico foram preservados.</div>':'')+
- '<details class="event-simple-secondary"><summary>Equipe e informações da loja</summary>'+
- '<div class="event-team-list">'+members.filter(m=>m.event_id===e.id).map(m=>
- '<div><span>'+h(username(m.user_id))+' · '+h(m.role)+'</span>'+
- (canManage&&!closed?button('Remover','member-remove','data-user="'+h(m.user_id)+'" data-event="'+h(e.id)+'"','small'):'')+
- '</div>').join('')+'</div>'+
- (canManage&&!closed?button('+ Adicionar responsável / operador','member-add','data-id="'+h(e.id)+'"','small'):'')+
- (e.notes?'<p>'+h(e.notes)+'</p>':'')+'</details>'+
- '<details class="event-simple-secondary"><summary>Histórico e rastreabilidade</summary>'+
- '<div class="event-audit-list">'+movements.filter(m=>m.event_id===e.id).slice(0,80).map(m=>
- '<div><span>'+h(products.find(p=>p.id===m.product_id)?.name||'SKU')+
- ' · '+h(m.action)+' <small>'+h(m.note||'')+'</small></span><strong>'+m.quantity+' un.</strong></div>').join('')+
- '</div></details></div>';
+ const local=balances.filter(b=>b.event_id===e.id&&Number(b.quantity)>0);
+ const pending=local.reduce((s,b)=>s+Number(b.quantity||0),0);
+ const damaged=damageItems.filter(x=>x.origin_event_id===e.id).reduce((s,d)=>s+Number(d.remaining||0),0);
+ const status=draft?'Preparação':closed?'Encerrada':pending?'Em operação':'Em operação';
+ const tabs={resumo:'Visão geral',pedidos:'Pedidos',mercadorias:'Mercadorias',
+  fechamento:'Fechamento',equipe:'Equipe',historico:'Histórico'};
+ const current=Object.hasOwn(tabs,tab)?tab:'resumo';
+ const title=(t,actions='')=>'<div class="su-section-header"><h2>'+t+'</h2>'+actions+'</div>';
+ const orderTab=button('Ver pedidos da loja','event-unit-tab','data-tab="pedidos"','small');
+ const productsHtml=()=>{
+  if(!local.length)return '<p class="su-empty">Nenhuma mercadoria com saldo físico nesta loja temporária.</p>';
+  const groups=groupInventory(products.filter(p=>local.some(b=>b.product_id===p.id)),models);
+  if(!groups.length)return '<div class="su-data-list">'+local.map(b=>
+   '<div><span>'+h(products.find(p=>p.id===b.product_id)?.name||'Produto')+'</span><strong>'+
+   format(b.quantity)+' un.</strong></div>').join('')+'</div>';
+  return groups.map(g=>'<details class="event-product-compact"><summary><div class="event-product-thumb">'+
+     (typeof data.photoButton==='function'?data.photoButton(g.main):'')+'</div>'+
+     '<div><strong>'+h(g.title)+'</strong><small>Variações e quantidades no local</small></div>'+
+     '<b>'+format(g.products.reduce((s,p)=>s+Number(local.find(b=>b.product_id===p.id)?.quantity||0),0))+' un.</b><span aria-hidden="true">▾</span></summary>'+
+     '<div class="event-product-variants">'+g.products.filter(p=>local.some(b=>b.product_id===p.id)).map(p=>
+      '<div><span>'+h([p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||p.name)+
+      '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small></span><b>'+
+      format(local.find(b=>b.product_id===p.id)?.quantity||0)+' un.</b></div>').join('')+'</div></details>').join('');
+ };
+ let panel='';
+ if(current==='resumo'){
+  panel=title('Visão geral')+
+    '<p class="su-next">'+(closed?'Loja encerrada. O histórico de pedidos e de movimentações foi preservado.':
+      draft?'Loja em preparação. Crie pedidos independentes para enviar mercadorias à fila do CDSB.':
+      pending?'Existem '+format(pending)+' unidade(s) fisicamente no local. Confira as devoluções quando retornarem.':
+      'Não há mercadorias pendentes de retorno. Verifique pedidos e fechamento.')+'</p>'+
+    title('Pedidos e mercadorias',orderTab)+
+    '<div class="su-data-list"><div><span>Estoque físico no local</span><strong>'+format(pending)+' un.</strong></div>'+
+    '<div><span>Avarias em análise</span><strong>'+format(damaged)+' un.</strong></div></div>';
+ }else if(current==='pedidos'){
+  panel=title('Pedidos independentes desta loja')+(ordersMarkup||'<p class="su-empty">Nenhum pedido criado para esta loja.</p>');
+ }else if(current==='mercadorias'){
+  panel=title('Mercadorias atualmente no local')+productsHtml();
+ }else if(current==='fechamento'){
+  panel=title('Conciliação logística')+
+   '<p class="su-next">Controle apenas devolvidas boas, avariadas e não devolvidas. O CDSB não registra vendas.</p>'+
+   '<div class="su-data-list"><div><span>Saldo físico a conciliar</span><strong>'+format(pending)+' un.</strong></div>'+
+   '<div><span>Avariadas em análise</span><strong>'+format(damaged)+' un.</strong></div></div>'+
+   (closed?'<p class="su-empty">Fechamento concluído e histórico preservado.</p>':
+    active&&pending?(canSettle?button('Conferir devolução','event-settle','','primary')+
+      '<p class="su-pending">Conclua a conciliação por produto antes de encerrar a unidade.</p>':
+      '<p class="su-pending">Há mercadorias a conciliar. Solicite a conferência a um responsável autorizado.</p>'):
+    active&&canClose?button('Encerrar loja','event-close','data-id="'+h(e.id)+'"','primary'):
+    '<p class="su-empty">Aguardando início da operação ou autorização para encerramento.</p>');
+ }else if(current==='equipe'){
+  panel=title('Equipe e responsáveis')+'<div class="su-data-list">'+
+   (members.filter(m=>m.event_id===e.id).length?members.filter(m=>m.event_id===e.id).map(m=>
+    '<div><span>'+h(username(m.user_id))+' · '+h(m.role)+'</span>'+
+    (canManage&&!closed?button('Remover','member-remove','data-user="'+h(m.user_id)+'" data-event="'+h(e.id)+'"','small'):'')+
+    '</div>').join(''):'<p class="su-empty">Nenhum operador vinculado.</p>')+'</div>'+
+   (canManage&&!closed?button('+ Adicionar responsável / operador','member-add','data-id="'+h(e.id)+'"','small'):'');
+ }else{
+  panel=title('Histórico e rastreabilidade')+
+   (movements.filter(m=>m.event_id===e.id).length?'<div class="su-data-list">'+
+   movements.filter(m=>m.event_id===e.id).slice(0,80).map(m=>
+    '<div><span>'+h(products.find(p=>p.id===m.product_id)?.name||'Produto')+' · '+
+     h(m.action)+'<small>'+h(m.note||'')+'</small></span><strong>'+format(m.quantity)+' un.</strong></div>').join('')+
+   '</div>':'<p class="su-empty">Nenhuma movimentação registrada.</p>');
+ }
+ const mainAction=canManage&&!closed?button(e.cover_path?'Trocar capa':'Adicionar capa','event-cover-edit','data-id="'+h(e.id)+'"','small'):'';
+ const canDeleteOption=canDelete?button('Excluir cadastro','event-delete','data-id="'+h(e.id)+'"','small danger'):'';
+ const responsible=members.filter(m=>m.event_id===e.id&&m.role==='responsavel').map(m=>username(m.user_id)).join(', ')||'Não informado';
+ return '<div class="event-simple su-page event-unit-page">'+
+  '<button type="button" class="event-back" data-action="back-events">← Lojas</button>'+
+  '<header class="event-simple-head su-header"><div><h1>'+h(e.name)+'</h1>'+
+    '<p>'+h(niceDate(e.starts_at))+(e.ends_at?' a '+h(niceDate(e.ends_at)):'')+
+    ' · Responsável: '+h(responsible)+'</p></div><span class="event-simple-status">'+status+'</span></header>'+
+  '<div class="su-overview"><div><small>Saldo físico no local</small><strong>'+format(pending)+' un.</strong></div>'+
+  '<div><small>Avariadas em análise</small><strong>'+format(damaged)+' un.</strong></div>'+
+  '<div><small>Estado da loja</small><strong class="su-compact-state">'+status+'</strong></div></div>'+
+  '<div class="su-tabs" role="tablist" aria-label="Administrar loja temporária">'+
+   Object.entries(tabs).map(([key,label])=>'<button type="button" role="tab" data-action="event-unit-tab" data-tab="'+key+
+    '" class="'+(key===current?'is-current':'')+'" aria-selected="'+(key===current)+'">'+label+'</button>').join('')+
+  '</div><section class="su-panel">'+panel+'</section>'+
+  (mainAction||canDeleteOption?'<div class="event-simple-actions su-admin-tools">'+mainAction+canDeleteOption+'</div>':'')+
+  '</div>';
 }
 export function damageListHTML(damages,products,events,actions=[],{h=esc,button=()=>''}={}){
  const open=damages.filter(d=>Number(d.remaining)>0),closed=damages.filter(d=>Number(d.remaining)===0);
