@@ -1,3 +1,4 @@
+import {gondolaSelectHTML} from './gondolas.js?v=20261016gondolas1';
 // AME MAIS — cadastro simplificado de roupas; variações são produtos reais do estoque.
 const types=['Camiseta','Camisa','Polo','Blusa','Vestido','Casaco','Outro'];
 const audiences=['Unissex','Feminino','Masculino'];
@@ -8,7 +9,7 @@ const select = (name, title, options, value) =>
   '<label class="field"><span>'+title+'</span><select name="'+name+'" required>'+
   options.map(o=>'<option value="'+o+'" '+(o===value?'selected':'')+'>'+o+'</option>').join('')+'</select></label>';
 
-export function apparelRowHTML(h,defaultColor='',initial=false){
+export function apparelRowHTML(h,defaultColor='',initial=false,gondolas=[]){
   const opts='<option value="">Tamanho</option>'+
     sizes.map(x=>'<option value="'+x+'" '+(initial&&x==='M'?'selected':'')+'>'+x+'</option>').join('');
   return '<div class="apparel-variant" data-apparel-row>'+
@@ -21,6 +22,8 @@ export function apparelRowHTML(h,defaultColor='',initial=false){
     '<label class="field"><span>EAN (opcional)</span><div class="inline apparel-ean">'+
     '<input name="variant_ean" data-variant-ean inputmode="numeric" maxlength="18" placeholder="Código de barras" />'+
     '<button type="button" class="button small" data-action="apparel-scan">📷</button></div></label>'+
+    gondolaSelectHTML('variant_gondola',gondolas,'',{label:'Gôndola da variação'})+
+    '<label class="field"><span>Prateleira</span><input name="variant_prateleira" maxlength="40" placeholder="Ex.: B"></label>'+
     '<label class="field"><span>Estoque inicial na loja *</span><input name="variant_qty" inputmode="numeric" type="number" min="0" max="1000000" step="1" required value="0" /></label>'+
     '</div></div>';
 }
@@ -77,7 +80,7 @@ export function apparelModal(state,{h,formModal,photoChooser,categorySelector,pr
     photoChooser(null)+productTagChooser(null)+(procurementFields?procurementFields(null):'')+
     '<section class="form-section wide"><div class="section-head"><strong>2. Tamanhos, cores e quantidades</strong></div>'+
     '<p class="help">Cada combinação de cor e tamanho é uma variação independente. Comece por uma e toque em Adicionar variação para incluir outras.</p>'+
-    '<div data-apparel-rows>'+apparelRowHTML(h,'Branco',true)+'</div>'+
+    '<div data-apparel-rows>'+apparelRowHTML(h,'Branco',true,state.gondolas||[])+'</div>'+
     '<div class="apparel-add-actions"><button type="button" class="button apparel-add" data-action="apparel-add-row">+ Adicionar variação</button>'+    '<button type="button" class="button" data-action="apparel-fill-sizes">Preencher P, M, G e GG</button></div>'+
     '</section>'+
     '<div class="note">A quantidade inicial será registrada no histórico. As futuras transferências, vendas e devoluções serão controladas por tamanho e cor.</div>'+
@@ -85,7 +88,7 @@ export function apparelModal(state,{h,formModal,photoChooser,categorySelector,pr
   formModal('Nova roupa · cadastro básico',inner,'apparel-create','Cadastrar roupa');
 }
 
-export function apparelAddRow(target,{h}){
+export function apparelAddRow(target,{h,gondolas=[]}){
   const form=target.closest('form');
   const container=form?.querySelector('[data-apparel-rows]');
   if(!container)return;
@@ -93,7 +96,7 @@ export function apparelAddRow(target,{h}){
     throw new Error('São permitidas até 40 variações por modelo.');
   const last=[...container.querySelectorAll('[data-apparel-row]')].at(-1);
   const color=last?.querySelector('[name="variant_color"]')?.value?.trim()||'Branco';
-  container.insertAdjacentHTML('beforeend',apparelRowHTML(h,color,false));
+  container.insertAdjacentHTML('beforeend',apparelRowHTML(h,color,false,gondolas));
   container.lastElementChild?.querySelector('select[name="variant_size"]')?.focus();
 }
 
@@ -121,7 +124,7 @@ function validatedVariants(form){
     const key=color.toLocaleLowerCase('pt-BR')+'|'+size.toUpperCase();
     if(seen.has(key))throw new Error('Cor e tamanho repetidos: '+color+' / '+size+'.');
     seen.add(key);
-    return {color,size,sku:sku||null,ean:ean||null,quantity};
+    return {color,size,sku:sku||null,ean:ean||null,gondola:get('variant_gondola'),prateleira:get('variant_prateleira'),quantity};
   });
 }
 
@@ -135,14 +138,14 @@ export async function submitApparel(form,{
   const variants=validatedVariants(form);
   if(!variants.length)throw new Error('Adicione pelo menos uma variação.');
   const hasGallery=Boolean(form.querySelector('[data-gallery]'));
-  const created=assertOk(await db.rpc('create_apparel',{
+  const created=assertOk(await db.rpc('create_apparel_with_location',{
     p_name:name,
     p_type:form.elements.namedItem('apparel_type').value,
     p_age_group:form.elements.namedItem('apparel_age').value,
     p_audience:form.elements.namedItem('apparel_audience').value,
     p_category_id:category,
     p_tags:productTagValues(form),
-    p_variants:variants
+    p_variants:variants,p_gondola:null,p_prateleira:null
   }));
   if(saveProcurement)await saveProcurement(created,form);
   let photoWarning=false;
@@ -158,7 +161,7 @@ export async function submitApparel(form,{
 }
 
 
-export function apparelFillSizes(target,{h}){
+export function apparelFillSizes(target,{h,gondolas=[]}){
   const form=target.closest('form'),rows=form?.querySelector('[data-apparel-rows]');
   if(!rows)return;
   const current=[...rows.querySelectorAll('[data-apparel-row]')];
@@ -174,7 +177,7 @@ export function apparelFillSizes(target,{h}){
     const empty=current.find(row=>!row.querySelector('[name="variant_size"]')?.value);
     const row=empty||(()=>{
       if(rows.querySelectorAll('[data-apparel-row]').length>=40)throw new Error('Limite de 40 variações.');
-      rows.insertAdjacentHTML('beforeend',apparelRowHTML(h,color,false));
+      rows.insertAdjacentHTML('beforeend',apparelRowHTML(h,color,false,gondolas));
       return rows.lastElementChild;
     })();
     row.querySelector('[name="variant_color"]').value=color;
@@ -185,7 +188,7 @@ export function apparelFillSizes(target,{h}){
   }
 }
 
-export function apparelVariantEditModal(p,{h,formModal,variationOptions=[],procurementFields}){
+export function apparelVariantEditModal(p,{h,formModal,variationOptions=[],procurementFields,gondolas=[]}){
   if(!p?.apparel_model_id)throw new Error('Variação inválida.');
   const configured=variationOptions.length?variationOptions:[p.apparel_size];
   const sizeOptions='<option value="">Variação</option>'+
@@ -198,7 +201,7 @@ export function apparelVariantEditModal(p,{h,formModal,variationOptions=[],procu
     '<label class="field"><span>SKU</span><input name="sku" maxlength="80" value="'+h(p.sku||'')+'"></label>'+
     '<label class="field"><span>EAN</span><div class="inline apparel-ean"><input name="ean" data-variant-ean inputmode="numeric" maxlength="18" value="'+h(p.ean||'')+'">'+
     '<button type="button" class="button small" data-action="apparel-scan">📷</button></div></label>'+
-    '<label class="field"><span>Gôndola</span><input name="gondola" maxlength="40" value="'+h(p.gondola||'')+'"></label>'+
+    gondolaSelectHTML('gondola',gondolas,p.gondola||'')+
     '<label class="field"><span>Prateleira</span><input name="prateleira" maxlength="40" value="'+h(p.prateleira||'')+'"></label>'+
     (procurementFields?procurementFields(p):'')+
      '<label class="field"><span>Situação</span><select name="active"><option value="true" '+(p.active?'selected':'')+'>Ativa</option>'+
