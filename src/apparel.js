@@ -1,4 +1,15 @@
-import {gondolaSelectHTML} from './gondolas.js?v=20261016gondolas1';
+// Espelho local do seletor: módulos de catálogo devem permanecer independentes de DOM/imports.
+const gondolaSelectHTML=(name,locations=[],current='',opts={})=>{
+ const esc=v=>String(v??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[x]));
+ const selected=String(current||'');
+ const list=(locations||[]).filter(x=>x.active||x.name===selected).slice();
+ if(selected&&!list.some(x=>x.name===selected))list.push({name:selected,active:false});
+ list.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR',{numeric:true}));
+ return '<label class="field"><span>'+esc(opts.label||'Gôndola')+'</span><select name="'+esc(name)+'"'+(opts.disabled?' disabled':'')+'>'+
+ '<option value=""'+(!selected?' selected':'')+'>Sem gôndola definida</option>'+
+ list.map(x=>'<option value="'+esc(x.name)+'"'+(x.name===selected?' selected':'')+'>'+esc(x.name)+(x.active?'':' (antiga)')+'</option>').join('')+
+ '</select></label>';
+};
 // AME MAIS — cadastro simplificado de roupas; variações são produtos reais do estoque.
 const types=['Camiseta','Camisa','Polo','Blusa','Vestido','Casaco','Outro'];
 const audiences=['Unissex','Feminino','Masculino'];
