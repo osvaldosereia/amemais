@@ -52,7 +52,7 @@ export function galleryMain(form,index){
 export async function galleryAddFiles(form,files,compress){
  const photos=galleryState(form);const incoming=[...files];
  if(!incoming.length)return;
- if(incoming.length+photos.length>6)throw Error('É permitido cadastrar no máximo 3 fotos por modelo.');
+ if(incoming.length+photos.length>6)throw Error('É permitido cadastrar no máximo 6 fotos por modelo.');
  const compressed=[];
  for(const file of incoming){
   if(!file.type.startsWith('image/')||file.size>20*1024*1024)
@@ -74,7 +74,7 @@ export async function galleryReplaceFile(form,index,file,compress){
 }
 export async function savePhotoGallery(form,{db,assertOk,modelId=null,productId=null}){
  const gallery=galleryState(form);
- if(gallery.length>3)throw Error('Máximo de seis fotos.');
+ if(gallery.length>6)throw Error('Máximo de seis fotos.');
  const folder=modelId?'apparel/'+modelId+'/':productId+'/';
  if(!modelId&&!productId)throw Error('Produto não identificado para as fotos.');
  const uploaded=[];
