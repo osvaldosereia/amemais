@@ -145,7 +145,32 @@ begin
  if v_status is distinct from 'separado' then raise exception 'Pedido ainda não separado';end if;
  select * into v_row from public.order_operational_progress
   where kind=p_kind and order_id=p_order for update;
- if not found then raise exception 'Este pedido usa conferência anterior. Atualize a separação ou use a conferência original.';end if;
+ if not found then
+  -- Pedidos já separados antes desta migração também podem ser conferidos no fluxo novo.
+  v_row.kind:=p_kind;v_row.order_id:=p_order;v_row.stage:='conferencia';
+  v_row.items:='{}'::jsonb;v_row.has_difference:=false;
+  for v_key,v_item in
+   select product_id::text,jsonb_build_object('requested',quantity,
+      'picked',case when p_kind='evento' then picked else quantity end,
+      'pick_reason','', 'counted',null,'check_reason','')
+    from public.event_pick_batch_items where p_kind='evento' and batch_id=p_order
+   union all
+   select product_id::text,jsonb_build_object('requested',quantity,
+     'picked',quantity,'pick_reason','', 'counted',null,'check_reason','')
+    from public.store_order_items where p_kind='loja' and order_id=p_order
+   union all
+   select product_id::text,jsonb_build_object('requested',quantity,
+     'picked',quantity,'pick_reason','', 'counted',null,'check_reason','')
+    from public.avulso_order_items where p_kind='avulso' and order_id=p_order
+  loop
+    v_row.items:=v_row.items||jsonb_build_object(v_key,v_item);
+    if (v_item->>'picked')::integer <> (v_item->>'requested')::integer
+       then v_row.has_difference:=true;end if;
+  end loop;
+  if v_row.items='{}'::jsonb then raise exception 'Pedido sem itens';end if;
+  insert into public.order_operational_progress(kind,order_id,stage,items,has_difference,updated_by)
+    values(p_kind,p_order,'conferencia',v_row.items,v_row.has_difference,auth.uid());
+ end if;
  if v_row.stage<>'conferencia' then raise exception 'Pedido não está na etapa de conferência';end if;
  if (select count(*) from jsonb_object_keys(p_items))<>(select count(*) from jsonb_object_keys(v_row.items))
  then raise exception 'Confira todos os SKUs';end if;
