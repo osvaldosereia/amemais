@@ -72,7 +72,8 @@ export function renderStoreUnit({store,orders=[],storeBalances=[],products=[],br
   panel='<div class="su-panel"><h2>Recebimentos da franquia</h2>'+rows(received)+'</div>';
  }else{
   panel='<div class="su-panel"><div class="su-section-header"><h2>Cadastro da unidade</h2>'+
-   (ctx.canManageStores?ctx.button('Editar cadastro','store-edit','data-id="'+esc(store.id)+'"','small'):'')+'</div>'+
+   (ctx.canManageStores?ctx.button('Editar cadastro','store-edit','data-id="'+esc(store.id)+'"','small')+
+    ctx.button(store.active?'Desativar loja':'Ativar loja','store-toggle','data-id="'+esc(store.id)+'"','small'):'')+'</div>'+
    '<div class="su-data-list">'+[
     ['Código',store.code],['Responsável',store.manager_name],['Telefone',store.phone],['Documento',store.document],['Endereço',store.address]
    ].map(([name,value])=>'<div><small>'+name+'</small><strong>'+esc(value||'Não informado')+'</strong></div>').join('')+'</div></div>';
