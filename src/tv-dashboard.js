@@ -441,7 +441,7 @@ function shell(data){
  const live=!!data&&!state.error&&Date.now()-state.lastSuccess<90000;
  const warning=state.error||state.managementError||state.rankingsError;
  root.innerHTML='<main class="tv-shell tv-one-shell">'+
-  '<header class="tv-one-header"><div class="tv-one-logo"><img src="./cdsb-brand.jpg" alt="CDSB — Centro de Distribuição São Bento"></div>'+
+  '<header class="tv-one-header"><div class="tv-one-logo"><img src="./cdsb-brand.svg?v=20261016logo2" alt="CDSB — Centro de Distribuição São Bento"></div>'+
   '<div class="tv-one-title"><h1>Painel Gerencial 360°</h1><small>CDSB · operação, estoque e resultados em uma única tela</small></div>'+
   '<div class="tv-one-header-right">'+statusMarkup()+
   '<span>Atualizado '+niceTime(generated)+'</span>'+
@@ -479,7 +479,7 @@ function advanceRotation(){
 }
 
 function message(title,detail){
- root.innerHTML='<div class="tv-entry"><img src="./cdsb-brand.jpg" alt="Centro de Distribuição São Bento">'+
+ root.innerHTML='<div class="tv-entry"><img src="./cdsb-brand.svg?v=20261016logo2" alt="Centro de Distribuição São Bento">'+
  '<h1>'+esc(title)+'</h1><p>'+esc(detail)+'</p>'+
  '<a href="./index.html">Voltar ao AME MAIS Estoque</a></div>';
 }
