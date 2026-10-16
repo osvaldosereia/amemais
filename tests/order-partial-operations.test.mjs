@@ -37,6 +37,8 @@ test('formulário de separação permite zero, parcial e motivo de falta',()=>{
  assert.match(html,/data-op-reason/);
  assert.match(html,/não encontrado|não impede/);
  assert.match(html,/000100005073/);
+ assert.match(html,/data-op-barcode/);
+ assert.match(html,/data-action="order-op-camera"/);
  const check=operationalFormMarkup({...order,workflow:{items:{sku1:{picked:7}}}},'conferencia');
  assert.match(check,/Quantidade conferida/);
  assert.doesNotMatch(check,/data-op-qty[^>]*value="7"/);
@@ -47,6 +49,7 @@ test('front chama RPCs autenticadas em cada etapa e não baixa estoque ao separa
  assert.match(app,/p_finish:finish/);
  assert.match(app,/state\.orderOperationalRows/);
  assert.match(app,/order-op-send/);
+ assert.match(app,/function operationalLocateSku/);
  assert.match(sql,/stage='enviado'/);
  assert.match(sql,/'liberada'/);
  assert.match(sql,/v_qty>0/);
