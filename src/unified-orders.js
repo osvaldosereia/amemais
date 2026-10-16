@@ -232,6 +232,18 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
   (o.status==='expirado'?'<p class="uo-shortage">Prazo de confirmação expirado. Histórico preservado.</p>':'')+
   '<details class="uo-order-open"><summary>Abrir pedido · '+n(o.lines.length)+' SKU(s) · '+n(o.total)+' unidades</summary>'+
   preview+
+  (o.workflow?.has_difference?'<section class="uo-difference-list"><strong>⚠ Divergências por produto</strong>'+
+   o.lines.filter(l=>{
+    const r=o.workflow.items?.[l.id]||{};
+    return (r.picked!=null&&Number(r.picked)!==Number(l.quantity))||
+     (r.counted!=null&&Number(r.counted)!==Number(l.quantity))||
+     (r.counted!=null&&r.picked!=null&&Number(r.counted)!==Number(r.picked));
+   }).map(l=>{
+    const r=o.workflow.items?.[l.id]||{};
+    return '<p><b>'+esc(l.modelTitle||l.name)+(l.size?' · '+esc(l.size):'')+'</b> · Solicitado '+n(l.quantity)+
+      ' · Separado '+n(r.picked)+' · Conferido '+(r.counted==null?'Pendente':n(r.counted))+
+      ' · Motivo: '+esc(r.check_reason||r.pick_reason||'Não informado')+'</p>';
+   }).join('')+'</section>':'')+
   '<div class="uo-operational-actions">'+
    (primary.length?'<div class="uo-primary-action">'+primary.join('')+'</div>':'')+
    (secondary.length?'<div class="uo-secondary-actions">'+secondary.join('')+'</div>':'')+
