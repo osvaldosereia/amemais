@@ -5,7 +5,8 @@ const sql=await readFile(new URL('../supabase/migrations/20261016_fix_event_veri
 const app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
 test('trigger de invalidação reconhece lote temporário pelo batch_id, pedidos regulares por order_id',()=>{
  assert.match(sql,/CREATE OR REPLACE FUNCTION app_private\.invalidate_order_final_verification\(\)/i);
- assert.match(sql,/TG_TABLE_NAME\s+WHEN\s+'event_pick_batch_items'\s+THEN\s+'evento'/i);
+ assert.match(sql,/v_kind\s*:=\s*CASE\s+TG_TABLE_NAME/i);
+ assert.match(sql,/WHEN\s+'event_pick_batch_items'\s+THEN\s+'evento'/i);
  assert.match(sql,/IF v_kind='evento' THEN\s*v_parent := OLD\.batch_id;/i);
  assert.match(sql,/IF v_kind='evento' THEN\s*v_parent := NEW\.batch_id;/i);
  assert.match(sql,/ELSE\s*v_parent := OLD\.order_id;/i);
