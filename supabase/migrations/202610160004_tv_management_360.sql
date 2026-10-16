@@ -147,7 +147,7 @@ event_in_progress as (
  left join public.event_pick_batch_items i on i.batch_id=b.id
  left join product_cats p on p.id=i.product_id
  where e.deleted_at is null and e.status in ('rascunho','ativo')
-   and (e.ends_at is null or e.ends_at>=current_date-1)
+   and (e.ends_at is null or e.ends_at>=(now() at time zone 'America/Cuiaba')::date-1)
  group by e.id,e.name,e.starts_at,p.category
 ),
 event_closed as (
@@ -207,9 +207,9 @@ demand_agg as (
  from demands d left join product_cats p on p.id=d.product_id group by p.category
 ),
 trend as (
- select (current_date-g.i)::date dte,
+ select ((now() at time zone 'America/Cuiaba')::date-g.i)::date dte,
   coalesce((select sum(d.quantity) from demands d
-    where (d.demand_at at time zone 'America/Cuiaba')::date=(current_date-g.i)::date),0)::integer units
+    where (d.demand_at at time zone 'America/Cuiaba')::date=((now() at time zone 'America/Cuiaba')::date-g.i)::date),0)::integer units
  from generate_series(0,13) g(i)
 ),
 purchases as (
