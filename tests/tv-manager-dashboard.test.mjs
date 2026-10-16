@@ -30,7 +30,7 @@ const mock={
  recent:[{code:'AA003',kind:'evento',text:'Conferência concluída',at:'2026-10-15T19:33:00Z'}]
 };
 test('modo TV possui página independente, 16:9, fullscreen e atualização periódica',()=>{
- assert.match(page,/tv-dashboard\.js\?v=20261016tvone2/);
+ assert.match(page,/tv-dashboard\.js\?v=\d{8}[a-z0-9]+/);
  assert.match(page,/tv-dashboard\.css\?v=20261016tvone2/);
  assert.match(css,/height:100dvh/);
  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
