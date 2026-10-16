@@ -92,93 +92,166 @@ export function groupedOrderLines(lines){
   missing:g.lines.reduce((n,l)=>n+l.missing,0)
  }));
 }
+
+const locationSort=new Intl.Collator('pt-BR',{numeric:true,sensitivity:'base'});
+function shortLocation(value){
+ const raw=String(value||'').trim().replace(/^g[oô]ndola\s*/i,'');
+ if(!raw)return '';
+ return /^\d+$/.test(raw)?String(Number(raw)):raw;
+}
+export function groupedOrderByLocation(lines=[]){
+ const sections=new Map();
+ for(const line of lines){
+  const key=shortLocation(line.gondola);
+  if(!sections.has(key))sections.set(key,[]);
+  sections.get(key).push(line);
+ }
+ return [...sections].sort((a,b)=>!a[0]?1:!b[0]?-1:locationSort.compare(a[0],b[0])).map(([key,items])=>({
+  key,title:key?'Gôndola '+key:'Sem gôndola cadastrada',
+  lines:items.sort((a,b)=>locationSort.compare(a.prateleira||'',b.prateleira||'')||
+    locationSort.compare(a.modelTitle||a.name||'',b.modelTitle||b.name||'')||
+    locationSort.compare(a.size||'',b.size||'')),
+  total:items.reduce((total,item)=>total+Number(item.quantity||0),0)
+ }));
+}
+function orderWorkflow(o,verified=false){
+ const status=o.status;
+ if(status==='pendente_estoque')return ['Falta de estoque','shortage','Falta de unidades: aguardar reposição ou resolver a pendência'];
+ if(['legado','solicitado'].includes(status))return ['Aguardando preparação','pending','É necessário reservar os produtos'];
+ if(['aguardando','reservado','aprovado'].includes(status))return ['A separar','ready','Pronto para iniciar a separação'];
+ if(status==='em_separacao')return ['Em separação','picked','Separação em andamento'];
+ if(status==='separado'&&!verified)return ['A conferir','checking','Separação concluída · Aguardando conferência final'];
+ if(status==='separado'&&verified)return ['Conferido','complete','Conferência concluída · Aguardando confirmação da saída'];
+ return [...(statuses[status]||[status,'pending']),'Saída/encerramento registrado'];
+}
 export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canDelete=false,canReceive=false,
  canDispatch=false,canDispatchStock=false,canVerify=false,isVerified=false,canAdjust=false,portal=false,time=x=>x}={}){
- const info=statuses[o.status]||[o.status,'pending'];
+ const info=orderWorkflow(o,isVerified);
  const data='data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"';
  const process=canProcess&&!portal;
- const event=o.kind==='evento',terminal=['despachado','enviado','concluido','recebido',
-  'recebido_divergente','cancelado','expirado'].includes(o.status);
- const ready=['reservado','aprovado','aguardando'].includes(o.status),
-  waiting=o.status==='pendente_estoque',inProgress=o.status==='em_separacao';
- const actions=[];
+ const event=o.kind==='evento';
+ const terminal=['despachado','enviado','concluido','recebido','recebido_divergente','cancelado','expirado'].includes(o.status);
+ const ready=['reservado','aprovado','aguardando'].includes(o.status);
+ const waiting=o.status==='pendente_estoque',inProgress=o.status==='em_separacao';
+ const primary=[],secondary=[],management=[];
+ // Exatamente uma ação operacional principal por etapa. Os botões existentes mantêm seus handlers.
  if(event){
   if(process&&(ready||inProgress))
-   actions.push(button(inProgress?'Continuar separação':'Separar lote','event-batch-pick',data,'small primary'));
-  if(o.status==='separado'&&canVerify)
-   actions.push(button(isVerified?'Rever conferência':'Conferir produtos','order-final-verify',data,'small primary'));
-  if(canDispatch&&o.status==='separado'&&isVerified)
-   actions.push(button('Confirmar saída do lote','event-batch-dispatch',data,'small primary'));
-  if(canCancel&&!terminal)actions.push(button('Editar lote','event-batch-edit',data,'small'));
-  if(canCancel&&!terminal)actions.push(button('Cancelar lote','event-batch-cancel',data,'small danger'));
+   primary.push(button(inProgress?'Continuar separação':'Iniciar separação','event-batch-pick',data,'small primary'));
+  else if(o.status==='separado'&&!isVerified&&canVerify)
+   primary.push(button('Conferir agora','order-final-verify',data,'small primary'));
+  else if(o.status==='separado'&&isVerified&&canDispatch)
+   primary.push(button('Confirmar saída','event-batch-dispatch',data,'small primary'));
+  if(o.status==='separado'&&isVerified&&canVerify)
+   secondary.push(button('Rever conferência','order-final-verify',data,'small'));
+  if(canCancel&&!terminal){
+   management.push(button('Editar lote','event-batch-edit',data,'small'));
+   management.push(button('Cancelar lote','event-batch-cancel',data,'small danger'));
+  }
  }else{
   if(process&&canAdjust&&['legado','solicitado'].includes(o.status))
-   actions.push(button('Preparar pedido','order-retry',data,'small primary'));
-  if(process&&canAdjust&&waiting)
-   actions.push(button('Resolver falta','order-shortage-adjust',data,'small primary'));
-  if(process&&ready)
-   actions.push(button('Separar',o.kind==='avulso'?'avulso-pick':'store-order-separate',data,'small primary'));
-  if(o.status==='separado'&&canVerify)
-   actions.push(button(isVerified?'Rever conferência':'Conferir produtos','order-final-verify',data,'small primary'));
-  if(process&&canDispatchStock&&o.status==='separado'&&isVerified)
-   actions.push(button('Confirmar saída',o.kind==='avulso'?'avulso-dispatch':'store-order-dispatch',data,'small primary'));
-  if(canReceive&&o.kind==='loja'&&o.status==='despachado')
-   actions.push(button('Conferir recebimento','store-order-receive',data,'small primary'));
+   primary.push(button('Preparar pedido','order-retry',data,'small primary'));
+  else if(process&&canAdjust&&waiting)
+   primary.push(button('Resolver falta','order-shortage-adjust',data,'small primary'));
+  else if(process&&ready)
+   primary.push(button('Iniciar separação',o.kind==='avulso'?'avulso-pick':'store-order-separate',data,'small primary'));
+  else if(o.status==='separado'&&!isVerified&&canVerify)
+   primary.push(button('Conferir agora','order-final-verify',data,'small primary'));
+  else if(o.status==='separado'&&isVerified&&process&&canDispatchStock)
+   primary.push(button('Confirmar saída',o.kind==='avulso'?'avulso-dispatch':'store-order-dispatch',data,'small primary'));
+  else if(canReceive&&o.kind==='loja'&&o.status==='despachado')
+   primary.push(button('Conferir recebimento','store-order-receive',data,'small primary'));
+  if(o.status==='separado'&&isVerified&&canVerify)
+   secondary.push(button('Rever conferência','order-final-verify',data,'small'));
   if(canCancel&&['legado','solicitado','pendente_estoque','aprovado','reservado','separado'].includes(o.status))
-   actions.push(button('Cancelar',o.kind==='avulso'?'avulso-cancel':'store-order-cancel',data,'small danger'));
+   management.push(button('Cancelar pedido',o.kind==='avulso'?'avulso-cancel':'store-order-cancel',data,'small danger'));
  }
- if(canDelete&&!portal)actions.push(button('Excluir pedido','admin-order-delete-open',data,'small danger'));
+ if(canDelete&&!portal)management.push(button('Excluir pedido','admin-order-delete-open',data,'small danger'));
  if(!portal&&o.lines.length&&!waiting&&!['legado','solicitado','cancelado','expirado'].includes(o.status))
-  actions.push(button('Imprimir 80 mm','order-print-thermal',data,'small'));
- const originLabel=event?'Loja temporária · Lote '+String(o.sequence).padStart(2,'0'):
+  secondary.push(button('Imprimir separação','order-print-thermal',data,'small'));
+ const originLabel=event?'Loja temporária · Lote '+String(o.sequence||1).padStart(2,'0'):
   o.kind==='avulso'?(o.raw.source==='cliente'?'Cliente catálogo':
    o.raw.source==='compartilhado'?'Cliente link':'Pedido avulso'):
-   o.raw.request_type==='franquia'?'Franquia':'Filial';
+   o.raw.request_type==='franquia'?'Franquia':'Loja / filial';
  const unchecked=['legado','solicitado'].includes(o.status);
- const groups=groupedOrderLines(o.lines);
- const content=groups.map((g,i)=>'<section class="uo-model-group">'+
+ const groups=groupedOrderLines(o.lines),locations=groupedOrderByLocation(o.lines);
+ const itemMarkup=l=>'<div class="uo-model-variant">'+
+   '<div class="uo-variant-identity"><b>'+esc([l.color,l.size].filter(x=>x&&x!=='Única').join(' · ')||'Único')+'</b>'+
+   '<small>SKU '+esc(l.sku||'—')+' · EAN '+esc(l.ean||'—')+'</small>'+
+   '<small>'+esc(l.gondola?'Gôndola '+l.gondola:'Local não informado')+
+    (l.prateleira?' · Prateleira '+l.prateleira:'')+'</small></div>'+
+   '<div class="uo-variant-quantities"><b>'+n(l.quantity)+' un.</b>'+
+   (portal?'':terminal?'<small>'+(['cancelado','expirado'].includes(o.status)?'Cancelado':'Enviado')+'</small>':
+    unchecked?'<small>Para preparar</small>':
+    '<small>'+n(l.reserved)+' reservadas</small>'+
+    (l.missing?'<small class="is-short">'+n(l.missing)+' faltam</small>':''))+
+   '</div></div>';
+ const content=groups.map(g=>'<section class="uo-model-group">'+
    '<div class="uo-model-head"><div class="uo-model-identity">'+
-    (g.imagePath?'<img class="uo-model-photo" data-photo-path="'+esc(g.imagePath)+'" alt="Foto do modelo '+esc(g.title)+'" loading="lazy">':'<span class="uo-model-photo uo-photo-empty" aria-hidden="true">▧</span>')+
+    (g.imagePath?'<img class="uo-model-photo" data-photo-path="'+esc(g.imagePath)+'" alt="Foto de '+esc(g.title)+'" loading="lazy">':'<span class="uo-model-photo uo-photo-empty" aria-hidden="true">▧</span>')+
     '<strong>'+esc(g.title)+'</strong></div>'+
     '<span>'+n(g.total)+' un. · '+g.lines.length+' variação(ões)</span></div>'+
-   g.lines.map(l=>'<div class="uo-model-variant">'+
-    '<div class="uo-variant-identity"><b>'+esc([l.color,l.size].filter(x=>x&&x!=='Única').join(' · ')||'Único')+'</b>'+
-      '<small>SKU '+esc(l.sku||'—')+' · EAN '+esc(l.ean||'—')+'</small>'+
-      '<small>'+esc(l.gondola?'Gôndola '+l.gondola:'Local não informado')+
-       (l.prateleira?' · Prateleira '+esc(l.prateleira):'')+'</small></div>'+
-    '<div class="uo-variant-quantities"><b>'+n(l.quantity)+' un.</b>'+
-    (portal?'':terminal?'<small>'+(['cancelado','expirado'].includes(o.status)?'Cancelado':'Enviado')+'</small>':
-      unchecked?'<small>Para preparar</small>':
-      '<small>'+n(l.reserved)+' reservadas</small>'+
-      (l.missing?'<small class="is-short">'+n(l.missing)+' faltam</small>':''))+
-    '</div></div>').join('')+'</section>').join('');
+   g.lines.map(itemMarkup).join('')+'</section>').join('');
+ const gondolaContent=locations.map(group=>
+  '<section class="uo-gondola-group"><header><strong>'+esc(group.title)+'</strong><span>'+n(group.total)+' unidades</span></header>'+
+  group.lines.map(l=>'<div class="uo-gondola-line"><span><strong>'+esc(l.modelTitle||l.name)+'</strong>'+
+   '<small>'+esc([l.color,l.size].filter(Boolean).join(' · ')||'Único')+
+   ' · SKU '+esc(l.sku||'—')+(l.prateleira?' · Prat. '+esc(l.prateleira):'')+'</small></span>'+
+   '<b>'+n(l.quantity)+' un.</b></div>').join('')+'</section>').join('');
+ const preview=o.lines.length===1?(()=>{
+  const l=o.lines[0],g=groups[0];
+  return '<div class="uo-product-preview">'+
+   (g?.imagePath?'<img data-photo-path="'+esc(g.imagePath)+'" alt="Foto de '+esc(g.title)+'" loading="lazy">':
+    '<span class="uo-preview-placeholder" aria-hidden="true">▧</span>')+
+   '<div><strong>'+esc(l.modelTitle||l.name)+
+     (l.size?' · '+esc(l.size):'')+'</strong>'+
+    '<small>SKU '+esc(l.sku||'—')+' · EAN '+esc(l.ean||'—')+'</small>'+
+    '<span class="uo-location">⌖ '+esc(l.gondola?'Gôndola '+l.gondola:'Sem gôndola')+
+     (l.prateleira?' · Prateleira '+esc(l.prateleira):'')+'</span></div>'+
+   '<b class="uo-preview-quantity">'+n(l.quantity)+' <small>un.</small></b></div>';
+ })():'<div class="uo-product-summary"><strong>'+n(o.lines.length)+' SKUs</strong>'+
+ '<span>'+n(groups.length)+' modelos · '+n(locations.length)+' locais de separação</span>'+
+ '<small>Abra a lista abaixo para separar por gôndola ou por modelo.</small></div>';
  const waitingText=event?
-  'Este lote aguarda reposição. As unidades disponíveis já estão reservadas; assim que entrar mercadoria, o sistema completa a reserva.':
-  'Faltam unidades. Você pode aguardar a reposição ou registrar uma redução justificada no pedido.';
- return '<article class="uo-card" data-order-card data-search="'+esc([
+  'Aguardando reposição. As unidades disponíveis continuam reservadas; assim que chegar mercadoria, o sistema completa a reserva.':
+  'Faltam unidades. Aguarde a reposição ou solicite ao responsável um ajuste justificado.';
+ return '<article class="uo-card uo-operational" data-order-card data-search="'+esc([
   o.id,o.code,o.target,o.origin,originLabel,...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
-  '" data-order-id="'+esc(o.id)+'" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'">'+
+  '" data-order-id="'+esc(o.id)+'" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'" data-order-destination="'+
+   (event?'evento':o.kind==='avulso'?'avulso':o.raw.request_type==='franquia'?'franquia':'loja')+'">'+
   '<header><div class="uo-head"><small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small>'+
-   '<h3>'+(event?'Lote #':'Pedido #')+
-    esc(o.code||'—')+'</h3>'+
+   '<h3>'+(event?'Lote #':'Pedido #')+esc(o.code||'—')+'</h3>'+
    '<strong>'+esc(o.target)+'</strong></div>'+
    '<span class="uo-pill '+info[1]+'">'+esc(info[0])+'</span></header>'+
-  '<div class="uo-metrics"><span>'+n(o.total)+' unidades · '+groups.length+' modelo(s)</span>'+
-   (portal?'':terminal?'<span>Saída/encerramento registrado</span>':
-    unchecked?'<span>Pendente de preparação</span>':
-    '<span>'+n(o.reserved)+' reservadas</span>'+
-     (o.missing?'<span class="uo-alert">'+n(o.missing)+' faltam</span>':'<span class="uo-ok">Pronto para separar</span>'))+
+  '<div class="uo-metrics"><span>'+n(o.total)+' unidades · '+groups.length+' modelo(s) · '+o.lines.length+' SKU(s)</span>'+
+   (!portal&&!terminal&&!unchecked?'<span>'+n(o.reserved)+' reservadas</span>':'')+
+   (waiting&&o.missing?'<span class="uo-alert">'+n(o.missing)+' faltam</span>':'')+
   '</div>'+
+  '<p class="uo-next-step '+(waiting?'is-shortage':'')+'">'+esc(info[2])+'</p>'+
   (waiting&&!portal?'<p class="uo-shortage">'+waitingText+'</p>':'')+
-  (o.status==='legado'?'<p class="uo-shortage">Pedido anterior ao novo sistema de reservas. Use Preparar pedido uma única vez para colocá-lo na fila.</p>':'')+
+  (o.status==='legado'?'<p class="uo-shortage">Pedido anterior ao sistema de reservas. Prepare o pedido para entrar na fila.</p>':'')+
   (o.status==='expirado'?'<p class="uo-shortage">Prazo de confirmação expirado. Histórico preservado.</p>':'')+
-  '<details class="uo-details"><summary>Produtos e tamanhos ('+groups.length+' modelo(s), '+o.lines.length+' variações)</summary>'+
-   '<div class="uo-model-list">'+content+'</div>'+
+  preview+
+  '<div class="uo-operational-actions">'+
+   (primary.length?'<div class="uo-primary-action">'+primary.join('')+'</div>':'')+
+   (secondary.length?'<div class="uo-secondary-actions">'+secondary.join('')+'</div>':'')+
+  '</div>'+
+  '<details class="uo-details"'+(o.lines.length>1?'':'')+'><summary>Ver produtos e localizações ('+
+    n(o.lines.length)+' SKUs)</summary>'+
+   '<div class="uo-list-view" data-group-view="location">'+
+    '<div class="uo-group-switch" role="group" aria-label="Organização dos produtos">'+
+     '<button type="button" class="is-current" data-action="order-group-location" aria-pressed="true">Por gôndola</button>'+
+     '<button type="button" data-action="order-group-model" aria-pressed="false">Por modelo</button></div>'+
+    '<div class="uo-location-list">'+gondolaContent+'</div>'+
+    '<div class="uo-model-list">'+content+'</div></div>'+
    (o.adjustments.length?'<div class="uo-audit"><strong>Alterações justificadas</strong>'+
-    o.adjustments.slice(-8).map(a=>'<p>'+esc(a.original_quantity)+' → '+esc(a.revised_quantity)+
-    ' un. · '+esc(a.reason)+'</p>').join('')+'</div>':'')+'</details>'+
+    o.adjustments.slice(-8).map(a=>'<p>'+esc(a.original_quantity)+' → '+esc(a.revised_quantity)+' un. · '+esc(a.reason)+'</p>').join('')+'</div>':'')+'</details>'+
   (o.externalReference?'<small>Referência externa: '+esc(o.externalReference)+'</small>':'')+
-  '<div class="uo-actions">'+actions.join('')+'</div></article>';
+  (management.length?'<details class="uo-admin-actions"><summary>'+
+   (canDelete?'Administração do pedido':'Gerenciar pedido')+'</summary>'+
+   '<p>Alterações administrativas podem cancelar reservas ou exigir nova separação.</p>'+
+   '<div class="uo-actions">'+management.join('')+'</div></details>':'')+
+  '</article>';
 }
 export function unifiedOrdersPage(orders,{
  button=()=>'',time=x=>x,portal=false,separationOnly=false,
