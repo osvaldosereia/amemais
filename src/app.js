@@ -323,12 +323,12 @@ function loginScreen(message=''){
 }
 
 function pendingAccessScreen(){
-  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand-login"><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="225" height="120"><small>CONTROLE DE ESTOQUE</small></div>'+
+  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand-login"><img src="./cdsb-brand.jpg" alt="CDSB — Centro de Distribuição São Bento" width="320" height="107"><small>CONTROLE DE ESTOQUE</small></div>'+
   '<h1>Acesso pendente</h1><p>O email <strong>'+h(state.user?.email)+'</strong> já foi identificado, mas precisa ser liberado por um administrador.</p>'+
   '<button class="button" data-action="logout">Sair</button></section></div>';
 }
 function initialAdminScreen(){
-  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand-login"><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="225" height="120"><small>CONTROLE DE ESTOQUE</small></div>'+
+  root.innerHTML='<div class="login-wrap"><section class="login"><div class="brand-login"><img src="./cdsb-brand.jpg" alt="CDSB — Centro de Distribuição São Bento" width="320" height="107"><small>CONTROLE DE ESTOQUE</small></div>'+
   '<h1>Ativar administrador</h1><p>Email confirmado: <strong>'+h(state.user?.email)+'</strong>. Informe o código de ativação de uso único.</p>'+
   '<form data-form="admin-bootstrap">'+
   field('Nome do administrador','full_name','text','','required minlength="2" maxlength="120"')+
@@ -474,7 +474,7 @@ function button(label,action,extra='',kind=''){
 }
 function pill(status){return '<span class="pill '+h(status)+'">'+h({ativo:'Ativo',encerrado:'Encerrado',rascunho:'Rascunho'}[status]||status)+'</span>';}
 function render(){
-  if(!db){root.innerHTML='<div class="login-wrap"><div class="login"><div class="brand-login"><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="225" height="120"><small>CONTROLE DE ESTOQUE</small></div><h2>Configuração necessária</h2><p>Verifique o Supabase exclusivo deste sistema em <code>config.js</code>.</p></div></div>';return;}
+  if(!db){root.innerHTML='<div class="login-wrap"><div class="login"><div class="brand-login"><img src="./cdsb-brand.jpg" alt="CDSB — Centro de Distribuição São Bento" width="320" height="107"><small>CONTROLE DE ESTOQUE</small></div><h2>Configuração necessária</h2><p>Verifique o Supabase exclusivo deste sistema em <code>config.js</code>.</p></div></div>';return;}
   if(!state.user){loginScreen();return;}
   if(!state.profile){state.setupPending?initialAdminScreen():pendingAccessScreen();return;}
   if(!state.profile.active){pendingAccessScreen();return;}
