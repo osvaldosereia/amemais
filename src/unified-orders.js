@@ -52,7 +52,9 @@ export function makeUnifiedOrders({avulsoOrders=[],avulsoItems=[],storeOrders=[]
   const mapped=rows(kind,order.id,lines);
   const terminal=['enviado','despachado','concluido','recebido','recebido_divergente','cancelado','expirado'].includes(status);
   const unchecked=['legado','solicitado'].includes(status);
-  return {kind,id:order.id,code:codeMap.get(kind+':'+order.id)||'—',eventId:order.event_id||null,
+  const destinationKind=kind==='evento'?'evento':kind==='avulso'?'avulso':
+    (storeById.get(order.to_store_id)?.kind==='franquia'||order.request_type==='franquia'?'franquia':'loja');
+  return {kind,destinationKind,id:order.id,code:codeMap.get(kind+':'+order.id)||'—',eventId:order.event_id||null,
    sequence:order.sequence||null,created_at:order.created_at,status,
    origin,target,source:order.source||order.request_type||kind,
    customerPhone:kind==='avulso'?order.customer_phone:'',
@@ -172,7 +174,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  const originLabel=event?'Loja temporária · Lote '+String(o.sequence||1).padStart(2,'0'):
   o.kind==='avulso'?(o.raw.source==='cliente'?'Cliente catálogo':
    o.raw.source==='compartilhado'?'Cliente link':'Pedido avulso'):
-   o.raw.request_type==='franquia'?'Franquia':'Loja / filial';
+   o.destinationKind==='franquia'?'Franquia':'Loja / filial';
  const unchecked=['legado','solicitado'].includes(o.status);
  const groups=groupedOrderLines(o.lines),locations=groupedOrderByLocation(o.lines);
  const itemMarkup=l=>'<div class="uo-model-variant">'+
@@ -218,7 +220,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  return '<article class="uo-card uo-operational" data-order-card data-search="'+esc([
   o.id,o.code,o.target,o.origin,originLabel,...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
   '" data-order-id="'+esc(o.id)+'" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'" data-order-destination="'+
-   (event?'evento':o.kind==='avulso'?'avulso':o.raw.request_type==='franquia'?'franquia':'loja')+
+   (o.destinationKind|| (event?'evento':o.kind==='avulso'?'avulso':'loja'))+
    '" data-order-verified="'+(o.status==='separado'&&isVerified?'true':'false')+'">'+
   '<header><div class="uo-head"><small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small>'+
    '<h3>'+(event?'Lote #':'Pedido #')+esc(o.code||'—')+'</h3>'+
@@ -266,6 +268,7 @@ export function unifiedOrdersPage(orders,{
  const toVerify=orders.filter(o=>o.status==='separado'&&!isVerified(o)).length;
  const readyToDispatch=orders.filter(o=>o.status==='separado'&&isVerified(o)).length;
  const waiting=orders.filter(o=>o.status==='pendente_estoque').length;
+ const destinationTypes=new Set(visible.map(o=>o.destinationKind||o.kind));
  const cards=visible.map(o=>unifiedOrderCard(o,{button,time,portal,
   canProcess:canProcess(o),canCancel:canCancel(o),canDelete:canDelete(o),canReceive:canReceive(o),
   canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o),
@@ -299,10 +302,12 @@ export function unifiedOrdersPage(orders,{
    '<option value="concluidos">Concluídos</option>'+
    '<option value="encerrados">Cancelados / expirados</option></select></label>'+
    '<label class="uo-filter">Destino<select data-unified-destination>'+
-   '<option value="todos">Todos</option><option value="evento">Loja temporária</option>'+
-   '<option value="franquia">Franquia</option>'+
-   '<option value="loja">Loja própria</option>'+
-   '<option value="avulso">Pedido avulso</option></select></label></div>'+
+   '<option value="todos">Todos</option>'+
+   (destinationTypes.has('evento')?'<option value="evento">Loja temporária</option>':'')+
+   (destinationTypes.has('franquia')?'<option value="franquia">Franquia</option>':'')+
+   (destinationTypes.has('loja')?'<option value="loja">Loja própria</option>':'')+
+   (destinationTypes.has('avulso')?'<option value="avulso">Pedido avulso</option>':'')+
+   '</select></label></div>'+
   '<div class="uo-list">'+(visible.length?cards:
     '<p class="uo-no-work">Nenhum pedido ou lote aguardando separação.</p>')+'</div>'+
   '<p class="uo-empty-filter" data-unified-empty hidden>Nenhum item encontrado com estes filtros.</p>'+
