@@ -14,5 +14,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verificar sintaxe dos módulos críticos
+        run: |
+          node --check src/app.js
+          node --check src/stock-workflows.js
+          node --check src/shelf-labels.js
+          node --check src/sku-panel.js
       - name: Validar cards, movimentações e remessas
         run: node --test tests/*.test.mjs
