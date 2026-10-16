@@ -162,6 +162,8 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
    '<details class="grouped-variants-mobile card-workspace" data-product-details'+(expanded?' open':'')+'>'+
      '<summary>Estoque e balanço por variação</summary>'+stockTabs+
      '<section data-stock-panel="balanco"><p class="card-workspace-help">Conte as quantidades físicas de todas as variações. As reservas não podem ser reduzidas.</p>'+
+        '<div class="card-balance-search"><input type="search" data-balance-scan-input placeholder="Bipe ou digite EAN/SKU e pressione Enter" aria-label="Localizar variação pelo código" autocomplete="off">'+
+        '<button type="button" class="button" data-action="product-balance-scan">Ler pela câmera</button></div>'+
         '<div class="card-balance-list">'+(stockRows||'<p>Nenhuma variação ativa.</p>')+'</div>'+
         (canBalance()?'<label class="card-balance-note" hidden>Motivo da divergência <textarea data-balance-note maxlength="250" rows="2" placeholder="Informe a causa da diferença identificada"></textarea></label>'+
         '<div class="card-balance-footer"><span data-balance-status>Nenhuma diferença identificada</span>'+
