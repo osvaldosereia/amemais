@@ -835,7 +835,7 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
  if(!e||!['rascunho','ativo'].includes(e.status)||!((isManager()&&hasPermission('events.separate'))||
   (!batch&&hasPermission('events.request')&&Boolean(memberRole(e.id)))))return;
  if(batch&&!['aguardando','pendente_estoque','em_separacao','separado'].includes(batch.status))
-  return toast('Este lote já saiu ou foi cancelado.',true);
+  return toast('Este pedido já foi enviado ou cancelado.',true);
  const saved=batch?state.eventBatchItems.filter(x=>x.batch_id===batch.id):[];
  // Pré-calcula o saldo livre em O(produtos + reservas), mesmo com catálogos grandes.
  const free=new Map();
@@ -1073,7 +1073,7 @@ function eventBatchPickModal(id){
  const o=unifiedOrderById('evento',id);
  if(!o||!['aguardando','em_separacao','separado'].includes(o.status)||
  isFranchisePortal()||!(hasPermission('orders.separate')||hasPermission('events.separate')))return;
- formModal('Separação · Lote #'+o.code+' · '+o.target,
+ formModal('Separação · Pedido #'+o.code+' · '+o.target,
   pickingOrderRows(o,{h}),'event-batch-picking','Salvar progresso');
  const form=document.querySelector('.modalback form[data-form="event-batch-picking"]');
  if(form){
@@ -1086,7 +1086,7 @@ function eventBatchPickModal(id){
 }
 function collectEventBatchPicking(form){
  const order=unifiedOrderById('evento',form.dataset.batch);
- if(!order)throw Error('Lote não encontrado');
+ if(!order)throw Error('Pedido não encontrado');
  const inputs=[...form.querySelectorAll('[data-pick-qty]')];
  if(inputs.length!==order.lines.length)throw Error('Nem todos os SKUs foram conferidos');
  return inputs.map(el=>{
@@ -1108,18 +1108,18 @@ async function saveEventBatchPicking(form,finish=false){
     p_batch:form.dataset.batch,p_items:items
   }));
   return status;
- },finish?'Lote totalmente separado. Aguardando confirmação da saída.':
+ },finish?'Pedido totalmente separado. Aguardando confirmação da saída.':
     'Progresso salvo. Pode continuar a separação mais tarde.');
 }
 function eventBatchCancelModal(id){
  if(!isManager()||!hasPermission('events.separate'))return;
  const batch=state.eventPickBatches.find(b=>b.id===id);
  if(!batch||['enviado','cancelado'].includes(batch.status))return;
- formModal('Cancelar lote '+String(batch.sequence).padStart(2,'0'),
-  '<p class="help">O lote será cancelado, suas reservas liberadas e o histórico preservado.</p>'+
+ formModal('Cancelar pedido '+String(batch.sequence).padStart(2,'0'),
+  '<p class="help">O pedido será cancelado, suas reservas liberadas e o histórico preservado.</p>'+
   '<label class="field"><span>Justificativa obrigatória</span>'+
   '<textarea name="reason" required minlength="5" maxlength="250" placeholder="Motivo do cancelamento"></textarea></label>',
-  'event-batch-cancel','Cancelar lote');
+  'event-batch-cancel','Cancelar pedido');
  const form=document.querySelector('.modalback form[data-form="event-batch-cancel"]');
  if(form)form.dataset.batch=id;
 }
@@ -1297,8 +1297,8 @@ function movementsPage(){
  };
  const auditLabel={
   GALLERY_UPDATED:'Alterou fotos',TEMPORARY_STORE_DELETED:'Excluiu evento',
-  EVENT_BATCH_CREATED:'Criou lote de evento',EVENT_BATCH_REVISED:'Revisou lote',
-  EVENT_BATCH_CANCELED:'Cancelou lote',CLOSED_RECONCILED:'Encerrou evento',
+  EVENT_BATCH_CREATED:'Criou pedido para loja temporária',EVENT_BATCH_REVISED:'Revisou pedido',
+  EVENT_BATCH_CANCELED:'Cancelou pedido',CLOSED_RECONCILED:'Encerrou evento',
   REQUESTED:'Criou pedido',CREATED:'Cadastrou',UPDATED:'Alterou cadastro',
   DELETED:'Excluiu cadastro'
  };
@@ -2730,7 +2730,7 @@ function orderDestinationPicker(){
   context?.type==='store'?'store:'+context.id:'';
  const selected=options.some(x=>x[0]===preferred)?preferred:options[0][0];
  formModal('Novo pedido',
-   '<p class="help">Escolha a unidade que receberá os produtos do CD. Não há lotes: cada solicitação é um pedido independente.</p>'+
+   '<p class="help">Escolha a unidade que receberá os produtos do CD. Cada solicitação é um pedido independente.</p>'+
    selectField('Unidade de destino','destination',options,selected)+
    '<p class="help">Ao confirmar os itens, o sistema reserva automaticamente a quantidade integral de cada produto.</p>',
    'unified-order-destination','Continuar');
@@ -3580,9 +3580,9 @@ async function handleClick(event){
   if(action==='event-batch-dispatch'){
     const b=state.eventPickBatches.find(x=>x.id===id);
     if(!b||b.status!=='separado'||!isManager()||!hasPermission('orders.dispatch'))return;
-    if(!window.confirm('Confirmar saída física do lote '+b.sequence+'? O estoque central será baixado agora.'))return;
+    if(!window.confirm('Confirmar saída física do pedido '+b.sequence+'? O estoque central será baixado agora.'))return;
     return exec(async()=>assertOk(await db.rpc('dispatch_event_pick_batch',{p_batch:id})),
-      'Lote enviado. Saída física registrada e reservas consumidas.');
+      'Pedido enviado. Saída física registrada e reservas consumidas.');
   }
   if(action==='event-batch-scan'){
     return scanEAN(code=>{
@@ -3591,7 +3591,7 @@ async function handleClick(event){
       const matches=state.items.filter(p=>p.active&&(p.ean===code||p.sku===code));
       if(matches.length!==1)return toast('EAN/SKU não encontrado ou ambíguo.',true);
       const input=[...form.querySelectorAll('[data-pick-qty]')].find(el=>el.dataset.id===matches[0].id);
-      if(!input)return toast('Produto não consta deste lote.',true);
+      if(!input)return toast('Produto não consta deste pedido.',true);
       const current=Number(input.value||0),maximum=Number(input.dataset.expected);
       if(current>=maximum)return toast('Este tamanho já está totalmente conferido.',true);
       input.value=String(current+1);updateUnifiedPickingTotal(form);
@@ -4413,10 +4413,10 @@ async function handleSubmit(event){
     if(!isManager()||!hasPermission('events.separate'))return;
     const reason=String(values.reason||'').trim();
     if(reason.length<5||reason.length>250)return toast('Justificativa de 5 a 250 caracteres obrigatória.',true);
-    if(!window.confirm('Cancelar este lote, liberando as reservas ainda ativas?'))return;
+    if(!window.confirm('Cancelar este pedido, liberando as reservas ainda ativas?'))return;
     return exec(async()=>assertOk(await db.rpc('cancel_event_pick_batch',{
       p_batch:form.dataset.batch,p_reason:reason
-    })),'Lote cancelado e estoque reservado liberado.');
+    })),'Pedido cancelado e reserva liberada.');
   }
   if(type==='event-plan-save'||type==='event-supplement-send'){
     const eid=form.dataset.event,e=eventById(eid);
