@@ -82,3 +82,30 @@
 @media (prefers-reduced-motion:reduce){
  .grouped-inventory-card .product-gallery-arrow{transition:none}
 }
+
+/* Atalho rápido para a galeria: somente ícone, com área de toque acessível. */
+.grouped-inventory-card .grouped-inventory-photo>.product-card-photo-quick{
+ position:absolute;top:10px;right:10px;z-index:5;
+ display:inline-flex;align-items:center;justify-content:center;
+ width:42px;height:42px;padding:0;border:1px solid rgba(255,255,255,.82);
+ border-radius:12px;background:#123859e8;color:white;
+ box-shadow:0 2px 12px #09253a70;cursor:pointer;line-height:1;
+ transition:background-color .15s,transform .15s
+}
+.grouped-inventory-card .grouped-inventory-photo>.product-card-photo-quick:hover{
+ background:#0b6648;transform:translateY(-1px)
+}
+.grouped-inventory-card .grouped-inventory-photo>.product-card-photo-quick:focus-visible{
+ outline:3px solid #ffc94e;outline-offset:2px
+}
+.grouped-inventory-card .grouped-inventory-photo>.product-card-photo-quick svg{
+ display:block;pointer-events:none
+}
+@media(max-width:760px){
+ .grouped-inventory-card .grouped-inventory-photo>.product-card-photo-quick{
+  top:7px;right:7px;width:44px;height:44px;border-radius:10px
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ .grouped-inventory-card .grouped-inventory-photo>.product-card-photo-quick{transition:none}
+}

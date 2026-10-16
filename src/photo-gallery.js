@@ -1,15 +1,15 @@
-// Galeria compartilhada pelo modelo: até 3 fotos, com ordem e capa editáveis.
+// Galeria compartilhada pelo modelo: até 6 fotos, com ordem e capa editáveis.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch]));
 const initialPaths=item=>Array.isArray(item?.image_paths)&&item.image_paths.length?
- item.image_paths.slice(0,3):(item?.image_path?[item.image_path]:[]);
+ item.image_paths.slice(0,6):(item?.image_path?[item.image_path]:[]);
 export function galleryMarkup(item){
  const paths=initialPaths(item);
  return '<section class="form-section wide gallery-editor"><div class="section-head"><strong>Fotos do produto</strong>'+
- '<small>Até 3 fotos por modelo; a primeira é a capa</small></div>'+
+ '<small>Até 6 fotos por modelo; a primeira é a capa</small></div>'+
  '<div data-gallery class="product-gallery-grid">'+paths.map((path,i)=>photoTile({path},i)).join('')+'</div>'+
  '<div class="gallery-controls"><button type="button" class="button" data-action="choose-photo">+ Adicionar fotos</button>'+
  '<button type="button" class="button" data-action="take-photo">📷 Câmera</button>'+
- '<small data-photo-status>Selecione até 3 fotos. Você pode trocar, remover ou escolher a principal.</small></div>'+
+ '<small data-photo-status>Selecione até 6 fotos. Você pode trocar, remover ou escolher a principal.</small></div>'+
  '<input hidden type="file" name="gallery_file" accept="image/*" multiple>'+
  '<input hidden type="file" name="camera_file" accept="image/*" capture="environment">'+
  '<input hidden type="file" name="gallery_replace_file" accept="image/*"></section>';
@@ -35,7 +35,7 @@ function paint(form){
  gallery.replaceChildren();
  gallery.innerHTML=galleryState(form).map(photoTile).join('');
  form.querySelector('[data-photo-status]').textContent=galleryState(form).length+
-  ' de 3 foto(s). A primeira é exibida nos cards e na impressão.';
+  ' de 6 foto(s). A primeira é exibida nos cards e na impressão.';
 }
 export function galleryRemove(form,index){
  const photos=galleryState(form);
@@ -52,7 +52,7 @@ export function galleryMain(form,index){
 export async function galleryAddFiles(form,files,compress){
  const photos=galleryState(form);const incoming=[...files];
  if(!incoming.length)return;
- if(incoming.length+photos.length>3)throw Error('É permitido cadastrar no máximo 3 fotos por modelo.');
+ if(incoming.length+photos.length>6)throw Error('É permitido cadastrar no máximo 6 fotos por modelo.');
  const compressed=[];
  for(const file of incoming){
   if(!file.type.startsWith('image/')||file.size>20*1024*1024)
@@ -74,7 +74,7 @@ export async function galleryReplaceFile(form,index,file,compress){
 }
 export async function savePhotoGallery(form,{db,assertOk,modelId=null,productId=null}){
  const gallery=galleryState(form);
- if(gallery.length>3)throw Error('Máximo de três fotos.');
+ if(gallery.length>6)throw Error('Máximo de seis fotos.');
  const folder=modelId?'apparel/'+modelId+'/':productId+'/';
  if(!modelId&&!productId)throw Error('Produto não identificado para as fotos.');
  const uploaded=[];

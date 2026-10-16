@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
-import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery2';
+import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261016sixphotos1';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015covergrant1';
 import {renderStoreHub,locationOrders,matchesStoreOrder,filterStoreHub} from './store-hub.js?v=20261016stores1';
 import {renderStoreUnit} from './store-unit.js?v=20261016stores1';
@@ -14,7 +14,7 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261016gondolas1';
 import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261016gondolas1';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261016gondolas1';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261016sixphotos1';
 import {catalogSortOptions,availableGondolas,gondolaKey,catalogMatchesQuery,orderCatalogGroups,filterCatalogGondola} from './catalog-order.js?v=20261016sort1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261016damage-direct1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
@@ -1762,6 +1762,13 @@ function printEventSummary(eventId){
   '<p>Conferir produtos devolvidos, avariados e quantidades não devolvidas. Aprovação final no CDSB.</p>'+
   '<div class="print-signatures"><span>Responsável pelo evento</span><span>Conferente CDSB</span></div>'));
 }
+function quickProductPhotoModal(item){
+ if(!item||item.apparel_model_id||!hasPermission('products.edit'))return;
+ formModal('Fotos · '+item.name,photoChooser(item),'product-photo-quick','Salvar fotos');
+ const form=document.querySelector('.modalback form[data-form="product-photo-quick"]');
+ if(form)form.dataset.id=item.id;
+ hydrateImages();
+}
 function productModal(item=null){
   if(!canRegisterProducts())return;
   const single='<div data-single-fields class="single-fields wide">'+
@@ -3308,6 +3315,19 @@ async function handleClick(event){
         variationOptions:resolveCategoryVariations(state.categories,m?.category_id||p?.category_id).options,procurementFields,gondolas:state.gondolas});
     }catch(error){fail(error);return;}
   }
+  if(action==='product-gallery-quick'){
+    if(!hasPermission('products.edit'))return;
+    try{
+      if(target.dataset.isModel==='true'){
+        const model=state.apparelModels.find(m=>m.id===id);
+        if(!model)return toast('Modelo de produto não encontrado.',true);
+        return apparelPhotoModal(model,state,{formModal,photoChooser,hydrateImages});
+      }
+      const item=product(id);
+      if(!item||item.apparel_model_id)return toast('Produto não encontrado.',true);
+      return quickProductPhotoModal(item);
+    }catch(error){fail(error);return;}
+  }
   if(action==='apparel-photo'){
     if(!canRegisterProducts())return;
     try{return apparelPhotoModal(state.apparelModels.find(m=>m.id===id),state,{formModal,photoChooser,hydrateImages});}
@@ -4393,6 +4413,15 @@ async function handleSubmit(event){
     state.loading=true;
     try{await saveApparelVariant(form,{db,assertOk,loadData,closeTopModal,toast,procurementValues});}
     catch(error){fail(error);}finally{state.loading=false;}
+    return;
+  }
+  if(type==='product-photo-quick'){
+    if(!hasPermission('products.edit'))return;
+    const id=form.dataset.id,item=product(id);
+    if(!item||item.apparel_model_id)return toast('Produto não encontrado.',true);
+    if(!galleryHasChanges(form)){closeTopModal();return;}
+    await exec(async()=>{await savePhotoGallery(form,{db,assertOk,productId:id});},
+      'Fotos do produto atualizadas.');
     return;
   }
   if(type==='apparel-photo'){

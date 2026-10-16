@@ -88,6 +88,13 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const active=group.products.filter(p=>p.active);
   const isProducts=mode==='products';
   const canEdit=isProducts&&(canEditProduct?canEditProduct():canRegisterProducts());
+  // Atalho contextual: o editor de fotos abre diretamente sem acessar as abas de cadastro.
+  const photoQuickAction=canEdit?
+    '<button type="button" class="product-card-photo-quick" data-action="product-gallery-quick" data-id="'+h(group.modelId||main.id)+'" data-is-model="'+String(Boolean(group.modelId))+'" '+
+    'aria-label="Editar fotos de '+h(group.title)+'" title="Editar fotos" >'+
+    '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+
+    '<rect x="3" y="3" width="15" height="15" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 15 4-4 3 3 3-3 5 5"/><path d="M20 11v8M16 15h8"/></svg></button>':'';
+
   const canMove=isProducts&&canMoveStock();
   const skuAccess=isProducts&&canManageSku();
   const inlineCount=isProducts&&canQuickCount();
@@ -251,7 +258,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       '</div></div>':'';
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
     '<div class="grouped-inventory-top">'+
-      '<div class="grouped-inventory-photo">'+photo+'</div>'+
+      '<div class="grouped-inventory-photo">'+photo+photoQuickAction+'</div>'+
       '<div class="grouped-inventory-info">'+
         '<strong class="product-card-name">'+h(group.title)+'</strong>'+
         '<small class="product-card-description">'+h(description)+'</small>'+
