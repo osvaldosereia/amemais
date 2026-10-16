@@ -83,6 +83,20 @@ issues as (
    and v.verified_at>=now()-interval '72 hours'
    and x.status not in ('cancelado','expirado')
  union all
+ select x.code,x.kind,x.destination_type,x.destination,
+   case when a.reason ilike '%encontr%' or a.reason ilike '%localiz%'
+        then 'Produto não encontrado na separação' else 'Quantidade reduzida na separação' end,
+   coalesce(p.name,'Produto sem cadastro'),coalesce(p.sku,''),
+   a.original_quantity,a.revised_quantity,
+   greatest(0,a.original_quantity-a.revised_quantity),
+   a.created_at,0
+ from public.unified_order_adjustments a
+ join order_ctx x on x.kind=a.order_kind and x.id=a.order_id
+ left join public.products p on p.id=a.product_id
+ where a.original_quantity>a.revised_quantity
+   and a.created_at>=now()-interval '72 hours'
+   and x.status not in ('cancelado','expirado')
+ union all
  select x.code,x.kind,x.destination_type,x.destination,'Falta de estoque'::text,
    coalesce(p.name,'Produto sem cadastro'),coalesce(p.sku,''),
    l.quantity,coalesce(r.qty,0),
