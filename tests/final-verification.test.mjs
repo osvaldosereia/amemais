@@ -60,7 +60,7 @@ test('backend valida código, quantidade, status e bloqueia os três tipos de sa
  assert.match(sql,/order_final_verifications_staff_read/);
  assert.match(sql,/REVOKE ALL ON public\.order_final_verifications FROM PUBLIC,anon,authenticated/);
  for(const kind of ['avulso','loja','evento']){
-  assert.match(sql,new RegExp("PERFORM public.assert_order_final_verification\\\\('"+kind+"'"));
+  assert.ok(sql.includes("PERFORM public.assert_order_final_verification('"+kind+"'"));
  }
 });
 test('login e código de barras são integrados à interface, com CSS versionado',()=>{
