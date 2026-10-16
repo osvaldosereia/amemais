@@ -10,7 +10,13 @@
   "theme_color": "#102d50",
   "icons": [
     {
-      "src": "./cdsb-emblem.jpg?v=20261016cdsb2",
+      "src": "./cdsb-app-icon.svg?v=20261016cdsb3",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./cdsb-emblem.jpg?v=20261016cdsb3",
       "sizes": "128x128",
       "type": "image/jpeg",
       "purpose": "any"
