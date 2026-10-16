@@ -37,7 +37,7 @@ test('compra confirma dias corridos e permite ajustar previsão sem alterar esto
  assert.match(db,/PURCHASE_ETA_UPDATED/);
  assert.match(app,/save_purchase_order_with_eta/);
  assert.match(app,/update_purchase_order_eta/);
- assert.match(app,/name="estimated_days"/);
+ assert.match(app,/field\('Prazo estimado de chegada \(dias corridos\)','estimated_days'/);
 });
 test('PDF é download direto com fotos, itens e datas (sem window.print)',()=>{
  assert.match(pdf,/jsPDF/);
@@ -60,6 +60,6 @@ test('TV mostra compras recentes via consulta autorizada e sem edição por forn
 test('cards de produtos sinalizam unidades encomendadas e ETA sem somar ao estoque livre',async()=>{
  const workflow=await read('src/stock-workflows.js');
  assert.match(workflow,/Encomendado/);
- assert.match(workflow,/expected_arrival_date|pendingDate/);
+ assert.match(workflow,/const incomingDates=/);
  assert.match(app,/purchasePendingByProduct/);
 });
