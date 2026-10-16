@@ -57,6 +57,8 @@ export function operationalFormMarkup(order,mode='separacao',verifications=[]){
   ' · '+total+' unidades solicitadas. Informe uma quantidade em cada SKU, inclusive zero quando não encontrado. '+
   (mode==='separacao'?'A falta não impede concluir a separação, desde que seja justificada.':
     'Conferência independente: confirme a contagem real. Divergências seguem para expedição com alerta.')+'</p>'+
+  '<div class="op-scanner"><label>Localizar SKU pelo leitor ou câmera<input type="search" data-op-barcode autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Digite ou leia EAN/SKU e pressione Enter"></label>'+
+   '<button type="button" class="button" data-action="order-op-camera">📷 Câmera</button></div>'+
   '<div class="op-summary">Solicitadas: <b>'+total+'</b> · '+
   (mode==='conferencia'?'Contagem de conferência':'Contagem da separação')+'</div>'+
   '<div class="op-lines">'+rows+'</div>'+
