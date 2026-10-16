@@ -16,8 +16,9 @@ const statuses={
 };
 export function makeUnifiedOrders({avulsoOrders=[],avulsoItems=[],storeOrders=[],storeItems=[],
  eventBatches=[],eventBatchItems=[],events=[],models=[],
- reservations=[],stores=[],products=[],adjustments=[],codes=[],portal=false,userId=null}){
+ reservations=[],stores=[],products=[],adjustments=[],codes=[],progress=[],portal=false,userId=null}){
  const codeMap=new Map(codes.map(x=>[x.kind+':'+x.order_id,x.code]));
+ const progressMap=new Map(progress.map(x=>[x.kind+':'+x.order_id,x]));
  const storeById=new Map(stores.map(x=>[x.id,x]));
  const eventById=new Map(events.map(x=>[x.id,x]));
  const productById=new Map(products.map(x=>[x.id,x]));
@@ -56,7 +57,7 @@ export function makeUnifiedOrders({avulsoOrders=[],avulsoItems=[],storeOrders=[]
     (storeById.get(order.to_store_id)?.kind==='franquia'||order.request_type==='franquia'?'franquia':'loja');
   return {kind,destinationKind,id:order.id,code:codeMap.get(kind+':'+order.id)||'—',eventId:order.event_id||null,
    sequence:order.sequence||null,created_at:order.created_at,status,
-   origin,target,source:order.source||order.request_type||kind,
+   origin,target,source:order.source||order.request_type||kind,workflow:progressMap.get(kind+':'+order.id)||null,
    customerPhone:kind==='avulso'?order.customer_phone:'',
    externalReference:order.external_reference||'',expires_at:order.expires_at,
    lines:mapped,total:mapped.reduce((n,l)=>n+l.quantity,0),
@@ -117,7 +118,11 @@ export function groupedOrderByLocation(lines=[]){
  }));
 }
 function orderWorkflow(o,verified=false){
- const status=o.status;
+ const status=o.status,stage=o.workflow?.stage;
+ if(stage==='separacao')return ['Em separação','picked','Separação em andamento'];
+ if(stage==='conferencia')return ['A conferir','checking','Separação concluída · Conferência pendente'];
+ if(stage==='expedicao')return ['Em expedição','checking','Conferência concluída · Aguardando registro de envio'];
+ if(stage==='enviado')return ['Enviado','complete','Envio físico registrado'];
  if(status==='pendente_estoque')return ['Falta de estoque','shortage','Falta de unidades: aguardar reposição ou resolver a pendência'];
  if(['legado','solicitado'].includes(status))return ['Aguardando preparação','pending','É necessário reservar os produtos'];
  if(['aguardando','reservado','aprovado'].includes(status))return ['A separar','ready','Pronto para iniciar a separação'];
@@ -131,7 +136,7 @@ function orderWorkflow(o,verified=false){
 export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canDelete=false,canReceive=false,
  canDispatch=false,canDispatchStock=false,canVerify=false,isVerified=false,canAdjust=false,hasIssue=false,portal=false,time=x=>x}={}){
  const info=orderWorkflow(o,isVerified);
- const hasOccurrence=Boolean(hasIssue||o.missing>0||o.adjustments.some(a=>Number(a.original_quantity)!==Number(a.revised_quantity)));
+ const hasOccurrence=Boolean(hasIssue||o.workflow?.has_difference||o.missing>0||o.adjustments.some(a=>Number(a.original_quantity)!==Number(a.revised_quantity)));
  const data='data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"';
  const process=canProcess&&!portal;
  const event=o.kind==='evento';
@@ -139,37 +144,24 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  const ready=['reservado','aprovado','aguardando'].includes(o.status);
  const waiting=o.status==='pendente_estoque',inProgress=o.status==='em_separacao';
  const primary=[],secondary=[],management=[];
- // Exatamente uma ação operacional principal por etapa. Os botões existentes mantêm seus handlers.
- if(event){
-  if(process&&(ready||inProgress))
-   primary.push(button(inProgress?'Continuar separação':'Iniciar separação','event-batch-pick',data,'small primary'));
-  else if(o.status==='separado'&&!isVerified&&canVerify)
-   primary.push(button('Conferir agora','order-final-verify',data,'small primary'));
-  else if(o.status==='separado'&&isVerified&&canDispatch)
-   primary.push(button('Confirmar saída','event-batch-dispatch',data,'small primary'));
-  if(o.status==='separado'&&isVerified&&canVerify)
-   secondary.push(button('Rever conferência','order-final-verify',data,'small'));
-  if(canCancel&&!terminal){
-   management.push(button('Editar lote','event-batch-edit',data,'small'));
-   management.push(button('Cancelar lote','event-batch-cancel',data,'small danger'));
-  }
- }else{
-  if(process&&canAdjust&&['legado','solicitado'].includes(o.status))
-   primary.push(button('Preparar pedido','order-retry',data,'small primary'));
-  else if(process&&canAdjust&&waiting)
-   primary.push(button('Resolver falta','order-shortage-adjust',data,'small primary'));
-  else if(process&&ready)
-   primary.push(button('Iniciar separação',o.kind==='avulso'?'avulso-pick':'store-order-separate',data,'small primary'));
-  else if(o.status==='separado'&&!isVerified&&canVerify)
-   primary.push(button('Conferir agora','order-final-verify',data,'small primary'));
-  else if(o.status==='separado'&&isVerified&&process&&canDispatchStock)
-   primary.push(button('Confirmar saída',o.kind==='avulso'?'avulso-dispatch':'store-order-dispatch',data,'small primary'));
-  else if(canReceive&&o.kind==='loja'&&o.status==='despachado')
-   primary.push(button('Conferir recebimento','store-order-receive',data,'small primary'));
-  if(o.status==='separado'&&isVerified&&canVerify)
-   secondary.push(button('Rever conferência','order-final-verify',data,'small'));
-  if(canCancel&&['legado','solicitado','pendente_estoque','aprovado','reservado','separado'].includes(o.status))
-   management.push(button('Cancelar pedido',o.kind==='avulso'?'avulso-cancel':'store-order-cancel',data,'small danger'));
+ const stage=o.workflow?.stage;
+ const canShip=event?canDispatch:canDispatchStock;
+ if(stage==='separacao'&&process)primary.push(button('Continuar separação','order-op-pick',data,'small primary'));
+ else if(stage==='conferencia'&&canVerify)primary.push(button('Conferir pedido','order-op-check',data,'small primary'));
+ else if(stage==='expedicao'&&canShip)primary.push(button('Registrar envio','order-op-send',data,'small primary'));
+ else if(!stage&&process&&(ready||inProgress))primary.push(button(inProgress?'Continuar separação':'Iniciar separação','order-op-pick',data,'small primary'));
+ else if(!stage&&o.status==='separado'&&canVerify)primary.push(button('Conferir pedido','order-op-check',data,'small primary'));
+ else if(!stage&&process&&canAdjust&&['legado','solicitado'].includes(o.status))
+  primary.push(button('Preparar pedido','order-retry',data,'small primary'));
+ else if(!stage&&process&&canAdjust&&waiting)
+  primary.push(button('Resolver falta','order-shortage-adjust',data,'small primary'));
+ else if(canReceive&&o.kind==='loja'&&o.status==='despachado')
+  primary.push(button('Conferir recebimento','store-order-receive',data,'small primary'));
+ if(event&&canCancel&&!terminal){
+  management.push(button('Editar lote','event-batch-edit',data,'small'));
+  management.push(button('Cancelar lote','event-batch-cancel',data,'small danger'));
+ }else if(!event&&canCancel&&['legado','solicitado','pendente_estoque','aprovado','reservado','separado'].includes(o.status)){
+  management.push(button('Cancelar pedido',o.kind==='avulso'?'avulso-cancel':'store-order-cancel',data,'small danger'));
  }
  if(canDelete&&!portal)management.push(button('Excluir pedido','admin-order-delete-open',data,'small danger'));
  if(!portal&&o.lines.length&&!waiting&&!['legado','solicitado','cancelado','expirado'].includes(o.status))
@@ -224,7 +216,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
   o.id,o.code,o.target,o.origin,originLabel,...o.adjustments.map(a=>a.reason||''),...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
   '" data-order-id="'+esc(o.id)+'" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'" data-order-destination="'+
    (o.destinationKind|| (event?'evento':o.kind==='avulso'?'avulso':'loja'))+
-   '" data-order-verified="'+(o.status==='separado'&&isVerified?'true':'false')+'" data-order-issue="'+hasOccurrence+'">'+
+   '" data-order-verified="'+(o.workflow?.stage==='expedicao'?'true':'false')+'" data-order-stage="'+esc(o.workflow?.stage||'')+'" data-order-issue="'+hasOccurrence+'">'+
   '<header><div class="uo-head"><small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small>'+
    '<h3>'+(event?'Lote #':'Pedido #')+esc(o.code||'—')+'</h3>'+
    '<strong>'+esc(o.target)+'</strong></div>'+
@@ -234,9 +226,11 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
    (waiting&&o.missing?'<span class="uo-alert">'+n(o.missing)+' faltam</span>':'')+
   '</div>'+
   '<p class="uo-next-step '+(waiting?'is-shortage':'')+'">'+esc(info[2])+'</p>'+
+  (hasOccurrence?'<p class="uo-exception-badge">⚠ Pedido com divergência · Abra para consultar os itens</p>':'')+
   (waiting&&!portal?'<p class="uo-shortage">'+waitingText+'</p>':'')+
   (o.status==='legado'?'<p class="uo-shortage">Pedido anterior ao novo sistema de reservas. Prepare o pedido para entrar na fila.</p>':'')+
   (o.status==='expirado'?'<p class="uo-shortage">Prazo de confirmação expirado. Histórico preservado.</p>':'')+
+  '<details class="uo-order-open"><summary>Abrir pedido · '+n(o.lines.length)+' SKU(s) · '+n(o.total)+' unidades</summary>'+
   preview+
   '<div class="uo-operational-actions">'+
    (primary.length?'<div class="uo-primary-action">'+primary.join('')+'</div>':'')+
@@ -253,6 +247,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
    (o.adjustments.length?'<div class="uo-audit"><strong>Alterações justificadas</strong>'+
     o.adjustments.slice(-8).map(a=>'<p>'+esc(a.original_quantity)+' → '+esc(a.revised_quantity)+' un. · '+esc(a.reason)+'</p>').join('')+'</div>':'')+'</details>'+
   (o.externalReference?'<small>Referência externa: '+esc(o.externalReference)+'</small>':'')+
+  '</details>'+
   (management.length?'<details class="uo-admin-actions"><summary>'+
    (canDelete?'Administração do pedido':'Gerenciar pedido')+'</summary>'+
    '<p>Alterações administrativas podem cancelar reservas ou exigir nova separação.</p>'+
@@ -266,10 +261,10 @@ export function unifiedOrdersPage(orders,{
 }={}){
  const active=['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'];
  const visible=separationOnly?orders.filter(o=>active.includes(o.status)||o.status==='pendente_estoque'):orders;
- const toPick=orders.filter(o=>['reservado','aprovado','aguardando'].includes(o.status)).length;
- const separating=orders.filter(o=>o.status==='em_separacao').length;
- const toVerify=orders.filter(o=>o.status==='separado'&&!isVerified(o)).length;
- const readyToDispatch=orders.filter(o=>o.status==='separado'&&isVerified(o)).length;
+ const toPick=orders.filter(o=>!o.workflow&&['reservado','aprovado','aguardando'].includes(o.status)).length;
+ const separating=orders.filter(o=>o.workflow?.stage==='separacao'||(!o.workflow&&o.status==='em_separacao')).length;
+ const toVerify=orders.filter(o=>o.workflow?.stage==='conferencia'||(!o.workflow&&o.status==='separado')).length;
+ const readyToDispatch=orders.filter(o=>o.workflow?.stage==='expedicao').length;
  const waiting=orders.filter(o=>o.status==='pendente_estoque').length;
  const destinationTypes=new Set(visible.map(o=>o.destinationKind||o.kind));
  const cards=visible.map(o=>unifiedOrderCard(o,{button,time,portal,
@@ -328,11 +323,11 @@ export function filterUnifiedOrders(container,query,status,destination='todos'){
  for(const card of container.querySelectorAll('[data-order-card]')){
   const s=card.dataset.orderStatus,verified=card.dataset.orderVerified==='true';
   const match=status==='todos'||!status||
-   (status==='a_separar'&&['reservado','aprovado','aguardando'].includes(s))||
+   (status==='a_separar'&&!card.dataset.orderStage&&['reservado','aprovado','aguardando'].includes(s))||
    (status==='a_preparar'&&['legado','solicitado'].includes(s))||
-   (status==='em_separacao'&&s==='em_separacao')||
-   (status==='a_conferir'&&s==='separado'&&!verified)||
-   (status==='pronto_saida'&&s==='separado'&&verified)||
+   (status==='em_separacao'&&(card.dataset.orderStage==='separacao'||(!card.dataset.orderStage&&s==='em_separacao')))||
+   (status==='a_conferir'&&(card.dataset.orderStage==='conferencia'||(!card.dataset.orderStage&&s==='separado')))||
+   (status==='pronto_saida'&&card.dataset.orderStage==='expedicao')||
    (status==='com_ocorrencia'&&card.dataset.orderIssue==='true')||
    (status==='pendentes'&&['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'].includes(s))||
    (status==='concluidos'&&['enviado','despachado','concluido','recebido','recebido_divergente'].includes(s))||
