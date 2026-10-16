@@ -404,7 +404,7 @@ export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE',photoUrls={
    '<td class="center"><b>'+n(l.quantity)+'</b></td>'+
    '<td class="write"></td><td class="center check"></td></tr>').join('')+
   '</tbody></table></div></section>').join('');
- const name=order.kind==='evento'?'LOTE DE EVENTO':'PEDIDO';
+ const name='PEDIDO';
  const code=order.kind==='evento'?'Pedido '+String(order.sequence||'').padStart(2,'0'):'Pedido';
  const reserve=order.reserved>0?' · Reservado: '+n(order.reserved):'';
  const shortage=order.missing>0?' · Faltando: '+n(order.missing):'';
@@ -442,6 +442,6 @@ export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE',photoUrls={
   '<div class="totals"><b>Total solicitado: '+n(order.total)+' unidades'+reserve+shortage+
    '</b><div>Observações / divergências: _________________________________________________</div></div>'+
   '<div class="signatures"><div>Separador · assinatura / hora</div><div>Conferente · assinatura / hora</div></div>'+
-  '<p class="instructions">Mantenha esta folha junto das mercadorias deste lote. O envio físico só será registrado após confirmação no sistema.</p>'+
+  '<p class="instructions">Mantenha esta folha junto das mercadorias deste pedido. O envio físico só será registrado após confirmação no sistema.</p>'+
   '<script>window.addEventListener("load",()=>{Promise.all(Array.from(document.images,im=>im.complete?Promise.resolve():new Promise(resolve=>{im.onload=resolve;im.onerror=resolve}))).then(()=>{window.focus();window.print()})});</script></body></html>';
 }
