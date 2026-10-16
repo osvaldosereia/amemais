@@ -5,6 +5,8 @@ import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015co
 import {renderStoreHub,locationOrders,matchesStoreOrder,filterStoreHub} from './store-hub.js?v=20261016stores1';
 import {renderStoreUnit} from './store-unit.js?v=20261016stores1';
 import { scanEAN } from './scan.js?v=20261014w2';
+import {preventScannerSubmit} from './product-form-scanner.js?v=20261016scanner1';
+import {gondolaSelectHTML,gondolasPageHTML} from './gondolas.js?v=20261016gondolas1';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
@@ -77,11 +79,12 @@ const nav = [
   {id:'compras',label:'Compras',ico:'clipboard'},
   {id:'movimentacoes',label:'Atividades',ico:'arrows'},
   {id:'categorias',label:'Categorias',ico:'layers'},
+  {id:'gondolas',label:'Gôndolas',ico:'pin'},
   {id:'tags',label:'Tags',ico:'more'},
   {id:'usuarios',label:'Usuários',ico:'users'}
 ];
 const state = {
-  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
+  user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],gondolas:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],orderOperationalRows:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
@@ -114,6 +117,7 @@ const canUseStoreOrders=()=>['orders.central','orders.franchise','orders.separat
 const isManager = () => hasPermission('events.manage');
 const isStockkeeper = () => state.profile?.role === 'estoquista';
 const canRegisterProducts = () => hasPermission('products.create') || hasPermission('products.edit');
+const canManageGondolas = () => isAdmin() || (state.profile?.role==='gerente'&&hasPermission('products.edit'));
 const canQuickBalance = () => hasPermission('stock.balance');
 const viewPermission = {produtos:'products.read',entrada:'stock.entry',saida:'stock.exit',eventos:'events.read',pedidos:'orders.read',movimentacoes:'movements.read',categorias:'categories.manage',tags:'tags.manage',usuarios:'users.manage',lojas:'stores.read'};
 const permittedView = v => {
@@ -121,6 +125,7 @@ const permittedView = v => {
  if(state.profile?.role==='evento'&&hasPermission('events.request'))return v==='meu-evento'||v==='eventos';
  if(state.profile?.role==='estoquista'&&hasPermission('orders.separate'))return v==='separador'||v==='pedidos';
  if(v==='minha-loja')return isFranchisePortal();
+ if(v==='gondolas')return hasPermission('products.read');
  if(v==='meu-evento')return state.profile?.role==='evento';
  if(v==='separador')return hasPermission('orders.separate');
  if(v==='inicio')return true;
@@ -204,6 +209,7 @@ async function loadData(){
     ['apparelModels',db.from('apparel_models').select('*').order('created_at',{ascending:false}).limit(1000)],
     ['categories',fetchAllCategories()],
     ['tags',db.from('tags').select('*').order('name').limit(1000)],
+     ['gondolas',db.from('gondolas').select('id,name,active').order('name').limit(1000)],
     ['events',db.from('events').select('*').order('starts_at',{ascending:false}).limit(1000)],
     ['members',db.from('event_members').select('*').limit(2000)],
     ['balances',db.from('stock_balances').select('*').limit(10000)],
@@ -451,7 +457,7 @@ function refreshTaxonomyForm(selectedCategory=null,selectedTag=null){
     if(label)label.textContent=categoryFull(selectedCategory);
     const add=form.querySelector('[data-action="quick-category"]');
     if(add)add.textContent='+ Subcategoria';
-    refreshCategorySizeOptions(form,state.categories);
+    refreshCategorySizeOptions(form,state.categories,state.gondolas);
   }
   const checks=form.querySelector('[data-tag-choices]');
   if(checks){
@@ -538,6 +544,7 @@ function pageContent(){
   if(state.view==='pedidos')return ordersPage();
   if(state.view==='separacao')return ordersPage();
   if(state.view==='categorias')return categoriesPage();
+  if(state.view==='gondolas')return gondolasPageHTML(state.gondolas,{button,canManage:canManageGondolas()});
   if(state.view==='tags')return tagsPage();
   if(state.view==='usuarios')return usersPage();
   if(state.view==='lojas')return storesPage();
@@ -1767,7 +1774,7 @@ function productModal(item=null){
       item?button('Imprimir etiqueta 80 mm','shelf-label-one','data-id="'+h(item.id)+'"','small'):
       '<small>Opcional</small>')+'</div>'+
     '<div class="location-fields">'+
-    field('Gôndola','gondola','text',item?.gondola||'','maxlength="40" placeholder="Ex.: Gôndola 02"')+
+    gondolaSelectHTML('gondola',state.gondolas,item?.gondola||'')+
     field('Prateleira','prateleira','text',item?.prateleira||'','maxlength="40" placeholder="Ex.: Prateleira B"')+
     '</div></section>';
   const markup='<div class="formgrid">'+
@@ -1784,7 +1791,7 @@ function productModal(item=null){
     item?'Salvar alterações':'Cadastrar produto');
   const form=document.querySelector('.modalback form');
   if(item)form.dataset.id=item.id;
-  else refreshCategorySizeOptions(form,state.categories);
+  else refreshCategorySizeOptions(form,state.categories,state.gondolas);
   if(item?.image_path||item?.image_paths?.length)hydrateImages();
 }
 
@@ -3234,7 +3241,7 @@ async function handleClick(event){
         if(label)label.textContent=value?categoryFull(value):(mode==='parent'?'Nenhuma (principal)':'Escolher categoria');
         if(mode==='product'){
           refreshProductTagChoices(form);
-          refreshCategorySizeOptions(form,state.categories);
+          refreshCategorySizeOptions(form,state.categories,state.gondolas);
           const add=form.querySelector('[data-action="quick-category"]');
           if(add)add.textContent=value?'+ Subcategoria':'+ Categoria';
         }
@@ -3279,16 +3286,16 @@ async function handleClick(event){
     return productModal();
   }
   if(action==='apparel-add-row'){
-    try{return apparelAddRow(target,{h});}catch(error){fail(error);return;}
+    try{return apparelAddRow(target,{h,gondolas:state.gondolas});}catch(error){fail(error);return;}
   }
   if(action==='apparel-fill-sizes'){
-    try{return apparelFillSizes(target,{h});}catch(error){fail(error);return;}
+    try{return apparelFillSizes(target,{h,gondolas:state.gondolas});}catch(error){fail(error);return;}
   }
   if(action==='apparel-variant-edit'){
     if(!canRegisterProducts())return;
     try{const p=product(id),m=state.apparelModels.find(x=>x.id===p?.apparel_model_id);
       return apparelVariantEditModal(p,{h,formModal,
-        variationOptions:resolveCategoryVariations(state.categories,m?.category_id||p?.category_id).options,procurementFields});
+        variationOptions:resolveCategoryVariations(state.categories,m?.category_id||p?.category_id).options,procurementFields,gondolas:state.gondolas});
     }catch(error){fail(error);return;}
   }
   if(action==='apparel-photo'){
@@ -3317,7 +3324,7 @@ async function handleClick(event){
     const options=resolveCategoryVariations(state.categories,model.category_id).options;
     if(!options.length)return toast('Configure primeiro as variações desta categoria em Categorias.',true);
     formModal('Adicionar variações · '+model.name,
-      addSizesContent(model,variants,options),'extra-sizes','Cadastrar variações');
+      addSizesContent(model,variants,options,state.gondolas),'extra-sizes','Cadastrar variações');
     const form=document.querySelector('.modalback form[data-form="extra-sizes"]');
     form.dataset.modelId=id;
     return;
@@ -4365,7 +4372,7 @@ async function handleSubmit(event){
     const existing=state.items.filter(p=>p.apparel_model_id===modelId);
     let payload;
     try{payload=collectExtraSizes(form,existing);}catch(error){fail(error);return;}
-    await exec(async()=>assertOk(await db.rpc('add_apparel_variants',{
+    await exec(async()=>assertOk(await db.rpc('add_apparel_variants_with_location',{
       p_model_id:modelId,p_variants:payload
     })),'Novos tamanhos adicionados ao mesmo produto.');
     return;
@@ -4921,6 +4928,7 @@ document.addEventListener('click',event=>{
   handleClick(event).catch(fail);
 });
 document.addEventListener('keydown',event=>{
+  if(preventScannerSubmit(event))return;
   if(event.key==='Enter'&&event.target.matches('[data-order-cart-search]')){
    event.preventDefault();
    const form=event.target.closest('form[data-form="store-order-create"]');
