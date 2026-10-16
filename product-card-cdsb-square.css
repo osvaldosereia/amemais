@@ -510,9 +510,3 @@
   grid-template-rows:min-content min-content min-content 1fr auto!important;
  }
 }
-@media(max-width:760px){
- .products-panel .product-card-v3 .grouped-inventory-info>.product-purchase-arrival,
- .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-info>.product-purchase-arrival{
-  font-size:.7rem!important;margin-top:4px!important;
- }
-}
