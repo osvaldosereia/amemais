@@ -125,7 +125,8 @@ function metric(label,value,hint=''){
 function emptyReport(txt){return '<p class="tv-empty">'+esc(txt)+'</p>';}
 function issueList(items,limit=7){
  if(!items?.length)return emptyReport('Nenhuma ocorrência específica registrada nas últimas 72 horas.');
- return items.slice(0,limit).map(item=>
+ const offset=((state.subpages[0]||0)%Math.ceil(items.length/limit))*limit;
+ return items.slice(offset,offset+limit).map(item=>
   '<div class="tv-issue-row"><div class="tv-issue-order"><strong>'+esc(item.code||'—')+'</strong>'+
   '<span>'+esc(item.destination_type||'Destino')+' · '+esc(item.destination||'Não identificado')+'</span></div>'+
   '<div class="tv-issue-reason"><strong>'+esc(item.issue||'Ocorrência')+'</strong>'+
@@ -340,7 +341,7 @@ function updateProgress(){
 }
 function nextScreen(delta=1){
  state.pageIndex=(state.pageIndex+delta+screens.length)%screens.length;
- if(delta>0&&[2,3,4].includes(state.pageIndex)){
+ if(delta>0&&[0,2,3,4].includes(state.pageIndex)){
    state.subpages[state.pageIndex]=state.subpages[state.pageIndex]===undefined?0:state.subpages[state.pageIndex]+1;
  }
  state.nextSwap=Date.now()+screens[state.pageIndex].seconds*1000;
