@@ -2655,9 +2655,9 @@ function userModal(){
     field('Usuário','username','text','','required minlength="3" maxlength="32" autocapitalize="none"')+
     selectField('Função','role',Object.entries(roles),'evento')+
     permissionFields('')+
-    field('Senha inicial','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"',
-      'Mínimo de 12 caracteres. A senha não será enviada por email.')+
-    field('Confirmar senha','password_confirm','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    field('Senha inicial','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"',
+      'Mínimo de 6 caracteres. Sem exigência de símbolos ou maiúsculas. A senha não será enviada por email.')+
+    field('Confirmar senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
     '</div><div class="note">O administrador entrega a senha ao funcionário por um canal seguro. O acesso é liberado imediatamente, sem confirmação por email.</div>',
     'user-new','Cadastrar usuário');
   setupFranchiseProfile(document.querySelector('.modal form[data-form="user-new"]'));
@@ -2666,8 +2666,8 @@ function adminPasswordModal(id){
   if(!isAdmin()||id===state.user?.id)return;
   const target=state.users.find(x=>x.id===id);if(!target)return;
   formModal('Definir senha · '+target.full_name,'<div class="formgrid">'+
-    field('Nova senha','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
-    field('Confirmar nova senha','password_confirm','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    field('Nova senha','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+    field('Confirmar nova senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
     '</div><p class="help">Não será enviado email de confirmação. Informe a nova senha diretamente ao colaborador.</p>',
     'user-password','Salvar senha');
   document.querySelector('.modalback form').dataset.id=id;
@@ -2675,14 +2675,14 @@ function adminPasswordModal(id){
 function myPasswordModal(){
   if(!state.user||!state.profile?.active)return;
   formModal('Minha senha','<div class="formgrid">'+
-    field('Nova senha','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
-    field('Confirmar nova senha','password_confirm','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    field('Nova senha','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+    field('Confirmar nova senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
     '</div><p class="help">Sua senha é armazenada com segurança no Supabase Auth.</p>',
     'my-password','Atualizar minha senha');
 }
 function passwordsValid(values){
   const p=String(values.password||''),repeat=String(values.password_confirm||'');
-  if(p.length<12||p.length>128)throw new Error('Utilize uma senha de 12 a 128 caracteres.');
+  if(p.length<6||p.length>128)throw new Error('Utilize uma senha de 6 a 128 caracteres.');
   if(p!==repeat)throw new Error('As senhas digitadas são diferentes.');
   return p;
 }
