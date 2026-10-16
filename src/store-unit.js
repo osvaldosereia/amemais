@@ -1,7 +1,7 @@
 // Painéis internos das lojas permanentes. Não executa alterações de estoque.
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=x=>Number(x||0).toLocaleString('pt-BR');
-const done=new Set(['enviado','despachado','concluido','recebido','recebido_divergente','cancelado','expirado']);
+const done=new Set(['enviado','concluido','recebido','recebido_divergente','cancelado','expirado']);
 export function displayOrderStage(order){
  const stage=order.workflow?.stage;
  if(stage==='conferencia'||order.status==='separado')return 'A conferir';
