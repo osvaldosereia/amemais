@@ -53,11 +53,12 @@ test('filtro de fila combina etapa, destino e texto',()=>{
  for(const label of ['A separar','Em separação','A conferir','Prontos para saída','Com falta','Destino'])
   assert.ok(page.includes(label),label);
  const cards=[{dataset:{orderStatus:'separado',orderDestination:'evento',
-  orderVerified:'false',search:'aa003 retiro'},hidden:false}];
+  orderVerified:'false',orderIssue:'true',search:'aa003 retiro'},hidden:false}];
  const root={querySelectorAll:()=>cards,querySelector:()=>({hidden:true})};
  assert.equal(filterUnifiedOrders(root,'aa003','a_conferir','evento'),1);
  assert.equal(filterUnifiedOrders(root,'','pronto_saida','evento'),0);
  assert.equal(filterUnifiedOrders(root,'','a_conferir','franquia'),0);
+ assert.equal(filterUnifiedOrders(root,'aa003','com_ocorrencia','evento'),1);
 });
 test('câmera está visível na conferência e usa handler preexistente',()=>{
  assert.match(fv,/data-action="verify-open-camera"/);
