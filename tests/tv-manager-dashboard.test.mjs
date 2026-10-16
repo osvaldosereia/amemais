@@ -16,9 +16,9 @@ function makeDashboard(){
  const fakeWindow={AME_CONFIG:{},addEventListener:()=>{}};
  const source=script.replace(/^import [^\n]+\n/,'')
   .replace(/boot\(\)\.catch\([\s\S]*$/,'');
- const {shell,state,screens,nextScreen}=new Function('document','window',source+
-  '\nreturn {shell,state,screens,nextScreen};')(fakeDocument,fakeWindow);
- return {shell,state,screens,nextScreen,root};
+ const {shell,state,screens,nextScreen,niceDate}=new Function('document','window',source+
+  '\nreturn {shell,state,screens,nextScreen,niceDate};')(fakeDocument,fakeWindow);
+ return {shell,state,screens,nextScreen,niceDate,root};
 }
 const mock={
  generated_at:'2026-10-15T19:33:00Z',
@@ -153,4 +153,10 @@ test('gestão 360 restringe o snapshot, não usa dados pessoais nem confunde ven
  assert.match(managementSQL,/damage_agg/);
  assert.match(managementSQL,/demand_agg/);
  assert.match(script,/Não devolvido não equivale a venda confirmada/);
+});
+
+test('datas do calendário de eventos respeitam Cuiabá sem recuar um dia',()=>{
+ const {niceDate}=makeDashboard();
+ assert.match(niceDate('2026-10-20'),/20/);
+ assert.match(managementSQL,/America\/Cuiaba/);
 });
