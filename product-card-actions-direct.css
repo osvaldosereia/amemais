@@ -297,3 +297,15 @@
  .products-panel .product-toolbar-v3 .catalog-sorting-row{flex-direction:column;align-items:stretch}
  .products-panel .catalog-filter-field{flex:1 1 auto;width:100%}
 }
+
+
+/* Filtro inativos agora é um comando direto, sem abrir menu de um único item. */
+.products-panel .catalog-inactive-toggle{
+ min-height:43px!important;border-radius:9px!important;
+ border:1px solid #d2e1d7!important;background:#fafcfa!important;
+ color:#37694d!important;padding:8px 12px!important;
+}
+.products-panel .catalog-inactive-toggle.active{
+ background:#e6f4e9!important;border-color:#8cc8a0!important;
+ color:#15593a!important;
+}
