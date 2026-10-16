@@ -59,7 +59,7 @@ export function productGalleryPaths(group){
  }
  return selected;
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canShare=false,canLabel=false,expanded=false,mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canEditProduct=null,canBalance=()=>false,canShare=false,canLabel=false,expanded=false,historyForGroup=()=>[],mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
   const galleryPaths=productGalleryPaths(group);
@@ -75,7 +75,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
      '</div>':photoButton(main);
   const active=group.products.filter(p=>p.active);
   const isProducts=mode==='products';
-  const canEdit=isProducts&&canRegisterProducts();
+  const canEdit=isProducts&&(canEditProduct?canEditProduct():canRegisterProducts());
   const canMove=isProducts&&canMoveStock();
   const skuAccess=isProducts&&canManageSku();
   const inlineCount=isProducts&&canQuickCount();
@@ -136,37 +136,100 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '</div>';
     }).join('')+'</div>';
   };
-  // Acesso direto às funções: duas faixas fixas, nenhuma ação escondida em menu.
+  // Um card por modelo: ações principais retráteis, balanceamento por SKU.
   const direct=(label,action,id,css='')=>button(label,action,
     'data-id="'+h(id)+'"','small '+css);
-  const toggleText=sizeCount===1?
-    (expanded?'Ocultar dados':'Ver dados'):
-    (expanded?'Ocultar ':'Ver ')+sizeCount+' variações';
-  const sizeAction='<button type="button" class="button product-card-action-primary product-card-sizes" data-action="product-card-sizes" '+
-    'data-card-key="'+h(group.key)+'" aria-expanded="'+String(Boolean(expanded))+'">'+
-    toggleText+' <span aria-hidden="true">⌄</span></button>';
-  // Um único SKU tem gestão imediata; múltiplas variações revelam as operações por SKU.
-  const mainAction=sizeCount===1&&skuAccess?
-    direct('Gerenciar SKU','sku-manage',main.id,'product-card-action-primary product-card-action-stock'):
-    sizeAction;
-  // Um único SKU pode ser editado diretamente; múltiplos SKUs usam o gerenciador.
-  const editAction=canEdit?
-    direct('Editar produto',sizeCount===1?'product-edit':groupEdit,
-      sizeCount===1?main.id:groupEditId,'product-card-action-primary'):'';
-  const primaryActions=mainAction+editAction+
-    (canLabel?direct('Etiqueta 80 mm','shelf-label-open',main.id,'product-card-action-primary'):'');
-  const secondaryActions=
-    (group.modelId&&canEdit?direct('+ Variação','add-variants',group.modelId,'product-card-action-secondary'):'')+
-    (canShare?direct('Compartilhar','share-product',main.id,'product-card-action-secondary'):'')+
-    (canRemoveEntireModel?direct('Excluir produto + variações','product-model-delete',group.modelId,
-       'product-card-action-secondary product-card-action-danger'):
-     (!group.modelId&&manage&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,
-       'product-card-action-secondary product-card-action-danger'):''));
+  const stockRows=active.map(p=>{
+    const physical=quantity(p),reserved=qtyReserved(p.id),free=qtyAvailable(p.id);
+    return '<div class="card-balance-row" data-balance-item data-product-id="'+h(p.id)+
+      '" data-expected="'+physical+'" data-reserved="'+reserved+'">'+
+      '<div class="card-balance-identity"><strong>'+h(p.apparel_size||'Único')+'</strong>'+
+        '<span>'+h(p.apparel_color&&p.apparel_color!=='Única'?p.apparel_color:p.name)+'</span>'+
+        '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small></div>'+
+      '<div class="card-balance-metrics"><div><small>Físico</small><strong>'+fmt(physical)+'</strong></div>'+
+        '<div><small>Reservado</small><strong>'+fmt(reserved)+'</strong></div>'+
+        '<div><small>Livre</small><strong>'+fmt(free)+'</strong></div>'+
+        '<label><small>Contado</small><input type="number" data-balance-count inputmode="numeric" min="'+reserved+
+         '" max="1000000" step="1" value="'+physical+'" aria-label="Quantidade física contada · '+h(p.apparel_size||p.name)+'"'+
+         (!canBalance()?' disabled':'')+'></label></div></div>';
+  }).join('');
+  const history=historyForGroup(group)||[];
+  const stockTabs='<div class="card-workspace-tabs" role="tablist" aria-label="Estoque do produto">'+
+   '<button type="button" data-action="product-stock-tab" data-tab="balanco" role="tab" aria-selected="true">Balanço rápido</button>'+
+   '<button type="button" data-action="product-stock-tab" data-tab="movimentar" role="tab" aria-selected="false">Movimentar</button>'+
+   '<button type="button" data-action="product-stock-tab" data-tab="historico" role="tab" aria-selected="false">Histórico</button></div>';
+  const stockWorkspace=isProducts?
+   '<details class="grouped-variants-mobile card-workspace" data-product-details'+(expanded?' open':'')+'>'+
+     '<summary>Estoque e balanço por variação</summary>'+stockTabs+
+     '<section data-stock-panel="balanco"><p class="card-workspace-help">Conte as quantidades físicas de todas as variações. As reservas não podem ser reduzidas.</p>'+
+        '<div class="card-balance-list">'+(stockRows||'<p>Nenhuma variação ativa.</p>')+'</div>'+
+        (canBalance()?'<label class="card-balance-note" hidden>Motivo da divergência <textarea data-balance-note maxlength="250" rows="2" placeholder="Informe a causa da diferença identificada"></textarea></label>'+
+        '<div class="card-balance-footer"><span data-balance-status>Nenhuma diferença identificada</span>'+
+        '<button type="button" class="button primary" data-action="product-balance-save">Salvar balanço</button></div>':
+        '<p class="card-workspace-help">Seu perfil permite somente consultar os saldos.</p>')+
+     '</section>'+
+     '<section data-stock-panel="movimentar" hidden><p class="card-workspace-help">Selecione a variação e o tipo de movimentação.</p>'+
+     '<div class="card-stock-move-list">'+active.map(p=>'<div class="card-stock-move-row"><strong>'+h(p.apparel_size||p.name)+
+       ' · '+h(p.apparel_color||'')+'</strong><span>'+fmt(quantity(p))+' un. físicas</span>'+
+       (skuAccess?'<div class="card-stock-move-buttons">'+
+         (canMove?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="entrada">Entrada</button>'+
+          '<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="saida">Saída excepcional</button>':'')+
+         (canBalance()?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="contagem">Conferir SKU</button>':'')+
+         '</div>':'')+'</div>').join('')+'</div></section>'+
+     '<section data-stock-panel="historico" hidden><p class="card-workspace-help">Últimos movimentos registrados das variações.</p>'+
+        (history.length?'<ul class="card-stock-history">'+history.slice(0,10).map(m=>'<li><strong>'+h(m.label||m.action||'Movimento')+
+         '</strong><span>'+h(m.action||'')+' · '+h(String(m.quantity??0))+' un.</span>'+
+         '<small>'+h(m.created_at?new Date(m.created_at).toLocaleDateString('pt-BR'):'')+'</small></li>').join('')+'</ul>':
+         '<p class="card-workspace-help">Nenhuma movimentação recente na lista carregada.</p>')+'</section>'+
+   '</details>':'<details class="grouped-variants-mobile" data-product-details'+(expanded?' open':'')+'>'+
+      '<summary>Estoque por variação</summary>'+modelRows()+'</details>';
+  const model=group.model;
+  const basicName=model?.name||main.name;
+  const basicTags=model?.tags||main.tags||[];
+  const edition=isProducts&&canEdit?
+   '<details class="product-card-editor card-workspace" data-product-editor>'+
+    '<summary>Editar cadastro do produto</summary>'+
+    '<div class="card-workspace-tabs" role="tablist" aria-label="Editar produto">'+
+      '<button type="button" data-action="product-editor-tab" data-tab="geral" role="tab" aria-selected="true">Geral</button>'+
+      '<button type="button" data-action="product-editor-tab" data-tab="variacoes" role="tab" aria-selected="false">Variações</button>'+
+      '<button type="button" data-action="product-editor-tab" data-tab="fotos" role="tab" aria-selected="false">Fotos</button></div>'+
+    '<section data-editor-panel="geral"><form data-form="product-card-basic" data-id="'+h(model?.id||main.id)+'" data-is-model="'+Boolean(group.modelId)+'">'+
+      '<details class="card-editor-accordion" open><summary>Dados gerais</summary>'+
+        '<label>Nome do produto<input name="name" maxlength="180" required value="'+h(basicName)+'"></label>'+
+        '<label>Tags (separadas por vírgula)<input name="tags" maxlength="500" value="'+h(basicTags.join(', '))+'"></label>'+
+        '</details>'+
+      '<details class="card-editor-accordion"><summary>Localização e códigos</summary>'+
+         '<p>SKU, EAN, gôndola e prateleira são individuais para cada variação. Use a aba Variações para editá-los.</p></details>'+
+      '<div class="card-editor-actions"><button type="submit" class="button primary">Salvar dados gerais</button></div></form></section>'+
+    '<section data-editor-panel="variacoes" hidden><div class="card-editor-variation-list">'+group.products.map(p=>
+      '<div class="card-editor-variation"><div><strong>'+h(p.apparel_size||'Único')+' · '+h(p.apparel_color||'')+'</strong>'+
+      '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small>'+
+      '<small>'+h([p.gondola?'Gôndola '+p.gondola:'',p.prateleira?'Prateleira '+p.prateleira:''].filter(Boolean).join(' · ')||'Localização não informada')+'</small></div>'+
+      direct('Editar variação','product-edit',p.id)+'</div>').join('')+'</div>'+
+      (group.modelId?direct('+ Adicionar variação','add-variants',group.modelId):'')+
+      '<details class="card-editor-accordion card-admin-tools"><summary>Administração avançada</summary>'+
+        '<p>Excluir pode afetar reservas e pedidos pendentes. O histórico concluído é preservado.</p>'+
+        (canRemoveEntireModel?direct('Excluir produto e todas as variações','product-model-delete',group.modelId,'danger'):
+          (canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'danger'):''))+
+      '</details></section>'+
+    '<section data-editor-panel="fotos" hidden><p class="card-workspace-help">Edite a galeria de fotos do produto.</p>'+
+      (group.modelId?direct('Gerenciar fotos','apparel-photo',group.modelId):
+        direct('Gerenciar fotos','product-edit',main.id))+'</section>'+
+   '</details>':'';
+  const primaryStock=isProducts?
+    '<button type="button" class="button product-card-action-primary product-card-action-stock" data-action="product-card-sizes" '+
+      'aria-expanded="'+String(Boolean(expanded))+'">Ver estoque <span aria-hidden="true">⌄</span></button>':'';
+  const primaryEdit=canEdit?
+    '<button type="button" class="button product-card-action-primary" data-action="product-card-edit-toggle" aria-expanded="false">'+
+      'Editar produto <span aria-hidden="true">⌄</span></button>':'';
   const actions=isProducts?
     '<div class="grouped-inventory-actions product-card-actions-v5" aria-label="Ações de '+h(group.title)+'">'+
-      '<div class="product-card-action-primary-row">'+primaryActions+'</div>'+
-      (secondaryActions?'<div class="product-card-action-secondary-row">'+secondaryActions+'</div>':'')+
-    '</div>':'';
+      '<div class="product-card-action-primary-row">'+primaryStock+primaryEdit+'</div>'+
+      '<div class="product-card-action-secondary-row">'+
+       (canLabel?direct('Etiqueta 80 mm','shelf-label-open',main.id,'product-card-action-secondary'):'')+
+       (canShare?direct('Compartilhar','share-product',main.id,'product-card-action-secondary'):'')+
+       (group.modelId&&canEdit?direct('+ Variação','add-variants',group.modelId,'product-card-action-secondary'):'')+
+      '</div></div>':'';
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
     '<div class="grouped-inventory-top">'+
       '<div class="grouped-inventory-photo">'+photo+'</div>'+
@@ -175,23 +238,19 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<small class="product-card-description">'+h(description)+'</small>'+
         (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':'')+
         '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
-          '<small>'+stockLabel+'</small><span><b>'+fmt(count)+'</b> un.</span></div>'+
+          '<small>Físico na central</small><span><b>'+fmt(count)+'</b> un.</span></div>'+
         '<div class="product-card-location'+(locationMissing?' is-unknown':'')+'" aria-label="Localização do produto">'+
            '<span class="product-location-icon" aria-hidden="true">⌖</span>'+
            '<strong>'+h(location)+'</strong></div>'+
       '</div>'+
       (isProducts?'<div class="stock-total-breakdown">'+
           '<div class="stock-total-metric reserved"><small>Reservado</small><strong>'+fmt(groupReserved)+'</strong><span>un.</span></div>'+
-          '<div class="stock-total-metric available"><small>Livre</small><strong>'+fmt(groupAvailable)+'</strong><span>un.</span></div>'+
+          '<div class="stock-total-metric available"><small>Disponível</small><strong>'+fmt(groupAvailable)+'</strong><span>un.</span></div>'+
         '</div>':'')+
     '</div>'+
 
     (isProducts?actions:'')+
-    '<details class="grouped-variants-mobile" data-product-details'+(expanded?' open':'')+'>'+
-      '<summary><span>Estoque por '+(group.modelId?'tamanho':'produto')+'</span>'+
-      '<span class="group-mobile-total">'+sizeCount+' variação(ões) <span aria-hidden="true">⌄</span></span></summary>'+
-      modelRows()+
-    '</details>'+
+    stockWorkspace+edition+
     '</article>';
 }
 function sizeLine(size){
