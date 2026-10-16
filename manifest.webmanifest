@@ -1,19 +1,19 @@
 {
-  "name": "AME MAIS Estoque",
-  "short_name": "AME MAIS",
-  "description": "Controle de estoque e eventos da AME MAIS",
+  "name": "CDSB — Centro de Distribuição São Bento",
+  "short_name": "CDSB",
+  "description": "Gestão de estoque, pedidos, separação e expedição do Centro de Distribuição São Bento",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#ffffff",
-  "theme_color": "#158b77",
+  "theme_color": "#102d50",
   "icons": [
     {
-      "src": "./app-icon.svg?v=20261014brand2",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "./cdsb-emblem.jpg?v=20261016cdsb1",
+      "sizes": "128x128",
+      "type": "image/jpeg",
+      "purpose": "any"
     }
   ]
 }
