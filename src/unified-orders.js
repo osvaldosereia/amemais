@@ -218,7 +218,8 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  return '<article class="uo-card uo-operational" data-order-card data-search="'+esc([
   o.id,o.code,o.target,o.origin,originLabel,...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
   '" data-order-id="'+esc(o.id)+'" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'" data-order-destination="'+
-   (event?'evento':o.kind==='avulso'?'avulso':o.raw.request_type==='franquia'?'franquia':'loja')+'">'+
+   (event?'evento':o.kind==='avulso'?'avulso':o.raw.request_type==='franquia'?'franquia':'loja')+
+   '" data-order-verified="'+(o.status==='separado'&&isVerified?'true':'false')+'">'+
   '<header><div class="uo-head"><small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small>'+
    '<h3>'+(event?'Lote #':'Pedido #')+esc(o.code||'—')+'</h3>'+
    '<strong>'+esc(o.target)+'</strong></div>'+
@@ -260,9 +261,11 @@ export function unifiedOrdersPage(orders,{
 }={}){
  const active=['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'];
  const visible=separationOnly?orders.filter(o=>active.includes(o.status)||o.status==='pendente_estoque'):orders;
- const backlog=orders.filter(o=>active.includes(o.status)).length;
+ const toPick=orders.filter(o=>['legado','solicitado','reservado','aprovado','aguardando'].includes(o.status)).length;
+ const separating=orders.filter(o=>o.status==='em_separacao').length;
+ const toVerify=orders.filter(o=>o.status==='separado'&&!isVerified(o)).length;
+ const readyToDispatch=orders.filter(o=>o.status==='separado'&&isVerified(o)).length;
  const waiting=orders.filter(o=>o.status==='pendente_estoque').length;
- const done=orders.filter(o=>['enviado','concluido','recebido','recebido_divergente'].includes(o.status)).length;
  const cards=visible.map(o=>unifiedOrderCard(o,{button,time,portal,
   canProcess:canProcess(o),canCancel:canCancel(o),canDelete:canDelete(o),canReceive:canReceive(o),
   canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o),
@@ -278,13 +281,28 @@ export function unifiedOrdersPage(orders,{
    separationOnly?'Fila dos separadores · pedidos e lotes de lojas temporárias.':
     'Todos os pedidos e remessas de lojas temporárias em uma fila única.')+'</p></div>'+
    '<div class="actions">'+actions+'</div></div>'+
-  '<div class="uo-summary"><div><small>A separar</small><strong>'+backlog+'</strong></div>'+
-   '<div><small>Aguardando estoque</small><strong>'+waiting+'</strong></div>'+
-   '<div><small>Concluídos</small><strong>'+done+'</strong></div></div>'+
-  '<div class="uo-tools"><label class="uo-search">Buscar<input type="search" data-unified-search placeholder="Pedido, lote, destino, SKU ou EAN…" autocomplete="off"></label>'+
-   '<label class="uo-filter">Situação<select data-unified-status><option value="todos">Todos</option>'+
-   '<option value="pendentes">A separar</option><option value="pendente_estoque">Com falta</option>'+
-   '<option value="concluidos">Concluídos</option><option value="encerrados">Cancelados / expirados</option></select></label></div>'+
+  '<div class="uo-summary" aria-label="Andamento dos pedidos">'+
+   '<div><small>A separar</small><strong>'+toPick+'</strong></div>'+
+   '<div><small>Em separação</small><strong>'+separating+'</strong></div>'+
+   '<div><small>A conferir</small><strong>'+toVerify+'</strong></div>'+
+   '<div><small>Prontos para saída</small><strong>'+readyToDispatch+'</strong></div>'+
+   '<div><small>Com falta</small><strong>'+waiting+'</strong></div></div>'+
+  '<div class="uo-tools"><label class="uo-search">Buscar'+
+   '<input type="search" data-unified-search placeholder="Pedido, destino, modelo, gôndola, SKU ou EAN…" autocomplete="off"></label>'+
+   '<label class="uo-filter">Etapa<select data-unified-status>'+
+   '<option value="todos">Todas</option>'+
+   '<option value="a_separar">A separar</option>'+
+   '<option value="em_separacao">Em separação</option>'+
+   '<option value="a_conferir">A conferir</option>'+
+   '<option value="pronto_saida">Prontos para saída</option>'+
+   '<option value="pendente_estoque">Com falta</option>'+
+   '<option value="concluidos">Concluídos</option>'+
+   '<option value="encerrados">Cancelados / expirados</option></select></label>'+
+   '<label class="uo-filter">Destino<select data-unified-destination>'+
+   '<option value="todos">Todos</option><option value="evento">Loja temporária</option>'+
+   '<option value="franquia">Franquia</option>'+
+   '<option value="loja">Loja própria</option>'+
+   '<option value="avulso">Pedido avulso</option></select></label></div>'+
   '<div class="uo-list">'+(visible.length?cards:
     '<p class="uo-no-work">Nenhum pedido ou lote aguardando separação.</p>')+'</div>'+
   '<p class="uo-empty-filter" data-unified-empty hidden>Nenhum item encontrado com estes filtros.</p>'+
@@ -294,17 +312,22 @@ export function unifiedOrdersPage(orders,{
      'A reserva não reduz o estoque físico. A saída é registrada somente após a conferência completa.')+'</p>'+
  '</section>';
 }
-export function filterUnifiedOrders(container,query,status){
+export function filterUnifiedOrders(container,query,status,destination='todos'){
  const q=String(query||'').trim().toLocaleLowerCase('pt-BR');
  let visible=0;
  for(const card of container.querySelectorAll('[data-order-card]')){
-  const s=card.dataset.orderStatus;
+  const s=card.dataset.orderStatus,verified=card.dataset.orderVerified==='true';
   const match=status==='todos'||!status||
-    (status==='pendentes'&&['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado','despachado'].includes(s))||
-    (status==='concluidos'&&['enviado','concluido','recebido','recebido_divergente'].includes(s))||
-    (status==='encerrados'&&['cancelado','expirado'].includes(s))||
-    status===s;
-  card.hidden=!match||!card.dataset.search.includes(q);
+   (status==='a_separar'&&['legado','solicitado','reservado','aprovado','aguardando'].includes(s))||
+   (status==='em_separacao'&&s==='em_separacao')||
+   (status==='a_conferir'&&s==='separado'&&!verified)||
+   (status==='pronto_saida'&&s==='separado'&&verified)||
+   (status==='pendentes'&&['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'].includes(s))||
+   (status==='concluidos'&&['enviado','despachado','concluido','recebido','recebido_divergente'].includes(s))||
+   (status==='encerrados'&&['cancelado','expirado'].includes(s))||
+   status===s;
+  const matchDestination=!destination||destination==='todos'||card.dataset.orderDestination===destination;
+  card.hidden=!match||!matchDestination||!card.dataset.search.includes(q);
   if(!card.hidden)visible++;
  }
  const empty=container.querySelector('[data-unified-empty]');
