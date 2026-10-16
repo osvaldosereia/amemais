@@ -735,10 +735,8 @@ function productsPage(){
         '</select></label>'+
       '</div>'+
       '<div class="product-filter-tools">'+
-        '<details class="product-extra-filters"><summary>☷ '+(state.showInactiveProducts?'Inativos visíveis':'Mais filtros')+
-          ' <span aria-hidden="true">⌄</span></summary><div>'+
-          button(state.showInactiveProducts?'Ocultar inativos':'Mostrar inativos','products-toggle-inactive','','small')+
-          '</div></details>'+
+        button(state.showInactiveProducts?'✓ Inativos visíveis':'Mostrar inativos',
+          'products-toggle-inactive','','small catalog-inactive-toggle'+(state.showInactiveProducts?' active':'') )+
         (filtersApplied?button('Limpar filtros','products-clear-filters','','small'):'')+
       '</div>'+
     '</div>'+
