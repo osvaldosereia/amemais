@@ -273,7 +273,8 @@ export function addSizesContent(model,variants,choices=[]){
    '<input type="hidden" name="new_color" value="'+esc(color)+'">'+
    (available.length?
     '<div class="note">Selecione as variações a cadastrar. SKU e EAN podem ser informados individualmente.</div>'+
-    '<div class="add-sizes-picker">'+available.map(size=>
+    '<div class="add-sizes-picker">'+choices.map(size=>existing.has(String(size).toLocaleLowerCase('pt-BR'))?
+      '<span class="size-chip size-chip-existing" title="Variação já cadastrada" aria-label="'+esc(size)+' já existe">'+esc(size)+' ✓</span>':
       '<button type="button" data-action="extra-size-toggle" data-size="'+esc(size)+
       '" class="size-chip" aria-pressed="false">'+esc(size)+'</button>').join('')+'</div>'+
     '<div class="extra-size-list">'+available.map(sizeLine).join('')+'</div>':
