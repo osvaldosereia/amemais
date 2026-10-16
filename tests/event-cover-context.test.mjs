@@ -38,7 +38,8 @@ test('sanitizes malicious instructions inside user-provided fields',()=>{
 test('new and existing event forms offer theme and pass it to stored event before requesting generation',()=>{
  assert.match(app,/name="cover_theme"/);
  assert.match(app,/data-cover-theme/);
- assert.match(app,/cover_theme:.*String/);
+ assert.match(app,/saveEventCoverTheme\(db,e.id,values.cover_theme\)/);
+ assert.match(app,/saveEventCoverTheme\(db,eventId,values.cover_theme\)/);
  assert.match(app,/generateEventCover\(db,e.id\)/);
  assert.match(app,/generateEventCover\(db,eventId\)/);
  assert.match(proxy,/event_id: eventId/);
