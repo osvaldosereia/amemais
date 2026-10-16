@@ -122,3 +122,13 @@
  .event-unit-page .event-lots-title{align-items:flex-start}
  .event-unit-page .event-lots-title .button{min-height:44px}
 }
+
+/* Recebimentos por SKU: dados efetivamente conferidos, sem supor estoque da franquia. */
+.su-receipt{display:flex;flex-direction:column;gap:12px;border:1px solid #e0e8f1;background:#fff;border-radius:11px;padding:13px;min-width:0}
+.su-receipt>.su-section-header{align-items:flex-start}
+.su-receipt>.su-section-header>div{display:flex;flex-direction:column;gap:5px}
+.su-receipt .su-data-list strong{color:#102d50;font-size:.83rem}
+.su-receipt .su-data-list small{display:block;margin-top:3px;color:#6e8297;font-size:.73rem;overflow-wrap:anywhere}
+.su-receipt .su-data-list>div{align-items:flex-start;gap:12px}
+.su-receipt .su-receipt-qty{flex:none;text-align:right;color:#183b5b;font-weight:650;font-size:.78rem;max-width:48%;line-height:1.4;overflow-wrap:anywhere}
+@media(max-width:460px){.su-receipt .su-data-list>div{flex-direction:column;gap:5px}.su-receipt .su-receipt-qty{max-width:100%;text-align:left}}
