@@ -11,6 +11,7 @@ const [app,orders,lots,catalog,thermal,db,disable,revise]=await Promise.all(path
 const moduleSource=await import('data:text/javascript;base64,'+
  Buffer.from(orders).toString('base64'));
 const {unifiedOrdersPage}=moduleSource;
+const cart=await readFile(new URL('../src/order-cart.js',import.meta.url),'utf8');
 const button=(label,action,attrs='')=>'<button data-action="'+action+'" '+attrs+'>'+label+'</button>';
 test('novo pedido seleciona destino real sem criar pedido de cliente',()=>{
  assert.match(app,/function orderDestinationPicker\(\)/);
@@ -43,7 +44,6 @@ test('criações transacionais exigem reserva integral sem divulgar saldo',()=>{
  assert.match(app,/isFranchisePortal\(\)/);
  assert.match(app,/showAvailable:!portal/);
  assert.match(app,/collectOrderCartItems\(form\)/);
- const cart=await readFile(new URL('../src/order-cart.js',import.meta.url),'utf8');
  assert.match(cart,/Disponibilidade será confirmada pela central/);
 });
 test('limites arbitrários do formulário antigo foram retirados',()=>{
