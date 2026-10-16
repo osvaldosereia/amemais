@@ -1,6 +1,6 @@
 import {makeVariationCards,makeVariationChips,resolveCategoryVariations} from './category-variations.js?v=20261015categorymetadata2';
 // Espelho local do seletor: módulos de catálogo devem permanecer independentes de DOM/imports.
-const gondolaSelectHTML=(name,locations=[],current='',opts={})=>{
+const productSizeGondolaSelectHTML=(name,locations=[],current='',opts={})=>{
  const esc=v=>String(v??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[x]));
  const selected=String(current||'');
  const list=(locations||[]).filter(x=>x.active||x.name===selected).slice();
@@ -22,7 +22,7 @@ function sizeCard(size){
     '<label class="field"><span>Código interno (SKU)</span><input name="size_sku" maxlength="80" disabled autocomplete="off" placeholder="Gerado automaticamente se vazio"></label>'+
     '<label class="field"><span>EAN (se houver)</span><div class="inline apparel-ean"><input name="size_ean" maxlength="14" inputmode="numeric" disabled placeholder="Código de barras">'+
     '<button class="button small" type="button" data-action="size-scan" aria-label="Ler EAN do tamanho '+size+'">📷</button></div></label>'+
-    gondolaSelectHTML('size_gondola',[], '', {label:'Gôndola deste tamanho',disabled:true})+
+    productSizeGondolaSelectHTML('size_gondola',[], '', {label:'Gôndola deste tamanho',disabled:true})+
     '<label class="field"><span>Prateleira deste tamanho (opcional)</span><input name="size_prateleira" maxlength="40" disabled placeholder="Ex.: B"></label>'+
     '<label class="field"><span>Estoque inicial *</span><input name="size_qty" type="number" step="1" min="0" max="1000000" value="0" disabled required inputmode="numeric"></label>'+
     '</div></div>';
