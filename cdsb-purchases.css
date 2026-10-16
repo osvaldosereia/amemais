@@ -60,3 +60,70 @@
  .buy-product-row{padding:10px;gap:8px}
  .buy-product-row input{width:75px}
 }
+
+/* Centro de compras renovado: um modelo por card, fotos e seleção mobile-first. */
+.buy-page{--buy-blue:#102d50;--buy-gold:#c7a35f;--buy-border:#d8e2ee;--buy-soft:#f4f7fb}
+.buy-page .buy-stat-grid>div{background:#f6f8fc;border-color:var(--buy-border)}
+.buy-page .buy-stat-grid strong,.buy-page .buy-section-head h2,.buy-page .buy-order strong,
+.buy-page .buy-product-row strong{color:var(--buy-blue)}
+.buy-page .buy-stat-grid span,.buy-page .buy-section-head small,.buy-page .buy-order small{color:#64758a}
+.buy-page .buy-status{background:#eaf0f8;color:var(--buy-blue)}
+.buy-page .buy-section-head,.buy-page .buy-filters{border-color:var(--buy-border)}
+.buy-group-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:13px;padding:14px}
+.buy-group-card{background:#fff;border:1px solid var(--buy-border);border-radius:14px;min-width:0;overflow:hidden;box-shadow:0 2px 10px #102d5008}
+.buy-group-head{display:flex;align-items:flex-start;gap:12px;padding:12px}
+.buy-group-photo,.buy-cart-photo{flex:0 0 98px;width:98px;aspect-ratio:1/1;display:grid;place-items:center;
+ border-radius:10px;background:#f0f3f7;overflow:hidden;border:1px solid var(--buy-border)}
+.buy-group-photo img,.buy-cart-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.buy-no-photo{font-size:.74rem;color:#718093}
+.buy-group-title{min-width:0;flex:1}
+.buy-group-title h3{font-size:.96rem;margin:0 0 7px;line-height:1.25;color:var(--buy-blue);overflow-wrap:anywhere}
+.buy-group-title>small{font-size:.72rem;color:#63768c}
+.buy-group-metrics{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.buy-group-metrics span{display:inline-flex;padding:5px 8px;border-radius:7px;
+ background:#eaf0f8;color:var(--buy-blue);font-size:.74rem}
+.buy-group-metrics b{padding-left:4px}
+.buy-variants{padding:0 12px}
+.buy-variant{display:flex;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid #ecf0f5;padding:9px 0}
+.buy-variant-name{display:flex;flex-direction:column;gap:2px;min-width:0}
+.buy-variant-name strong{color:var(--buy-blue);font-size:.8rem}
+.buy-variant-name small{font-size:.7rem;color:#687b90}
+.buy-variant-values{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;min-width:115px}
+.buy-variant-values span{white-space:nowrap;background:var(--buy-soft);border:1px solid #e0e7f1;
+ border-radius:6px;padding:4px 6px;font-size:.67rem;color:#455d7a}
+.buy-group-actions{display:flex;gap:8px;flex-wrap:wrap;padding:11px 12px;background:#fbfcfe;border-top:1px solid var(--buy-border)}
+.buy-group-actions .button{min-height:41px;flex:1;font-size:.77rem}
+.buy-cart-group{border:1px solid var(--buy-border);border-radius:12px;margin:10px;background:#fff;overflow:hidden}
+.buy-cart-group[hidden]{display:none!important}
+.buy-cart-group>header{display:flex;align-items:center;gap:11px;background:#f6f8fb;padding:10px 12px}
+.buy-cart-group>header>div:last-child{display:flex;flex-direction:column;gap:5px}
+.buy-cart-group>header strong{font-size:.88rem;color:var(--buy-blue)}
+.buy-cart-group>header small{color:#6d7e90;font-size:.72rem}
+.buy-cart-photo{width:66px;flex-basis:66px}
+.buy-cart-group .buy-product-row{padding:11px 12px;gap:10px;border-color:#e8eef5}
+.buy-cart-group .buy-product-row label{min-width:0;flex:1;display:flex;gap:10px;align-items:center;cursor:pointer}
+.buy-cart-group .buy-product-row label>span{min-width:0;display:flex;flex-direction:column;gap:4px}
+.buy-cart-group .buy-product-row label strong{font-size:.8rem}
+.buy-cart-group .buy-product-row label small{line-height:1.3;font-size:.71rem}
+.buy-cart-group .buy-product-row [data-buy-select]{width:20px;height:20px;accent-color:var(--buy-blue);flex:0 0 20px}
+.buy-cart-group .buy-product-row [data-buy-quantity]{width:75px;min-height:42px;color:var(--buy-blue)}
+.buy-cart-group .buy-product-row [data-buy-quantity]:disabled{opacity:.4;background:#edf1f5}
+.buy-product-list{max-height:53vh;overflow:auto;background:#f8fafc}
+.buy-order{border-color:var(--buy-border)}
+.buy-order>div:first-child small{line-height:1.4}
+.buy-order-actions .button{font-size:.75rem}
+.buy-outflow-report{max-height:60vh;overflow:auto}
+.buy-outflow-report .buy-outflow-line{display:flex;justify-content:space-between;gap:12px;
+ padding:10px 0;border-bottom:1px solid var(--buy-border)}
+@media(max-width:760px){
+ .buy-group-grid{grid-template-columns:1fr;padding:9px}
+ .buy-group-head{padding:11px}
+ .buy-group-photo{width:116px;flex-basis:116px}
+ .buy-variant{flex-direction:column;align-items:stretch}
+ .buy-variant-values{justify-content:flex-start}
+ .buy-group-actions .button{min-height:44px}
+ .buy-order-actions{flex-wrap:wrap}
+ .buy-cart-group{margin:7px}
+ .buy-cart-group>header{padding:8px}
+}
+@media(max-width:380px){.buy-group-photo{width:90px;flex-basis:90px}.buy-group-title h3{font-size:.85rem}}
