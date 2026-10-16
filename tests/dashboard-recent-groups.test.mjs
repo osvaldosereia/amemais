@@ -60,7 +60,7 @@ test('o mesmo renderer emite um card com painel retrátil e soma de estoque',()=
   assert.equal((html.match(/data-product-card=/g)||[]).length,1);
   assert.match(html,/Camiseta Masculina HDH tipo 2/);
   assert.match(html,/<b>430<\/b> un\./);
-  assert.match(html,/4 tamanhos/);
+  assert.match(html,/4 variações/);
   assert.match(html,/data-action="product-card-sizes"/);
   assert.match(html,/data-product-details/);
   assert.match(html,/SKU 1000/);
