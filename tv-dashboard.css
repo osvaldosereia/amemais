@@ -310,3 +310,23 @@ button{font:inherit;cursor:pointer}
  .tv-progress-track{width:100%}
  .tv-critical-banner span{display:none}
 }
+
+
+.tv-settings-cover{position:fixed;inset:0;z-index:30;background:#04281ebd;display:flex;
+ align-items:center;justify-content:center;padding:18px}
+.tv-settings-dialog{background:#fff;color:#163e2b;border-radius:16px;padding:22px;
+ width:min(580px,98vw);max-height:90vh;overflow:auto;box-shadow:0 15px 45px #0a291a50}
+.tv-settings-dialog h2{margin:0 0 7px;font-size:23px}
+.tv-settings-dialog p{color:#62786b;line-height:1.5;font-size:14px}
+.tv-settings-list{display:flex;flex-direction:column;gap:5px;margin:13px 0}
+.tv-settings-list label{display:flex;align-items:center;justify-content:space-between;
+ gap:15px;padding:8px 0;border-bottom:1px solid #e5ebe6;font-weight:680;font-size:14px}
+.tv-settings-list input{width:85px;min-height:43px;border:1px solid #bbd7c5;
+ border-radius:8px;padding:8px;font:inherit;font-size:16px;color:#1b6242}
+.tv-settings-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.tv-settings-actions button{padding:11px 15px;border-radius:9px;border:1px solid #cbded2;
+ color:#1c5d3f;background:#f7faf8;font-weight:800}
+.tv-settings-actions button:last-child{background:#146345;color:#fff;border-color:#146345}
+.tv-inner-card .tv-inline-totals:has(.tv-metric-mini:nth-child(4)){gap:5px}
+.tv-inner-card .tv-inline-totals:has(.tv-metric-mini:nth-child(4)) .tv-metric-mini{padding:6px}
+.tv-inner-card .tv-inline-totals:has(.tv-metric-mini:nth-child(4)) .tv-metric-mini strong{font-size:clamp(18px,1.5vw,29px)}
