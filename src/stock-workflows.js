@@ -59,7 +59,7 @@ export function productGalleryPaths(group){
  }
  return selected;
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canShare=false,canLabel=false,expanded=false,mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canShare=false,canLabel=false,expanded=false,mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
   const galleryPaths=productGalleryPaths(group);
@@ -85,11 +85,11 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const count=active.reduce((sum,p)=>sum+quantity(p),0);
   const groupReserved=isProducts?active.reduce((sum,p)=>sum+qtyReserved(p.id),0):0;
   const groupAvailable=isProducts?active.reduce((sum,p)=>sum+qtyAvailable(p.id),0):count;
-  const stockLabel=mode==='event'?'Na loja temporária':'Físico na central';
+  const stockLabel=mode==='event'?'Na loja temporária':'Total na central';
   const colors=[...new Set(active.map(p=>(p.apparel_color||'').trim()).filter(c=>c&&c!=='Única'))];
   const description=group.modelId
     ?(colors.length===1?colors[0]+' · ':colors.length>1?colors.length+' cores · ':'')+
-      active.length+' tamanho(s)/variação(ões)'
+      active.length+' '+(active.length===1?'variação':'variações')
     :'Produto único';
   const locations=[...new Set(active.map(p=>
     [p.gondola?'Gôndola '+p.gondola:'',p.prateleira?'Prateleira '+p.prateleira:'']
@@ -129,30 +129,29 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
           (!p.active?'<small class="product-variant-disabled">Inativo</small>':'')+
           '<small class="stock-variant-physical">Físico: <b>'+fmt(physical)+'</b> un.</small>'+
           '</div></div>'+stockHtml+
-        (((skuAccess&&sizeCount>1)||canCount)?'<div class="group-variant-actions">'+
+        ((skuAccess||canCount)?'<div class="group-variant-actions">'+
           (canCount?button('✓ Salvar','stock-free-save','data-id="'+h(p.id)+'" hidden','small primary variant-count-save'):'')+
-          (skuAccess&&sizeCount>1?button('Gerenciar','sku-manage','data-id="'+h(p.id)+'"','small'):'')+
+          (skuAccess?button('Gerenciar SKU','sku-manage','data-id="'+h(p.id)+'"','small'):'')+
           '</div>':'')+
         '</div>';
     }).join('')+'</div>';
   };
-  // Retrátil responsivo. Só o saldo livre pode ser conferido diretamente, com RPC auditada.
-  const moreOptions=(canShare?'<button type="button" data-action="share-product" data-id="'+h(main.id)+'">'+
-      'Compartilhar no WhatsApp</button>':'')+
-
-    (group.modelId&&canEdit?'<button type="button" data-action="add-variants" data-id="'+h(group.modelId)+'">+ Adicionar variações</button>':'')+
-    (manage?'<button type="button" class="product-menu-danger" data-action="'+
-      (group.modelId?'product-card-edit':'product-delete')+'" data-id="'+h(groupEditId)+'">'+
-      (group.modelId?'Gerenciar / excluir tamanhos':'Excluir produto')+'</button>':'')+
-    (canRemoveEntireModel?'<button type="button" class="product-menu-danger" data-action="product-model-delete" data-id="'+h(group.modelId)+'">Excluir produto completo · todas as variações</button>':'');
+  // Botões diretos: permissões e confirmação permanecem nos handlers.
+  const direct=(label,action,id,css='')=>button(label,action,
+    'data-id="'+h(id)+'"','small product-card-direct '+css);
+  const toggleText=sizeCount===1?
+    (expanded?'Ocultar SKU / estoque':'Ver SKU / estoque'):
+    (expanded?'Ocultar ':'Ver ')+sizeCount+' variações';
   const actions=isProducts?
-    '<div class="grouped-inventory-actions">'+
-      (sizeCount===1&&skuAccess?button('Gerenciar SKU','sku-manage','data-id="'+h(main.id)+'"','primary'):'')+
-      (canLabel?button('Etiqueta 80 mm','shelf-label-open','data-id="'+h(main.id)+'"','small'):'')+
-      '<button type="button" class="product-card-sizes" data-action="product-card-sizes" data-card-key="'+h(group.key)+'"'+
-      ' aria-expanded="'+String(Boolean(expanded))+'">'+(sizeCount===1?'Ver detalhes':(expanded?'Ocultar':'Ver')+' '+sizeCount+' tamanhos')+' <span aria-hidden="true">⌄</span></button>'+
-      (moreOptions?'<details class="product-card-more"><summary aria-label="Mais opções do produto" title="Mais opções">⋯</summary>'+
-        '<div class="product-card-more-menu">'+moreOptions+'</div></details>':'')+
+    '<div class="grouped-inventory-actions" aria-label="Ações de '+h(group.title)+'">'+
+      '<button type="button" class="product-card-sizes product-card-direct product-card-action-main" data-action="product-card-sizes" data-card-key="'+h(group.key)+'"'+
+      ' aria-expanded="'+String(Boolean(expanded))+'">'+toggleText+' <span aria-hidden="true">⌄</span></button>'+
+      (canEdit?direct('Editar produto',groupEdit,groupEditId,'product-card-action-edit'):'')+
+      (group.modelId&&canEdit?direct('Adicionar variação','add-variants',group.modelId):'')+
+      (canLabel?direct('Imprimir etiqueta','shelf-label-open',main.id):'')+
+      (canShare?direct('Compartilhar','share-product',main.id):'')+
+      (canRemoveEntireModel?direct('Excluir produto','product-model-delete',group.modelId,'product-card-action-danger'):
+       (!group.modelId&&manage&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'product-card-action-danger'):''))+
     '</div>':'';
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
     '<div class="grouped-inventory-top">'+
