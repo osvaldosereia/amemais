@@ -74,3 +74,18 @@ test('quantidades de saída respeitam estoque livre',()=>{
  assert.throws(()=>operationCartLines(cart,products,()=>12,'saida',()=>4),/Estoque livre insuficiente/);
  assert.equal(operationCartLines(cart,products,()=>12,'entrada',()=>4)[0].expected,12);
 });
+
+test('produto único mostra ações diretas e permite gerenciar o SKU',()=>{
+ const only={...products[0],apparel_model_id:null};
+ const one=groupInventory([only],[])[0];
+ const html=groupedCard(one,{
+  h,photoButton:()=>'<button>Foto</button>',qtyStore:()=>12,qtyEvent:()=>0,
+  qtyReserved:()=>2,qtyAvailable:()=>10,button,
+  isManager:()=>true,canRegisterProducts:()=>true,canMoveStock:()=>true,
+  canManageSku:()=>true,canDeleteProduct:()=>true,canShare:true,canLabel:true
+ });
+ assert.match(html,/Ver SKU \/ estoque/);
+ for(const action of ['sku-manage','product-edit','shelf-label-open','share-product','product-delete'])
+  assert.match(html,new RegExp('data-action="'+action+'"'));
+ assert.doesNotMatch(html,/product-card-more/);
+});
