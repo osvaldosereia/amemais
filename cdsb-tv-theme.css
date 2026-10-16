@@ -17,3 +17,18 @@ html,body{background:#f3f5f8;color:#19344f}
 .tv-live{color:#225e48}
 @media(max-width:900px){.tv-one-logo{width:115px;min-width:115px}.tv-one-logo img{height:39px}}
 @media(max-width:550px){.tv-one-logo{width:94px;min-width:94px}.tv-one-logo img{height:35px}}
+
+
+/* Marca vetorial legível sem ocupar mais que a faixa de cabeçalho. */
+@media(min-width:901px){
+ .tv-one-logo{width:185px;min-width:185px;height:49px;display:flex;justify-content:center;align-items:center}
+ .tv-one-logo img{width:100%;height:auto;max-height:49px;object-fit:contain}
+}
+@media(max-width:900px){
+ .tv-one-logo{width:142px;min-width:142px;height:46px}
+ .tv-one-logo img{width:100%;height:auto;max-height:46px;object-fit:contain}
+}
+@media(max-width:550px){
+ .tv-one-logo{width:123px;min-width:123px;height:40px}
+ .tv-one-logo img{width:100%;height:auto;max-height:40px}
+}
