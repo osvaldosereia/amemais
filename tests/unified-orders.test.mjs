@@ -49,7 +49,7 @@ test('pedidos com falta mostram quantidade original, reservada e diferença',()=
 test('pedido reservado inicia separação; separado segue para conferência',()=>{
  const base=makeUnifiedOrders(props).find(x=>x.kind==='avulso');
  const reserved=unifiedOrderCard({...base,status:'reservado',missing:0},{button,canProcess:true});
- const separated=unifiedOrderCard({...base,status:'separado',missing:0},{button,canProcess:true,canDispatchStock:true,isVerified:true});
+ const separated=unifiedOrderCard({...base,status:'separado',missing:0},{button,canProcess:true,canVerify:true,canDispatchStock:true,isVerified:true});
  assert.match(reserved,/order-op-pick/);
  assert.doesNotMatch(reserved,/order-op-send/);
  assert.match(separated,/order-op-check/);
