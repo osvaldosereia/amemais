@@ -1,4 +1,4 @@
-// Catálogo visual para montar lotes de lojas temporárias.
+// Catálogo visual para montar pedidos de lojas temporárias.
 // Um modelo pode ter muitas variações, mas conta como apenas um item do limite de 10.
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
@@ -118,7 +118,7 @@ function cards(group,store){
      '</div><label>Quantidade <input type="number" inputmode="numeric" step="1" min="0" max="1000000"'+
       ' data-plan-qty data-id="'+esc(p.id)+'" value="'+current+'" aria-label="Quantidade de '+esc(variation)+'"></label></div>';
    }).join('')+
-    (n?'<button type="button" class="lot-remove" data-action="lot-clear-model" data-key="'+esc(group.key)+'">Remover modelo do lote</button>':'')+
+    (n?'<button type="button" class="lot-remove" data-action="lot-clear-model" data-key="'+esc(group.key)+'">Remover modelo do pedido</button>':'')+
    '</div></article>';
 }
 export function filterLotCatalog(form,{resetPage=false}={}){
@@ -147,12 +147,12 @@ export function filterLotCatalog(form,{resetPage=false}={}){
  });
  const total=found.length,shown=store.view==='selected'?found:found.slice(0,store.page*PAGE);
  list.innerHTML=shown.map(g=>cards(g,store)).join('')||
-  '<div class="lot-empty">'+(store.view==='selected'?'Seu lote está vazio. Volte ao catálogo para explorar produtos.':
+  '<div class="lot-empty">'+(store.view==='selected'?'Seu pedido está vazio. Volte ao catálogo para explorar produtos.':
    'Nenhum modelo com estes filtros. Experimente outra categoria ou limpe a busca.')+'</div>';
  const more=scope.querySelector('[data-action="lot-more"]');
  if(more){more.hidden=shown.length>=total;more.textContent='Mostrar mais ('+(total-shown.length)+' restantes)';}
  const info=scope.querySelector('[data-lot-results]');
- if(info)info.textContent=store.view==='selected'?'Revisão do lote · '+total+' modelo(s) selecionado(s)':
+ if(info)info.textContent=store.view==='selected'?'Revisão do pedido · '+total+' modelo(s) selecionado(s)':
   (total===store.catalogue.length?total+' modelos disponíveis para explorar':total+' de '+store.catalogue.length+' modelos encontrados')+
   (total>PAGE?' · mostrando '+shown.length:'');
  for(const tab of scope.querySelectorAll('[data-action="lot-view"]')){
@@ -171,7 +171,7 @@ export function filterLotCatalog(form,{resetPage=false}={}){
 }
 export function onLotQuantityInput(form,input){
  const store=form?.__lotPicker;
- if(!store)return {ok:false,error:'Lote indisponível'};
+ if(!store)return {ok:false,error:'Pedido indisponível'};
  const id=input.dataset.id,key=store.productKeys.get(id);
  if(!key)return {ok:false,error:'Variação inválida'};
  const raw=input.value.trim(),value=raw===''?0:Number(raw);
@@ -183,11 +183,6 @@ export function onLotQuantityInput(form,input){
  store.invalid=false;input.setCustomValidity('');
  const previous=store.selected.get(id)||0;
  if(value>0)store.selected.set(id,value);else store.selected.delete(id);
- if(selectedLotCount(form).models>10){
-  if(previous>0)store.selected.set(id,previous);else store.selected.delete(id);
-  input.value=String(previous);
-  return {ok:false,error:'O lote permite até 10 modelos. Envie este lote e crie outro para continuar.'};
- }
  const card=input.closest('[data-lot-card]');
  if(card){
   const group=store.catalogue.find(g=>g.key===key),n=countGroup(group,store.selected);
@@ -228,12 +223,11 @@ export function lotCatalogAction(form,button){
  return true;
 }
 export function collectLotItems(form){
- const store=form?.__lotPicker;if(!store)throw Error('Lote não inicializado.');
+ const store=form?.__lotPicker;if(!store)throw Error('Pedido não inicializado.');
  if(store.invalid||form.querySelector('[data-plan-qty]:invalid'))throw Error('Corrija as quantidades inválidas.');
  const items=[...store.selected].map(([product_id,quantity])=>({product_id,quantity}));
  if(items.some(x=>!Number.isInteger(x.quantity)||x.quantity<1||x.quantity>1000000))
   throw Error('Quantidade inválida.');
- if(items.length>150)throw Error('O limite é 150 variações por lote.');
- if(selectedLotCount(form).models>10)throw Error('O limite é 10 modelos por lote.');
+ if(items.length>5000)throw Error('Pedido excede o limite técnico de segurança de 5.000 SKUs.');
  return items;
 }
