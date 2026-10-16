@@ -357,7 +357,7 @@ function oneCategories(items){
 function onePurchases(){
  if(state.recentPurchasesError)return emptyReport('Compras recentes indisponíveis no momento.');
  if(!state.recentPurchases?.length)return emptyReport('Nenhuma compra cadastrada.');
- return '<div class="tv-buy-recent">'+state.recentPurchases.slice(0,6).map(o=>{
+ return '<div class="tv-buy-recent"><h3>Pedidos de compra recentes</h3>'+state.recentPurchases.slice(0,6).map(o=>{
   const label={rascunho:'Rascunho',enviado:'Encomendado',finalizado:'Concluído',cancelado:'Cancelado'}[o.status]||o.status;
   const late=o.status==='enviado'&&o.expected_arrival_date&&o.expected_arrival_date<
    new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -380,7 +380,7 @@ const oneTitles={
  low:'10 produtos com menor estoque',high:'10 produtos com maior estoque',dormant:'Sem pedidos há +90 dias',
  popular:'Produtos mais pedidos · 30 dias',franchises:'Franquias · últimos 30 dias',
  categories:'Categorias · comparação 30 dias',upcoming:'Próximos eventos',
- closed:'Eventos encerrados',purchases:'Pedidos de compra recentes'
+ closed:'Eventos encerrados',purchases:'Compras e produtividade'
 };
 function oneGrid(operational,manage,rankings){
  return '<div class="tv-one-grid">'+
