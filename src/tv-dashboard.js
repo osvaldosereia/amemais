@@ -10,7 +10,7 @@ const dt=(time,opts)=>new Intl.DateTimeFormat('pt-BR',{timeZone:timezone,...opts
 const niceTime=v=>v?dt(v,{hour:'2-digit',minute:'2-digit'}):'—';
 const niceDate=v=>v?dt(/^\d{4}-\d{2}-\d{2}$/.test(String(v))?v+'T12:00:00Z':v,{day:'2-digit',month:'short',year:'numeric'}):'—';
 const n=v=>fmt.format(Number(v)||0);
-const state={snapshot:null,management:null,managementError:null,error:null,loading:false,lastSuccess:0,lastManagement:0,accessDenied:false,pageIndex:0,paused:false,nextSwap:0,subpages:{},settingsOpen:false};
+const state={snapshot:null,management:null,managementError:null,error:null,loading:false,lastSuccess:0,lastManagement:0,accessDenied:false,pageIndex:0,paused:false,nextSwap:0,subpages:{},settingsOpen:false,rankings:null,rankingsError:null,detailReport:null};
 let db=null;
 let timer=null,clockTimer=null,rotationTimer=null;
 const path={
@@ -295,42 +295,164 @@ function settingsMarkup(){
   '<div class="tv-settings-actions"><button type="button" data-action="close-tv-settings">Cancelar</button>'+
    '<button type="button" data-action="save-tv-settings">Salvar tempos</button></div></section></div>';
 }
+
+const oneCard=(title,key,content)=>'<article class="tv-one-card tv-card-'+key+'"><h2><span>'+esc(title)+'</span>'+
+ '<button type="button" data-action="open-detail" data-report="'+key+'" aria-label="Abrir '+esc(title)+'">Abrir ↗</button></h2>'+content+'</article>';
+const oneEmpty=label=>'<p class="tv-one-empty">'+esc(label||'Nenhum registro no período.')+'</p>';
+const oneRows=(items,mode,limit=10)=>{
+ if(!items?.length)return oneEmpty('Nenhum produto encontrado.');
+ const col=mode==='popular'?'Un. pedidas':mode==='dormant'?'Dias':'Disponível';
+ return '<div class="tv-one-product-head"><span>Produto · SKU</span><span>'+esc(col)+'</span></div>'+
+ items.slice(0,limit).map(p=>'<div class="tv-one-product-row"><span title="'+esc(p.name)+'">'+esc(p.name||'Produto')+
+ (p.apparel_size?' · '+esc(p.apparel_size):'')+'<small>'+esc(p.sku||'Sem SKU')+
+ (p.gondola?' · Gônd. '+esc(p.gondola):'')+'</small></span><strong class="'+(mode==='low'&&!num(p.available)?'tv-one-zero':'')+'">'+
+ n(mode==='popular'?p.requested_30d:mode==='dormant'?p.days_without_order:p.available)+'</strong></div>').join('');
+};
+function oneQueue(items){
+ if(!items?.length)return oneEmpty('Nenhum pedido pendente.');
+ return items.slice(0,6).map(x=>{
+  const stage=stages[x.stage]||stages.outro;
+  return '<div class="tv-one-queue"><b>'+esc(x.code||'—')+'</b><span>'+esc(x.destination||'Destino')+'</span>'+
+   '<em class="stage-'+stage.class+'">'+esc(stage.label)+'</em><small>'+n(x.minutes)+' min</small></div>';
+ }).join('');
+}
+function oneIssues(items,limit=4){
+ if(!items?.length)return oneEmpty('Sem ocorrências identificadas.');
+ return items.slice(0,limit).map(x=>'<div class="tv-one-issue"><b>'+esc(x.code||'—')+' · '+esc(x.destination_type||'')+
+ ' · '+esc(x.destination||'')+'</b><span>'+esc(x.issue||'Ocorrência')+' · '+esc(x.product||'Produto')+'</span>'+
+ '<small>Solicitado '+n(x.expected)+' · Identificado '+n(x.found)+'</small></div>').join('');
+}
+function oneDamages(items){
+ if(!items?.length)return oneEmpty('Nenhuma avaria nos últimos 30 dias.');
+ return items.slice(0,5).map(x=>'<div class="tv-one-simple-row"><span>'+esc(x.category)+' · '+n(x.occurrences)+
+ ' ocorrência(s)</span><b>'+n(x.units)+' un.</b></div>').join('');
+}
+function oneFranchises(items){
+ const groups=groupBy(items,'franchise');
+ if(!groups.length)return oneEmpty('Nenhuma franquia cadastrada.');
+ return '<div class="tv-one-franchises">'+groups.slice(0,4).map(([name,rows])=>{
+ const sum=k=>rows.reduce((a,r)=>a+num(r[k]),0);
+ return '<div><b>'+esc(name)+'</b><small>Solicitadas '+n(sum('requested'))+'</small><small>Expedidas '+n(sum('shipped'))+'</small></div>';
+ }).join('')+'</div>';
+}
+function oneEvents(items,closed=false){
+ const groups=groupBy(items,'event_name');
+ if(!groups.length)return oneEmpty(closed?'Sem encerramentos recentes.':'Sem eventos em preparação.');
+ return groups.slice(0,3).map(([name,rows])=>{
+  const sum=k=>rows.reduce((a,r)=>a+num(r[k]),0);
+  const q=sum(closed?'sent':'requested'),done=sum(closed?'returned':'prepared');
+  return '<div class="tv-one-event"><b>'+esc(name)+'</b><small>'+
+   (closed?'Enviadas '+n(q)+' · Devolvidas '+n(done)+' · Não devolvidas '+n(sum('nonreturned')):
+    'Solicitadas '+n(q)+' · Separadas '+n(done)+' · Enviadas '+n(sum('sent')))+'</small>'+
+   (closed?'':'<div class="tv-one-progress"><i style="width:'+percent(done,q)+'%"></i></div>')+'</div>';
+ }).join('')+(closed?'<small class="tv-one-disclaimer">Não devolvido não equivale a venda confirmada.</small>':'');
+}
+function oneCategories(items){
+ if(!items?.length)return oneEmpty('Nenhuma categoria com demanda.');
+ const max=Math.max(1,...items.map(x=>Math.max(num(x.current_units),num(x.previous_units))));
+ return items.slice(0,5).map(x=>'<div class="tv-one-category"><div><span>'+esc(x.category)+'</span><b>'+
+ n(x.current_units)+' / '+n(x.previous_units)+'</b></div><i style="width:'+percent(x.current_units,max)+
+ '%"></i><em style="width:'+percent(x.previous_units,max)+'%"></em></div>').join('');
+}
+function onePurchases(operational,manage){
+ return '<div class="tv-one-mini-metrics">'+[
+ ['Compras abertas',manage?.purchases?.open],['Enviadas ao fornecedor',manage?.purchases?.sent],
+ ['Conferidos hoje',manage?.quality?.checks_today],['Expedidos hoje',operational?.metrics?.finished_today]
+ ].map(([label,value])=>'<div><small>'+esc(label)+'</small><strong>'+n(value)+'</strong></div>').join('')+'</div>';
+}
+function oneKpis(operational,manage){
+ const m=operational?.metrics||{};
+ return [['A separar',m.to_pick,'list'],['A conferir',m.checking,'clipboard'],
+ ['Prontos para saída',m.checked,'check'],['Enviados hoje',m.finished_today,'truck'],
+ ['Sem estoque',manage?.stock_summary?.zero,'alert'],
+ ['Abaixo do mínimo',manage?.stock_summary?.below_min,'chart']]
+ .map(([name,value,ico],i)=>'<div class="tv-one-kpi '+(i>3?'warn':'')+'">'+icon(ico)+
+ '<div><small>'+esc(name)+'</small><strong>'+n(value)+'</strong></div></div>').join('');
+}
+const oneTitles={
+ queue:'Fila prioritária',issues:'Ocorrências identificadas',damages:'Avarias · últimos 30 dias',
+ low:'10 produtos com menor estoque',high:'10 produtos com maior estoque',dormant:'Sem pedidos há +90 dias',
+ popular:'Produtos mais pedidos · 30 dias',franchises:'Franquias · últimos 30 dias',
+ categories:'Categorias · comparação 30 dias',upcoming:'Próximos eventos',
+ closed:'Eventos encerrados',purchases:'Compras e produtividade'
+};
+function oneGrid(operational,manage,rankings){
+ return '<div class="tv-one-grid">'+
+ oneCard(oneTitles.queue,'queue',oneQueue(operational?.priority))+
+ oneCard(oneTitles.issues,'issues',oneIssues(manage?.issues))+
+ oneCard(oneTitles.damages,'damages',oneDamages(manage?.damages))+
+ oneCard(oneTitles.low,'low',oneRows(manage?.low_stock,'low'))+
+ oneCard(oneTitles.high,'high',oneRows(rankings?.top_stock,'high'))+
+ oneCard(oneTitles.dormant,'dormant',oneRows(rankings?.dormant,'dormant',5))+
+ oneCard(oneTitles.popular,'popular',oneRows(rankings?.most_ordered,'popular'))+
+ oneCard(oneTitles.franchises,'franchises',oneFranchises(manage?.franchises))+
+ oneCard(oneTitles.categories,'categories',oneCategories(manage?.categories))+
+ oneCard(oneTitles.upcoming,'upcoming',oneEvents(manage?.upcoming))+
+ oneCard(oneTitles.closed,'closed',oneEvents(manage?.closed_events,true))+
+ oneCard(oneTitles.purchases,'purchases',onePurchases(operational,manage))+'</div>';
+}
+function oneDetailData(key,operational,manage,rankings){
+ if(['low','high','popular','dormant'].includes(key)){
+  const rows=key==='low'?manage?.low_stock||[]:key==='high'?rankings?.top_stock||[]:
+   key==='popular'?rankings?.most_ordered||[]:rankings?.dormant||[];
+  return rows.map(p=>[p.name+(p.apparel_size?' · '+p.apparel_size:''),p.sku||'—',p.gondola||'—',
+   n(p.available),key==='popular'?n(p.requested_30d)+' un. solicitadas':
+   key==='dormant'?n(p.days_without_order)+' dias':
+   key==='low'?'Mínimo '+n(p.min_stock):'Físico '+n(p.physical)]);
+ }
+ if(key==='issues')return (manage?.issues||[]).map(x=>[x.code,x.destination_type+' · '+x.destination,x.issue,x.product+' · '+x.sku,n(x.expected)+' / '+n(x.found)]);
+ if(key==='queue')return (operational?.priority||[]).map(x=>[x.code,x.destination,(stages[x.stage]||stages.outro).label,n(x.units),n(x.minutes)+' min']);
+ if(key==='damages')return (manage?.damages||[]).map(x=>[x.category,n(x.occurrences),n(x.units)]);
+ if(key==='franchises')return (manage?.franchises||[]).map(x=>[x.franchise,x.category,n(x.requested),n(x.shipped)]);
+ if(key==='upcoming')return (manage?.upcoming||[]).map(x=>[x.event_name,x.category,n(x.requested),n(x.prepared),n(x.sent)]);
+ if(key==='closed')return (manage?.closed_events||[]).map(x=>[x.event_name,x.category,n(x.sent),n(x.returned),n(x.nonreturned)]);
+ if(key==='categories')return (manage?.categories||[]).map(x=>[x.category,n(x.current_units),n(x.previous_units),n(num(x.current_units)-num(x.previous_units))]);
+ return [
+ ['Compras abertas',n(manage?.purchases?.open)],['Enviadas ao fornecedor',n(manage?.purchases?.sent)],
+ ['Pedidos conferidos hoje',n(manage?.quality?.checks_today)],
+ ['Expedidos hoje',n(operational?.metrics?.finished_today)]
+ ];
+}
+function oneDetail(operational,manage,rankings){
+ const key=state.detailReport;
+ if(!oneTitles[key])return '';
+ const headers=['low','high','popular','dormant'].includes(key)?['Produto','SKU','Gôndola','Disponível','Referência']:
+ key==='issues'?['Pedido','Destino','Ocorrência','Produto','Quantidade']:
+ key==='queue'?['Pedido','Destino','Etapa','Unidades','Espera']:
+ key==='damages'?['Categoria','Ocorrências','Unidades']:
+ key==='franchises'?['Franquia','Categoria','Solicitadas','Expedidas']:
+ key==='upcoming'?['Evento','Categoria','Solicitadas','Separadas','Enviadas']:
+ key==='closed'?['Evento','Categoria','Enviadas','Devolvidas','Não devolvidas']:
+ key==='categories'?['Categoria','30 dias','30 dias anteriores','Diferença']:['Indicador','Total'];
+ const rows=oneDetailData(key,operational,manage,rankings);
+ return '<div class="tv-one-overlay" data-action="close-detail"><aside class="tv-one-sheet" role="dialog" aria-modal="true" aria-label="'+esc(oneTitles[key])+'">'+
+ '<header><div><small>AME MAIS ESTOQUE · relatório</small><h2>'+esc(oneTitles[key])+'</h2></div>'+
+ '<button type="button" data-action="close-detail" aria-label="Fechar">×</button></header>'+
+ '<div class="tv-one-sheet-body"><table><thead><tr>'+headers.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead>'+
+ '<tbody>'+rows.map(row=>'<tr>'+row.map(value=>'<td>'+esc(value??'—')+'</td>').join('')+'</tr>').join('')+
+ (rows.length?'':'<tr><td colspan="'+headers.length+'">Nenhum registro neste relatório.</td></tr>')+
+ '</tbody></table></div><footer><a href="./index.html" target="_blank" rel="noopener">Abrir sistema ↗</a>'+
+ '<button type="button" data-action="close-detail">Fechar</button></footer></aside></div>';
+}
+
 function shell(data){
- const noData=state.error&&!data;
  const generated=data?.generated_at||null;
- const at=generated||new Date().toISOString();
- const screen=screens[state.pageIndex];
- const hasDetailedData=state.management&&!state.managementError;
- root.innerHTML='<main class="tv-shell tv-360-shell">'+
-  '<header class="tv-header">'+
-   '<div class="tv-brand"><span class="tv-wordmark">AME<b>+</b></span>'+
-    '<div class="tv-brand-sub">STORE</div></div>'+
-   '<div class="tv-title"><h1>Gestão 360°</h1>'+
-    '<p>CDSB · '+esc(screen.label)+'</p></div>'+
-   '<div class="tv-header-tools">'+statusMarkup()+
-    '<button type="button" data-action="refresh" aria-label="Atualizar">'+icon('refresh')+'</button>'+
-    '<button type="button" data-action="fullscreen" aria-label="Tela cheia">'+icon('full')+'</button>'+
-    '<button type="button" data-action="open-tv-settings" aria-label="Configurar tempo das telas" title="Tempo de leitura">'+icon('clock')+'</button>'+
-   '</div><div class="tv-time-box"><span>Atualizado</span><strong>'+niceTime(generated)+'</strong>'+
-   '<small>'+niceDate(at)+'</small></div></header>'+
-  (state.error?'<div class="tv-error" role="status">'+esc(state.error)+
-   ' <button data-action="refresh" type="button">Tentar novamente</button></div>':'')+
-  (noData?'<section class="tv-unavailable"><h2>Dados indisponíveis</h2><p>Confira a conexão e tente novamente.</p></section>':
-  '<section class="tv-alert-ticker">'+headerAlert(data,state.management)+'</section>'+
-  '<section class="tv-stats" aria-label="Indicadores principais">'+kpis(data?.metrics)+'</section>'+
-  (state.managementError?'<div class="tv-analytics-warning">Relatórios gerenciais: '+esc(state.managementError)+'</div>':'')+
-  '<section class="tv-main-screen" aria-label="'+esc(screen.label)+'">'+
-   currentScreen(data,state.management)+'</section>')+
-  '<footer class="tv-footer tv-360-footer"><span>AME MAIS ESTOQUE · Operação atualizada a cada 30 segundos'+
-    (hasDetailedData?' · Relatórios disponíveis':' · Relatórios não atualizados')+'</span>'+
-  '<div class="tv-rotation-control">'+
-   '<button type="button" data-action="previous-screen" aria-label="Tela anterior">◀</button>'+
-   '<span>'+esc(screen.label)+' · '+(state.pageIndex+1)+'/'+screens.length+'</span>'+
-   '<button type="button" data-action="toggle-rotation">'+(state.paused?'▶ Retomar':'Ⅱ Pausar')+'</button>'+
-   '<button type="button" data-action="next-screen" aria-label="Próxima tela">▶</button>'+
-  '</div><div class="tv-progress-track" aria-hidden="true"><i data-rotation-progress></i></div></footer>'+
-  settingsMarkup()+'</main>';
- updateProgress();
+ const live=!!data&&!state.error&&Date.now()-state.lastSuccess<90000;
+ const warning=state.error||state.managementError||state.rankingsError;
+ root.innerHTML='<main class="tv-shell tv-one-shell">'+
+  '<header class="tv-one-header"><div class="tv-one-logo">AME<b>+</b><small>STORE</small></div>'+
+  '<div class="tv-one-title"><h1>Painel Gerencial 360°</h1><small>CDSB · operação, estoque e resultados em uma única tela</small></div>'+
+  '<div class="tv-one-header-right">'+statusMarkup()+
+  '<span>Atualizado '+niceTime(generated)+'</span>'+
+  '<button type="button" data-action="refresh" aria-label="Atualizar">'+icon('refresh')+'</button>'+
+  '<button type="button" data-action="fullscreen" aria-label="Tela cheia">'+icon('full')+'</button></div></header>'+
+ (warning?'<div class="tv-one-warning" role="status">'+esc(warning)+'</div>':'')+
+ '<section class="tv-one-ticker">'+headerAlert(data,state.management)+'</section>'+
+ '<section class="tv-one-kpis">'+oneKpis(data,state.management)+'</section>'+
+ '<section class="tv-one-main">'+oneGrid(data,state.management,state.rankings)+'</section>'+
+ '<footer class="tv-one-footer"><span>AME MAIS ESTOQUE · Atualização a cada 30 segundos · tela única, sem rotação</span>'+
+ '<span>'+esc(live?'Dados atualizados':'Última atualização não confirmada')+'</span></footer>'+
+ oneDetail(data,state.management,state.rankings)+'</main>';
 }
 function updateProgress(){
  const node=document.querySelector('[data-rotation-progress]');
@@ -362,8 +484,8 @@ async function refresh(){
  if(!db||state.loading||state.accessDenied)return;
  state.loading=true;
  try{
-  const [operational,management]=await Promise.all([
-   db.rpc('tv_operations_snapshot'),db.rpc('tv_management_snapshot')
+  const [operational,management,rankings]=await Promise.all([
+   db.rpc('tv_operations_snapshot'),db.rpc('tv_management_snapshot'),db.rpc('tv_product_rankings')
   ]);
   const {data,error}=operational;
   if(error)throw error;
@@ -375,6 +497,9 @@ async function refresh(){
   }else{
     state.managementError='Acesso indisponível para os relatórios.';
   }
+  if(rankings.error){state.rankingsError='Ranking de produtos indisponível; última consulta mantida.';}
+  else if(rankings.data&&typeof rankings.data==='object'){state.rankings=rankings.data;state.rankingsError=null;}
+  else state.rankingsError='Ranking de produtos indisponível.';
   if(!data){
    state.accessDenied=true;
    state.snapshot=null;
@@ -387,7 +512,6 @@ async function refresh(){
   state.snapshot=data;
   state.lastSuccess=Date.now();
   state.error=null;
-  if(!state.nextSwap)state.nextSwap=Date.now()+screens[0].seconds*1000;
   shell(data);
  }catch(error){
   console.error('TV dashboard refresh failed',error);
@@ -399,7 +523,6 @@ async function refresh(){
  }finally{state.loading=false;}
 }
 async function boot(){
- loadRotationSettings();
  if(!cfg.supabaseUrl||!cfg.supabasePublishableKey){
   message('Configuração indisponível','Supabase não está configurado para esta instalação.');return;
  }
@@ -418,7 +541,6 @@ async function boot(){
  await refresh();
  if(!state.accessDenied){
   timer=setInterval(refresh,30000);
-  rotationTimer=setInterval(advanceRotation,1000);
   clockTimer=setInterval(()=>{
    const live=document.querySelector('.tv-live');
    if(!live||!state.snapshot)return;
@@ -430,6 +552,10 @@ async function boot(){
 }
 document.addEventListener('click',async event=>{
  const action=event.target.closest('[data-action]')?.dataset.action;
+ if(action==='open-detail'){const key=event.target.closest('[data-report]')?.dataset.report;
+  if(oneTitles[key]){state.detailReport=key;shell(state.snapshot);}return;}
+ if(action==='close-detail'){if(event.target.closest('.tv-one-sheet')&&event.target.dataset.action!=='close-detail')return;
+  state.detailReport=null;shell(state.snapshot);return;}
  if(action==='refresh')await refresh();
  if(action==='open-tv-settings'){
    state.settingsOpen=true;state.paused=true;shell(state.snapshot);
