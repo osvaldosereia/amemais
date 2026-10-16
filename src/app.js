@@ -18,6 +18,7 @@ import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectIn
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261015cdsbevents3';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261016orderflow2';
+import {operationalFormMarkup,operationalDifferenceRows} from './order-operations.js?v=20261016ops1';
 import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,findVerificationProduct} from './final-verification.js?v=20261016orderflow1';
 import {pickingThermalHTML} from './thermal-picking.js?v=20261015nophoto1';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261015shortcodes1';
@@ -77,7 +78,7 @@ const nav = [
 ];
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
-  balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],
+  balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],orderOperationalRows:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
@@ -212,6 +213,10 @@ async function loadData(){
     resources.push(['orderVerificationRows',db.from('order_final_verifications')
       .select('kind,order_id,product_id,expected_quantity,counted_quantity,scanned_code,verified_by,verified_at')
       .limit(15000)]);
+  if(hasPermission('orders.read')||hasPermission('orders.separate')||
+     hasPermission('events.separate')||hasPermission('orders.dispatch'))
+    resources.push(['orderOperationalRows',db.from('order_operational_progress')
+       .select('kind,order_id,stage,items,has_difference,updated_at,updated_by').limit(15000)]);
   if(hasPermission('products.edit')||hasPermission('purchases.manage'))
    resources.push(['suppliers',db.from('suppliers').select('*').order('name').limit(1000)]);
   if(hasPermission('purchases.manage')){
@@ -875,6 +880,69 @@ function refreshEventLotCounter(form){
  const submit=form.querySelector('button[type="submit"]');
  if(submit)submit.disabled=models<1||models>10||Boolean(form.__lotPicker?.invalid);
 }
+function operationalModal(kind,id,mode='separacao'){
+ const order=unifiedOrderById(kind,id);
+ if(!order||isFranchisePortal())return toast('Pedido indisponível.',true);
+ const canPick=kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
+   hasPermission('orders.separate')&&(kind==='avulso'||assignedStore(order.raw.from_store_id));
+ if(!canPick)return toast('Sem permissão.',true);
+ const stage=order.workflow?.stage;
+ if(mode==='separacao'&&!(stage==='separacao'||(!stage&&(
+   kind==='evento'?['aguardando','em_separacao'].includes(order.status):
+   kind==='loja'?order.status==='aprovado':order.status==='reservado'))))
+  return toast('O pedido não está disponível para separação.',true);
+ if(mode==='conferencia'&&!(stage==='conferencia'||(!stage&&order.status==='separado')))
+  return toast('Conclua primeiro a separação.',true);
+ formModal((mode==='conferencia'?'Conferência':'Separação')+' · '+order.code,
+  operationalFormMarkup(order,mode,state.orderVerificationRows),'order-operational',
+  'Salvar progresso');
+ const form=document.querySelector('.modalback form[data-form="order-operational"]');
+ if(!form)return;
+ form.dataset.kind=kind;form.dataset.order=id;form.dataset.mode=mode;
+ form.querySelector('.modalfooter')?.insertAdjacentHTML('beforeend',
+  '<button type="button" class="button primary" data-action="order-op-finish">'+
+    (mode==='conferencia'?'Concluir conferência':'Concluir separação')+'</button>');
+ form.closest('.modal')?.classList.add('operational-modal');
+ hydrateImages();
+}
+function readOperationalItems(form){
+ const order=unifiedOrderById(form?.dataset.kind,form?.dataset.order);
+ if(!order)throw Error('Pedido não encontrado');
+ const rows=[...form.querySelectorAll('[data-op-line]')];
+ if(rows.length!==order.lines.length)throw Error('Todos os SKUs devem ser conferidos');
+ const result={};
+ for(const row of rows){
+  const input=row.querySelector('[data-op-qty]'),raw=input?.value?.trim()??'';
+  const qty=raw===''?NaN:Number(raw),expected=Number(row.dataset.expected);
+  const reason=row.querySelector('[data-op-reason]')?.value.trim()||'';
+  if(!Number.isInteger(qty)||qty<0||qty>expected)
+   throw Error('Informe para cada SKU um número de 0 até a quantidade solicitada');
+  if(reason.length>250)throw Error('Motivo deve ter no máximo 250 caracteres');
+  result[row.dataset.product]={quantity:qty,reason};
+ }
+ return result;
+}
+async function submitOperational(form,finish=false){
+ if(!form||state.loading)return;
+ let items;try{items=readOperationalItems(form);}catch(e){return toast(e.message,true);}
+ const order=unifiedOrderById(form.dataset.kind,form.dataset.order);
+ if(!order)return;
+ const mismatch=order.lines.some(line=>Number(items[line.id]?.quantity)!==Number(line.quantity));
+ if(finish&&mismatch&&order.lines.some(line=>Number(items[line.id]?.quantity)<Number(line.quantity)&&
+  String(items[line.id]?.reason||'').length<5&&
+  String(order.workflow?.items?.[line.id]?.pick_reason||'').length<5))
+  return toast('Explique a falta ou divergência de cada SKU (mínimo de 5 caracteres).',true);
+ const msg=finish?(form.dataset.mode==='conferencia'?
+   'Conferência concluída. Pedido encaminhado à expedição.':
+   'Separação concluída. Pedido encaminhado à conferência.'):'Progresso registrado.';
+ return exec(async()=>{
+  const out=assertOk(await db.rpc(form.dataset.mode==='conferencia'?
+   'save_operational_check':'save_operational_pick',{
+     p_kind:order.kind,p_order:order.id,p_items:items,p_finish:finish
+   }));
+  return out;
+ },msg);
+}
 function finalVerificationModal(kind,id){
  const order=unifiedOrderById(kind,id);
  if(!order||order.status!=='separado'||isFranchisePortal()||!(
@@ -1309,6 +1377,7 @@ function unifiedOrderRecords(){
   eventBatches:state.eventPickBatches,eventBatchItems:state.eventBatchItems,events:state.events,models:state.apparelModels,
   reservations:state.stockReservations,stores:state.stores,
   products:state.items,adjustments:state.unifiedOrderAdjustments,codes:state.orderCodes,
+  progress:state.orderOperationalRows,
   portal:false,userId:state.user?.id
  });
 }
@@ -3653,6 +3722,20 @@ async function handleClick(event){
     });
     return;
   }
+  if(action==='order-op-pick')return operationalModal(target.dataset.kind,id,'separacao');
+  if(action==='order-op-check')return operationalModal(target.dataset.kind,id,'conferencia');
+  if(action==='order-op-finish')return submitOperational(target.closest('form'),true);
+  if(action==='order-op-send'){
+   const order=unifiedOrderById(target.dataset.kind,id);
+   if(!order||order.workflow?.stage!=='expedicao'||!hasPermission('orders.dispatch'))return;
+   const shipped=order.lines.reduce((sum,line)=>sum+Number(order.workflow.items?.[line.id]?.counted||0),0);
+   if(!window.confirm('Registrar envio físico de '+shipped+' unidade(s) do pedido '+order.code+
+     (order.workflow.has_difference?' COM DIVERGÊNCIA? As faltas serão registradas e suas reservas liberadas.':'?')))
+     return;
+   return exec(async()=>assertOk(await db.rpc('send_operational_order',{
+     p_kind:order.kind,p_order:order.id
+   })),'Envio registrado e reservas processadas.');
+  }
   if(action==='order-final-verify')return finalVerificationModal(target.dataset.kind,id);
   if(action==='verify-open-camera')return scanEAN(code=>{
     const form=document.querySelector('.modalback form[data-form="order-final-verify"]');
@@ -3892,6 +3975,7 @@ async function handleSubmit(event){
   event.preventDefault();if(state.loading)return;
   const values=Object.fromEntries(new FormData(form).entries());
   const type=form.dataset.form;
+  if(type==='order-operational')return submitOperational(form,false);
   if(type==='login-password'){
     state.loading=true;
     try{
