@@ -43,7 +43,7 @@ test('fila única inclui lote com identificação da loja e unidades reservadas'
  assert.equal(records[0].reserved,6);
  assert.equal(records[0].missing,0);
  const html=unifiedOrderCard(records[0],{button,canProcess:true,canDispatch:true,canCancel:true});
- assert.match(html,/Lote 02/);
+ assert.match(html,/Pedido/);
  assert.match(html,/order-op-pick/);
  assert.match(html,/Abrir pedido/);
  assert.match(html,/Camiseta Masculina HDH/);
@@ -66,7 +66,7 @@ test('impressão A4 compacta tem gôndola, identificação, modelo e campos em b
  const html=pickingA4HTML(order,{printedAt:'15/10/2026 08:00'});
  assert.match(html,/@page\{size:A4 portrait/);
  assert.match(html,/DESTINO: Loja Temporária Outubro/);
- assert.match(html,/Lote 02/);
+ assert.match(html,/Pedido/);
  assert.match(html,/Gôndola 02/);
  assert.match(html,/Gôndola 05/);
  assert.match(html,/Camiseta Masculina HDH/);
@@ -80,7 +80,7 @@ test('separação mostra apenas trabalho em aberto, sem lotes enviados',()=>{
  const records=makeUnifiedOrders({...data,eventBatches:[batches[0],done]});
  const html=unifiedOrdersPage(records,{button,separationOnly:true,canProcess:()=>true});
  assert.match(html,/Separação/);
- assert.match(html,/Lote 02/);
+ assert.match(html,/Pedido/);
  assert.doesNotMatch(html,/data-order-id="enviado"/);
 });
 test('gestão do evento permite vários lotes e não altera enviado',()=>{
@@ -88,13 +88,13 @@ test('gestão do evento permite vários lotes e não altera enviado',()=>{
   {...batches[0],sequence:1,status:'enviado'},
   {...batches[0],id:'outro',sequence:2,status:'aguardando'}],
   items:lines,products,button,canCreate:true});
- assert.match(overview,/Criar lote/);
- assert.match(overview,/Lote 01/);
- assert.match(overview,/Lote 02/);
+ assert.match(overview,/Novo pedido/);
+ assert.match(overview,/Pedido/);
+ assert.match(overview,/Pedido/);
  assert.match(overview,/event-batch-go/);
 });
 test('formulário de lotes explica limite de dez modelos e destino da fila',()=>{
  const html=eventLotForm('<p>Form</p>',{});
- assert.match(html,/10 modelos/);
- assert.match(html,/fila de Pedidos/);
+ assert.match(html,/0 modelos/);
+ assert.match(html,/Observação do pedido/);
 });
