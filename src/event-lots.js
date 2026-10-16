@@ -34,7 +34,7 @@ export function eventLotsOverview({event,batches,items,products,button,canCreate
    '</strong><small>Solicitação '+String(b.sequence).padStart(2,'0')+' · '+fmt(count)+' modelos · '+fmt(rows.length)+' variações · '+fmt(units)+' un.</small>'+
    '<small>'+fmt(picked)+' un. separadas · '+esc(time(b.created_at))+'</small></div>'+
    '<span class="uo-pill '+info[1]+'">'+esc(info[0])+'</span>'+
-   button('Ver na separação','event-batch-go','data-id="'+esc(b.id)+'"','small')+
+   button('Abrir pedido','event-batch-go','data-id="'+esc(b.id)+'"','small')+
   '</div>';
  }).join(''):'<p class="muted">Nenhum pedido criado ainda. Faça o primeiro pedido para essa loja.</p>')+
  '</div></section>';
