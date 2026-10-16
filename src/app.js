@@ -549,6 +549,7 @@ function productGroupCard(group){
     canManageSku:()=>!isFranchisePortal()&&['stock.entry','stock.exit','stock.balance','products.edit'].some(hasPermission),
     canQuickCount:()=>!isFranchisePortal()&&hasPermission('stock.balance')&&['admin','gerente','estoquista'].includes(state.profile?.role),
     canDeleteWholeModel:()=>isAdmin()&&hasPermission('system.force_delete'),
+    canDeleteProduct:()=>hasPermission('products.delete')||hasPermission('system.force_delete'),
     expanded:state.expandedProductGroups.has(group.key),canShare:canRegisterProducts(),
     canLabel:!isFranchisePortal()
   });
@@ -662,7 +663,7 @@ function productModelManager(modelId){
       (hasPermission('products.delete')||hasPermission('system.force_delete')?button('Excluir','product-delete','data-id="'+h(p.id)+'"','small danger'):'')+
     '</div></div>').join('');
   overlay.innerHTML='<section class="modal" role="dialog" aria-modal="true" aria-label="Editar '+h(model.name)+'">'+
-    '<div class="modalhead"><h2>Editar · '+h(model.name)+'</h2>'+
+    '<div class="modalhead"><h2>Editar produto · '+h(model.name)+'</h2>'+
       '<button type="button" class="plain" data-action="modal-close" aria-label="Fechar">✕</button></div>'+
     '<div class="product-model-manage">'+
       '<p>Escolha o tamanho que deseja editar. Cada variação tem EAN, SKU e estoque independentes.</p>'+
@@ -3194,7 +3195,10 @@ async function handleClick(event){
     else state.expandedProductGroups.delete(key);
     target.setAttribute('aria-expanded',String(details.open));
     const sizeCount=details.querySelectorAll('[data-product-id]').length;
-    target.innerHTML=(details.open?'Ocultar ': 'Ver ')+sizeCount+' tamanhos <span aria-hidden="true">⌄</span>';
+    const label=sizeCount===1?
+      (details.open?'Ocultar SKU / estoque':'Ver SKU / estoque'):
+      (details.open?'Ocultar ':'Ver ')+sizeCount+' variações';
+    target.innerHTML=label+' <span aria-hidden="true">⌄</span>';
     return;
   }
   if(action==='stock-free-save'){
