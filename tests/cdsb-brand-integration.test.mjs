@@ -9,7 +9,7 @@ const [app,tv,entry,tvPage,theme,tvTheme,manifest,logo,orders,temporary,deny]
  =await Promise.all(files.map(name=>readFile(new URL(name,import.meta.url),'utf8')));
 test('marca CDSB: imagem oficial única na sidebar e cabeçalho exclusivo no celular',()=>{
  assert.match(app,/const desktopIdentity='<div class="brand brand-lockup">'\+mark\+'<\/div>'/);
- assert.match(app,/const mark='<img class="cdsb-brand-logo" src="\.\/cdsb-brand\.svg"/);
+ assert.match(app,/const mark='<img class="cdsb-brand-logo" src="\.\/cdsb-brand\.svg\?v=20261016logo2"/);
  assert.match(app,/cdsb-mobile-identity/);
  assert.match(theme,/\.cdsb-mobile-identity\{display:none\}/);
  assert.match(theme,/@media\(max-width:760px\)/);
@@ -17,8 +17,8 @@ test('marca CDSB: imagem oficial única na sidebar e cabeçalho exclusivo no cel
  assert.equal((app.match(/<div class="brand brand-lockup"/g)||[]).length,1);
 });
 test('login e Painel TV usam marca horizontal; favicon e PWA usam brasão',()=>{
- assert.match(app,/brand-login"><img src="\.\/cdsb-brand\.svg"/);
- assert.match(tv,/tv-one-logo"><img src="\.\/cdsb-brand\.svg"/);
+ assert.match(app,/brand-login"><img src="\.\/cdsb-brand\.svg\?v=20261016logo2"/);
+ assert.match(tv,/tv-one-logo"><img src="\.\/cdsb-brand\.svg\?v=20261016logo2"/);
  assert.match(entry,/rel="icon" type="image\/jpeg" href="\.\/cdsb-emblem\.jpg/);
  assert.match(tvPage,/rel="icon" type="image\/jpeg" href="\.\/cdsb-emblem\.jpg/);
  const m=JSON.parse(manifest);
