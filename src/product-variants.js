@@ -1,5 +1,16 @@
 import {makeVariationCards,makeVariationChips,resolveCategoryVariations} from './category-variations.js?v=20261015categorymetadata2';
-import {gondolaSelectHTML} from './gondolas.js?v=20261016gondolas1';
+// Espelho local do seletor: módulos de catálogo devem permanecer independentes de DOM/imports.
+const gondolaSelectHTML=(name,locations=[],current='',opts={})=>{
+ const esc=v=>String(v??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[x]));
+ const selected=String(current||'');
+ const list=(locations||[]).filter(x=>x.active||x.name===selected).slice();
+ if(selected&&!list.some(x=>x.name===selected))list.push({name:selected,active:false});
+ list.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR',{numeric:true}));
+ return '<label class="field"><span>'+esc(opts.label||'Gôndola')+'</span><select name="'+esc(name)+'"'+(opts.disabled?' disabled':'')+'>'+
+ '<option value=""'+(!selected?' selected':'')+'>Sem gôndola definida</option>'+
+ list.map(x=>'<option value="'+esc(x.name)+'"'+(x.name===selected?' selected':'')+'>'+esc(x.name)+(x.active?'':' (antiga)')+'</option>').join('')+
+ '</select></label>';
+};
 // Cadastro único de produtos: variações de roupas sem outra seção de navegação.
 export const STANDARD_SIZES=['P','M','G','GG','XGG','XXGG','EXGG'];
 const safe=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
