@@ -4608,6 +4608,22 @@ document.addEventListener('click',event=>{
   handleClick(event).catch(fail);
 });
 document.addEventListener('keydown',event=>{
+  if(event.key==='Enter'&&event.target.matches('[data-balance-scan-input]')){
+    event.preventDefault();
+    const input=event.target,panel=input.closest('[data-product-details]');
+    const code=input.value.trim();
+    if(!panel||!code)return;
+    const row=[...panel.querySelectorAll('[data-balance-item]')].find(r=>{
+      const p=product(r.dataset.productId);
+      return p&&(String(p.ean||'')===code||String(p.sku||'')===code);
+    });
+    if(!row)return toast('Código não pertence às variações deste produto.',true);
+    input.value='';
+    const count=row.querySelector('[data-balance-count]');
+    if(count&&!count.disabled){count.focus();count.select();}
+    else row.scrollIntoView({block:'nearest',behavior:'smooth'});
+    return;
+  }
   if(event.key==='Enter'&&event.target.matches('[data-verify-scan]')){
     event.preventDefault();
     verificationReadCode(event.target.closest('form'),event.target.value);
