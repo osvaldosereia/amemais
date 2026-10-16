@@ -218,3 +218,21 @@
  .products-panel .product-card-v3 .product-card-action-secondary-row{grid-template-columns:repeat(2,minmax(0,1fr))!important}
  .products-panel .product-card-v3 .product-card-action-secondary-row>button:last-child:nth-child(odd){grid-column:1/-1}
 }
+
+
+/* Leitor USB/HID e câmera: entrada local, sem trocar o filtro do catálogo. */
+.product-card-v3 .card-balance-search{
+ display:flex;align-items:stretch;gap:8px;margin:10px 0;min-width:0;
+}
+.product-card-v3 .card-balance-search input{
+ flex:1 1 200px;min-width:0;min-height:44px;border:1px solid #bed9c8;
+ border-radius:9px;padding:9px 12px;color:#1b4e35;background:#fff;font-size:.86rem;
+}
+.product-card-v3 .card-balance-search button{
+ flex:0 0 auto;min-height:44px;border:1px solid #bcdaca;border-radius:9px;
+ color:#1a5b40;background:#f0f8f3;font-weight:740;padding:8px 12px;cursor:pointer;
+}
+@media(max-width:380px){
+ .product-card-v3 .card-balance-search{flex-wrap:wrap}
+ .product-card-v3 .card-balance-search button{flex:1 1 100%}
+}
