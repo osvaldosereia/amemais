@@ -1351,6 +1351,9 @@ function ordersPage(separationOnly=false){
     o.kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
     hasPermission('orders.separate')&&(o.kind==='avulso'||assignedStore(o.raw.from_store_id))),
   isVerified:o=>verificationCanDispatch(o,state.orderVerificationRows),
+  hasIssue:o=>state.orderVerificationRows.some(row=>
+    row.kind===o.kind&&row.order_id===o.id&&
+    (Number(row.counted_quantity)!==Number(row.expected_quantity))),
   canAdjust:o=>!portal&&hasPermission('orders.dispatch'),
   canDelete:o=>!portal&&isAdmin(),
   canCancel:o=>o.kind==='evento'?(!portal&&isManager()&&hasPermission('events.separate')):
