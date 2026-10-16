@@ -148,7 +148,7 @@ export function setOrderCartQuantity(form,id,value){
 export function orderCartAction(form,target){
  const s=form?.__orderCart;if(!s||!target)return false;
  const action=target.dataset.action;
- if(action==='order-cart-view'){s.view=target.dataset.view==='selected'?'selected':'catalog';renderOrderCart(form,{resetPage:true});return true;}
+ if(action==='order-cart-view'){s.view=target.dataset.view==='selected'?'selected':'catalog';if(s.view==='selected'){const input=form.querySelector('[data-order-cart-search]');if(input)input.value='';}renderOrderCart(form,{resetPage:true});return true;}
  if(action==='order-cart-more'){s.page++;renderOrderCart(form);return true;}
  if(action==='order-cart-expand'){
   const key=target.dataset.key;
@@ -215,9 +215,9 @@ export function orderCartReview(groups=[],selection=new Map(),destination='',{sh
   '<p class="order-cart-footnote">Confirmar o pedido cria a solicitação e efetua a reserva pelo fluxo existente. Não representa expedição física.</p>'+
   '<button type="button" class="button" data-action="order-cart-edit">← Editar seleção</button></div>';
 }
-export function reviewItemsMarkup(items=[],products=[],destination='',{showAvailable=false,available=()=>0}={}){
+export function reviewItemsMarkup(items=[],products=[],destination='',{showAvailable=false,available=()=>0,models=[]}={}){
  const s=new Map(items.map(x=>[x.product_id,Number(x.quantity||0)]));
- const groups=makeOrderCatalog(products,[],available);
+ const groups=makeOrderCatalog(products,models,available);
  // Dados de pedidos temporários também podem conter itens históricos não ativos.
  for(const x of items)if(!groups.some(g=>g.variants.some(v=>v.id===x.product_id))){
   const p=products.find(p=>p.id===x.product_id);
@@ -254,9 +254,9 @@ export function confirmOrderCartReview(form,{items,note='',destination=''}={}){
   {blockConfirmation:state.showAvailable&&orderCartSummary(state.groups,state.selection).missing>0});
  return false;
 }
-export function confirmEventOrderReview(form,{items,note='',destination='',products=[]}={}){
+export function confirmEventOrderReview(form,{items,note='',destination='',products=[],models=[]}={}){
  const signature=JSON.stringify([destination,note,items]);
  if(form.classList.contains('is-reviewing-order')&&form.dataset.reviewSignature===signature)return true;
- stageReview(form,signature,reviewItemsMarkup(items,products,destination));
+ stageReview(form,signature,reviewItemsMarkup(items,products,destination,{models}));
  return false;
 }
