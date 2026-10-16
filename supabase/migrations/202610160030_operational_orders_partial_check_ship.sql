@@ -337,3 +337,20 @@ end;$function$
 ;
 revoke all on function public.send_operational_order(text,uuid) from public,anon,authenticated;
 grant execute on function public.send_operational_order(text,uuid) to authenticated;
+
+-- Revisões de lote anulam progresso anterior e exigem nova separação/conferência.
+create or replace function public.reset_operational_progress_on_batch_revision()
+returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ if new.revision is distinct from old.revision then
+  delete from public.order_operational_progress
+   where kind='evento' and order_id=new.id and stage<>'enviado';
+ end if;
+ return new;
+end;
+$$;
+revoke all on function public.reset_operational_progress_on_batch_revision() from public,anon,authenticated;
+drop trigger if exists event_batch_reset_operational_progress on public.event_pick_batches;
+create trigger event_batch_reset_operational_progress
+after update of revision on public.event_pick_batches
+for each row execute function public.reset_operational_progress_on_batch_revision();
