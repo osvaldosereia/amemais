@@ -19,7 +19,7 @@ export function eventLotForm(formHTML,{edit=false,number=null,note=''}={}){
 export function eventLotsOverview({event,batches,items,products,button,canCreate=false,time=x=>x,codeForBatch=()=> '—'}){
  const scoped=batches.filter(b=>b.event_id===event.id).sort((a,b)=>a.sequence-b.sequence);
  const states={pendente_estoque:['Aguardando estoque','warning'],aguardando:['A separar','ready'],
-  em_separacao:['Em separação','ready'],separado:['Separado','ready'],
+  em_separacao:['Em separação','ready'],separado:['A conferir','checking'],
   enviado:['Enviado','complete'],cancelado:['Cancelado','closed']};
  return '<section class="event-lots-section"><div class="event-lots-title"><div><h2>Pedidos da loja temporária</h2>'+
   '<p>Faça novos pedidos sempre que precisar. Cada pedido é independente, sem subdivisões, e segue para a fila de separação do CD.</p></div>'+
@@ -32,7 +32,7 @@ export function eventLotsOverview({event,batches,items,products,button,canCreate
   const picked=rows.reduce((n,l)=>n+Number(l.picked),0);
   return '<div class="event-lot-row"><div><strong>Pedido #'+esc(codeForBatch(b.id))+
    '</strong><small>Solicitação '+String(b.sequence).padStart(2,'0')+' · '+fmt(count)+' modelos · '+fmt(rows.length)+' variações · '+fmt(units)+' un.</small>'+
-   '<small>'+fmt(picked)+' un. conferidas · '+esc(time(b.created_at))+'</small></div>'+
+   '<small>'+fmt(picked)+' un. separadas · '+esc(time(b.created_at))+'</small></div>'+
    '<span class="uo-pill '+info[1]+'">'+esc(info[0])+'</span>'+
    button('Ver na separação','event-batch-go','data-id="'+esc(b.id)+'"','small')+
   '</div>';
