@@ -15,47 +15,62 @@ const products=['P','M','G'].map((size,i)=>({
 const group=groupInventory(products,[{id:'model-1',name:'Camiseta Preta'}])[0];
 const h=x=>String(x);
 const button=(label,action,extra='')=>'<button data-action="'+action+'" '+extra+'>'+label+'</button>';
-test('cada variação tem somente um comando Gerenciar visível no retrátil',()=>{
+test('card agrupado possui abas retráteis de consulta, balanço, movimentação e histórico',()=>{
  const html=groupedCard(group,{
   h,photoButton:()=>'<button>Foto</button>',qtyStore:()=>12,qtyEvent:()=>0,
   qtyReserved:()=>2,qtyAvailable:()=>10,button,
   isManager:()=>true,canRegisterProducts:()=>true,canMoveStock:()=>true,
-  canManageSku:()=>true
+  canManageSku:()=>true,canBalance:()=>true,canEditProduct:()=>true,
+  canStockEntry:()=>true,canStockExit:()=>true
  });
- assert.equal((html.match(/data-action="sku-manage"/g)||[]).length,3); // um comando real por SKU
- assert.doesNotMatch(html,/data-action="stock-group-modal"/);
- assert.doesNotMatch(html,/data-action="stock-modal"/);
+ assert.match(html,/data-action="product-card-sizes"/);
+ assert.match(html,/data-action="product-card-edit-toggle"/);
+ assert.match(html,/data-stock-panel="balanco"/);
+ assert.match(html,/data-stock-panel="movimentar"/);
+ assert.match(html,/data-stock-panel="historico"/);
  assert.match(html,/data-product-details/);
- assert.match(html,/Ver 3 variações/);
- assert.match(html,/Reservado<\/small><strong>6<\/strong>/);
- assert.match(html,/Livre<\/small><strong>30<\/strong>/);
+ assert.match(html,/data-product-editor/);
+ assert.equal((html.match(/data-balance-item/g)||[]).length,3);
+ assert.equal((html.match(/data-balance-count/g)||[]).length,3);
+ assert.match(html,/data-action="product-balance-save"/);
+ assert.doesNotMatch(html,/product-card-more/);
 });
-test('balanço rápido altera somente o Livre dentro do tamanho expandido',()=>{
+test('balanço edita contagem física de todas as variações, não o saldo livre',()=>{
  const html=groupedCard(group,{
   h,photoButton:()=>'',qtyStore:()=>12,qtyEvent:()=>0,
   qtyReserved:()=>2,qtyAvailable:()=>10,button,
   isManager:()=>true,canRegisterProducts:()=>true,
-  canMoveStock:()=>true,canManageSku:()=>true,canQuickCount:()=>true,expanded:true
+  canMoveStock:()=>true,canManageSku:()=>true,canBalance:()=>true,expanded:true
  });
- assert.equal((html.match(/data-count-free/g)||[]).length,3);
- assert.equal((html.match(/data-action="stock-free-save"/g)||[]).length,3);
- assert.match(html,/data-expected-physical="12" data-expected-reserved="2"/);
- assert.match(html,/value="10" data-initial="10"/);
+ assert.equal((html.match(/data-balance-count/g)||[]).length,3);
+ assert.match(html,/data-expected="12" data-reserved="2"/);
+ assert.match(html,/min="2" max="1000000" step="1" value="12"/);
  assert.match(html,/data-product-details open/);
- assert.match(html,/Ocultar 3 variações/);
- assert.doesNotMatch(html,/Cor \*/);
+ assert.match(html,/data-balance-note/);
+ assert.doesNotMatch(html,/data-count-free/);
+ assert.doesNotMatch(html,/data-action="stock-free-save"/);
 });
-test('perfil de leitura não exibe operações de movimentação ou edição',()=>{
+test('perfil somente de consulta não pode editar estoque ou cadastro',()=>{
  const html=groupedCard(group,{
   h,photoButton:()=>'',qtyStore:()=>12,qtyEvent:()=>0,qtyReserved:()=>0,
   qtyAvailable:()=>12,button,isManager:()=>false,canRegisterProducts:()=>false,
-  canMoveStock:()=>false,canManageSku:()=>false
+  canMoveStock:()=>false,canManageSku:()=>false,canBalance:()=>false,
+  canEditProduct:()=>false
  });
- assert.doesNotMatch(html,/data-action="sku-manage"/);
- assert.doesNotMatch(html,/data-action="stock-modal"/);
- assert.doesNotMatch(html,/data-action="stock-group-modal"/);
- assert.doesNotMatch(html,/data-count-free/);
- assert.doesNotMatch(html,/data-action="stock-free-save"/);
+ assert.match(html,/Ver estoque/);
+ assert.doesNotMatch(html,/data-action="product-card-edit-toggle"/);
+ assert.doesNotMatch(html,/data-action="product-balance-save"/);
+ assert.doesNotMatch(html,/data-action="product-stock-mode"/);
+ assert.match(html,/data-balance-count[^>]+disabled/);
+});
+test('permissões distinguem entradas e saídas excepcionais de cada SKU',()=>{
+ const html=groupedCard(group,{
+  h,photoButton:()=>'',qtyStore:()=>12,qtyEvent:()=>0,qtyReserved:()=>0,
+  qtyAvailable:()=>12,button,isManager:()=>false,canRegisterProducts:()=>false,
+  canManageSku:()=>true,canStockEntry:()=>true,canStockExit:()=>false
+ });
+ assert.match(html,/data-mode="entrada"/);
+ assert.doesNotMatch(html,/data-mode="saida"/);
 });
 test('remessa usa carrinho existente sem seção pública de saídas',()=>{
  const html=stockOperationPage({
@@ -75,17 +90,20 @@ test('quantidades de saída respeitam estoque livre',()=>{
  assert.equal(operationCartLines(cart,products,()=>12,'entrada',()=>4)[0].expected,12);
 });
 
-test('produto único mostra ações diretas e permite gerenciar o SKU',()=>{
+test('produto único usa as mesmas abas sem excluir o conjunto indevidamente',()=>{
  const only={...products[0],apparel_model_id:null};
  const one=groupInventory([only],[])[0];
  const html=groupedCard(one,{
   h,photoButton:()=>'<button>Foto</button>',qtyStore:()=>12,qtyEvent:()=>0,
   qtyReserved:()=>2,qtyAvailable:()=>10,button,
-  isManager:()=>true,canRegisterProducts:()=>true,canMoveStock:()=>true,
-  canManageSku:()=>true,canDeleteProduct:()=>true,canShare:true,canLabel:true
+  isManager:()=>true,canRegisterProducts:()=>true,canEditProduct:()=>true,
+  canBalance:()=>true,canManageSku:()=>true,canDeleteProduct:()=>true,
+  canShare:true,canLabel:true
  });
- assert.match(html,/Gerenciar SKU/);
- for(const action of ['sku-manage','product-edit','shelf-label-open','share-product','product-delete'])
+ assert.match(html,/Ver estoque/);
+ assert.match(html,/data-action="product-card-edit-toggle"/);
+ for(const action of ['product-edit','product-balance-save','shelf-label-open','share-product','product-delete'])
   assert.match(html,new RegExp('data-action="'+action+'"'));
+ assert.doesNotMatch(html,/data-action="product-model-delete"/);
  assert.doesNotMatch(html,/product-card-more/);
 });
