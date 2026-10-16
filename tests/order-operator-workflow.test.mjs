@@ -18,7 +18,7 @@ const args={eventBatches:[{id:'ev1',event_id:'e1',status:'separado',sequence:1}]
 test('AA003 mostra a etapa correta, localização e uma ação principal',()=>{
  const order=makeUnifiedOrders(args)[0];
  const html=unifiedOrderCard(order,{button:btn,canProcess:true,canVerify:true,canCancel:true,canDelete:true});
- for(const part of ['Lote #AA003','RETIRO ENCHEIVOS','A conferir',
+ for(const part of ['Pedido #AA003','RETIRO ENCHEIVOS','A conferir',
   'Separação concluída','Gôndola 03','000100005073','Conferir pedido',
   'Imprimir separação','Administração do pedido','Abrir pedido'])
   assert.ok(html.includes(part),part);
