@@ -246,3 +246,54 @@
  .uo-secondary-actions>.button{min-height:44px;padding:8px 6px;font-size:.77rem}
  .uo-group-switch{max-width:none}
 }
+
+
+/* Fluxo de pedidos agrupados: resumo compacto, itens somente após abrir. */
+.uo-order-open{border:1px solid #dce9e0;border-radius:10px;background:#f8fcf9;overflow:hidden}
+.uo-order-open>summary{display:flex;align-items:center;cursor:pointer;
+ padding:14px 16px;font-size:.9rem;font-weight:810;color:#165d3f;min-height:51px}
+.uo-order-open[open]{background:#fff}
+.uo-order-open[open]>summary{border-bottom:1px solid #e3eee6;background:#eaf5ed}
+.uo-order-open>.uo-product-preview,.uo-order-open>.uo-product-summary{margin:12px}
+.uo-order-open>.uo-operational-actions{padding:4px 12px 10px}
+.uo-order-open>.uo-details{margin:0 12px 12px}
+.uo-exception-badge{margin:0;padding:9px 11px;background:#fff1e7;border:1px solid #eccbaa;
+ border-radius:8px;color:#974528;font-weight:790;font-size:.79rem}
+.uo-difference-list{margin:0 12px 12px;border:1px solid #ebc5aa;background:#fff9f4;
+ border-radius:9px;padding:11px 13px}
+.uo-difference-list>strong{display:block;color:#933e25;font-size:.84rem;margin-bottom:7px}
+.uo-difference-list p{font-size:.79rem;color:#7c573f;margin:6px 0;line-height:1.45}
+.uo-pill.checking{background:#e7eff9;color:#315b86}
+.op-workflow{display:flex;flex-direction:column;gap:10px}
+.op-intro{background:#f2f8f3;color:#42654c;font-size:.86rem;line-height:1.55;
+ padding:12px 14px;border-radius:9px;margin:0}
+.op-summary{background:#e8f4eb;color:#164e35;font-size:.85rem;border-radius:8px;
+ padding:11px 13px}
+.op-lines{display:flex;flex-direction:column;gap:11px;max-height:50vh;overflow:auto;padding:2px}
+.op-line{border:1px solid #dae9dd;border-radius:11px;background:#fff;padding:12px;display:flex;flex-direction:column;gap:11px}
+.op-line-heading{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:11px;align-items:center}
+.op-line-heading img{height:75px;width:75px;object-fit:contain;border-radius:8px;border:1px solid #dceadd}
+.op-line-heading>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.op-line-heading strong{color:#174c35;font-size:.96rem}
+.op-line-heading small{color:#698574;font-size:.76rem}
+.op-line-heading>b{color:#176447;font-size:.83rem;white-space:nowrap}
+.op-fields{display:grid;grid-template-columns:minmax(0,145px) minmax(0,1fr);gap:12px}
+.op-fields label{display:flex;flex-direction:column;gap:6px;font-size:.8rem;font-weight:730;color:#395e48}
+.op-fields input{min-height:47px;border:1px solid #bfd8c7;border-radius:9px;
+ padding:10px 12px;color:#163f2b;font-size:1rem;width:100%;background:#fff}
+.op-fields input:focus{outline:2px solid #91c4a3;outline-offset:1px}
+.op-warning{color:#805b31;font-size:.78rem;line-height:1.45;margin:0}
+.operational-modal .modalfooter{gap:7px;flex-wrap:wrap}
+.operational-modal .modalfooter .button.primary{font-size:.86rem}
+@media(max-width:760px){
+ .uo-order-open>summary{font-size:.83rem;padding:12px}
+ .uo-order-open>.uo-product-preview{margin:9px}
+ .op-line-heading{grid-template-columns:65px minmax(0,1fr)}
+ .op-line-heading img{height:67px;width:63px}
+ .op-line-heading>b{grid-column:2}
+ .op-fields{grid-template-columns:1fr}
+ .op-fields input{min-height:51px}
+ .op-line{padding:10px}
+ .op-lines{max-height:54vh}
+ .operational-modal .modalfooter .button{flex:1;min-width:110px;min-height:47px}
+}
