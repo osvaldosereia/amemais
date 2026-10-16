@@ -110,3 +110,19 @@ test('mobile: botão de corrigir permanece tocável e painel de edição se expa
  assert.match(verificationCss,/min-height:44px/);
  assert.match(verificationCss,/verify-selected-help/);
 });
+
+
+test('caso AA003: contagem corrigida de 5 para 2 encerra a divergência sem dar saída automática',()=>{
+ const aa003={...order,lines:[{...order.lines[0],quantity:2}]};
+ const previous=[{kind:'evento',order_id:'order-1',product_id:'p1',
+  expected_quantity:2,counted_quantity:5,scanned_code:'000100005073'}];
+ assert.equal(ui.verificationProgress(aa003,previous).complete,false);
+ assert.match(ui.finalVerificationMarkup(aa003,previous),/5 \/ 2 un\./);
+ assert.match(ui.finalVerificationMarkup(aa003,previous),/Corrigir quantidade/);
+ const fixed=previous.map(x=>({...x,counted_quantity:2}));
+ assert.equal(ui.verificationProgress(aa003,fixed).matched,1);
+ assert.equal(ui.verificationCanDispatch(aa003,fixed),true);
+ assert.match(ui.finalVerificationMarkup(aa003,fixed),/1 de 1 SKUs/);
+ assert.match(ui.finalVerificationMarkup(aa003,fixed),/2 de 2 un\. conferidas/);
+ assert.doesNotMatch(app,/if\(result\.complete\)\s*await db\.rpc\('dispatch_event_pick_batch'/);
+});
