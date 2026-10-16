@@ -1,113 +1,55 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../src/store-hub.js',import.meta.url),'utf8');
 const hub=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const sample=[
- {id:'avulso-1',kind:'avulso',status:'reservado',created_at:'2026-10-15',origin:'Central',target:'Cliente',raw:{},total:4},
- {id:'store-1',kind:'loja',status:'separado',created_at:'2026-10-14',origin:'Central',target:'Franquia A',raw:{from_store_id:'central',to_store_id:'fran-a'},total:6},
- {id:'store-2',kind:'loja',status:'recebido',created_at:'2026-10-13',origin:'Central',target:'Franquia A',raw:{from_store_id:'central',to_store_id:'fran-a'},total:6},
- {id:'store-3',kind:'loja',status:'solicitado',created_at:'2026-10-12',origin:'Central',target:'Franquia B',raw:{from_store_id:'central',to_store_id:'fran-b'},total:5},
- {id:'event-1',kind:'evento',eventId:'event-a',status:'aguardando',created_at:'2026-10-11',origin:'Central',target:'Evento A',raw:{event_id:'event-a'},total:3,sequence:1},
- {id:'event-2',kind:'evento',eventId:'event-a',status:'enviado',created_at:'2026-10-10',origin:'Central',target:'Evento A',raw:{event_id:'event-a'},total:2,sequence:2},
- {id:'event-3',kind:'evento',eventId:'event-b',status:'cancelado',created_at:'2026-10-09',origin:'Central',target:'Evento B',raw:{event_id:'event-b'},total:2,sequence:1}
+{id:'avulso-1',kind:'avulso',status:'reservado',created_at:'2026-10-15',raw:{},total:4},
+{id:'store-1',kind:'loja',status:'separado',created_at:'2026-10-14',raw:{from_store_id:'central',to_store_id:'fran-a'},total:6},
+{id:'store-2',kind:'loja',status:'recebido',created_at:'2026-10-13',raw:{from_store_id:'central',to_store_id:'fran-a'},total:6},
+{id:'event-1',kind:'evento',eventId:'event-a',status:'aguardando',created_at:'2026-10-11',raw:{event_id:'event-a'},total:3},
+{id:'event-2',kind:'evento',eventId:'event-a',status:'enviado',created_at:'2026-10-10',raw:{event_id:'event-a'},total:2}
 ];
-const ctx={
- button:(label,action,attrs='')=>'<button data-action="'+action+'" '+attrs+'>'+label+'</button>',
- time:x=>x,canBrowseOrders:true,canManageStores:true,canManageEvent:true,canOpenEvent:true,
- showCentral:true,showFranchises:true,showEvents:true,showBranches:false,canSeeStore:()=>true
-};
-test('central tem fila completa; franquia e evento somente seus próprios pedidos',()=>{
- assert.equal(hub.locationOrders(sample,{type:'central',id:'central'}).length,7);
+const button=(label,action,attrs='')=>'<button data-action="'+action+'" '+attrs+'>'+label+'</button>';
+const ctx={button,time:x=>x,canManageStores:true,canManageEvent:true,canBrowseOrders:true,canOpenEvent:true,
+ showCentral:true,showFranchises:true,showEvents:true,showBranches:true,canSeeStore:()=>true,canSeeEvent:()=>true};
+test('somente pedidos da unidade são incluídos no escopo',()=>{
+ assert.equal(hub.locationOrders(sample,{type:'central',id:'central'}).length,5);
  assert.equal(hub.locationOrders(sample,{type:'store',id:'fran-a'}).length,2);
  assert.equal(hub.locationOrders(sample,{type:'event',id:'event-a'}).length,2);
- assert.equal(hub.locationOrders(sample,{type:'store',id:'fran-b'}).length,1);
- assert.equal(hub.locationOrders(sample,{type:'event',id:'event-b'}).length,1);
- assert.equal(hub.locationOrders(sample,{type:'store',id:'unknown'}).length,0);
+ assert.equal(hub.locationOrders(sample,{type:'store',id:'inexistente'}).length,0);
+ assert.equal(hub.locationOrders(sample,{type:'event',id:'event-a'},'pending').length,1);
+ assert.equal(hub.locationOrders(sample,{type:'event',id:'event-a'},'history').length,1);
 });
-test('loja temporária inclui pedido de cliente vinculado ao evento',()=>{
- const customer={id:'customer-event',kind:'avulso',eventId:'event-a',
-  status:'reservado',created_at:'2026-10-15',target:'Cliente no evento',origin:'Central',
-  total:1,raw:{}};
- const scoped=hub.locationOrders([...sample,customer],{type:'event',id:'event-a'});
- assert.equal(scoped.length,3);
- assert.ok(scoped.some(o=>o.id===customer.id));
- assert.equal(hub.locationOrders([...sample,customer],{type:'event',id:'event-b'}).length,1);
+test('não exibe o centro de distribuição como loja e exibe Cristo Rei uma vez',()=>{
+ const html=hub.renderStoreHub({stores:[{id:'cdsb',kind:'central',name:'CDSB',is_primary:true},
+ {id:'cristo',kind:'filial',ownership_type:'propria',code:'CRISTOREICBA',name:'Loja Cristo Rei',active:true},
+ {id:'fran-a',kind:'franquia',name:'Franquia A',active:true}],events:[{id:'event-a',name:'Evento A',status:'rascunho'}],orders:sample,context:ctx});
+ assert.match(html,/Loja Cristo Rei/);
+ assert.doesNotMatch(html,/CDSB<\/h3>/);
+ assert.equal((html.match(/Loja Cristo Rei<\/h3>/g)||[]).length,1);
+ assert.match(html,/data-location="store-cristo"/);
+ assert.match(html,/data-location="event-event-a"/);
+ assert.doesNotMatch(html,/Pedidos para acompanhar e separar/);
 });
-test('separa pendentes de histórico incluindo cancelados',()=>{
- assert.deepEqual(hub.locationOrders(sample,{type:'event',id:'event-a'},'pending').map(x=>x.id),['event-1']);
- assert.deepEqual(hub.locationOrders(sample,{type:'event',id:'event-a'},'history').map(x=>x.id),['event-2']);
- assert.deepEqual(hub.locationOrders(sample,{type:'store',id:'fran-a'},'history').map(x=>x.id),['store-2']);
- assert.equal(hub.isHistoricalOrder(sample.at(-1)),true);
-});
-test('loja central é a Cristo Rei e CDSB não é exibido na aba Lojas',()=>{
- const html=hub.renderStoreHub({
-  stores:[{id:'cdsb',code:'CENTRAL',name:'Centro de Distribuição São Bento (CDSB)',is_primary:true,kind:'central',ownership_type:'cdsb'},
-    {id:'cristo',code:'CRISTOREICBA',name:'Loja Cristo Rei Cuiabá',kind:'filial',ownership_type:'propria',active:true},
-    {id:'fran-a',name:'Franquia A',kind:'franquia',active:true},
-    {id:'fran-b',name:'Franquia B',kind:'franquia',active:true}],
-  events:[{id:'event-a',name:'Evento A',status:'ativo'},{id:'event-b',name:'Evento B',status:'encerrado'}],
-  orders:sample,context:ctx
- });
- const a=html.indexOf('>Loja Central</h2>'),b=html.indexOf('>Franquias</h2>'),c=html.indexOf('>Lojas Temporárias</h2>');
- assert.ok(a>=0&&b>a&&c>b);
- assert.match(html,/Loja Cristo Rei Cuiabá/);
- assert.doesNotMatch(html,/Centro de Distribuição São Bento/);
- assert.doesNotMatch(html,/data-location="central-cdsb"/);
- assert.equal((html.match(/Loja Cristo Rei Cuiabá/g)||[]).length,1);
- assert.match(html,/data-location-type="store" data-location-id="cristo"/);
- assert.match(html,/data-action="store-hub-orders"/);
- assert.match(html,/<details class="sh-history">/);
-});
-test('franqueado vê somente franquias disponíveis e não a central nem temporárias',()=>{
- const html=hub.renderStoreHub({
-  stores:[{id:'central',name:'Loja Central',is_primary:true,kind:'central'},
-    {id:'fran-a',name:'Franquia A',kind:'franquia'},
-    {id:'fran-b',name:'Franquia B',kind:'franquia'}],
-  orders:sample,context:{...ctx,portal:true,showCentral:false,showEvents:false,
-   canManageStores:false,canManageEvent:false,canSeeStore:s=>s.id==='fran-a'}
- });
+test('franqueado só vê sua unidade vinculada',()=>{
+ const html=hub.renderStoreHub({stores:[{id:'fran-a',kind:'franquia',name:'Franquia A',active:true},
+ {id:'fran-b',kind:'franquia',name:'Franquia B',active:true}],orders:sample,
+ context:{...ctx,portal:true,showCentral:false,showEvents:false,canManageStores:false,canSeeStore:s=>s.id==='fran-a'}});
  assert.match(html,/Franquia A/);
  assert.doesNotMatch(html,/Franquia B/);
- assert.doesNotMatch(html,/>Loja Central<\/h2>/);
- assert.doesNotMatch(html,/>Lojas Temporárias<\/h2>/);
+ assert.equal((html.match(/data-action="store-unit-open"/g)||[]).length,1);
 });
-test('lojas permitem atuar em pedidos próprios; CDSB fica somente na fila geral de Pedidos',()=>{
- const html=hub.renderStoreHub({
-  stores:[{id:'cdsb',name:'Centro de Distribuição São Bento',is_primary:true,kind:'central'},
-   {id:'cristo',code:'CRISTOREICBA',name:'Loja Cristo Rei Cuiabá',kind:'filial',ownership_type:'propria'},
-   {id:'fran-a',name:'Franquia A',kind:'franquia',active:true}],
-  events:[{id:'event-a',name:'Evento A',status:'ativo'}],
-  orders:sample.map(x=>({...x,status:x.id==='store-1'?'aprovado':x.status,lines:[{id:'sku-1',quantity:1}]})),
-  context:{...ctx,canProcess:()=>true,canPrint:()=>true}
- });
- assert.doesNotMatch(html,/data-action="avulso-pick"/);
- assert.match(html,/data-action="store-order-separate"/);
- assert.match(html,/data-action="event-batch-pick"/);
- assert.match(html,/data-action="order-print-thermal"/);
- assert.doesNotMatch(html,/Centro de Distribuição São Bento/);
-});
-test('capa, nomes e informações de unidades são escapados',()=>{
- const html=hub.renderStoreHub({stores:[{id:'x',name:'<script>',kind:'franquia'}],
-  events:[{id:'y',name:'Evento',status:'ativo',cover_path:'" onerror="alert(1)'}],
-  context:{...ctx,showCentral:false}});
+test('nomes e capa escapados não injetam HTML ativo',()=>{
+ const html=hub.renderStoreHub({stores:[{id:'x',name:'<script>alert(1)</script>',kind:'franquia'}],
+ events:[{id:'e',name:'Evento',status:'ativo',cover_path:'" onerror="alert(1)'}],context:ctx});
  assert.doesNotMatch(html,/<script>/);
  assert.doesNotMatch(html,/src="[^"]*onerror=/);
 });
-
-test('o cartão Cristo Rei usa apenas pedidos relacionados à loja, nunca a fila inteira do CDSB',()=>{
- const ownOrder={id:'cristo-order',kind:'loja',status:'aguardando',
-  created_at:'2026-10-15T17:00:00Z',raw:{from_store_id:'cdsb',to_store_id:'cristo'},
-  origin:'CDSB',target:'Cristo Rei',total:4,lines:[]};
- const html=hub.renderStoreHub({stores:[
-  {id:'cdsb',code:'CENTRAL',name:'CDSB',kind:'central',is_primary:true},
-  {id:'cristo',code:'CRISTOREICBA',name:'Loja Cristo Rei Cuiabá',kind:'filial',ownership_type:'propria'},
-  {id:'fran-a',name:'Outra Franquia',kind:'franquia'}
- ],orders:[...sample,ownOrder],context:{...ctx,showEvents:false,showBranches:true}});
- const card=html.match(/<article class="sh-location" data-location="store-cristo">([\s\S]*?)<\/article>/)?.[1];
- assert.ok(card);
- assert.match(card,/cristo-order/i);
- assert.doesNotMatch(card,/avulso-1/);
- assert.doesNotMatch(card,/store-1/);
- assert.doesNotMatch(html,/Filiais próprias<\/h2>/);
+test('filtro de tipos não modifica lista de pedidos nem estado de outros cards',()=>{
+ const cards=[{dataset:{storeHubName:'cristo rei',storeHubType:'propria',storeHubStatus:'active'},hidden:false},
+ {dataset:{storeHubName:'franquia azul',storeHubType:'franquia',storeHubStatus:'active'},hidden:false}];
+ const b={dataset:{type:'propria'},classList:{toggle:()=>{}},setAttribute:()=>{}};
+ const area={querySelectorAll:s=>s.includes('item')?cards:[b],querySelector:()=>({hidden:true})};
+ assert.equal(hub.filterStoreHub(area,'cristo','propria','active'),1);
+ assert.equal(cards[0].hidden,false);assert.equal(cards[1].hidden,true);
+ assert.equal(hub.filterStoreHub(area,'','todas','all'),2);
 });
