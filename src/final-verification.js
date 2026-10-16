@@ -37,6 +37,10 @@ export function finalVerificationMarkup(order,rows=[]){
     '<small>EAN '+esc(x.ean||'—')+' · SKU '+esc(x.sku||'—')+'</small>'+
     '<small>'+esc([x.gondola?'Gôndola '+x.gondola:'Sem gôndola',x.prateleira?'Prateleira '+x.prateleira:''].filter(Boolean).join(' · '))+'</small>'+
     '<div class="verify-line-bottom"><b>'+esc(badge)+'</b><span>'+(x.actual===null?x.quantity+' un. solicitadas':x.actual+' / '+x.quantity+' un.')+'</span></div>'+
+    (x.verification?.scanned_code?
+      '<button type="button" class="verify-edit-button" data-action="verify-edit-item" data-id="'+esc(x.id)+'"'+
+      ' aria-label="'+(x.ok?'Recontar':'Corrigir divergência de')+' '+esc(x.modelTitle||x.name)+'">'+
+      (x.ok?'Recontar':'Corrigir quantidade')+'</button>':'')+
    '</div></div>';
  }).join('');
  return '<section class="verify-workflow">'+
@@ -52,9 +56,10 @@ export function finalVerificationMarkup(order,rows=[]){
     'Passe um produto no leitor para informar sua quantidade.')+'</div>'+
   '<div data-verify-selected hidden class="verify-selected">'+
    '<strong data-verify-selected-name></strong>'+
+   '<p class="verify-selected-help" data-verify-selected-help>Conte as unidades e confirme a quantidade.</p>'+
    '<label class="field"><span>Quantidade física encontrada</span>'+
     '<input type="number" name="verify_quantity" data-verify-quantity min="0" max="1000000" step="1" inputmode="numeric" placeholder="Digite a quantidade contada"></label>'+
-   '<button type="button" class="button primary" data-action="verify-confirm-item">Confirmar quantidade deste SKU</button>'+
+   '<button type="button" class="button primary" data-action="verify-confirm-item" data-verify-submit>Confirmar quantidade deste SKU</button>'+
   '</div>'+
   '<div class="verify-items">'+cards+'</div>'+
  '</section>';
