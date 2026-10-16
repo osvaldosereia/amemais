@@ -38,7 +38,7 @@ test('unifica dois bancos de pedidos sem duplicar reservas',()=>{
 });
 test('pedidos com falta mostram quantidade original, reservada e diferença',()=>{
  const order=makeUnifiedOrders(props).find(x=>x.kind==='avulso');
- const html=unifiedOrderCard(order,{button,canProcess:true,canCancel:true});
+ const html=unifiedOrderCard(order,{button,canProcess:true,canCancel:true,canAdjust:true});
  assert.match(html,/10 unidades/);
  assert.match(html,/6 reservadas/);
  assert.match(html,/4 faltam/);
@@ -49,7 +49,7 @@ test('pedidos com falta mostram quantidade original, reservada e diferença',()=
 test('pedido reservado mostra conferência; separado mostra saída',()=>{
  const base=makeUnifiedOrders(props).find(x=>x.kind==='avulso');
  const reserved=unifiedOrderCard({...base,status:'reservado',missing:0},{button,canProcess:true});
- const separated=unifiedOrderCard({...base,status:'separado',missing:0},{button,canProcess:true});
+ const separated=unifiedOrderCard({...base,status:'separado',missing:0},{button,canProcess:true,canDispatchStock:true,isVerified:true});
  assert.match(reserved,/avulso-pick/);
  assert.doesNotMatch(reserved,/avulso-dispatch/);
  assert.match(separated,/avulso-dispatch/);
@@ -82,7 +82,7 @@ test('pedidos legados ficam sem avaliação, em vez de falta confirmada',()=>{
  assert.equal(order.missing,0);
  const html=unifiedOrderCard(order,{button,canProcess:true});
  assert.match(html,/Pedido anterior ao novo sistema/);
- assert.match(html,/Pendente de preparação/);
+ assert.match(html,/Aguardando preparação/);
 });
 test('conferência EAN apresenta campos e não baixa estoque ao separar',()=>{
  const order=makeUnifiedOrders(props)[0];
