@@ -2675,8 +2675,8 @@ function adminPasswordModal(id){
 function myPasswordModal(){
   if(!state.user||!state.profile?.active)return;
   formModal('Minha senha','<div class="formgrid">'+
-    field('Nova senha','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
-    field('Confirmar nova senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+    field('Nova senha','password','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
+    field('Confirmar nova senha','password_confirm','password','','required minlength="12" maxlength="128" autocomplete="new-password"')+
     '</div><p class="help">Sua senha é armazenada com segurança no Supabase Auth.</p>',
     'my-password','Atualizar minha senha');
 }
