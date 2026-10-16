@@ -55,12 +55,12 @@ export async function createPurchasePDF(order,supplier,items,{products=[],models
  let y=18,page=1;
  const setText=(r=16,g=45,b=80)=>pdf.setTextColor(r,g,b);
  const line=(at)=>{pdf.setDrawColor(...gold);pdf.line(left,at,right,at);};
- const pageFoot=()=>{pdf.setFontSize(8);setText(...muted);
+ const pageFoot=(number=page)=>{pdf.setFontSize(8);setText(...muted);
   pdf.text('CDSB | Compra não representa entrada em estoque',left,290);
-  pdf.text('Página '+page,right,290,{align:'right'});
+  pdf.text('Página '+number,right,290,{align:'right'});
  };
  function startPage(){
-  if(page>1){pageFoot();pdf.addPage();y=18;}
+  if(page>1){pageFoot(page-1);pdf.addPage();y=18;}
   setText(...ink);pdf.setFont('helvetica','bold');pdf.setFontSize(16);
   pdf.text('CDSB | PEDIDO DE COMPRA',left,y);y+=7;
   setText(...gold);pdf.setFontSize(12);
@@ -87,9 +87,13 @@ export async function createPurchasePDF(order,supplier,items,{products=[],models
  pdf.setFont('helvetica','bold');pdf.setFontSize(10);
  pdf.text(groups.length+' modelo(s)  |  '+items.length+' SKU(s)  |  '+format(total)+' unidade(s)',left,y);
  y+=10;
- for(const [i,g] of groups.entries()){
-  const maxText=pdf.splitTextToSize(g.name||'Produto',145);
-  const blockH=Math.max(38,15+g.rows.length*7.8+maxText.length*4);
+ for(const g of groups){
+  const chunks=[];
+  for(let offset=0;offset<g.rows.length;offset+=12)chunks.push(g.rows.slice(offset,offset+12));
+  for(const [chunkIndex,chunk] of chunks.entries()){
+  const title=(g.name||'Produto')+(chunkIndex?' (continuação)':'');
+  const maxText=pdf.splitTextToSize(title,145);
+  const blockH=Math.max(38,15+chunk.length*11+maxText.length*4);
   ensure(blockH+5);
   const top=y;
   pdf.setFillColor(244,247,251);pdf.roundedRect(left,top,184,blockH,2,2,'F');
@@ -100,19 +104,21 @@ export async function createPurchasePDF(order,supplier,items,{products=[],models
    pdf.text('Sem foto',left+16.5,top+18,{align:'center'});}
   const px=left+34, tx=px+124;
   setText(...ink);pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);
-  const display=pdf.splitTextToSize(g.name||'Produto',125);
+  const display=pdf.splitTextToSize(title,125);
   pdf.text(display,px,top+6);let iy=top+7+display.length*4.3;
   pdf.setFontSize(8.5);
-  for(const row of g.rows){
+  for(const row of chunk){
    pdf.setFont('helvetica','normal');setText(...muted);
    const variant=[row.color&&row.color!=='Única'?row.color:'',row.size].filter(Boolean).join(' · ');
    const label=(variant||'Único')+'  |  SKU '+(row.sku||'—');
    pdf.text(pdf.splitTextToSize(label,122)[0],px,iy);
-   pdf.setFont('helvetica','bold');setText(...ink);
+   pdf.setFontSize(7);pdf.text('EAN '+(row.ean||'—'),px,iy+3.7);
+   pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);setText(...ink);
    pdf.text(format(row.quantity)+' un.',right-4,iy,{align:'right'});
-   iy+=7.8;
+   iy+=11;
   }
-  y=top+Math.max(26,blockH)+5;
+  y=top+blockH+5;
+  }
  }
  ensure(22);
  if(order.note){
