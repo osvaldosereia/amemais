@@ -41,7 +41,7 @@ export function code128SVG(value){
   }
  }
  const total=x+quiet;
- return '<svg class="shelf-barcode" xmlns="http://www.w3.org/2000/svg" width="70mm" height="17mm" viewBox="0 0 '+
+ return '<svg class="shelf-barcode" xmlns="http://www.w3.org/2000/svg" width="72mm" height="27mm" viewBox="0 0 '+
   total+' 48" preserveAspectRatio="none" fill="#000" shape-rendering="crispEdges" role="img" aria-label="Código de barras Code 128: '+
   escapeHtml(code)+'">'+bars.join('')+'</svg>';
 }
@@ -68,6 +68,8 @@ export function shelfLabelArticle(item){
  (item.shelf?'<div class="shelf-label-shelf"><span>PRATELEIRA</span><strong>'+escapeHtml(item.shelf)+'</strong></div>':'')+'</div>'+
  '<div class="shelf-label-product"><strong>'+escapeHtml(item.name)+'</strong>'+
  (variant?'<span>'+escapeHtml(variant)+'</span>':'')+'</div>'+
+ '<div class="shelf-label-identifiers"><div><span>SKU</span><strong>'+escapeHtml(item.sku||'—')+'</strong></div>'+ 
+ '<div><span>EAN</span><strong>'+escapeHtml(item.ean||'—')+'</strong></div></div>'+
  (barcode?'<div class="shelf-label-code">'+barcode+
   '<strong>'+escapeHtml(item.scanned)+'</strong></div>':
   '<div class="shelf-label-no-code">SEM EAN / SKU VÁLIDO</div>')+
@@ -99,7 +101,7 @@ export function shelfLabelPicker(products,modelName=''){
       '" min="1" max="20" step="1" inputmode="numeric" value="1" '+(!eligible?'disabled':'')+'></label>'+
   '</div>';
  }).join('')+'</div>'+
- '<p class="shelf-label-help">Formato de impressão: <b>80 mm de largura × 56 mm por etiqueta</b> (até 40 por impressão), sem fotos, preço ou quantidade em estoque. Não confundir o código impresso com o código do pedido.</p>'+
+ '<p class="shelf-label-help">Formato de impressão: <b>80 mm de largura × 85 mm por etiqueta</b> (até 40 por impressão), sem fotos, preço ou quantidade em estoque. Não confundir o código impresso com o código do pedido.</p>'+
  '</div>';
 }
 export function collectShelfLabels(products,form,modelName=''){
@@ -129,7 +131,7 @@ export function shelfLabelsHTML(items){
  'html,body{padding:0;margin:0;background:white;color:black}',
  'body{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
  '.label-sheet{width:80mm;margin:0 auto}',
- '.shelf-label{height:56mm;width:80mm;max-width:80mm;padding:2.5mm 4mm 2mm;',
+ '.shelf-label{height:85mm;width:80mm;max-width:80mm;padding:2.5mm 3.5mm 2mm;',
  'display:flex;flex-direction:column;gap:1mm;border-bottom:1px dashed #888;',
  'page-break-inside:avoid;break-inside:avoid;overflow:hidden}',
  '.shelf-label-heading{display:flex;justify-content:space-between;align-items:center}',
@@ -143,14 +145,18 @@ export function shelfLabelsHTML(items){
  '.shelf-label-place>div>strong{font-size:19pt;font-weight:900;line-height:1.1}',
  '.shelf-label-shelf{text-align:right;min-width:16mm}',
  '.shelf-label-shelf strong{font-size:17pt!important}',
- '.shelf-label-product{display:flex;flex-direction:column;min-height:11mm;gap:.7mm}',
- '.shelf-label-product strong{font-size:11pt;font-weight:900;line-height:1.12;',
+ '.shelf-label-product{display:flex;flex-direction:column;min-height:15mm;gap:1mm}',
+ '.shelf-label-product strong{font-size:17pt;font-weight:900;line-height:1.12;',
  'overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
- '.shelf-label-product span{font-size:10.5pt;font-weight:800}',
+ '.shelf-label-product span{font-size:12pt;font-weight:800}',
+ '.shelf-label-identifiers{display:flex;flex-direction:column;gap:1mm;padding:1mm 0;border-top:1px solid #222}',
+ '.shelf-label-identifiers>div{display:flex;align-items:baseline;gap:2mm;min-width:0}',
+ '.shelf-label-identifiers span{font-size:9pt;font-weight:800;min-width:9mm}',
+ '.shelf-label-identifiers strong{font-size:13pt;font-weight:850;overflow-wrap:anywhere}',
  '.shelf-label-code{display:flex;align-items:center;justify-content:center;flex-direction:column;',
  'margin-top:auto;gap:.4mm}',
- '.shelf-barcode{width:70mm;height:17mm;display:block}',
- '.shelf-label-code>strong{font-family:monospace;font-size:10pt;letter-spacing:1px}',
+ '.shelf-barcode{width:72mm;height:27mm;display:block}',
+ '.shelf-label-code>strong{font-family:monospace;font-size:12pt;font-weight:800;letter-spacing:.4px}',
  '.shelf-label-no-code{text-align:center;font-size:8pt}',
  '.shelf-label-footer{border-top:1px solid #000;display:flex;align-items:center;',
  'justify-content:space-between;gap:2mm;font-size:7pt;font-weight:700;padding-top:.7mm}',
@@ -167,7 +173,7 @@ export function shelfLabelsHTML(items){
  '<script>',
  'window.printLabels80=()=>{',
  'const sheet=document.querySelector(".label-sheet");if(!sheet)return;',
- 'const mm=sheet.querySelectorAll(".shelf-label").length*56+2;',
+ 'const mm=sheet.querySelectorAll(".shelf-label").length*85+2;',
  'let tag=document.getElementById("shelf-page-size");',
  'if(!tag){tag=document.createElement("style");tag.id="shelf-page-size";document.head.append(tag);}',
  'tag.textContent="@page{size:80mm "+Math.max(56,Math.min(2250,mm))+"mm;margin:0}";',
