@@ -2613,14 +2613,16 @@ function orderQuantityModal(orderId,phase){
   ['solicitado','aprovado'].includes(order.status)&&hasPermission('orders.separate')&&assignedStore(order.from_store_id);
  if(!allowed)return;
  const items=state.storeOrderItems.filter(x=>x.order_id===orderId);
+ const op=state.orderOperationalRows.find(x=>x.kind==='loja'&&x.order_id===orderId&&x.stage==='enviado');
  const rows=items.map(x=>{
    const p=product(x.product_id);
+   const expected=receiving&&op?Number(op.items?.[x.product_id]?.counted??0):Number(x.quantity);
    const initial=adjusting?x.quantity:0;
    return '<div class="store-picking-line"><div><strong>'+h(p?.name||'Produto')+'</strong>'+
     '<small>'+h([p?.sku,p?.ean,p?.apparel_size,p?.apparel_color].filter(Boolean).join(' · '))+'</small>'+
-    '<small>'+x.quantity+' un. '+(receiving?'enviadas':'solicitadas / reservadas')+'</small></div>'+
-    '<label>Quantidade <input type="number" data-phase-qty data-id="'+h(x.product_id)+'" data-expected="'+x.quantity+
-    '" min="0" max="'+x.quantity+'" step="1" inputmode="numeric" value="'+initial+'" required></label></div>';
+    '<small>'+expected+' un. '+(receiving?'efetivamente enviadas':'solicitadas / reservadas')+'</small></div>'+
+    '<label>Quantidade <input type="number" data-phase-qty data-id="'+h(x.product_id)+'" data-expected="'+expected+
+    '" min="0" max="'+expected+'" step="1" inputmode="numeric" value="'+initial+'" required></label></div>';
  }).join('');
  formModal(receiving?'Conferir recebimento':picking?'Conferir separação':'Ajustar atendimento',
    '<p class="help">'+(receiving?'Registre apenas o que chegou fisicamente. Faltas ficam documentadas e não entram no estoque.':
