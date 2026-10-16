@@ -39,14 +39,16 @@ test('só libera expedição depois de validar todos os tamanhos/quantidades',()
  assert.equal(ui.verificationCanDispatch(order,[...verified,
   {kind:'evento',order_id:'order-1',product_id:'p2',counted_quantity:0,expected_quantity:1}]),false);
 });
-test('mostra botão de conferência antes da saída',()=>{
+test('conferência leva à expedição e só então libera o envio',()=>{
  const card=mod.unifiedOrderCard(order,{button:cb,canVerify:true,canDispatch:true,isVerified:false});
- assert.match(card,/data-action="order-final-verify"/);
- assert.doesNotMatch(card,/data-action="event-batch-dispatch"/);
- const approved=mod.unifiedOrderCard(order,{button:cb,canVerify:true,canDispatch:true,isVerified:true});
- assert.match(approved,/data-action="event-batch-dispatch"/);
- const nope=mod.unifiedOrderCard(order,{button:cb,canVerify:false,canDispatch:true,isVerified:false});
- assert.doesNotMatch(nope,/data-action="order-final-verify"/);
+ assert.match(card,/data-action="order-op-check"/);
+ assert.doesNotMatch(card,/data-action="order-op-send"/);
+ const expedited={...order,workflow:{stage:'expedicao',items:{p1:{requested:10,picked:10,counted:10},
+  p2:{requested:1,picked:1,counted:1}},has_difference:false}};
+ const ready=mod.unifiedOrderCard(expedited,{button:cb,canDispatch:true});
+ assert.match(ready,/data-action="order-op-send"/);
+ const denied=mod.unifiedOrderCard(expedited,{button:cb,canDispatch:false});
+ assert.doesNotMatch(denied,/data-action="order-op-send"/);
 });
 test('backend valida código, quantidade, status e bloqueia os três tipos de saída',()=>{
  assert.match(sql,/CREATE TABLE IF NOT EXISTS public.order_final_verifications/);
