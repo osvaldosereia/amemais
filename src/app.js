@@ -11,7 +11,7 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015categorymetadata2';
 import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015categorymetadata2';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015shelf1';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015cardsfix5';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
@@ -3196,7 +3196,7 @@ async function handleClick(event){
     target.setAttribute('aria-expanded',String(details.open));
     const sizeCount=details.querySelectorAll('[data-product-id]').length;
     const label=sizeCount===1?
-      (details.open?'Ocultar SKU / estoque':'Ver SKU / estoque'):
+      (details.open?'Ocultar dados':'Ver dados'):
       (details.open?'Ocultar ':'Ver ')+sizeCount+' variações';
     target.innerHTML=label+' <span aria-hidden="true">⌄</span>';
     return;
