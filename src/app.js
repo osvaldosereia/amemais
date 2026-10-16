@@ -86,7 +86,7 @@ const state = {
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
-  search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
+  search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
@@ -511,6 +511,17 @@ function render(){
   hydrateImages();
   const hub=root.querySelector('.sh-hub');
   if(hub)filterStoreHub(hub,state.storeHubFilter.search,state.storeHubFilter.type,state.storeHubFilter.status);
+  if(state.pendingOrderFocus&&state.view==='pedidos'){
+   const focus=state.pendingOrderFocus;
+   const card=[...root.querySelectorAll('[data-order-card]')].find(el=>
+    el.dataset.orderKind===focus.kind&&el.dataset.orderId===focus.id);
+   if(card){
+    card.querySelector('details.uo-order-open')?.setAttribute('open','');
+    card.querySelector('details.uo-details')?.setAttribute('open','');
+    card.scrollIntoView({block:'center',behavior:'smooth'});
+   }
+   state.pendingOrderFocus=null;
+  }
 }
 
 function pageContent(){
@@ -4491,10 +4502,17 @@ async function handleSubmit(event){
       })),'Pedido alterado. A separação e conferência deverão ser feitas novamente.');
     }
     if(!confirmEventOrderReview(form,{items,note,destination:form.dataset.orderDestination||eventById(eid)?.name||'Loja temporária',
-     products:state.items}))return;
-    return exec(async()=>assertOk(await db.rpc('create_event_pick_batch',{
-      p_event:eid,p_items:items,p_note:note||null
-    })),'Pedido criado e reservado integralmente. Ele aparecerá na fila de Pedidos.');
+     products:state.items,models:state.apparelModels}))return;
+    return exec(async()=>{
+      const created=assertOk(await db.rpc('create_event_pick_batch',{
+       p_event:eid,p_items:items,p_note:note||null
+      }));
+      if(created&&permittedView('pedidos')){
+       state.ordersContext={type:'event',id:eid,mode:'all'};
+       state.pendingOrderFocus={kind:'evento',id:created};
+       state.view='pedidos';
+      }
+    },'Pedido criado e reservado. Acompanhe a separação, conferência e expedição em Pedidos.');
   }
   if(type==='event-batch-picking')return saveEventBatchPicking(form,false);
   if(type==='event-batch-cancel'){
@@ -4740,11 +4758,18 @@ async function handleSubmit(event){
     if(!confirmOrderCartReview(form,{items,note:String(values.note||''),
        destination:(target.kind==='franquia'?'Franquia · ':'Loja própria · ')+target.name}))return;
     const main=state.stores.find(x=>x.is_primary);
-    await exec(async()=>assertOk(await db.rpc('create_store_order',{
-      p_from_store:main.id,p_to_store:values.to_store_id,
-      p_type:state.stores.find(x=>x.id===values.to_store_id)?.kind==='franquia'?'franquia':'central',
-      p_items:items,p_note:values.note||null
-    })),'Pedido criado com reserva automática. A saída física ocorrerá após a conferência.');return;
+    await exec(async()=>{
+      const created=assertOk(await db.rpc('create_store_order',{
+       p_from_store:main.id,p_to_store:values.to_store_id,
+       p_type:target.kind==='franquia'?'franquia':'central',
+       p_items:items,p_note:values.note||null
+      }));
+      if(created&&permittedView('pedidos')){
+       state.ordersContext={type:'store',id:target.id,mode:'all'};
+       state.pendingOrderFocus={kind:'loja',id:created};
+       state.view='pedidos';
+      }
+    },'Pedido criado e reservado. Confira o registro antes de iniciar a separação.');return;
   }
   if(type==='branch-return-dispatch'){
     const storeId=form.dataset.store;
