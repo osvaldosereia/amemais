@@ -50,7 +50,8 @@ test('destaca gôndola e prateleira no card e nas variações',()=>{
  const html=groupedCard(group,props);
  assert.match(html,/class="product-card-location"/);
  assert.match(html,/Gôndola 03 · Prateleira B/);
- assert.match(html,/class="group-variant-location"/);
+ assert.match(html,/Gôndola 03 · Prateleira B/);
+ assert.match(html,/data-product-editor/);
 });
 test('foto e localização são escapadas no HTML',()=>{
  const group=groupInventory([{...product,apparel_model_id:null,
