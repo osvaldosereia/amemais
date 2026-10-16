@@ -59,3 +59,10 @@
  .verify-item .verify-details{min-width:0}
  .verify-selected [data-verify-submit]{width:100%;min-height:49px;font-size:.95rem}
 }
+
+
+.verify-camera-action{margin-top:2px;align-self:flex-start;min-height:43px;border-radius:9px;
+ border:1px solid #c8dfd0;background:#eef8f2;color:#1b6142;font-weight:780;
+ padding:10px 15px}
+.verify-camera-action:focus-visible{outline:3px solid #8fcbab;outline-offset:2px}
+@media(max-width:760px){.verify-camera-action{width:100%;min-height:46px}}
