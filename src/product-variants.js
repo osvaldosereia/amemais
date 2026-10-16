@@ -1,4 +1,5 @@
 import {makeVariationCards,makeVariationChips,resolveCategoryVariations} from './category-variations.js?v=20261015categorymetadata2';
+import {gondolaSelectHTML} from './gondolas.js?v=20261016gondolas1';
 // Cadastro único de produtos: variações de roupas sem outra seção de navegação.
 export const STANDARD_SIZES=['P','M','G','GG','XGG','XXGG','EXGG'];
 const safe=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -10,7 +11,7 @@ function sizeCard(size){
     '<label class="field"><span>Código interno (SKU)</span><input name="size_sku" maxlength="80" disabled autocomplete="off" placeholder="Gerado automaticamente se vazio"></label>'+
     '<label class="field"><span>EAN (se houver)</span><div class="inline apparel-ean"><input name="size_ean" maxlength="14" inputmode="numeric" disabled placeholder="Código de barras">'+
     '<button class="button small" type="button" data-action="size-scan" aria-label="Ler EAN do tamanho '+size+'">📷</button></div></label>'+
-    '<label class="field"><span>Gôndola deste tamanho (opcional)</span><input name="size_gondola" maxlength="40" disabled placeholder="Ex.: A03"></label>'+
+    gondolaSelectHTML('size_gondola',[], '', {label:'Gôndola deste tamanho',disabled:true})+
     '<label class="field"><span>Prateleira deste tamanho (opcional)</span><input name="size_prateleira" maxlength="40" disabled placeholder="Ex.: B"></label>'+
     '<label class="field"><span>Estoque inicial *</span><input name="size_qty" type="number" step="1" min="0" max="1000000" value="0" disabled required inputmode="numeric"></label>'+
     '</div></div>';
@@ -42,7 +43,7 @@ export function setSizesMode(form,checked){
     .forEach(input=>input.disabled=!checked);
   for(const row of panel.querySelectorAll('[data-size-variant]')){
     const enabled=checked&&!row.hidden;
-    row.querySelectorAll('input').forEach(input=>input.disabled=!enabled);
+    row.querySelectorAll('input,select').forEach(input=>input.disabled=!enabled);
   }
   const single=form.querySelector('[data-single-fields]');
   if(single){
@@ -61,7 +62,7 @@ export function setSizeSelected(form,size,enabled){
   row.hidden=!enabled;
   chip.classList.toggle('selected',enabled);
   chip.setAttribute('aria-pressed',String(enabled));
-  row.querySelectorAll('input').forEach(input=>input.disabled=!enabled);
+  row.querySelectorAll('input,select').forEach(input=>input.disabled=!enabled);
 
 }
 export function collectSizeVariants(form){
