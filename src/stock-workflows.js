@@ -136,22 +136,36 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '</div>';
     }).join('')+'</div>';
   };
-  // Botões diretos: permissões e confirmação permanecem nos handlers.
+  // Acesso direto às funções: duas faixas fixas, nenhuma ação escondida em menu.
   const direct=(label,action,id,css='')=>button(label,action,
-    'data-id="'+h(id)+'"','small product-card-direct '+css);
+    'data-id="'+h(id)+'"','small '+css);
   const toggleText=sizeCount===1?
-    (expanded?'Ocultar SKU / estoque':'Ver SKU / estoque'):
+    (expanded?'Ocultar dados':'Ver dados'):
     (expanded?'Ocultar ':'Ver ')+sizeCount+' variações';
+  const sizeAction='<button type="button" class="button product-card-action-primary product-card-sizes" data-action="product-card-sizes" '+
+    'data-card-key="'+h(group.key)+'" aria-expanded="'+String(Boolean(expanded))+'">'+
+    toggleText+' <span aria-hidden="true">⌄</span></button>';
+  // Um único SKU tem gestão imediata; múltiplas variações revelam as operações por SKU.
+  const mainAction=sizeCount===1&&skuAccess?
+    direct('Gerenciar SKU','sku-manage',main.id,'product-card-action-primary product-card-action-stock'):
+    sizeAction;
+  // Um único SKU pode ser editado diretamente; múltiplos SKUs usam o gerenciador.
+  const editAction=canEdit?
+    direct('Editar produto',sizeCount===1?'product-edit':groupEdit,
+      sizeCount===1?main.id:groupEditId,'product-card-action-primary'):'';
+  const primaryActions=mainAction+editAction+
+    (canLabel?direct('Etiqueta 80 mm','shelf-label-open',main.id,'product-card-action-primary'):'');
+  const secondaryActions=
+    (group.modelId&&canEdit?direct('+ Variação','add-variants',group.modelId,'product-card-action-secondary'):'')+
+    (canShare?direct('Compartilhar','share-product',main.id,'product-card-action-secondary'):'')+
+    (canRemoveEntireModel?direct('Excluir produto + variações','product-model-delete',group.modelId,
+       'product-card-action-secondary product-card-action-danger'):
+     (!group.modelId&&manage&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,
+       'product-card-action-secondary product-card-action-danger'):''));
   const actions=isProducts?
-    '<div class="grouped-inventory-actions" aria-label="Ações de '+h(group.title)+'">'+
-      '<button type="button" class="product-card-sizes product-card-direct product-card-action-main" data-action="product-card-sizes" data-card-key="'+h(group.key)+'"'+
-      ' aria-expanded="'+String(Boolean(expanded))+'">'+toggleText+' <span aria-hidden="true">⌄</span></button>'+
-      (canEdit?direct('Editar produto',groupEdit,groupEditId,'product-card-action-edit'):'')+
-      (group.modelId&&canEdit?direct('Adicionar variação','add-variants',group.modelId):'')+
-      (canLabel?direct('Imprimir etiqueta','shelf-label-open',main.id):'')+
-      (canShare?direct('Compartilhar','share-product',main.id):'')+
-      (canRemoveEntireModel?direct('Excluir produto completo','product-model-delete',group.modelId,'product-card-action-danger'):
-       (!group.modelId&&manage&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'product-card-action-danger'):''))+
+    '<div class="grouped-inventory-actions product-card-actions-v5" aria-label="Ações de '+h(group.title)+'">'+
+      '<div class="product-card-action-primary-row">'+primaryActions+'</div>'+
+      (secondaryActions?'<div class="product-card-action-secondary-row">'+secondaryActions+'</div>':'')+
     '</div>':'';
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
     '<div class="grouped-inventory-top">'+
@@ -159,6 +173,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       '<div class="grouped-inventory-info">'+
         '<strong class="product-card-name">'+h(group.title)+'</strong>'+
         '<small class="product-card-description">'+h(description)+'</small>'+
+        (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':'')+
         '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
           '<small>'+stockLabel+'</small><span><b>'+fmt(count)+'</b> un.</span></div>'+
         '<div class="product-card-location'+(locationMissing?' is-unknown':'')+'" aria-label="Localização do produto">'+
