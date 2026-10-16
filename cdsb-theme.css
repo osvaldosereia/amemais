@@ -1,0 +1,76 @@
+/* Identidade CDSB — Centro de Distribuição São Bento | 2026-10-16
+   Camada final de design: azul institucional, dourado e branco.
+   Verde permanece reservado exclusivamente a estados de sucesso/estoque OK. */
+:root{
+ --cdsb-blue:#102d50;--cdsb-blue-light:#1c446e;--cdsb-gold:#c7a35f;--cdsb-gold-soft:#f4ebd8;
+ --cdsb-text:#21344b;--cdsb-muted:#627184;--cdsb-border:#dce2e8;--cdsb-surface:#fff;
+ --cdsb-bg:#f6f7f9;--c-forest:#102d50;--c-forest-dark:#0d2746;
+ --c-forest-deep:#081e37;--c-text:#21344b;--c-muted:#627184;
+ --c-border:#dce2e8;--c-bg:#f6f7f9;--app-accent:var(--cdsb-blue);
+}
+html,body{color:var(--cdsb-text);background:var(--cdsb-bg)}
+a,.plain{color:var(--cdsb-blue-light)}
+.app-shell.mobile-c-app .sidebar{background:#fff;border-right-color:var(--cdsb-border)}
+.mobile-c-app .sidebar .brand-lockup{
+ display:flex!important;align-items:center;justify-content:center;
+ height:128px;min-height:128px;max-height:128px;
+ padding:19px 10px!important;border:1px solid #e4e5e7;border-radius:15px;
+ background:#fff;margin:0;box-shadow:none;
+}
+.brand-lockup .cdsb-brand-logo{display:block;width:100%;max-width:208px;height:auto;max-height:94px;object-fit:contain}
+.mobile-c-app .topbar{background:#fff;border-color:var(--cdsb-border)}
+.cdsb-mobile-identity{display:none}
+.mobile-c-app .nav button{color:#465b74}
+.mobile-c-app .nav button.active{color:var(--cdsb-blue);background:#e9eef5;font-weight:800;border-left:3px solid var(--cdsb-gold)}
+.mobile-c-app .nav button:hover{background:#f2f5f9}
+.mobile-c-app .sidefoot{color:var(--cdsb-muted);border-color:var(--cdsb-border)}
+.mobile-c-app :is(.pagehead h1,.c-welcome h1,.c-section-heading h2,.panelhead h2){color:var(--cdsb-blue)}
+.mobile-c-app :is(.panel,.card,.uo-card){border-color:var(--cdsb-border)}
+.mobile-c-app .button.primary,.button.primary,.c-action-primary,.mobile-menu-scan{
+ color:#fff;background:var(--cdsb-blue);border-color:var(--cdsb-blue);box-shadow:none}
+.mobile-c-app .button.primary:hover,.button.primary:hover,.c-action-primary:hover{background:var(--cdsb-blue-light);border-color:var(--cdsb-blue-light)}
+.button:not(.primary):not(.danger),.c-action-outline{color:var(--cdsb-blue);border-color:#ccd7e3;background:#fff}
+.button:not(.primary):not(.danger):hover,.c-action-outline:hover{background:#f1f5fa}
+:where(.field input,.field select,.field textarea,.search,select.filter):focus{outline-color:var(--cdsb-gold)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline-color:var(--cdsb-gold)}
+.c-hero{background:linear-gradient(120deg,#102d50,#1d4c7a 70%,#102d50);box-shadow:0 10px 24px #102d5021}
+.c-hero-art span{background:#9cb9d1}.c-hero-art span:nth-child(4){background:var(--cdsb-gold)}
+.c-hero-sub{color:#e2e9f0}.c-eyebrow,.c-section-heading>button{color:var(--cdsb-blue-light)}
+.c-metric-icon{color:var(--cdsb-blue);background:#edf2f8}
+.c-metric-data strong{color:var(--cdsb-blue)}
+.mobile-c-app .mobile-top-menu{color:var(--cdsb-blue);border-color:#d9e0e8;background:#f2f5f8}
+.mobile-more-overlay{background:rgba(9,27,50,.58)}
+.mobile-more-overlay .mobile-more-sheet{background:#fff}
+.mobile-more-sheet .c-more-items button.active{background:#eaf0f8;color:var(--cdsb-blue);border-color:#d6e0ec}
+.mobile-more-sheet .c-more-account button{color:var(--cdsb-blue);background:#f3f6fa}
+.mobile-navigation-head,.mobile-more-sheet .c-more-account{border-color:#dfe5eb}
+.mobile-navigation-head strong,.mobile-more-sheet .c-more-account strong{color:var(--cdsb-blue)}
+.mobile-navigation-head .mobile-navigation-close{background:#e9eff6;color:var(--cdsb-blue)}
+.mobile-menu-current{color:var(--cdsb-blue)}
+.uo-order-open>summary,.uo-gondola-line>span>strong,.uo-product-preview>div>strong,.uo-order-open strong{color:var(--cdsb-blue)}
+.uo-order-open[open]>summary,.uo-gondola-group>header{color:var(--cdsb-blue);background:#edf3f9}
+.uo-location,.uo-preview-quantity,.uo-next-step{color:#2a547d}
+.uo-group-switch{background:#edf2f7}
+.uo-group-switch button.is-current{color:var(--cdsb-blue)}
+.uo-card .uo-pill.checking{color:#1f527d;background:#e8f0fb}
+.uo-operational .uo-primary-action>.button{background:var(--cdsb-blue);color:#fff}
+.op-line.is-selected{border-color:var(--cdsb-gold);background:#fcfaf5}
+.login-wrap{background:linear-gradient(180deg,#f4f6f9,#fff)}
+.login{border:1px solid #dbe3eb;box-shadow:0 12px 38px #102d5011}
+.brand-login{padding:3px 0 16px;background:#fff}
+.brand-login img{width:min(100%,326px);height:auto;max-height:140px;aspect-ratio:1979 / 658;object-fit:contain}
+.brand-login small{color:var(--cdsb-blue-light);font-size:.64rem;letter-spacing:.18em}
+.login h1{color:var(--cdsb-blue)}
+/* Elementos com sucesso real continuam verdes, avisos dourados e divergências vermelhas. */
+.pill.ativo,.badge.success{color:#236347;background:#e9f5ed}
+.pill.rascunho{color:#845a19;background:#faf1df}
+@media(max-width:760px){
+ .mobile-c-app .sidebar .brand-lockup{display:none!important}
+ .cdsb-mobile-identity{display:flex;align-items:center;gap:9px}
+ .cdsb-mobile-identity img{width:40px;height:40px;object-fit:contain;border-radius:50%}
+ .cdsb-mobile-identity span{color:var(--cdsb-blue);font-weight:850;font-size:1.18rem;letter-spacing:.045em}
+ .mobile-c-app .topbar{min-height:67px}
+ .mobile-navigation-head img{width:49px;height:49px;border-radius:50%}
+ .mobile-c-app .content{padding-top:18px}
+ .brand-login img{max-width:300px}
+}
