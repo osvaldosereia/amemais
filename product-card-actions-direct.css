@@ -22,7 +22,7 @@
   width:100%!important;min-width:0!important;max-width:none!important;min-height:42px!important;
   margin:0!important;padding:9px 8px!important;border-radius:10px!important;
   border:1px solid #cddfd3!important;box-shadow:none!important;cursor:pointer!important;
-  font:700 .82rem/1.22 inherit!important;text-align:center!important;white-space:normal!important;
+  font-family:inherit!important;font-size:.82rem!important;font-weight:700!important;line-height:1.22!important;text-align:center!important;white-space:normal!important;
   overflow-wrap:anywhere;
 }
 .products-panel .product-card-v3 .product-card-actions-v5 .product-card-action-primary,
@@ -134,7 +134,7 @@
   display:flex;flex-direction:column;gap:7px;margin:11px 0 0;
   color:#8f3b2d;font-weight:700;font-size:.8rem;
 }
-.product-card-v3 .card-balance-note textarea{
+.product-card-v3 .card-balance-note[hidden]{display:none!important}\n.product-card-v3 .card-balance-note textarea{
   width:100%;border:1px solid #dbb6a8;border-radius:9px;padding:10px;font:inherit;resize:vertical;
   color:#193e2e;background:#fff;
 }
