@@ -3822,17 +3822,11 @@ async function handleClick(event){
     });
   }
   if(action==='unified-order-new')return orderDestinationPicker();
-  if(action==='order-new')return openAvulsoOrderModal();
+  if(action==='order-new')return orderDestinationPicker();
   if(action==='order-assign-event'){
     if(!hasPermission('orders.assign'))return;return orderEventModal(id);
   }
-  if(action==='customer-link-new'){
-    if(!hasPermission('catalog.manage'))return;
-    return formModal('Criar acesso para cliente',
-      '<div class="formgrid">'+field('Identificação do acesso','label','text','','required minlength="2" maxlength="100" placeholder="Ex.: Cliente Maria ou Feira de Outubro"')+'</div>'+
-      '<p class="help">Gera um link de catálogo, válido por 30 dias, sem acesso ao estoque nem ao sistema administrativo. O cliente informa nome e telefone ao fazer o pedido.</p>',
-      'customer-link-create','Gerar acesso');
-  }
+  if(action==='customer-link-new')return toast('Links para clientes foram desativados.',true);
   if(action==='customer-link-revoke'){
     if(!hasPermission('catalog.manage')||!window.confirm('Revogar este acesso? O cliente não conseguirá abrir o catálogo nem enviar novos pedidos por esse link.'))return;
     return exec(async()=>assertOk(await db.rpc('revoke_customer_catalog_access',{p_id:id})),'Acesso revogado.');
@@ -4354,18 +4348,7 @@ async function handleSubmit(event){
     if(destination.startsWith('event:'))return eventBatchModal(destination.slice(6));
     return toast('Escolha uma unidade cadastrada.',true);
   }
-  if(type==='order-create'){
-    if(!hasPermission('orders.internal'))return;
-    let items;
-    try{items=collectInternalOrder(form);}catch(error){toast(error.message,true);return;}
-    const name=String(values.customer_name||'').trim(),phone=String(values.customer_phone||'').trim();
-    if(name.length<2||phone.replace(/\D/g,'').length<10){toast('Informe nome e telefone com DDD.',true);return;}
-    await exec(async()=>assertOk(await db.rpc('create_internal_avulso_order',{
-      p_name:name,p_phone:phone,p_items:items,
-      p_event_id:values.event_id||null,p_request_id:crypto.randomUUID()
-    })),'Pedido registrado e reserva automática realizada. O físico não foi alterado.');
-    return;
-  }
+  if(type==='order-create')return toast('Novo pedido precisa de destino cadastrado. Use Novo pedido.',true);
   if(type==='order-associate'){
     if(!hasPermission('orders.assign'))return;
     await exec(async()=>assertOk(await db.rpc('assign_avulso_order_event',{
@@ -4373,21 +4356,8 @@ async function handleSubmit(event){
     })),'Vínculo de evento atualizado; estoque inalterado.');
     return;
   }
-  if(type==='customer-link-create'){
-    if(!hasPermission('catalog.manage'))return;
-    const label=String(values.label||'').trim();if(label.length<2||label.length>100)return toast('Informe um nome para o acesso.',true);
-    state.loading=true;
-    try{
-      const token=assertOk(await db.rpc('create_customer_catalog_access',{p_label:label}));
-      if(!/^[0-9a-f]{64}$/.test(token))throw Error('Token de acesso não foi criado corretamente.');
-      const url=new URL('./cliente.html',location.href);url.search='';url.hash='t='+token;
-      closeTopModal();
-      await loadData();
-      customerAccessLinkModal(label,url.toString());
-    }catch(error){fail(error);}
-    finally{state.loading=false;}
-    return;
-  }
+  if(type==='customer-link-create')return toast('Função desativada. Use Novo pedido.',true);
+
   if(type==='event-batch-write'){
     const eid=form.dataset.event,batchId=form.dataset.batch;
     if(!((isManager()&&hasPermission('events.separate'))||
