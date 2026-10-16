@@ -2,7 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261015gallery2';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015covergrant1';
-import {renderStoreHub,locationOrders,matchesStoreOrder} from './store-hub.js?v=20261016dest1';
+import {renderStoreHub,locationOrders,matchesStoreOrder,filterStoreHub} from './store-hub.js?v=20261016stores1';
+import {renderStoreUnit} from './store-unit.js?v=20261016stores1';
 import { scanEAN } from './scan.js?v=20261014w2';
 import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=20261014v3';
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
@@ -82,7 +83,7 @@ const state = {
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
-  search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,
+  search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,activeStore:null,activeStoreTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
@@ -2522,10 +2523,32 @@ function branchStockModal(storeId){
 }
 function storesPage(){
  const portal=isFranchisePortal();
+ if(state.activeStore){
+  const store=state.stores.find(s=>s.id===state.activeStore&&!s.force_archived_at&&!s.is_primary);
+  if(store&&(hasPermission('stores.manage')||assignedStore(store.id))){
+   return renderStoreUnit({
+    store,orders:locationOrders(unifiedOrderRecords(),{type:'store',id:store.id}),
+    storeBalances:state.storeBalances,products:state.items,branchMovements:state.branchMovements,
+    branchReturns:state.branchReturns,storeOrderReceipts:state.storeOrderReceipts,
+    tab:state.activeStoreTab,context:{button,time:niceTime,
+      canBrowseOrders:permittedView('pedidos'),
+      canManageStores:hasPermission('stores.manage')&&!portal,
+      canRequest:store.active&&(store.kind==='franquia'?hasPermission('orders.franchise'):hasPermission('orders.central')),
+      canMove:store.active&&store.kind==='filial'&&assignedStore(store.id)&&
+        (hasPermission('stores.manage')||hasPermission('orders.receive')),
+      canReturn:store.active&&store.kind==='filial'&&assignedStore(store.id)&&
+        (hasPermission('stores.manage')||hasPermission('orders.receive'))
+    }
+   });
+  }
+  state.activeStore=null;
+ }
+
  return renderStoreHub({
   stores:state.stores.filter(s=>!s.force_archived_at),events:state.events,orders:unifiedOrderRecords(),
   context:{
    button,time:niceTime,portal,canForceDelete:hasPermission('system.force_delete'),
+   storeBalances:state.storeBalances,eventBalances:state.balances,filter:state.storeHubFilter,
    canBrowseOrders:permittedView('pedidos'),
    canProcess:o=>permittedView('pedidos')&&!portal&&(
      o.kind==='evento'?(hasPermission('orders.separate')||hasPermission('events.separate')):
@@ -2968,6 +2991,7 @@ function searchAndManageSku(code){
 function switchView(view) {
   if(view==='pedidos-lojas'||view==='separacao')view='pedidos';
   if(view==='eventos'&&state.profile?.role!=='evento')view='lojas';
+  state.activeStore=null;state.activeStoreTab='resumo';
   if(['roupas','saida','balanco','inventario'].includes(view))view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.page=0;state.ordersContext=null;
@@ -3570,9 +3594,13 @@ async function handleClick(event){
   if(action==='event-batch-cancel')return eventBatchCancelModal(id);
   if(action==='event-batch-go'){
     if(!permittedView('pedidos'))return toast('Sem permissão para acessar os pedidos.',true);
-    state.view='pedidos';state.activeEvent=null;render();
+    const event=state.eventPickBatches.find(x=>x.id===id);
+    if(!event||!eventById(event.event_id))return toast('Pedido não encontrado.',true);
+    state.ordersContext={type:'event',id:event.event_id,mode:'all'};
+    state.view='pedidos';render();
     const card=document.querySelector('[data-order-id="'+id+'"]');
     card?.scrollIntoView({block:'center',behavior:'smooth'});
+    card?.querySelector('details.uo-order-open')?.setAttribute('open','');
     card?.querySelector('details.uo-details')?.setAttribute('open','');
     return;
   }
@@ -3624,12 +3652,51 @@ async function handleClick(event){
    if(form)form.dataset.eventId=id;
    return;
   }
+  if(action==='store-hub-type'){
+   const choice=target.dataset.type;
+   if(!['todas','propria','franquia','temporaria'].includes(choice))return;
+   state.storeHubFilter.type=choice;
+   filterStoreHub(target.closest('.sh-hub'),state.storeHubFilter.search,choice,state.storeHubFilter.status);
+   return;
+  }
+  if(action==='store-unit-open'){
+   const type=target.dataset.locationType,uid=target.dataset.locationId;
+   if(type==='event'){
+    const ev=eventById(uid);
+    if(!ev||ev.deleted_at||!permittedView('eventos')||
+     !(hasPermission('events.read')||hasPermission('events.manage')||memberRole(uid)))return;
+    state.activeStore=null;state.activeEvent=uid;state.view='eventos';
+   }else if(type==='store'){
+    const st=state.stores.find(s=>s.id===uid&&!s.is_primary&&!s.force_archived_at);
+    if(!st||!(hasPermission('stores.manage')||assignedStore(uid)))return;
+    state.activeStore=uid;state.activeStoreTab='resumo';state.view='lojas';
+   }else return;
+   render();window.scrollTo(0,0);return;
+  }
+  if(action==='store-unit-back'){
+   state.activeStore=null;state.activeStoreTab='resumo';state.view='lojas';
+   render();window.scrollTo(0,0);return;
+  }
+  if(action==='store-unit-tab'){
+   if(!state.activeStore)return;
+   const chosen=target.dataset.tab;
+   if(!['resumo','pedidos','estoque','movimentacoes','configuracoes','recebimentos','cadastro'].includes(chosen))return;
+   state.activeStoreTab=chosen;render();return;
+  }
   if(action==='store-hub-admin'){
    if(!hasPermission('stores.manage'))return;
    state.view='lojas-admin';state.ordersContext=null;render();window.scrollTo(0,0);return;
   }
   if(action==='store-hub-back'){
-   state.ordersContext=null;state.view='lojas';render();window.scrollTo(0,0);return;
+   const old=state.ordersContext;state.ordersContext=null;
+   if(old?.type==='event'&&eventById(old.id)&&permittedView('eventos')){
+    state.activeEvent=old.id;state.view='eventos';
+   }else{
+    state.view='lojas';
+    if(old?.type==='store'&&state.stores.some(s=>s.id===old.id&&!s.force_archived_at))
+      state.activeStore=old.id;
+   }
+   render();window.scrollTo(0,0);return;
   }
   if(action==='store-hub-reset'){
    if(!permittedView('pedidos'))return;
@@ -3655,6 +3722,7 @@ async function handleClick(event){
    if(focus)requestAnimationFrame(()=>{
     const card=[...document.querySelectorAll('[data-order-card]')].find(el=>el.dataset.orderId===focus);
     if(!card)return;
+    card.querySelector('details.uo-order-open')?.setAttribute('open','');
     const details=card.querySelector('details.uo-details');
     if(details)details.open=true;
     card.scrollIntoView({block:'center',behavior:'smooth'});
@@ -3864,7 +3932,7 @@ async function handleClick(event){
    return exec(async()=>assertOk(await db.rpc('confirm_commercial_order_delivery',{p_order:id})),
     'Entrega confirmada. Pedido movido para o histórico.');
   }
-  if(action==='store-order-new')return storeOrderModal();
+  if(action==='store-order-new')return storeOrderModal(target.dataset.store||state.activeStore||'');
   if(action==='store-order-separate')return storePickingModal(id);
   if(action==='store-order-adjust')return orderQuantityModal(id,'adjust');
   if(action==='store-order-receive')return orderQuantityModal(id,'receiving');
@@ -4814,6 +4882,11 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-store-hub-search]')){
+   state.storeHubFilter.search=event.target.value;
+   filterStoreHub(event.target.closest('.sh-hub'),state.storeHubFilter.search,
+     state.storeHubFilter.type,state.storeHubFilter.status);
+  }
   if(event.target.matches('[data-users-search]'))applyUserListFilter();
   if(event.target.matches('[data-buy-search]'))syncPurchaseForm(event.target.closest('form'));
   if(event.target.matches('[data-balance-count]')){
@@ -4954,6 +5027,11 @@ document.addEventListener('keydown',event=>{
   }
 });
 document.addEventListener('change',event=>{
+  if(event.target.matches('[data-store-hub-status-filter]')){
+   state.storeHubFilter.status=event.target.value;
+   filterStoreHub(event.target.closest('.sh-hub'),state.storeHubFilter.search,
+     state.storeHubFilter.type,state.storeHubFilter.status);
+  }
   if(event.target.matches('[data-product-sort]')){
     state.catalogSort=event.target.value;state.page=0;render();return;
   }
