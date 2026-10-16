@@ -17,7 +17,7 @@ import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=2
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261016dest1';
-import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261016dest1';
+import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261016compact1';
 import {operationalFormMarkup,operationalDifferenceRows} from './order-operations.js?v=20261016partial1';
 import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,findVerificationProduct} from './final-verification.js?v=20261016orderflow1';
 import {pickingThermalHTML} from './thermal-picking.js?v=20261016dest1';
@@ -3753,7 +3753,18 @@ async function handleClick(event){
       p_kind:kind,p_order:id
     })),'Disponibilidade reavaliada. Consulte as faltas no pedido.');
   }
-  if(action==='order-group-location'||action==='order-group-model'){
+  if(action==='uo-summary-filter'){
+    const page=target.closest('.uo-page');
+    const field=page?.querySelector('[data-unified-status]');
+    if(field){
+      field.value=field.value===target.dataset.status?'todos':target.dataset.status;
+      filterUnifiedOrders(page,page.querySelector('[data-unified-search]')?.value||'',
+       field.value,page.querySelector('[data-unified-destination]')?.value||'todos',
+       page.querySelector('[data-unified-sort]')?.value||'recentes');
+    }
+    return;
+   }
+   if(action==='order-group-location'||action==='order-group-model'){
     const container=target.closest('[data-group-view]');
     if(!container)return;
     const mode=action==='order-group-model'?'model':'location';
@@ -4834,7 +4845,8 @@ document.addEventListener('input',event=>{
     const container=event.target.closest('.uo-page');
     filterUnifiedOrders(container,event.target.value,
       container?.querySelector('[data-unified-status]')?.value||'todos',
-      container?.querySelector('[data-unified-destination]')?.value||'todos');
+      container?.querySelector('[data-unified-destination]')?.value||'todos',
+      container?.querySelector('[data-unified-sort]')?.value||'recentes');
   }
   if(event.target.matches('form[data-form="avulso-picking"] [data-pick-qty],form[data-form="event-batch-picking"] [data-pick-qty]'))
     updateUnifiedPickingTotal(event.target.closest('form'));
@@ -4955,11 +4967,12 @@ document.addEventListener('change',event=>{
   if(event.target.matches('[data-users-filter-role]'))applyUserListFilter();
   if(event.target.matches('[data-buy-modal-supplier]'))syncPurchaseForm(event.target.closest('form'));
   if(event.target.matches('[data-buy-filter]')){state.purchaseSupplierFilter=event.target.value;render();return;}
-  if(event.target.matches('[data-unified-status], [data-unified-destination]')){
+  if(event.target.matches('[data-unified-status], [data-unified-destination], [data-unified-sort]')){
     const container=event.target.closest('.uo-page');
     filterUnifiedOrders(container,container?.querySelector('[data-unified-search]')?.value||'',
       container?.querySelector('[data-unified-status]')?.value||'todos',
-      container?.querySelector('[data-unified-destination]')?.value||'todos');
+      container?.querySelector('[data-unified-destination]')?.value||'todos',
+      container?.querySelector('[data-unified-sort]')?.value||'recentes');
   }
   if(event.target.closest('form[data-form="sku-manage"]')){
     syncSkuManagerPreview(event.target.closest('form[data-form="sku-manage"]'));
