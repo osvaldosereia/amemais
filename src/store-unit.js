@@ -21,7 +21,7 @@ export function renderStoreUnit({store,orders=[],storeBalances=[],products=[],br
  const validTabs=franchise?['resumo','pedidos','recebimentos','cadastro']:
   ['resumo','pedidos','estoque','movimentacoes','configuracoes'];
  const activeTab=validTabs.includes(tab)?tab:'resumo';
- const scopedBalances=franchise?[]:storeBalances.filter(x=>x.store_id===store.id&&Number(x.quantity)>=0);
+ const scopedBalances=franchise?[]:storeBalances.filter(x=>x.store_id===store.id&&Number(x.quantity)>0);
  const stock=scopedBalances.reduce((s,b)=>s+Number(b.quantity||0),0);
  const ownReturns=branchReturns.filter(r=>r.from_store_id===store.id);
  const ownMovements=branchMovements.filter(m=>m.store_id===store.id).slice(0,60);
@@ -68,8 +68,33 @@ export function renderStoreUnit({store,orders=[],storeBalances=[],products=[],br
     ' · '+esc(m.reason||m.operation||'Movimento')+'</span><strong>'+fmt(m.quantity_delta)+' un.</strong></div>').join('')+'</div>':
     '<p class="su-empty">Nenhum movimento registrado.</p>')+'</div>';
  }else if(activeTab==='recebimentos'){
-  const received=orders.filter(o=>o.status==='despachado'||o.status==='recebido'||o.status==='recebido_divergente');
-  panel='<div class="su-panel"><h2>Recebimentos da franquia</h2>'+rows(received)+'</div>';
+  const received=orders.filter(o=>['despachado','recebido','recebido_divergente'].includes(o.status));
+  const receiptMap=new Map();
+  for(const record of storeOrderReceipts){
+   if(!receiptMap.has(record.order_id))receiptMap.set(record.order_id,[]);
+   receiptMap.get(record.order_id).push(record);
+  }
+  panel='<div class="su-panel"><div class="su-section-header"><h2>Recebimentos da franquia</h2></div>'+
+   (received.length?'<div class="su-orders">'+received.map(o=>{
+    const receipts=receiptMap.get(o.id)||[];
+    return '<article class="su-receipt"><div class="su-section-header"><div><strong>Pedido #'+esc(o.code||'—')+'</strong>'+
+     '<small>'+esc(displayOrderStage(o))+' · '+fmt(o.total)+' unidades</small></div>'+
+     orderAction(o)+'</div>'+
+     (receipts.length?'<div class="su-data-list">'+receipts.map(r=>{
+      const product=products.find(p=>p.id===r.product_id);
+      const expected=Number(r.expected_quantity)||0,checked=Number(r.received_quantity)||0;
+      const missing=Math.max(0,Number(r.missing_quantity)||0);
+      return '<div><span><strong>'+esc(product?.name||'Produto')+'</strong>'+
+       (product?.sku?'<small>SKU '+esc(product.sku)+'</small>':'')+
+       (r.reason?'<small>'+esc(r.reason)+'</small>':'')+
+       '</span><span class="su-receipt-qty">'+fmt(checked)+' de '+fmt(expected)+' recebidas'+
+       (missing?' · '+fmt(missing)+' un. falta'+(missing===1?'':'m'):'')+'</span></div>';
+     }).join('')+'</div>':
+     '<p class="su-empty">'+(o.status==='despachado'?
+       'Entrega ainda em trânsito. A conferência ocorrerá no recebimento.':
+       'Conferência por SKU não disponível neste acesso.')+'</p>')+'</article>';
+   }).join('')+'</div>':'<p class="su-empty">Nenhum pedido enviado ou recebido para apresentar.</p>')+
+  '</div>';
  }else{
   panel='<div class="su-panel"><div class="su-section-header"><h2>Cadastro da unidade</h2>'+
    (ctx.canManageStores?ctx.button('Editar cadastro','store-edit','data-id="'+esc(store.id)+'"','small')+
