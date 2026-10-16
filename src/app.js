@@ -2776,18 +2776,19 @@ function storeOrderModal(preselectId=''){
  const target=targets.find(x=>x.id===preselectId)||(!preselectId?targets[0]:null);
  if(!target)return toast('Unidade de destino indisponível ou não autorizada.',true);
  const destination=(target.kind==='franquia'?'Franquia · ':'Loja própria · ')+target.name;
+ const portal=isFranchisePortal();
  const groups=makeOrderCatalog(state.items,state.apparelModels,
-  p=>qtyAvailable(p.id),
+  portal?()=>0:p=>qtyAvailable(p.id),
   p=>target.kind==='franquia'?categoryFranchiseMin(p):0);
  formModal('Montar pedido · '+target.name,
    '<input type="hidden" name="to_store_id" value="'+h(target.id)+'">'+
-   orderCartMarkup(groups,{destination})+
+   orderCartMarkup(groups,{destination,showAvailable:!portal})+
    '<div class="order-cart-note">'+textareaField('Observação (opcional)','note')+'</div>'+
    '<p class="order-cart-guidance">A reserva só será feita após revisar e confirmar o pedido. A saída física ocorre depois da conferência.</p>',
    'store-order-create','Revisar pedido');
  const form=document.querySelector('.modalback form[data-form="store-order-create"]');
  if(!form)return;
- mountOrderCart(form,{groups,destination,onRender:hydrateImages});
+ mountOrderCart(form,{groups,destination,showAvailable:!portal,onRender:hydrateImages});
 }
 
 function storeModal(item=null){
