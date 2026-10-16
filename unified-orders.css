@@ -297,3 +297,11 @@
  .op-lines{max-height:54vh}
  .operational-modal .modalfooter .button{flex:1;min-width:110px;min-height:47px}
 }
+
+
+.op-scanner{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:end}
+.op-scanner label{display:flex;flex-direction:column;gap:6px;font-size:.78rem;font-weight:750;color:#476d53}
+.op-scanner input{height:46px;width:100%;border:1px solid #bfdac7;border-radius:8px;padding:9px 12px;font:inherit}
+.op-scanner>.button{height:46px}
+.op-line.is-selected{border:2px solid #168a57;background:#eff9f1}
+@media(max-width:550px){.op-scanner{grid-template-columns:1fr}.op-scanner>.button{width:100%}}
