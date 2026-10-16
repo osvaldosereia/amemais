@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 const files=['../src/app.js','../src/tv-dashboard.js','../index.html',
  '../painel-tv.html','../cdsb-theme.css','../cdsb-tv-theme.css',
- '../manifest.webmanifest','../src/unified-orders.js','../src/event-lots.js',
+ '../manifest.webmanifest','../cdsb-brand.svg','../src/unified-orders.js','../src/event-lots.js',
  '../supabase/migrations/20261016_disable_customer_orders.sql'];
-const [app,tv,entry,tvPage,theme,tvTheme,manifest,orders,temporary,deny]
+const [app,tv,entry,tvPage,theme,tvTheme,manifest,logo,orders,temporary,deny]
  =await Promise.all(files.map(name=>readFile(new URL(name,import.meta.url),'utf8')));
 test('marca CDSB: imagem oficial única na sidebar e cabeçalho exclusivo no celular',()=>{
  assert.match(app,/const desktopIdentity='<div class="brand brand-lockup">'\+mark\+'<\/div>'/);
- assert.match(app,/const mark='<img class="cdsb-brand-logo" src="\.\/cdsb-brand\.jpg"/);
+ assert.match(app,/const mark='<img class="cdsb-brand-logo" src="\.\/cdsb-brand\.svg"/);
  assert.match(app,/cdsb-mobile-identity/);
  assert.match(theme,/\.cdsb-mobile-identity\{display:none\}/);
  assert.match(theme,/@media\(max-width:760px\)/);
@@ -17,8 +17,8 @@ test('marca CDSB: imagem oficial única na sidebar e cabeçalho exclusivo no cel
  assert.equal((app.match(/<div class="brand brand-lockup"/g)||[]).length,1);
 });
 test('login e Painel TV usam marca horizontal; favicon e PWA usam brasão',()=>{
- assert.match(app,/brand-login"><img src="\.\/cdsb-brand\.jpg"/);
- assert.match(tv,/tv-one-logo"><img src="\.\/cdsb-brand\.jpg"/);
+ assert.match(app,/brand-login"><img src="\.\/cdsb-brand\.svg"/);
+ assert.match(tv,/tv-one-logo"><img src="\.\/cdsb-brand\.svg"/);
  assert.match(entry,/rel="icon" type="image\/jpeg" href="\.\/cdsb-emblem\.jpg/);
  assert.match(tvPage,/rel="icon" type="image\/jpeg" href="\.\/cdsb-emblem\.jpg/);
  const m=JSON.parse(manifest);
@@ -33,7 +33,9 @@ test('contraste visual padronizado para azul e dourado sem neutralizar falhas',(
  assert.match(theme,/--cdsb-gold:#c7a35f/);
  assert.match(theme,/\.login-wrap/);
  assert.match(theme,/\.uo-exception-badge/);
- assert.match(theme,/\.mobile-c-app \.sidebar \.brand-lockup\{height:143px/);
+ assert.match(theme,/height:165px;min-height:165px;max-height:165px/);
+ assert.match(theme,/\.mobile-c-app \.topbar \.cdsb-mobile-identity\{display:none!important\}/);
+ assert.match(theme,/grid-template-columns:282px minmax\(0,1fr\)/);
  assert.match(theme,/\.button\.primary/);
 });
 test('criação pública de links e pedidos sem destino desativada; pedido único persiste',()=>{
@@ -44,4 +46,15 @@ test('criação pública de links e pedidos sem destino desativada; pedido únic
  assert.match(deny,/revoke all on function public\.create_customer_catalog_access/);
  assert.doesNotMatch(orders,/data-action="customer-link-new"/);
  assert.match(temporary,/Pedidos da loja temporária/);
+});
+
+
+test('logo escalável preserva o brasão e mantém tipografia e subtítulo legíveis',()=>{
+ assert.match(logo,/<svg[^>]*viewBox="0 0 980 320"/);
+ assert.match(logo,/data:image\/jpeg;base64,/);
+ assert.match(logo,/CENTRO DE DISTRIBUIÇÃO SÃO BENTO/);
+ assert.match(logo,/textLength="646"/);
+ assert.match(tvTheme,/width:185px/);
+ assert.match(entry,/20261016logo3/);
+ assert.match(tvPage,/20261016logo3/);
 });
