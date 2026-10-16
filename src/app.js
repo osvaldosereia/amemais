@@ -2223,15 +2223,36 @@ function eventCoverCard(e,compact=false){
  return '<div class="event-cover'+(compact?' compact':'')+'"><img data-event-cover="'+h(e.cover_path)+'" alt="Capa do evento '+h(e.name)+'" loading="lazy"></div>';
 }
 function syncCoverFileField(form){
- const label=form?.querySelector('[data-cover-file]');
- if(label)label.hidden=form.elements.namedItem('cover_mode')?.value!=='upload';
+ const mode=form?.elements.namedItem('cover_mode')?.value;
+ const file=form?.querySelector('[data-cover-file]');
+ if(file)file.hidden=mode!=='upload';
+ const theme=form?.querySelector('[data-cover-theme]');
+ if(theme)theme.hidden=mode!=='generate';
+}
+function eventCoverThemeField(value=''){
+ return '<label class="field" data-cover-theme>'+
+  '<span>Tema da capa (opcional)</span>'+
+  '<input type="text" name="cover_theme" maxlength="220" value="'+h(value)+'" '+
+   'placeholder="Ex.: Retiro espiritual com oração, natureza e acolhimento">'+
+  '<small>Usaremos o nome da loja e este tema. Se ficar vazio, a IA interpretará o nome e as observações.</small>'+
+ '</label>';
+}
+async function saveEventCoverTheme(db,id,theme){
+ const text=String(theme||'').trim();
+ if(text.length>220)throw Error('Informe um tema de até 220 caracteres.');
+ const result=await db.from('events').update({cover_theme:text||null}).eq('id',id)
+  .select('id,cover_theme').maybeSingle();
+ if(result.error)throw result.error;
+ if(!result.data||String(result.data.cover_theme||'')!==text)
+  throw Error('Não foi possível salvar o tema da capa.');
 }
 function eventCoverModal(id){
  if(!hasPermission('events.manage'))return;
  const e=eventById(id);if(!e||e.deleted_at)return;
  formModal('Capa · '+e.name,
   eventCoverCard(e)+'<p class="help">Capa horizontal de 1600 × 900 pixels. Envie uma foto, gere com IA ou remova a atual.</p>'+
-  selectField('O que deseja fazer','cover_mode',[['upload','Enviar nova imagem'],['generate','Gerar com OpenAI (econômico)'],['remove','Remover capa']])+
+  selectField('O que deseja fazer','cover_mode',[['upload','Enviar nova imagem'],['generate','Gerar com IA usando o nome e tema'],['remove','Remover capa']])+
+  eventCoverThemeField(e.cover_theme||'')+
   '<label class="field" data-cover-file><span>Selecionar imagem (caso escolha envio)</span><input type="file" name="event_cover_file" accept="image/*"></label>',
   'event-cover-update','Aplicar');
  const f=document.querySelector('.modalback form[data-form="event-cover-update"]');if(f){f.dataset.eventId=id;syncCoverFileField(f);}
@@ -2248,7 +2269,8 @@ function eventModal(){
   field('Data de término (opcional)','ends_at','date')+
   selectField('Responsável','responsible_id',people.map(u=>[u.id,u.full_name]),state.user.id,'required')+
   textareaField('Local, observações e informações básicas','notes')+
-  selectField('Imagem de capa','cover_mode',[['none','Criar sem capa'],['upload','Enviar imagem'],['generate','Gerar imagem com OpenAI (low)']])+
+  selectField('Imagem de capa','cover_mode',[['none','Criar sem capa'],['upload','Enviar imagem'],['generate','Gerar capa pelo nome e tema (IA)']])+
+  eventCoverThemeField()+
   '<label class="field" data-cover-file><span>Arquivo de imagem (caso escolha Enviar)</span><input type="file" name="event_cover_file" accept="image/*"></label>'+
   '</div><p class="help">Após criar, monte a lista de separação, imprima em A4 e confirme o envio físico.</p>',
   'event-create','Criar e preparar');
@@ -4598,8 +4620,10 @@ async function handleSubmit(event){
     if(mode==='upload'){
      if(!(file instanceof File)||!file.size)throw Error('Selecione uma imagem para enviar.');
      await uploadEventCover(db,e.id,file);
-    }else if(mode==='generate')await generateEventCover(db,e.id);
-    else if(mode==='remove')assertOk(await db.from('events').update({cover_path:null}).eq('id',e.id));
+    }else if(mode==='generate'){
+     await saveEventCoverTheme(db,e.id,values.cover_theme);
+     await generateEventCover(db,e.id);
+    }else if(mode==='remove')assertOk(await db.from('events').update({cover_path:null}).eq('id',e.id));
    },'Capa do evento atualizada.');
   }
   if(type==='event-create'){
@@ -4618,7 +4642,10 @@ async function handleSubmit(event){
         if(!(values.event_cover_file instanceof File)||!values.event_cover_file.size)
          throw Error('Nenhum arquivo foi enviado.');
         await uploadEventCover(db,eventId,values.event_cover_file);
-       }else if(values.cover_mode==='generate')await generateEventCover(db,eventId);
+       }else if(values.cover_mode==='generate'){
+        await saveEventCoverTheme(db,eventId,values.cover_theme);
+        await generateEventCover(db,eventId);
+       }
       }catch(error){coverWarning=error.message||'Capa não salva';console.warn('Evento criado sem capa',error);}
     },()=>coverWarning?'Loja criada. Capa pendente: '+coverWarning:'Loja criada com sucesso. Prepare os produtos em Pedidos.');
   }
