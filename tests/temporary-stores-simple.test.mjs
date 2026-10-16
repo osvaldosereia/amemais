@@ -45,22 +45,22 @@ test('encerramento diferencia devolvidos, avariados e não devolvidos sem invent
  assert.match(html,/Não devolvidas/);
  assert.match(html,/Não devolvidas não são classificadas como vendas/);
 });
-test('a home de loja em preparação permite impressão A4 e envio',()=>{
- const html=eventCompactDetail({event,plan:{revision:2},planItems:plan.map(x=>({...x,event_id:event.id})),
-  balances:[],movements:[],shipments:[],groupInventory,products,models,h,button,
-  canPlan:true,canClose:true});
- assert.match(html,/event-plan/);assert.match(html,/event-print/);assert.match(html,/event-dispatch/);
- assert.match(html,/10/);
+test('temporária em preparação usa abas e não apresenta plano legado como pedido',()=>{
+ const html=eventCompactDetail({event,ordersMarkup:'<div>Pedido #AA003</div>',tab:'pedidos',
+  balances:[],movements:[],groupInventory,products,models,h,button});
+ assert.match(html,/Pedido #AA003/);
+ assert.match(html,/event-unit-tab/);
+ assert.doesNotMatch(html,/Lista de separação|Imprimir A4/);
 });
-test('loja em operação mostra conferência sem cinco cartões de histórico expandidos',()=>{
+test('loja em operação mostra mercadorias, conciliação e histórico em abas',()=>{
  const active={...event,status:'ativo'};
  const balances=plan.map(x=>({...x,event_id:active.id}));
  const html=eventCompactDetail({event:active,balances,planItems:[],shipments:[],
-  movements:[],products,models,groupInventory,h,button,canPlan:true,canClose:true});
+  movements:[],products,models,groupInventory,h,button,canSettle:true,canClose:true,tab:'fechamento'});
  assert.match(html,/event-settle/);
- assert.match(html,/event-supplement/);
- assert.match(html,/event-product-compact/);
- assert.match(html,/Histórico e rastreabilidade/);
+ assert.match(html,/Conciliação logística/);
+ assert.match(html,/data-action="event-unit-tab"/);
+ assert.doesNotMatch(html,/event-supplement|data-action="event-sale"|1\. Separação/);
 });
 test('relatório A4 apresenta tamanhos, SKU, EAN, quantidade e campos manuscritos',()=>{
  const html=a4PickingHTML({event,items:plan,products,models,responsible:'Responsável de teste',
