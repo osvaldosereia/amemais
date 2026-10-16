@@ -47,7 +47,7 @@ export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE'}={}){
     '</article>';
   }).join('')+'</section>').join('');
  const code=String(order.code||'—');
- const title=order.kind==='evento'?'LOTE':'PEDIDO';
+ const title='PEDIDO';
  const units=locations.reduce((sum,group)=>sum+group.units,0);
  const skuCount=locations.reduce((sum,group)=>sum+group.lines.length,0);
  const css=[
