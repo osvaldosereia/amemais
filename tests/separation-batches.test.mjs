@@ -44,7 +44,8 @@ test('fila única inclui lote com identificação da loja e unidades reservadas'
  assert.equal(records[0].missing,0);
  const html=unifiedOrderCard(records[0],{button,canProcess:true,canDispatch:true,canCancel:true});
  assert.match(html,/Lote 02/);
- assert.match(html,/event-batch-pick/);
+ assert.match(html,/order-op-pick/);
+ assert.match(html,/Abrir pedido/);
  assert.match(html,/Camiseta Masculina HDH/);
  assert.match(html,/02 variação|2 variaç/);
  assert.match(html,/Gôndola 05/);
