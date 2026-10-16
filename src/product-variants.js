@@ -10,6 +10,8 @@ function sizeCard(size){
     '<label class="field"><span>Código interno (SKU)</span><input name="size_sku" maxlength="80" disabled autocomplete="off" placeholder="Gerado automaticamente se vazio"></label>'+
     '<label class="field"><span>EAN (se houver)</span><div class="inline apparel-ean"><input name="size_ean" maxlength="14" inputmode="numeric" disabled placeholder="Código de barras">'+
     '<button class="button small" type="button" data-action="size-scan" aria-label="Ler EAN do tamanho '+size+'">📷</button></div></label>'+
+    '<label class="field"><span>Gôndola deste tamanho (opcional)</span><input name="size_gondola" maxlength="40" disabled placeholder="Ex.: A03"></label>'+
+    '<label class="field"><span>Prateleira deste tamanho (opcional)</span><input name="size_prateleira" maxlength="40" disabled placeholder="Ex.: B"></label>'+
     '<label class="field"><span>Estoque inicial *</span><input name="size_qty" type="number" step="1" min="0" max="1000000" value="0" disabled required inputmode="numeric"></label>'+
     '</div></div>';
 }
@@ -80,9 +82,11 @@ export function collectSizeVariants(form){
       throw new Error('O EAN "'+ean+'" foi repetido em dois tamanhos. Cada código deve identificar apenas uma variação.');
     if(ean)usedEans.add(ean);
     if(ean&&!/^[0-9]{8,14}$/.test(ean))throw new Error('EAN inválido no tamanho '+size+'.');
+    const gondola=get('size_gondola'),prateleira=get('size_prateleira');
+    if(gondola.length>40||prateleira.length>40)throw new Error('Gôndola ou prateleira inválida no tamanho '+size+'.');
     if(text===''||!Number.isInteger(quantity)||quantity<0||quantity>1000000)
       throw new Error('Estoque inválido no tamanho '+size+'.');
-    return {size,color,sku,ean:ean||null,quantity};
+    return {size,color,sku,ean:ean||null,gondola,prateleira,quantity};
   });
 }
 export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast,saveGallery,saveProcurement}){
