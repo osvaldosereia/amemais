@@ -59,7 +59,7 @@ export function productGalleryPaths(group){
  }
  return selected;
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canEditProduct=null,canBalance=()=>false,canShare=false,canLabel=false,expanded=false,historyForGroup=()=>[],mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canEditProduct=null,canBalance=()=>false,canShare=false,canLabel=false,expanded=false,historyForGroup=()=>[],categories=[],mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
   const galleryPaths=productGalleryPaths(group);
@@ -197,6 +197,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       '<details class="card-editor-accordion" open><summary>Dados gerais</summary>'+
         '<label>Nome do produto<input name="name" maxlength="180" required value="'+h(basicName)+'"></label>'+
         '<label>Tags (separadas por vírgula)<input name="tags" maxlength="500" value="'+h(basicTags.join(', '))+'"></label>'+
+        '<label>Categoria<select name="category_id">'+(categories.length?categories.map(cat=>'<option value="'+h(cat.id)+'"'+(cat.id===(model?.category_id||main.category_id)?' selected':'')+'>'+h(cat.name)+'</option>').join(''):'<option value="'+h(model?.category_id||main.category_id||'')+'">Categoria atual</option>')+'</select></label>'+
         '</details>'+
       '<details class="card-editor-accordion"><summary>Localização e códigos</summary>'+
          '<p>SKU, EAN, gôndola e prateleira são individuais para cada variação. Use a aba Variações para editá-los.</p></details>'+
