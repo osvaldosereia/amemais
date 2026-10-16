@@ -272,7 +272,19 @@ begin
    if v_physical is null or v_physical<v_qty then raise exception 'Estoque insuficiente no SKU %',v_item.product_id;end if;
   end if;
   -- As reservas não expedidas são liberadas sem baixa no saldo físico.
-  update public.stock_reservations set status=case when v_qty>0 then 'consumida' else 'liberada' end,
+  -- Registra explicitamente as unidades não atendidas como reserva liberada.
+  if v_qty>0 and v_qty<v_item.quantity then
+   insert into public.stock_reservations(
+     order_id,product_id,quantity,status,created_by,created_at,ended_by,ended_at,avulso_order_id,event_batch_id)
+   select r.order_id,r.product_id,v_item.quantity-v_qty,'liberada',
+     r.created_by,r.created_at,auth.uid(),now(),r.avulso_order_id,r.event_batch_id
+   from public.stock_reservations r where r.product_id=v_item.product_id
+     and r.status='ativa' and ((p_kind='loja' and r.order_id=p_order)
+      or (p_kind='evento' and r.event_batch_id=p_order)
+      or (p_kind='avulso' and r.avulso_order_id=p_order));
+  end if;
+  update public.stock_reservations set quantity=case when v_qty>0 then v_qty else quantity end,
+    status=case when v_qty>0 then 'consumida' else 'liberada' end,
     ended_by=auth.uid(),ended_at=now()
    where product_id=v_item.product_id and status='ativa'
     and ((p_kind='loja' and order_id=p_order)
