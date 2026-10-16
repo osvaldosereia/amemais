@@ -172,8 +172,8 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
      '<div class="card-stock-move-list">'+active.map(p=>'<div class="card-stock-move-row"><strong>'+h(p.apparel_size||p.name)+
        ' · '+h(p.apparel_color||'')+'</strong><span>'+fmt(quantity(p))+' un. físicas</span>'+
        (skuAccess?'<div class="card-stock-move-buttons">'+
-         (canMove?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="entrada">Entrada</button>'+
-          '<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="saida">Saída excepcional</button>':'')+
+         (canStockEntry()?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="entrada">Entrada</button>':'')+
+         (canStockExit()?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="saida">Saída excepcional</button>':'')+
          (canBalance()?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="contagem">Conferir SKU</button>':'')+
          '</div>':'')+'</div>').join('')+'</div></section>'+
      '<section data-stock-panel="historico" hidden><p class="card-workspace-help">Últimos movimentos registrados das variações.</p>'+
