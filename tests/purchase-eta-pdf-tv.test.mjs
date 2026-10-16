@@ -57,7 +57,7 @@ test('TV mostra compras recentes via consulta autorizada e sem edição por forn
  assert.match(tv,/tv_recent_purchase_orders/);
  assert.match(tv,/Compras recentes/);
 });
-test('cards de produtos sinalizam unidades encomendadas e ETA sem somar ao estoque livre',()=>{
+test('cards de produtos sinalizam unidades encomendadas e ETA sem somar ao estoque livre',async()=>{
  const workflow=await read('src/stock-workflows.js');
  assert.match(workflow,/Encomendado/);
  assert.match(workflow,/expected_arrival_date|pendingDate/);
