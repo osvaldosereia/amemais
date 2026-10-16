@@ -150,7 +150,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       (group.modelId&&canEdit?direct('Adicionar variação','add-variants',group.modelId):'')+
       (canLabel?direct('Imprimir etiqueta','shelf-label-open',main.id):'')+
       (canShare?direct('Compartilhar','share-product',main.id):'')+
-      (canRemoveEntireModel?direct('Excluir produto','product-model-delete',group.modelId,'product-card-action-danger'):
+      (canRemoveEntireModel?direct('Excluir produto completo','product-model-delete',group.modelId,'product-card-action-danger'):
        (!group.modelId&&manage&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'product-card-action-danger'):''))+
     '</div>':'';
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
