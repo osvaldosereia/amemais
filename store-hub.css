@@ -103,3 +103,22 @@
 }
 @media(max-width:390px){.sh-hub-toolbar{grid-template-columns:1fr}.su-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.sh-page *,.su-page *{scroll-behavior:auto!important}}
+
+/* Loja temporária: cor e espaçamento CDSB, sem banner grande acima das ações. */
+.event-unit-page.event-simple{gap:14px;max-width:100%;width:100%;min-width:0}
+.event-unit-page>.event-cover.compact{width:100%;height:96px;max-height:96px;border-radius:11px;overflow:hidden;flex:none;order:0}
+.event-unit-page>.event-cover.compact img{display:block;width:100%;height:100%;object-fit:cover}
+.event-unit-page .event-back{color:#284c70;font-size:.79rem}
+.event-unit-page .event-simple-head h1{color:#102d50}
+.event-unit-page .event-simple-head p{color:#657e94}
+.event-unit-page .event-simple-status{background:#edf3fa;color:#163e69}
+.event-unit-page .su-overview strong.su-compact-state{font-size:.86rem}
+.event-unit-page .event-lots-section{padding:0;border:0;box-shadow:none;background:transparent}
+.event-unit-page .event-lots-title{flex-wrap:wrap;gap:12px}
+.event-unit-page .event-lot-row{flex-wrap:wrap;gap:9px}
+.event-unit-page .su-admin-tools{margin-top:4px;justify-content:flex-end}
+@media(max-width:760px){
+ .event-unit-page>.event-cover.compact{height:72px;max-height:72px}
+ .event-unit-page .event-lots-title{align-items:flex-start}
+ .event-unit-page .event-lots-title .button{min-height:44px}
+}
