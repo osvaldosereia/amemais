@@ -33,3 +33,10 @@ test('nomes de lojas e produtos são escapados',()=>{
  const html=renderStoreUnit({store:{...own,name:'<script>x</script>'},products:[{id:'sku',name:'<img onerror=x>'}],storeBalances:[{store_id:'own',product_id:'sku',quantity:3}],tab:'estoque',context:{button}});
  assert.doesNotMatch(html,/<script>|<img onerror=/);
 });
+
+test('pedido despachado continua ativo até confirmação de recebimento',()=>{
+ const html=renderStoreUnit({store:franchise,orders:[{id:'t',kind:'loja',status:'despachado',total:3,code:'AA010'}],
+  tab:'resumo',context:{button,canBrowseOrders:true}});
+ assert.match(html,/Pedidos em andamento<\/small><strong>1<\/strong>/);
+ assert.match(html,/Em trânsito<\/small><strong>1<\/strong>/);
+});
