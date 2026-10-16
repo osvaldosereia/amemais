@@ -306,7 +306,7 @@ async function loadProfile(){
 function loginScreen(message=''){
   const legacy=false;
   root.innerHTML='<div class="login-wrap"><section class="login">'+
-  '<div class="brand-login"><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="225" height="120"><small>CONTROLE DE ESTOQUE</small></div>'+
+  '<div class="brand-login"><img src="./cdsb-brand.jpg" alt="CDSB — Centro de Distribuição São Bento" width="320" height="107"><small>CONTROLE DE ESTOQUE</small></div>'+
   '<h1>Entrar no sistema</h1><p class="muted">'+
   (legacy?'Acesso por email para contas antigas que ainda não definiram senha.':
     'Entre com seu usuário e senha.')+'</p>'+
@@ -484,7 +484,7 @@ function render(){
   else if(state.profile?.role==='evento'&&hasPermission('events.request'))state.view='meu-evento';
  }
  if(!permittedView(state.view))state.view=isFranchisePortal()?'minha-loja':state.profile?.role==='estoquista'?'separador':state.profile?.role==='evento'?'meu-evento':'inicio';
-  const mark='<img class="ame-brand-logo" src="./ame-plus-logo.svg" alt="Ame+ Store" width="132" height="70">';
+  const mark='<img class="cdsb-brand-logo" src="./cdsb-brand.jpg" alt="CDSB — Centro de Distribuição São Bento" width="210" height="70">';
   const sectionNav=isFranchisePortal()?[{id:'minha-loja',label:'Minha Loja',ico:'home'},{id:'pedidos',label:'Meus pedidos',ico:'clipboard'}]:
   state.profile?.role==='evento'&&hasPermission('events.request')?[{id:'meu-evento',label:'Meu Evento',ico:'calendar'},{id:'eventos',label:'Detalhes',ico:'clipboard'}]:
   state.profile?.role==='estoquista'&&hasPermission('orders.separate')?[{id:'separador',label:'Separação',ico:'clipboard'},{id:'pedidos',label:'Todos os pedidos',ico:'package'}]:nav;
@@ -494,14 +494,13 @@ function render(){
   (['admin','gerente'].includes(state.profile?.role)?
     '<button type="button" data-action="open-tv" class="tv-nav-link">'+uiIcon('trend',19)+
     '<span>Painel TV</span></button>':'');
-  const desktopIdentity='<div class="brand brand-lockup">'+mark+'<small>CONTROLE DE ESTOQUE</small></div>';
+  const desktopIdentity='<div class="brand brand-lockup">'+mark+'</div>';
   root.innerHTML='<div class="app-shell mobile-c-app"><aside class="sidebar">'+desktopIdentity+
     '<nav class="nav" aria-label="Menu principal">'+menu+'</nav>'+
     '<div class="sidefoot"><strong>'+h(state.profile.full_name)+'</strong><br>'+h(profileLabel(state.profile))+
     '<br><button class="plain" data-action="my-password">Minha senha</button>'+
     '<br><button class="plain" data-action="logout">Sair da conta</button></div></aside>'+
-    '<div class="main"><header class="topbar"><div class="topbar-brand">'+mark+
-    '<span class="ame-header-title">CDSB</span></div>'+
+    '<div class="main"><header class="topbar"><div class="topbar-brand cdsb-mobile-identity"><img src="./cdsb-emblem.jpg" alt="" width="38" height="38"><span>CDSB</span></div>'+
     '<div class="topbar-right"><span class="userpill">'+h(state.profile.full_name)+' · '+h(profileLabel(state.profile))+'</span>'+
     '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-expanded="false" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>';
@@ -3044,13 +3043,13 @@ async function handleClick(event){
       '</button>').join('');
     overlay.innerHTML='<section class="mobile-more-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-navigation-title">'+
       '<header class="mobile-navigation-head">'+
-        '<div><img src="./ame-plus-logo.svg" alt="Ame+ Store" width="84" height="45">'+
+        '<div><img src="./cdsb-emblem.jpg" alt="Brasão do CDSB" width="56" height="56">'+
           '<strong id="mobile-navigation-title">Menu do sistema</strong></div>'+
         '<button type="button" data-action="mobile-more-close" class="mobile-navigation-close" aria-label="Fechar menu">✕</button>'+
       '</header>'+
       '<div class="mobile-navigation-scroll">'+
         '<div class="mobile-menu-label">NAVEGAÇÃO</div>'+
-        '<nav class="c-more-items" aria-label="Seções do AME MAIS">'+controls+'</nav>'+
+        '<nav class="c-more-items" aria-label="Seções do CDSB">'+controls+'</nav>'+
         '<div class="mobile-menu-label">ACESSO RÁPIDO</div>'+
         '<button type="button" class="mobile-menu-scan" data-action="global-scan">'+
           uiIcon('scan',22)+'<span>Ler EAN pela câmera</span>'+uiIcon('chevron',17)+'</button>'+
