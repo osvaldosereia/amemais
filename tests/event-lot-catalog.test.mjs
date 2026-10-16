@@ -70,7 +70,7 @@ test('catálogo de centenas usa carregamento incremental e filtra categorias des
  assert.match(nodes['[data-lot-results-list]'].innerHTML,/Modelo 20/);
  assert.doesNotMatch(nodes['[data-lot-results-list]'].innerHTML,/Modelo 22/);
 });
-test('escolha sobrevive à filtragem e impõe 10 modelos sem limitar variações do mesmo modelo',()=>{
+test('seleção mantém mais de 10 modelos no mesmo pedido sem dividir em lotes',()=>{
  const {form,nodes}=makeForm();
  for(let i=0;i<10;i++){
   const input={value:'3',dataset:{id:'variant-'+i},closest:()=>null,setCustomValidity(){}};
@@ -78,14 +78,14 @@ test('escolha sobrevive à filtragem e impõe 10 modelos sem limitar variações
  }
  assert.deepEqual(lot.selectedLotCount(form),{models:10,units:30});
  const extra={value:'1',dataset:{id:'variant-12'},closest:()=>null,setCustomValidity(){}};
- assert.equal(lot.onLotQuantityInput(form,extra).ok,false);
- assert.equal(extra.value,'0');
+ assert.equal(lot.onLotQuantityInput(form,extra).ok,true);
+ assert.equal(extra.value,'1');
  nodes['[data-lot-search]'].value='SKU-80';
  lot.filterLotCatalog(form,{resetPage:true});
- assert.equal(lot.collectLotItems(form).length,10);
+ assert.equal(lot.collectLotItems(form).length,11);
  form.__lotPicker.view='selected';
  lot.filterLotCatalog(form);
- assert.match(nodes['[data-lot-results]'].textContent,/10 modelo/);
+ assert.match(nodes['[data-lot-results]'].textContent,/11 modelo/);
 });
 test('nomes são escapados no HTML do catálogo',()=>{
  const html=lot.lotCatalogMarkup([{
