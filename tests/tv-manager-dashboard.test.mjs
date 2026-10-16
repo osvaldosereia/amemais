@@ -6,6 +6,7 @@ const page=await readFile(new URL('../painel-tv.html',import.meta.url),'utf8');
 const css=await readFile(new URL('../tv-dashboard.css',import.meta.url),'utf8');
 const script=await readFile(new URL('../src/tv-dashboard.js',import.meta.url),'utf8');
 const sql=await readFile(new URL('../supabase/migrations/20261015_manager_tv_dashboard.sql',import.meta.url),'utf8');
+const managementSQL=await readFile(new URL('../supabase/migrations/202610160004_tv_management_360.sql',import.meta.url),'utf8');
 const app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
 const entry=await readFile(new URL('../index.html',import.meta.url),'utf8');
 
@@ -15,9 +16,9 @@ function makeDashboard(){
  const fakeWindow={AME_CONFIG:{},addEventListener:()=>{}};
  const source=script.replace(/^import [^\n]+\n/,'')
   .replace(/boot\(\)\.catch\([\s\S]*$/,'');
- const {shell,state}=new Function('document','window',source+
-  '\nreturn {shell,state};')(fakeDocument,fakeWindow);
- return {shell,state,root};
+ const {shell,state,screens,nextScreen}=new Function('document','window',source+
+  '\nreturn {shell,state,screens,nextScreen};')(fakeDocument,fakeWindow);
+ return {shell,state,screens,nextScreen,root};
 }
 const mock={
  generated_at:'2026-10-15T19:33:00Z',
@@ -29,8 +30,8 @@ const mock={
  recent:[{code:'AA003',kind:'evento',text:'Conferência concluída',at:'2026-10-15T19:33:00Z'}]
 };
 test('modo TV possui página independente, 16:9, fullscreen e atualização periódica',()=>{
- assert.match(page,/tv-dashboard\.js\?v=20261015tv1/);
- assert.match(page,/tv-dashboard\.css\?v=20261015tv1/);
+ assert.match(page,/tv-dashboard\.js\?v=20261016tv360v1/);
+ assert.match(page,/tv-dashboard\.css\?v=20261016tv360v1/);
  assert.match(css,/height:100dvh/);
  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
  assert.match(css,/grid-template-rows:minmax/);
@@ -77,5 +78,79 @@ test('somente gerente/admin veem link de acesso na navegação',()=>{
  assert.match(app,/\['admin','gerente'\]\.includes\(state\.profile\?\.role\)/);
  assert.match(app,/data-action="open-tv"/);
  assert.match(app,/window\.open\('\.\/painel-tv\.html'/);
- assert.match(entry,/src\/app\.js\?v=20261015tv1/);
+ assert.match(entry,/src\/secure-entry\.js\?v=/);
+});
+
+
+const management={
+ generated_at:'2026-10-16T18:00:00Z',
+ issues:[{code:'AB123',kind:'loja',destination_type:'Franquia',
+   destination:'Franquia Centro',issue:'Produto não encontrado na separação',
+   product:'Camiseta HDH',sku:'HDH-P',expected:10,found:8,missing:2,priority:0}],
+ low_stock:[{name:'Camiseta HDH',sku:'HDH-P',apparel_size:'P',gondola:'3',category:'Camisetas',
+   physical:5,reserved:2,available:3,min_stock:10}],
+ stock_summary:{products:21,zero:2,below_min:3,reserved:15,physical:200},
+ franchises:[{franchise:'Franquia Centro',category:'Camisetas',requested:120,shipped:90}],
+ upcoming:[{event_name:'Feira 2026',starts_at:'2026-10-20',category:'Camisetas',
+  requested:100,prepared:70,sent:20}],
+ closed_events:[{event_name:'Feira encerrada',closed_at:'2026-10-10',category:'Camisetas',
+  sent:100,returned:30,nonreturned:65,damaged:5,historical_sales:0}],
+ damages:[{category:'Camisetas',units:5,occurrences:2}],
+ categories:[{category:'Camisetas',current_units:140,previous_units:100}],
+ trend:[{day:'2026-10-15',units:18},{day:'2026-10-16',units:30}],
+ purchases:{open:3,sent:2},quality:{checks_today:7}
+};
+test('sete telas rotativas mantêm leitura adequada e tempos por relatório',()=>{
+ const {screens}=makeDashboard();
+ assert.equal(screens.length,7);
+ assert.deepEqual(screens.map(s=>s.seconds),[20,25,30,25,30,30,25]);
+ assert.match(script,/setInterval\(advanceRotation,1000\)/);
+ assert.match(script,/if\(action==='toggle-rotation'\)/);
+ assert.match(script,/if\(action==='next-screen'\)/);
+ assert.match(script,/if\(action==='previous-screen'\)/);
+ assert.match(css,/tv-four-grid/);
+});
+test('alerta informa código do pedido, tipo de destino, nome, produto e diferença',()=>{
+ const {shell,state,root}=makeDashboard();
+ state.snapshot=mock;state.management=management;state.lastSuccess=Date.now();
+ state.nextSwap=Date.now()+20000;
+ shell(mock);
+ assert.match(root.innerHTML,/AB123/);
+ assert.match(root.innerHTML,/Franquia Centro/);
+ assert.match(root.innerHTML,/Produto não encontrado na separação/);
+ assert.match(root.innerHTML,/Camiseta HDH/);
+ assert.match(root.innerHTML,/10 \/ Identificado 8/);
+});
+test('qualquer texto da ocorrência é escapado para não injetar código na TV',()=>{
+ const {shell,state,root}=makeDashboard();
+ state.management={...management,issues:[{...management.issues[0],destination:'<script>alert(99)</script>'}]};
+ state.snapshot=mock;state.lastSuccess=Date.now();shell(mock);
+ assert.doesNotMatch(root.innerHTML,/<script>alert\(99\)<\/script>/);
+ assert.match(root.innerHTML,/&lt;script&gt;alert/);
+});
+test('painel organiza estoque, franquias, eventos, avarias, categorias e comparativos',()=>{
+ const {shell,state,root}=makeDashboard();
+ state.management=management;state.snapshot=mock;state.lastSuccess=Date.now();
+ const expected=[
+  '10 produtos com menor estoque','Franquia Centro','Feira 2026',
+  'Feira encerrada','Avarias por categoria','Compras e abastecimento'
+ ];
+ for(let i=1;i<7;i++){
+  state.pageIndex=i;shell(mock);
+  assert.match(root.innerHTML,new RegExp(expected[i-1]));
+  if(i===5)assert.match(root.innerHTML,/tv-compare-bars/);
+ }
+});
+test('gestão 360 restringe o snapshot, não usa dados pessoais nem confunde venda com não devolução',()=>{
+ assert.match(managementSQL,/p\.role in \('admin','gerente'\)/);
+ assert.match(managementSQL,/security definer/);
+ assert.match(managementSQL,/revoke all on function public\.tv_management_snapshot/);
+ assert.doesNotMatch(managementSQL,/customer_name|customer_phone|manager_name|s\.phone/);
+ assert.match(managementSQL,/public\.unified_order_adjustments/);
+ assert.match(managementSQL,/order_public_codes/);
+ assert.match(managementSQL,/event_in_progress/);
+ assert.match(managementSQL,/event_closed/);
+ assert.match(managementSQL,/damage_agg/);
+ assert.match(managementSQL,/demand_agg/);
+ assert.match(script,/Não devolvido não equivale a venda confirmada/);
 });
