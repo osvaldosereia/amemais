@@ -118,7 +118,8 @@ export function groupedOrderByLocation(lines=[]){
  }));
 }
 function orderWorkflow(o,verified=false){
- const status=o.status,stage=o.workflow?.stage;
+ const status=o.status,stage=['cancelado','expirado','despachado','enviado','concluido','recebido','recebido_divergente'].includes(status)?
+  (o.workflow?.stage==='enviado'?'enviado':null):o.workflow?.stage;
  if(stage==='separacao')return ['Em separação','picked','Separação em andamento'];
  if(stage==='conferencia')return ['A conferir','checking','Separação concluída · Conferência pendente'];
  if(stage==='expedicao')return ['Em expedição','checking','Conferência concluída · Aguardando registro de envio'];
@@ -144,7 +145,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  const ready=['reservado','aprovado','aguardando'].includes(o.status);
  const waiting=o.status==='pendente_estoque',inProgress=o.status==='em_separacao';
  const primary=[],secondary=[],management=[];
- const stage=o.workflow?.stage;
+ const stage=terminal?(o.workflow?.stage==='enviado'?'enviado':null):o.workflow?.stage;
  const canShip=event?canDispatch:canDispatchStock;
  if(stage==='separacao'&&process)primary.push(button('Continuar separação','order-op-pick',data,'small primary'));
  else if(stage==='conferencia'&&canVerify)primary.push(button('Conferir pedido','order-op-check',data,'small primary'));
@@ -298,7 +299,7 @@ export function unifiedOrdersPage(orders,{
    '<div><small>A separar</small><strong>'+toPick+'</strong></div>'+
    '<div><small>Em separação</small><strong>'+separating+'</strong></div>'+
    '<div><small>A conferir</small><strong>'+toVerify+'</strong></div>'+
-   '<div><small>Prontos para saída</small><strong>'+readyToDispatch+'</strong></div>'+
+   '<div><small>Em expedição</small><strong>'+readyToDispatch+'</strong></div>'+
    '<div><small>Com falta</small><strong>'+waiting+'</strong></div></div>'+
   '<div class="uo-tools"><label class="uo-search">Buscar'+
    '<input type="search" data-unified-search placeholder="Pedido, destino, modelo, gôndola, SKU ou EAN…" autocomplete="off"></label>'+
@@ -308,7 +309,7 @@ export function unifiedOrdersPage(orders,{
    '<option value="a_preparar">A preparar</option>'+ 
    '<option value="em_separacao">Em separação</option>'+
    '<option value="a_conferir">A conferir</option>'+
-   '<option value="pronto_saida">Prontos para saída</option>'+
+   '<option value="pronto_saida">Em expedição</option>'+
    '<option value="pendente_estoque">Com falta</option>'+ 
    '<option value="com_ocorrencia">Com ocorrência</option>'+ 
    '<option value="concluidos">Concluídos</option>'+
