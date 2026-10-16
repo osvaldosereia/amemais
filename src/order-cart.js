@@ -66,11 +66,11 @@ export function orderCartMarkup(groups=[],{destination='',showAvailable=true}={}
    '</section><aside class="order-cart-summary" data-order-cart-summary aria-live="polite">'+
     '<h3>Resumo do pedido</h3><p>Selecione produtos para começar.</p></aside></div></div>';
 }
-function quantityHtml(v,qty){
+function quantityHtml(v,qty,showAvailable=true){
  const text=[v.color,v.size].filter(Boolean).join(' · ')||'Variação única';
  return '<div class="order-cart-variant"><div class="order-cart-var-label"><strong>'+esc(text)+'</strong>'+
   '<small>'+esc([v.sku&&'SKU '+v.sku,v.ean&&'EAN '+v.ean].filter(Boolean).join(' · '))+'</small>'+
-  '<small>'+fmt(v.available)+' disponível'+(v.available===1?'':'is')+' na central'+
+  '<small>'+(showAvailable?fmt(v.available)+' disponíveis na central':'Disponibilidade confirmada pela central')+
    (v.min?' · Mín. '+fmt(v.min)+' un.':'')+'</small></div>'+
   '<div class="order-cart-quantity"><button type="button" data-action="order-cart-minus" data-id="'+esc(v.id)+'" aria-label="Reduzir quantidade de '+esc(text)+'">−</button>'+
   '<input type="number" data-order-cart-qty data-id="'+esc(v.id)+'" min="0" max="1000000" step="1" inputmode="numeric" value="'+qty+'" aria-label="Quantidade de '+esc(text)+'">'+
@@ -87,18 +87,19 @@ function cardHtml(g,state){
     (count?'<span class="order-cart-picked">'+fmt(count)+' un. selecionadas</span>':'')+'</div>'+
    '<button type="button" class="button order-cart-expand" data-action="order-cart-expand" data-key="'+esc(g.key)+'" aria-expanded="'+expanded+'">'+
     (expanded?'Ocultar':'Selecionar')+'</button></div>'+
-  (expanded?'<div class="order-cart-variants">'+g.variants.map(v=>quantityHtml(v,Number(state.selection.get(v.id)||0))).join('')+'</div>':'')+
+  (expanded?'<div class="order-cart-variants">'+g.variants.map(v=>quantityHtml(v,Number(state.selection.get(v.id)||0),state.showAvailable)).join('')+'</div>':'')+
   '</article>';
 }
-function summaryHtml(groups,selection){
+function summaryHtml(groups,selection,showAvailable=true){
  const s=orderCartSummary(groups,selection);
  return '<h3>Resumo do pedido</h3>'+
   '<div class="order-cart-metrics"><div><small>Modelos</small><strong>'+fmt(s.models)+'</strong></div>'+
    '<div><small>SKUs</small><strong>'+fmt(s.skus)+'</strong></div>'+
    '<div><small>Unidades</small><strong>'+fmt(s.units)+'</strong></div></div>'+
-  (s.units?'<div class="order-cart-stock-count"><span>Disponíveis agora</span><strong>'+fmt(s.available)+' un.</strong></div>'+
+  (s.units&&!showAvailable?'<p class="order-cart-muted">Disponibilidade será confirmada pela central após o envio.</p>':
+   s.units?'<div class="order-cart-stock-count"><span>Disponíveis agora</span><strong>'+fmt(s.available)+' un.</strong></div>'+
     (s.missing?'<p class="order-cart-shortage">⚠ '+fmt(s.missing)+' unidade'+(s.missing===1?'':'s')+
-     ' faltante'+(s.missing===1?'':'s')+'. A quantidade solicitada será mantida.</p>':
+     ' faltante'+(s.missing===1?'':'s')+'. A reserva integral poderá ser recusada; revise o pedido.</p>':
      '<p class="order-cart-sufficient">✓ Todas as unidades estão disponíveis neste momento.</p>'):
    '<p class="order-cart-muted">Os produtos e as quantidades escolhidos aparecerão aqui.</p>')+
   '<p class="order-cart-footnote">A disponibilidade pode mudar até a confirmação. A separação e a expedição são posteriores.</p>';
@@ -118,16 +119,16 @@ export function renderOrderCart(form,{resetPage=false}={}){
  const caption=form.querySelector('[data-order-cart-results-label]');if(caption)caption.textContent=
   fmt(list.length)+' modelo(s) encontrado(s)';
  const summary=orderCartSummary(state.groups,state.selection);
- const container=form.querySelector('[data-order-cart-summary]');if(container)container.innerHTML=summaryHtml(state.groups,state.selection);
+ const container=form.querySelector('[data-order-cart-summary]');if(container)container.innerHTML=summaryHtml(state.groups,state.selection,state.showAvailable);
  const counter=form.querySelector('[data-order-cart-count]');if(counter)counter.textContent=String(summary.skus);
  for(const b of form.querySelectorAll('[data-action="order-cart-view"]')){
   const selected=b.dataset.view===state.view;b.classList.toggle('is-current',selected);b.setAttribute('aria-pressed',String(selected));
  }
  state.onRender?.();
 }
-export function mountOrderCart(form,{groups=[],destination='',onRender=()=>{}}={}){
+export function mountOrderCart(form,{groups=[],destination='',showAvailable=true,onRender=()=>{}}={}){
  if(!form)return;
- form.__orderCart={groups,destination,selection:new Map(),expanded:new Set(),page:1,view:'catalog',onRender,invalid:false};
+ form.__orderCart={groups,destination,showAvailable,selection:new Map(),expanded:new Set(),page:1,view:'catalog',onRender,invalid:false};
  form.closest('.modal')?.classList.add('order-cart-modal');
  form.classList.add('order-cart-form');
  renderOrderCart(form);
@@ -140,7 +141,7 @@ export function setOrderCartQuantity(form,id,value){
  if(!state.groups.some(g=>g.variants.some(v=>v.id===id)))return false;
  if(num)state.selection.set(id,num);else state.selection.delete(id);
  state.invalid=false;
- const summary=form.querySelector('[data-order-cart-summary]');if(summary)summary.innerHTML=summaryHtml(state.groups,state.selection);
+ const summary=form.querySelector('[data-order-cart-summary]');if(summary)summary.innerHTML=summaryHtml(state.groups,state.selection,state.showAvailable);
  const counter=form.querySelector('[data-order-cart-count]');if(counter)counter.textContent=String(orderCartSummary(state.groups,state.selection).skus);
  return true;
 }
@@ -193,7 +194,7 @@ export function collectOrderCartItems(form){
  }
  return items;
 }
-export function orderCartReview(groups=[],selection=new Map(),destination=''){
+export function orderCartReview(groups=[],selection=new Map(),destination='',{showAvailable=true}={}){
  const sum=orderCartSummary(groups,selection);
  const selected=groups.flatMap(g=>g.variants.filter(v=>Number(selection.get(v.id)||0)>0).map(v=>({
   title:g.title,v,qty:Number(selection.get(v.id))
@@ -203,11 +204,13 @@ export function orderCartReview(groups=[],selection=new Map(),destination=''){
   '<div class="order-cart-metrics"><div><small>Modelos</small><strong>'+fmt(sum.models)+'</strong></div>'+
    '<div><small>SKUs</small><strong>'+fmt(sum.skus)+'</strong></div>'+
    '<div><small>Unidades</small><strong>'+fmt(sum.units)+'</strong></div></div>'+
+  '<p class="order-cart-review-units">'+fmt(sum.units)+' unidades solicitadas</p>'+
   '<div class="order-cart-review-lines">'+selected.map(({title,v,qty})=>
    '<div><span><strong>'+esc(title)+'</strong><small>'+esc([v.color,v.size,v.sku].filter(Boolean).join(' · '))+
     '</small></span><b>'+fmt(qty)+' un.</b></div>').join('')+'</div>'+
-  (sum.missing?'<p class="order-cart-shortage">⚠ '+fmt(sum.missing)+' unidade'+(sum.missing===1?'':'s')+
-   ' faltante'+(sum.missing===1?'':'s')+'. O pedido será enviado com a quantidade solicitada, sem ajuste automático.</p>':
+  (!showAvailable?'<p class="order-cart-muted">Disponibilidade será confirmada pela central após o envio.</p>':
+   sum.missing?'<p class="order-cart-shortage">⚠ '+fmt(sum.missing)+' unidade'+(sum.missing===1?'':'s')+
+   ' faltante'+(sum.missing===1?'':'s')+'. A reserva integral poderá ser recusada. Revise as quantidades ou aguarde reposição.</p>':
    '<p class="order-cart-sufficient">'+fmt(sum.available)+' unidades disponíveis atualmente na central.</p>')+
   '<p class="order-cart-footnote">Confirmar o pedido cria a solicitação e efetua a reserva pelo fluxo existente. Não representa expedição física.</p>'+
   '<button type="button" class="button" data-action="order-cart-edit">← Editar seleção</button></div>';
@@ -221,17 +224,17 @@ export function reviewItemsMarkup(items=[],products=[],destination='',{showAvail
   groups.push({key:x.product_id,title:p?.name||'Produto',variants:[{id:x.product_id,sku:p?.sku||'',color:p?.apparel_color||'',
    size:p?.apparel_size||'',available:showAvailable?Math.max(0,Number(available(p))||0):Number(x.quantity)||0}]});
  }
- return orderCartReview(groups,s,destination);
+ return orderCartReview(groups,s,destination,{showAvailable});
 }
 export function editOrderReview(form){
  form.classList.remove('is-reviewing-order');
  form.querySelector('[data-order-review]')?.remove();
  delete form.dataset.reviewSignature;
  const submit=form.querySelector('.modalfooter button[type="submit"]');
- if(submit)submit.textContent=form.dataset.orderReviewOriginal||'Revisar pedido';
+ if(submit){submit.textContent=form.dataset.orderReviewOriginal||'Revisar pedido';submit.disabled=false;submit.title='';}
  form.querySelector('[data-order-cart-search], [data-lot-search]')?.focus({preventScroll:true});
 }
-function stageReview(form,signature,markup){
+function stageReview(form,signature,markup,{blockConfirmation=false}={}){
  form.querySelector('[data-order-review]')?.remove();
  const div=document.createElement('section');div.dataset.orderReview='';
  div.className='order-cart-review';div.innerHTML=markup;
@@ -239,14 +242,16 @@ function stageReview(form,signature,markup){
  form.classList.add('is-reviewing-order');
  form.dataset.reviewSignature=signature;
  const submit=form.querySelector('.modalfooter button[type="submit"]');
- if(submit){form.dataset.orderReviewOriginal ||=submit.textContent;submit.textContent='Confirmar pedido';}
+ if(submit){form.dataset.orderReviewOriginal ||=submit.textContent;submit.textContent='Confirmar pedido';submit.disabled=blockConfirmation;
+   submit.title=blockConfirmation?'Corrija as quantidades com falta antes de confirmar.':'';}
  form.scrollTop=0;
 }
 export function confirmOrderCartReview(form,{items,note='',destination=''}={}){
  const state=form?.__orderCart;if(!state)throw Error('Carrinho de pedido indisponível.');
  const signature=JSON.stringify([destination,note,items]);
  if(form.classList.contains('is-reviewing-order')&&form.dataset.reviewSignature===signature)return true;
- stageReview(form,signature,orderCartReview(state.groups,state.selection,destination));
+ stageReview(form,signature,orderCartReview(state.groups,state.selection,destination,{showAvailable:state.showAvailable}),
+  {blockConfirmation:state.showAvailable&&orderCartSummary(state.groups,state.selection).missing>0});
  return false;
 }
 export function confirmEventOrderReview(form,{items,note='',destination='',products=[]}={}){
