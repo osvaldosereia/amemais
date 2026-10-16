@@ -11,7 +11,7 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015categorymetadata2';
 import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015categorymetadata2';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261016cards7';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261016cards8';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
