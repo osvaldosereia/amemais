@@ -1,3 +1,4 @@
+import {gondolaSelectHTML} from './gondolas.js?v=20261016gondolas1';
 // Variações por categoria. null = herdar da categoria superior; [] = produto sem variações.
 export const defaultNoVariations=[];
 export const escapeVariant = value=>String(value??'').replace(/[&<>"']/g,c=>({
@@ -102,7 +103,7 @@ export function variationOptionsToSave(form){
  }
  throw new Error('Modo de variações inválido.');
 }
-export function makeVariationCards(options){
+export function makeVariationCards(options,gondolas=[]){
  const h=escapeVariant;
  return options.map(label=>'<div class="size-variant-card" data-size-variant="'+h(label)+'" hidden>'+
   '<div class="size-variant-heading"><strong>'+h(label)+'</strong>'+
@@ -112,6 +113,8 @@ export function makeVariationCards(options){
    '<label class="field"><span>EAN (opcional)</span><div class="inline apparel-ean">'+
     '<input name="size_ean" inputmode="numeric" maxlength="14" disabled placeholder="Código de barras">'+
     '<button type="button" class="button small" data-action="size-scan">📷</button></div></label>'+
+   gondolaSelectHTML('size_gondola',gondolas,'',{label:'Gôndola deste tamanho',disabled:true})+
+   '<label class="field"><span>Prateleira</span><input name="size_prateleira" maxlength="40" disabled placeholder="Ex.: B"></label>'+
    '<label class="field"><span>Estoque inicial</span><input name="size_qty" type="number" step="1" min="0" max="1000000" value="0" disabled required inputmode="numeric"></label>'+
   '</div></div>').join('');
 }
@@ -119,7 +122,7 @@ export function makeVariationChips(options){
  const h=escapeVariant;
  return options.map(label=>'<button type="button" class="size-chip" aria-pressed="false" data-action="size-toggle" data-size="'+h(label)+'">'+h(label)+'</button>').join('');
 }
-export function refreshCategorySizeOptions(form,categories){
+export function refreshCategorySizeOptions(form,categories,gondolas=[]){
  const picker=form?.querySelector('[data-variant-panel]');
  if(!picker)return;
  syncApparelCategoryMetadata(form,categories);
@@ -129,7 +132,7 @@ export function refreshCategorySizeOptions(form,categories){
  const chips=picker.querySelector('.size-chip-group');
  const list=picker.querySelector('.size-variant-list');
  if(!chips||!list)return;
- chips.innerHTML=makeVariationChips(options);list.innerHTML=makeVariationCards(options);
+ chips.innerHTML=makeVariationChips(options);list.innerHTML=makeVariationCards(options,gondolas);
  const toggle=form.querySelector('[data-use-sizes]');
  if(toggle){
   toggle.disabled=!options.length;
