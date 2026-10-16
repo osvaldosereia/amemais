@@ -17,7 +17,7 @@ import {catalogSortOptions,availableGondolas,gondolaKey,catalogMatchesQuery,orde
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261016damage-direct1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
-import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261016stores1';
+import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261016stores2';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261016compact1';
 import {operationalFormMarkup,operationalDifferenceRows} from './order-operations.js?v=20261016partial1';
 import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,findVerificationProduct} from './final-verification.js?v=20261016orderflow1';
@@ -816,6 +816,8 @@ function eventDetails(){
   damageItems:state.damages,closure:state.consignationClosures.find(x=>x.event_id===e.id),
   products:state.items,models:state.apparelModels,groupInventory,photoButton,
   h,button,niceDate,username,ordersMarkup:lots,tab:state.eventUnitTab,
+  openOrders:state.eventPickBatches.filter(b=>b.event_id===e.id&&
+    !['enviado','cancelado'].includes(b.status)).length,
   canSettle:e.status==='ativo'&&(
    (hasPermission('events.close')&&hasPermission('events.manage'))||
    (hasPermission('events.request')&&memberRole(e.id)==='responsavel')),
@@ -3646,7 +3648,7 @@ async function handleClick(event){
    const remaining=state.balances.filter(b=>b.event_id===id).reduce((sum,b)=>sum+Number(b.quantity||0),0);
    formModal('Excluir loja temporária · '+e.name,
     '<p class="help">Esta operação arquiva a loja e cancela pedidos ainda não enviados. As '+remaining+
-    ' unidade(s) ainda no local serão devolvidas automaticamente à central. Vendas e baixas anteriores não serão revertidas. O histórico ficará preservado.</p>'+
+    ' unidade(s) ainda no local serão devolvidas automaticamente à central. Movimentações anteriores não serão revertidas. O histórico ficará preservado.</p>'+
     '<label class="field"><span>Código de autorização</span><input name="delete_code" type="password" autocomplete="off" required minlength="4" maxlength="80" placeholder="Informe o código de exclusão"></label>',
     'event-delete-confirm','Excluir e devolver estoque');
    const form=document.querySelector('.modalback form[data-form="event-delete-confirm"]');
@@ -4069,14 +4071,26 @@ async function handleClick(event){
     await exec(async()=>assertOk(await db.rpc('activate_event',{p_event_id:id})),'Evento ativado.');
   }
   if(action==='event-close'){
-    const remaining=state.balances.filter(x=>x.event_id===id).reduce((s,b)=>s+b.quantity,0);
-    if(remaining>0)return toast('Há '+remaining+' unidade(s) ainda na loja temporária. Registre venda/baixa justificada ou devolva tudo antes de encerrar.',true);
+    const e=eventById(id);
+    if(!e||e.deleted_at||e.status!=='ativo'||!hasPermission('events.close')||
+      !(hasPermission('events.manage')||memberRole(e.id)==='responsavel'))
+      return toast('Sem permissão para encerrar esta loja temporária.',true);
+    const openOrders=state.eventPickBatches.filter(b=>b.event_id===e.id&&
+      !['enviado','cancelado'].includes(b.status)).length;
+    if(openOrders)return toast('Há '+openOrders+' pedido(s) aguardando expedição ou cancelamento. Resolva antes de encerrar.',true);
+    const remaining=state.balances.filter(x=>x.event_id===e.id).reduce((s,b)=>s+Number(b.quantity||0),0);
+    if(remaining>0)return toast('Há '+remaining+' unidade(s) ainda na loja temporária. Concilie devolvidas, avariadas e não devolvidas antes de encerrar.',true);
     if(!window.confirm('Encerrar esta loja temporária? O saldo está conciliado em zero.'))return;
-    await exec(async()=>assertOk(await db.rpc('close_event',{p_event_id:id})),'Loja temporária encerrada com saldo conciliado.');
+    await exec(async()=>assertOk(await db.rpc('close_event',{p_event_id:e.id})),'Loja temporária encerrada com saldo conciliado.');
+    return;
   }
   if(action==='member-remove'){
+    const e=eventById(eventId);
+    if(!hasPermission('events.manage')||!e||e.deleted_at||!user||
+      !state.members.some(m=>m.event_id===e.id&&m.user_id===user))return;
     if(!window.confirm('Remover o acesso desta pessoa a este evento?'))return;
-    await exec(async()=>assertOk(await db.from('event_members').delete().eq('event_id',eventId).eq('user_id',user)),'Acesso removido.');
+    await exec(async()=>assertOk(await db.from('event_members').delete().eq('event_id',e.id).eq('user_id',user)),'Acesso removido.');
+    return;
   }
   if(action==='user-toggle'){
     const u=state.users.find(x=>x.id===id);

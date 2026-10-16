@@ -59,7 +59,7 @@ export function eventCompactDetail(data){
  const {event:e,members=[],balances=[],movements=[],damageItems=[],closure=null,
    products=[],models=[],groupInventory=()=>[],h=esc,button=()=>'',
    niceDate=x=>x,username=x=>x,canManage=false,canClose=false,canSettle=false,
-   canDelete=false,ordersMarkup='',tab='resumo'}=data;
+   canDelete=false,ordersMarkup='',openOrders=0,tab='resumo'}=data;
  const active=e.status==='ativo',draft=e.status==='rascunho',closed=e.status==='encerrado';
  const local=balances.filter(b=>b.event_id===e.id&&Number(b.quantity)>0);
  const pending=local.reduce((s,b)=>s+Number(b.quantity||0),0);
@@ -108,6 +108,7 @@ export function eventCompactDetail(data){
     active&&pending?(canSettle?button('Conferir devolução','event-settle','','primary')+
       '<p class="su-pending">Conclua a conciliação por produto antes de encerrar a unidade.</p>':
       '<p class="su-pending">Há mercadorias a conciliar. Solicite a conferência a um responsável autorizado.</p>'):
+    active&&openOrders>0?'<p class="su-pending">'+format(openOrders)+' pedido'+(openOrders===1?'':'s')+' pendente'+(openOrders===1?'':'s')+' de expedição ou cancelamento. Resolva antes de encerrar a loja.</p>':
     active&&canClose?button('Encerrar loja','event-close','data-id="'+h(e.id)+'"','primary'):
     '<p class="su-empty">Aguardando início da operação ou autorização para encerramento.</p>');
  }else if(current==='equipe'){
