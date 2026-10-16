@@ -37,7 +37,7 @@ test('o sistema pede o código e chama a RPC restrita a administrador',()=>{
  assert.match(app,/db\.rpc\('admin_remove_order'/);
  assert.match(app,/p_confirmation:confirmation/);
  assert.match(app,/hiddenOrders=new Set\(state\.removedOrders\.map/);
- assert.match(page,/src\/app\.js\?v=20261015adminorders1/);
+ assert.match(page,/src\/secure-entry\.js\?v=\d{8}[a-z0-9]+/);
 });
 test('o banco preserva o histórico e só disponibiliza a exclusão por RPC',()=>{
  assert.match(migration,/app_private\.role_in\('admin'\)/);
