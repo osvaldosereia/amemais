@@ -9,7 +9,7 @@ const gallery=await readFile(new URL('../src/photo-gallery.js',import.meta.url),
 const baseTheme=await readFile(new URL('../cdsb-theme.css',import.meta.url),'utf8');
 
 test('nova camada visual é a última folha CSS e usa a identidade CDSB',()=>{
- assert.match(index,/product-card-cdsb-square\.css\?v=20261016square1/);
+ assert.match(index,/product-card-cdsb-square\.css\?v=20261016square2/);
  const lastCss=index.match(/<link\s+rel="stylesheet"[^>]+>/g).at(-1);
  assert.match(lastCss,/product-card-cdsb-square\.css/);
  assert.match(baseTheme,/--cdsb-blue:#102d50/);
