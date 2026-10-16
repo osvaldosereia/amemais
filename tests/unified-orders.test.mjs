@@ -73,7 +73,9 @@ test('concluídos, cancelados e expirados não exibem falsas faltas após consum
   assert.equal(order.missing,0);
   const html=unifiedOrderCard(order,{button});
   assert.doesNotMatch(html,/\d+ faltam/);
-  assert.match(html,/Saída\/encerramento registrado/);
+  if(['cancelado','expirado'].includes(status))
+   assert.match(html,/Pedido cancelado|Prazo de reserva expirado/);
+  else assert.match(html,/Saída\/encerramento registrado/);
  }
 });
 test('pedidos legados ficam sem avaliação, em vez de falta confirmada',()=>{
