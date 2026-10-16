@@ -129,8 +129,9 @@ function orderWorkflow(o,verified=false){
  return [...(statuses[status]||[status,'pending']),'Saída/encerramento registrado'];
 }
 export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canDelete=false,canReceive=false,
- canDispatch=false,canDispatchStock=false,canVerify=false,isVerified=false,canAdjust=false,portal=false,time=x=>x}={}){
+ canDispatch=false,canDispatchStock=false,canVerify=false,isVerified=false,canAdjust=false,hasIssue=false,portal=false,time=x=>x}={}){
  const info=orderWorkflow(o,isVerified);
+ const hasOccurrence=Boolean(hasIssue||o.missing>0||o.adjustments.some(a=>Number(a.original_quantity)!==Number(a.revised_quantity)));
  const data='data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"';
  const process=canProcess&&!portal;
  const event=o.kind==='evento';
@@ -220,10 +221,10 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
   'Aguardando reposição. As unidades disponíveis continuam reservadas; assim que chegar mercadoria, o sistema completa a reserva.':
   'Faltam unidades. Aguarde a reposição ou solicite ao responsável um ajuste justificado.';
  return '<article class="uo-card uo-operational" data-order-card data-search="'+esc([
-  o.id,o.code,o.target,o.origin,originLabel,...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
+  o.id,o.code,o.target,o.origin,originLabel,...o.adjustments.map(a=>a.reason||''),...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
   '" data-order-id="'+esc(o.id)+'" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'" data-order-destination="'+
    (o.destinationKind|| (event?'evento':o.kind==='avulso'?'avulso':'loja'))+
-   '" data-order-verified="'+(o.status==='separado'&&isVerified?'true':'false')+'">'+
+   '" data-order-verified="'+(o.status==='separado'&&isVerified?'true':'false')+'" data-order-issue="'+hasOccurrence+'">'+
   '<header><div class="uo-head"><small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small>'+
    '<h3>'+(event?'Lote #':'Pedido #')+esc(o.code||'—')+'</h3>'+
    '<strong>'+esc(o.target)+'</strong></div>'+
@@ -260,7 +261,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
 }
 export function unifiedOrdersPage(orders,{
  button=()=>'',time=x=>x,portal=false,separationOnly=false,
- canProcess=()=>false,canCancel=()=>false,canDelete=()=>false,canReceive=()=>false,canDispatch=()=>false,canDispatchStock=()=>false,canVerify=()=>false,isVerified=()=>false,canAdjust=()=>false,
+ canProcess=()=>false,canCancel=()=>false,canDelete=()=>false,canReceive=()=>false,canDispatch=()=>false,canDispatchStock=()=>false,canVerify=()=>false,isVerified=()=>false,canAdjust=()=>false,hasIssue=()=>false,
  canAvulso=false,canStore=false,canEventBatch=false,eventId='',canLink=false,linksMarkup='',summaryLink=''
 }={}){
  const active=['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'];
@@ -274,7 +275,7 @@ export function unifiedOrdersPage(orders,{
  const cards=visible.map(o=>unifiedOrderCard(o,{button,time,portal,
   canProcess:canProcess(o),canCancel:canCancel(o),canDelete:canDelete(o),canReceive:canReceive(o),
   canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o),
-  canVerify:canVerify(o),isVerified:isVerified(o),canAdjust:canAdjust(o)})).join('');
+  canVerify:canVerify(o),isVerified:isVerified(o),canAdjust:canAdjust(o),hasIssue:hasIssue(o)})).join('');
  const actions=!separationOnly?
    (eventId
      ? (canEventBatch?button('+ Montar lote para esta loja','event-batch-new','data-event="'+esc(eventId)+'"','primary'):'')
@@ -301,7 +302,8 @@ export function unifiedOrdersPage(orders,{
    '<option value="em_separacao">Em separação</option>'+
    '<option value="a_conferir">A conferir</option>'+
    '<option value="pronto_saida">Prontos para saída</option>'+
-   '<option value="pendente_estoque">Com falta</option>'+
+   '<option value="pendente_estoque">Com falta</option>'+ 
+   '<option value="com_ocorrencia">Com ocorrência</option>'+ 
    '<option value="concluidos">Concluídos</option>'+
    '<option value="encerrados">Cancelados / expirados</option></select></label>'+
    '<label class="uo-filter">Destino<select data-unified-destination>'+
@@ -331,6 +333,7 @@ export function filterUnifiedOrders(container,query,status,destination='todos'){
    (status==='em_separacao'&&s==='em_separacao')||
    (status==='a_conferir'&&s==='separado'&&!verified)||
    (status==='pronto_saida'&&s==='separado'&&verified)||
+   (status==='com_ocorrencia'&&card.dataset.orderIssue==='true')||
    (status==='pendentes'&&['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'].includes(s))||
    (status==='concluidos'&&['enviado','despachado','concluido','recebido','recebido_divergente'].includes(s))||
    (status==='encerrados'&&['cancelado','expirado'].includes(s))||
