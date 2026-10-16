@@ -44,7 +44,7 @@ begin
  set exception_reason=p_reason,exception_recipient=v_recipient
  where id=v_batch and exception_reason is null;
  return v_result;
-end;$function$
+end;$function$;
 
 revoke all on function public.record_stock_exception(uuid,integer,integer,text,text,text,uuid) from public,anon;
 grant execute on function public.record_stock_exception(uuid,integer,integer,text,text,text,uuid) to authenticated;
