@@ -10,7 +10,7 @@ const dt=(time,opts)=>new Intl.DateTimeFormat('pt-BR',{timeZone:timezone,...opts
 const niceTime=v=>v?dt(v,{hour:'2-digit',minute:'2-digit'}):'—';
 const niceDate=v=>v?dt(v,{day:'2-digit',month:'short',year:'numeric'}):'—';
 const n=v=>fmt.format(Number(v)||0);
-const state={snapshot:null,management:null,managementError:null,error:null,loading:false,lastSuccess:0,lastManagement:0,accessDenied:false,pageIndex:0,paused:false,nextSwap:0,subpages:{}};
+const state={snapshot:null,management:null,managementError:null,error:null,loading:false,lastSuccess:0,lastManagement:0,accessDenied:false,pageIndex:0,paused:false,nextSwap:0,subpages:{},settingsOpen:false};
 let db=null;
 let timer=null,clockTimer=null,rotationTimer=null;
 const path={
@@ -275,6 +275,24 @@ function headerAlert(data,management){
   '<span>Consulte a tela Operação ao vivo para identificar os pedidos.</span></span>';
  return '<span class="tv-calm-banner">Sem ocorrências críticas identificadas</span>';
 }
+function loadRotationSettings(){
+ try{
+  const saved=JSON.parse(window.localStorage?.getItem('ame-tv-360-seconds')||'null');
+  if(!Array.isArray(saved)||saved.length!==screens.length)return;
+  for(let i=0;i<screens.length;i++)
+   if(Number.isInteger(saved[i])&&saved[i]>=10&&saved[i]<=120)screens[i].seconds=saved[i];
+ }catch(error){console.warn('Preferências do painel não disponíveis');}
+}
+function settingsMarkup(){
+ if(!state.settingsOpen)return '';
+ return '<div class="tv-settings-cover"><section class="tv-settings-dialog" role="dialog" aria-modal="true" aria-label="Duração das telas">'+
+  '<h2>Tempo de leitura por tela</h2><p>Escolha entre 10 e 120 segundos para cada relatório. As durações ficam salvas apenas neste navegador.</p>'+
+  '<div class="tv-settings-list">'+screens.map((x,i)=>
+   '<label><span>'+esc(x.label)+'</span><input type="number" inputmode="numeric" min="10" max="120" step="1" value="'+x.seconds+
+   '" data-tv-duration="'+i+'" aria-label="Segundos para '+esc(x.label)+'"></label>').join('')+'</div>'+
+  '<div class="tv-settings-actions"><button type="button" data-action="close-tv-settings">Cancelar</button>'+
+   '<button type="button" data-action="save-tv-settings">Salvar tempos</button></div></section></div>';
+}
 function shell(data){
  const noData=state.error&&!data;
  const generated=data?.generated_at||null;
@@ -290,6 +308,7 @@ function shell(data){
    '<div class="tv-header-tools">'+statusMarkup()+
     '<button type="button" data-action="refresh" aria-label="Atualizar">'+icon('refresh')+'</button>'+
     '<button type="button" data-action="fullscreen" aria-label="Tela cheia">'+icon('full')+'</button>'+
+    '<button type="button" data-action="open-tv-settings" aria-label="Configurar tempo das telas" title="Tempo de leitura">'+icon('clock')+'</button>'+
    '</div><div class="tv-time-box"><span>Atualizado</span><strong>'+niceTime(generated)+'</strong>'+
    '<small>'+niceDate(at)+'</small></div></header>'+
   (state.error?'<div class="tv-error" role="status">'+esc(state.error)+
@@ -308,7 +327,7 @@ function shell(data){
    '<button type="button" data-action="toggle-rotation">'+(state.paused?'▶ Retomar':'Ⅱ Pausar')+'</button>'+
    '<button type="button" data-action="next-screen" aria-label="Próxima tela">▶</button>'+
   '</div><div class="tv-progress-track" aria-hidden="true"><i data-rotation-progress></i></div></footer>'+
-  '</main>';
+  settingsMarkup()+'</main>';
  updateProgress();
 }
 function updateProgress(){
@@ -378,6 +397,7 @@ async function refresh(){
  }finally{state.loading=false;}
 }
 async function boot(){
+ loadRotationSettings();
  if(!cfg.supabaseUrl||!cfg.supabasePublishableKey){
   message('Configuração indisponível','Supabase não está configurado para esta instalação.');return;
  }
@@ -409,6 +429,24 @@ async function boot(){
 document.addEventListener('click',async event=>{
  const action=event.target.closest('[data-action]')?.dataset.action;
  if(action==='refresh')await refresh();
+ if(action==='open-tv-settings'){
+   state.settingsOpen=true;state.paused=true;shell(state.snapshot);
+ }
+ if(action==='close-tv-settings'){
+   state.settingsOpen=false;state.paused=false;
+   state.nextSwap=Date.now()+screens[state.pageIndex].seconds*1000;shell(state.snapshot);
+ }
+ if(action==='save-tv-settings'){
+   const inputs=[...document.querySelectorAll('[data-tv-duration]')];
+   const values=inputs.map(el=>Number(el.value));
+   if(values.length!==screens.length||values.some(v=>!Number.isInteger(v)||v<10||v>120)){
+     window.alert('Use números entre 10 e 120 segundos.');return;
+   }
+   values.forEach((v,i)=>screens[i].seconds=v);
+   try{window.localStorage?.setItem('ame-tv-360-seconds',JSON.stringify(values));}catch(e){}
+   state.settingsOpen=false;state.paused=false;
+   state.nextSwap=Date.now()+screens[state.pageIndex].seconds*1000;shell(state.snapshot);
+ }
  if(action==='next-screen')nextScreen();
  if(action==='previous-screen')nextScreen(-1);
  if(action==='toggle-rotation'){
