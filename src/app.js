@@ -2743,7 +2743,7 @@ function storeOrderModal(preselectId=''){
    (x.kind==='filial'&&hasPermission('orders.central'))));
  if(!targets.length)return toast('Não há unidade habilitada para solicitar mercadorias.',true);
  const portal=isFranchisePortal();
- const rows=state.items.filter(p=>p.active).slice(0,1500).map(p=>
+ const rows=state.items.filter(p=>p.active).map(p=>
   '<div class="store-order-product" data-store-row data-filter="'+h([p.name,p.ean,p.sku,p.apparel_color,p.apparel_size].join(' ').toLocaleLowerCase('pt-BR'))+'">'+
   '<div><strong>'+h(p.name)+'</strong><small>'+h([p.apparel_color,p.apparel_size,p.sku,p.ean].filter(Boolean).join(' · '))+
   (portal?'':' · Livre na central: '+qtyAvailable(p.id)+' un.')+'</small>'+ 
