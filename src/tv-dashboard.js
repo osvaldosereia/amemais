@@ -212,7 +212,7 @@ function closedCards(items){
  return '<article class="tv-inner-card"><div class="tv-title-line"><h3>'+esc(name)+'</h3>'+
     '<time>'+niceDate(rows[0].closed_at)+'</time></div>'+
   '<div class="tv-inline-totals">'+metric('Enviadas',total('sent'))+metric('Devolvidas',total('returned'))+
-     metric('Não devolvidas',total('nonreturned'))+'</div>'+
+     metric('Não devolvidas',total('nonreturned'))+metric('Avariadas',total('damaged'))+'</div>'+
   '<div class="tv-mini-table">'+rows.slice(0,5).map(x=>'<div><span>'+esc(x.category)+'</span>'+
     '<strong>'+n(x.returned)+' dev. / '+n(x.nonreturned)+' não dev.</strong></div>').join('')+'</div>'+
   '<p class="tv-disclaimer">Não devolvido não equivale a venda confirmada.</p></article>';
@@ -321,7 +321,7 @@ function updateProgress(){
 function nextScreen(delta=1){
  state.pageIndex=(state.pageIndex+delta+screens.length)%screens.length;
  if(delta>0&&[2,3,4].includes(state.pageIndex)){
-   state.subpages[state.pageIndex]=(state.subpages[state.pageIndex]||0)+1;
+   state.subpages[state.pageIndex]=state.subpages[state.pageIndex]===undefined?0:state.subpages[state.pageIndex]+1;
  }
  state.nextSwap=Date.now()+screens[state.pageIndex].seconds*1000;
  shell(state.snapshot);
