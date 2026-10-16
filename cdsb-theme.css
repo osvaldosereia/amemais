@@ -123,3 +123,34 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
  .mobile-c-app .sidebar .brand-lockup{display:none!important}
  .mobile-c-app .topbar{background:#fff}
 }
+
+
+/* Identidade CDSB v2: sem compressão visual, marca única no desktop. */
+@media(min-width:1200px){
+ .mobile-c-app.app-shell{grid-template-columns:282px minmax(0,1fr)}
+}
+@media(min-width:761px){
+ .mobile-c-app .sidebar{padding:18px 14px 16px;gap:16px}
+ .mobile-c-app .sidebar .brand-lockup{
+   display:flex!important;justify-content:center;align-items:center;
+   height:165px;min-height:165px;max-height:165px;
+   padding:14px 9px!important;margin:0;background:#fff;
+   border:1px solid #dce2e8;border-radius:15px;box-shadow:none;
+ }
+ .mobile-c-app .sidebar .brand-lockup .cdsb-brand-logo{
+   display:block;width:100%;height:auto;max-width:268px;
+   max-height:127px;object-fit:contain;object-position:center;
+   flex:0 1 auto;
+ }
+ .mobile-c-app .topbar .cdsb-mobile-identity{display:none!important}
+ .mobile-c-app .topbar .topbar-right{margin-left:auto}
+}
+.mobile-c-app .brand-login img{
+ display:block;width:min(100%,390px);height:auto;max-height:148px;
+ aspect-ratio:980 / 320;object-fit:contain;object-position:center;
+}
+@media(max-width:760px){
+ .mobile-c-app .topbar .cdsb-mobile-identity{display:flex!important}
+ .mobile-c-app .sidebar .brand-lockup{display:none!important}
+ .mobile-c-app .brand-login img{width:min(100%,335px);max-height:116px}
+}
