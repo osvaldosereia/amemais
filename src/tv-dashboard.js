@@ -268,7 +268,8 @@ function headerAlert(data,management){
  const issue=management?.issues?.[0];
  if(issue)return '<span class="tv-critical-banner">'+icon('alert')+
   '<strong>'+esc(issue.code)+' · '+esc(issue.destination_type)+': '+esc(issue.destination)+'</strong>'+
-  '<span>'+esc(issue.issue)+' — '+esc(issue.product)+' (faltam '+n(issue.missing)+')</span></span>';
+  '<span>'+esc(issue.issue)+' — '+esc(issue.product)+
+   (num(issue.missing)>0?' (faltam '+n(issue.missing)+' un.)':' (diferença na contagem)')+'</span></span>';
  const shortage=num(data?.alerts?.shortage),divergence=num(data?.alerts?.divergence);
  if(shortage||divergence)return '<span class="tv-critical-banner">'+icon('alert')+
   '<strong>'+n(shortage)+' pedido(s) com falta · '+n(divergence)+' divergência(s)</strong>'+
