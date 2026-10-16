@@ -10,7 +10,7 @@ const dt=(time,opts)=>new Intl.DateTimeFormat('pt-BR',{timeZone:timezone,...opts
 const niceTime=v=>v?dt(v,{hour:'2-digit',minute:'2-digit'}):'—';
 const niceDate=v=>v?dt(/^\d{4}-\d{2}-\d{2}$/.test(String(v))?v+'T12:00:00Z':v,{day:'2-digit',month:'short',year:'numeric'}):'—';
 const n=v=>fmt.format(Number(v)||0);
-const state={snapshot:null,management:null,managementError:null,error:null,loading:false,lastSuccess:0,lastManagement:0,accessDenied:false,pageIndex:0,paused:false,nextSwap:0,subpages:{},settingsOpen:false,rankings:null,rankingsError:null,detailReport:null};
+const state={snapshot:null,management:null,managementError:null,error:null,loading:false,lastSuccess:0,lastManagement:0,accessDenied:false,pageIndex:0,paused:false,nextSwap:0,subpages:{},settingsOpen:false,rankings:null,rankingsError:null,detailReport:null,recentPurchases:[],recentPurchasesError:null};
 let db=null;
 let timer=null,clockTimer=null,rotationTimer=null;
 const path={
@@ -354,11 +354,17 @@ function oneCategories(items){
  n(x.current_units)+' / '+n(x.previous_units)+'</b></div><i style="width:'+percent(x.current_units,max)+
  '%"></i><em style="width:'+percent(x.previous_units,max)+'%"></em></div>').join('');
 }
-function onePurchases(operational,manage){
- return '<div class="tv-one-mini-metrics">'+[
- ['Compras abertas',manage?.purchases?.open],['Enviadas ao fornecedor',manage?.purchases?.sent],
- ['Conferidos hoje',manage?.quality?.checks_today],['Expedidos hoje',operational?.metrics?.finished_today]
- ].map(([label,value])=>'<div><small>'+esc(label)+'</small><strong>'+n(value)+'</strong></div>').join('')+'</div>';
+function onePurchases(){
+ if(state.recentPurchasesError)return emptyReport('Compras recentes indisponíveis no momento.');
+ if(!state.recentPurchases?.length)return emptyReport('Nenhuma compra cadastrada.');
+ return '<div class="tv-buy-recent"><h3>Pedidos de compra recentes</h3>'+state.recentPurchases.slice(0,6).map(o=>{
+  const label={rascunho:'Rascunho',enviado:'Encomendado',finalizado:'Concluído',cancelado:'Cancelado'}[o.status]||o.status;
+  const late=o.status==='enviado'&&o.expected_arrival_date&&o.expected_arrival_date<
+   new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  return '<div class="tv-buy-recent-row'+(late?' is-late':'')+'">'+
+   '<b>PC-'+n(o.number)+'</b><span>'+esc(o.supplier)+'<small>'+n(o.units)+' un. · '+n(o.skus)+' SKUs</small></span>'+
+   '<strong>'+esc(label)+(late?' · ATRASADO':'')+'<small>Prev. '+niceDate(o.expected_arrival_date)+'</small></strong></div>';
+ }).join('')+'</div>';
 }
 function oneKpis(operational,manage){
  const m=operational?.metrics||{};
@@ -389,7 +395,7 @@ function oneGrid(operational,manage,rankings){
  oneCard(oneTitles.categories,'categories',oneCategories(manage?.categories))+
  oneCard(oneTitles.upcoming,'upcoming',oneEvents(manage?.upcoming))+
  oneCard(oneTitles.closed,'closed',oneEvents(manage?.closed_events,true))+
- oneCard(oneTitles.purchases,'purchases',onePurchases(operational,manage))+'</div>';
+ oneCard(oneTitles.purchases,'purchases',onePurchases())+'</div>';
 }
 function oneDetailData(key,operational,manage,rankings){
  if(['low','high','popular','dormant'].includes(key)){
@@ -407,6 +413,7 @@ function oneDetailData(key,operational,manage,rankings){
  if(key==='upcoming')return (manage?.upcoming||[]).map(x=>[x.event_name,x.category,n(x.requested),n(x.prepared),n(x.sent)]);
  if(key==='closed')return (manage?.closed_events||[]).map(x=>[x.event_name,x.category,n(x.sent),n(x.returned),n(x.nonreturned)]);
  if(key==='categories')return (manage?.categories||[]).map(x=>[x.category,n(x.current_units),n(x.previous_units),n(num(x.current_units)-num(x.previous_units))]);
+ if(key==='purchases')return (state.recentPurchases||[]).map(o=>['PC-'+o.number,o.supplier,o.status,n(o.units)+' un.',niceDate(o.expected_arrival_date)]);
  return [
  ['Compras abertas',n(manage?.purchases?.open)],['Enviadas ao fornecedor',n(manage?.purchases?.sent)],
  ['Pedidos conferidos hoje',n(manage?.quality?.checks_today)],
@@ -423,7 +430,8 @@ function oneDetail(operational,manage,rankings){
  key==='franchises'?['Franquia','Categoria','Solicitadas','Expedidas']:
  key==='upcoming'?['Evento','Categoria','Solicitadas','Separadas','Enviadas']:
  key==='closed'?['Evento','Categoria','Enviadas','Devolvidas','Não devolvidas']:
- key==='categories'?['Categoria','30 dias','30 dias anteriores','Diferença']:['Indicador','Total'];
+ key==='categories'?['Categoria','30 dias','30 dias anteriores','Diferença']:
+ key==='purchases'?['Compra','Fornecedor','Situação','Unidades','Chegada prevista']:['Indicador','Total'];
  const rows=oneDetailData(key,operational,manage,rankings);
  return '<div class="tv-one-overlay" data-action="close-detail"><aside class="tv-one-sheet" role="dialog" aria-modal="true" aria-label="'+esc(oneTitles[key])+'">'+
  '<header><div><small>CDSB · relatório</small><h2>'+esc(oneTitles[key])+'</h2></div>'+
@@ -487,9 +495,12 @@ async function refresh(){
  if(!db||state.loading||state.accessDenied)return;
  state.loading=true;
  try{
-  const [operational,management,rankings]=await Promise.all([
-   db.rpc('tv_operations_snapshot'),db.rpc('tv_management_snapshot'),db.rpc('tv_product_rankings')
+  const [operational,management,rankings,purchases]=await Promise.all([
+   db.rpc('tv_operations_snapshot'),db.rpc('tv_management_snapshot'),db.rpc('tv_product_rankings'),
+   db.rpc('tv_recent_purchase_orders')
   ]);
+  if(purchases.error){state.recentPurchasesError='Falha ao consultar pedidos de compra';}
+  else {state.recentPurchases=Array.isArray(purchases.data)?purchases.data:[];state.recentPurchasesError=null;}
   const {data,error}=operational;
   if(error)throw error;
   if(management.error){

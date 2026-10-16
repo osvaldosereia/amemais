@@ -30,7 +30,8 @@ import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCar
  setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
  confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261016cart1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
-import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
+import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261016buyeta1';
+import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
 import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261016label57';
 
@@ -538,7 +539,7 @@ function pageContent(){
   if(state.view==='avarias')return damageStockPage();
   if(state.view==='produtos')return productsPage();
   if(state.view==='compras')return purchasesPage({products:state.items,suppliers:state.suppliers,balances:state.balances,
-   reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,button,filter:state.purchaseSupplierFilter});
+   reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,models:state.apparelModels,button,filter:state.purchaseSupplierFilter});
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):storesPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
@@ -583,6 +584,7 @@ function productGroupCard(group){
     canBalance:()=>!isFranchisePortal()&&hasPermission('stock.balance')&&['admin','gerente','estoquista'].includes(state.profile?.role),
     canStockEntry:()=>hasPermission('stock.entry'),canStockExit:()=>hasPermission('stock.exit'),
     historyForGroup:g=>state.movements.filter(m=>g.products.some(p=>p.id===m.product_id)).slice(0,10),
+    purchases:purchasePendingByProduct(state.purchaseOrders,state.purchaseItems),
     categories:state.categories,
     expanded:state.expandedProductGroups.has(group.key),canShare:canRegisterProducts(),
     canLabel:!isFranchisePortal()
@@ -1650,9 +1652,9 @@ function syncPurchaseForm(form){
  const selected=form.querySelector('[data-buy-modal-supplier]')?.value;
  const q=(form.querySelector('[data-buy-search]')?.value||'').toLocaleLowerCase('pt-BR').trim();
  let visible=0;
- for(const row of form.querySelectorAll('[data-buy-product]')){
-  row.hidden=!(row.dataset.supplier===selected&&(!q||row.dataset.search.includes(q)));
-  if(!row.hidden)visible++;
+ for(const group of form.querySelectorAll('.buy-cart-group')){
+  group.hidden=!(group.dataset.supplier===selected&&(!q||group.dataset.search.includes(q)));
+  if(!group.hidden)visible+=group.querySelectorAll('[data-buy-product]').length;
  }
  const counter=form.querySelector('[data-buy-count]');
  if(counter)counter.textContent=visible+' variação(ões) encontradas';
@@ -1662,16 +1664,45 @@ function purchaseNewModal(selected=null){
  const suppliers=state.suppliers.filter(s=>s.active);
  if(!suppliers.length)return toast('Cadastre um fornecedor antes de montar a compra.',true);
  const supplierId=selected&&suppliers.some(s=>s.id===selected)?selected:suppliers[0].id;
- const rows=purchaseOrderRows(state.items,suppliers,state.balances,state.stockReservations,state.purchaseOrders,state.purchaseItems);
+ const rows=purchaseOrderRows(state.items,suppliers,state.balances,state.stockReservations,state.purchaseOrders,state.purchaseItems,state.apparelModels);
  formModal('Montar pedido de compra','<div class="formgrid">'+
   selectField('Fornecedor','supplier_id',suppliers.map(s=>[s.id,s.name]),supplierId,'data-buy-modal-supplier')+
   '<label class="field wide"><span>Buscar produto, EAN ou SKU</span><input type="search" data-buy-search placeholder="Buscar produtos do fornecedor"></label>'+
   '<div class="buy-product-list wide">'+rows+'</div>'+
   '<small class="wide help" data-buy-count></small>'+
+  field('Prazo estimado de chegada (dias corridos)','estimated_days','number','15','required min="1" max="365" step="1" inputmode="numeric"')+
   textareaField('Observações para o fornecedor','note')+'</div>'+
   '<div class="note">As sugestões consideram estoque mínimo, reservas e compras em aberto. Quantidades podem ser editadas. A emissão não movimenta estoque.</div>',
-  'buy-order-create','Criar pedido de compra');
+  'buy-order-create','Salvar pedido e baixar PDF');
  syncPurchaseForm(document.querySelector('.modalback form[data-form="buy-order-create"]'));
+ hydrateImages();
+}
+async function downloadBuyOrder(order,lines){
+ if(!order)return toast('Compra não encontrada.',true);
+ const supplier=state.suppliers.find(s=>s.id===order.supplier_id);
+ if(!supplier)return toast('Fornecedor não localizado.',true);
+ const products=new Map(state.items.map(p=>[p.id,p]));
+ const models=new Map(state.apparelModels.map(m=>[m.id,m]));
+ const paths=[...new Set(lines.map(line=>{
+  const p=products.get(line.product_id);
+  return models.get(p?.apparel_model_id)?.image_path||p?.image_path;
+ }).filter(Boolean))];
+ const photoUrls=await signedPhotoUrls(paths);
+ const {blob,filename}=await createPurchasePDF(order,supplier,lines,{
+  products:state.items,models:state.apparelModels,photoUrls
+ });
+ downloadPurchasePDF({blob,filename});
+ toast('PDF gerado para download: '+filename);
+}
+function purchaseEtaModal(order){
+ if(!order||!hasPermission('purchases.manage')||!['rascunho','enviado'].includes(order.status))return;
+ formModal('Atualizar previsão · Compra PC-'+order.number,
+  '<p class="help">O novo prazo é contado em dias corridos a partir de hoje. A previsão anterior ficará registrada no histórico de auditoria.</p>'+
+  '<div class="formgrid">'+field('Novo prazo de chegada (dias corridos)','estimated_days','number',String(order.estimated_days||15),
+   'required min="1" max="365" step="1" inputmode="numeric"')+'</div>',
+  'buy-eta-save','Salvar nova previsão');
+ const form=document.querySelector('form[data-form="buy-eta-save"]');
+ if(form)form.dataset.id=order.id;
 }
 function printHTML(html){
  const popup=window.open('','_blank');
@@ -3423,14 +3454,47 @@ async function handleClick(event){
    if(!hasPermission('purchases.manage'))return;
    const order=state.purchaseOrders.find(x=>x.id===id);
    if(!order)return toast('Pedido de compra não encontrado.',true);
-   return printHTML(purchaseOrderDocument(order,state.suppliers.find(s=>s.id===order.supplier_id),
-     state.purchaseItems.filter(x=>x.purchase_order_id===id)));
+   try{return await downloadBuyOrder(order,state.purchaseItems.filter(x=>x.purchase_order_id===id));}
+   catch(error){return fail(error);}
+  }
+  if(action==='buy-eta-edit'){
+   if(!hasPermission('purchases.manage'))return;
+   return purchaseEtaModal(state.purchaseOrders.find(x=>x.id===id));
+  }
+  if(action==='buy-product-report'){
+   if(!hasPermission('purchases.manage'))return;
+   const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+     state.purchaseOrders,state.purchaseItems).find(g=>g.key===target.dataset.group);
+   if(!group)return toast('Produto não encontrado.',true);
+   const ids=group.variants.map(p=>p.id);
+   const since=new Date(Date.now()-90*86400000).toISOString();
+   try{
+    const result=await db.from('stock_movements').select('product_id,action,quantity,delta_store,created_at')
+     .in('product_id',ids).gte('created_at',since).order('created_at',{ascending:false}).limit(3000);
+    const moves=assertOk(result)||[];
+    const cut=Date.now()-30*86400000;
+    const rows=group.variants.map(p=>{
+     const all=moves.filter(m=>m.product_id===p.id&&Number(m.delta_store)<0);
+     const month=all.filter(m=>new Date(m.created_at).getTime()>=cut);
+     const qtd=arr=>arr.reduce((sum,m)=>sum+Math.abs(Number(m.delta_store)||0),0);
+     return '<div class="buy-outflow-line"><div><strong>'+h(p.apparel_size||'Único')+
+     '</strong><small> · SKU '+h(p.sku||'—')+'</small></div><div>30 dias: <b>'+qtd(month)+
+     '</b> · 90 dias: <b>'+qtd(all)+'</b> un.</div></div>';
+    }).join('');
+    formModal('Saídas registradas · '+group.title,
+     '<p class="help">Movimentações físicas de saída do CD, não vendas ao consumidor. Transferências e saídas excepcionais podem aparecer neste total.</p>'+
+     '<div class="buy-outflow-report">'+rows+'</div>'+
+     (moves.length===3000?'<p class="help">Consulta limitada a 3.000 movimentações; os totais podem estar incompletos.</p>':'')+
+     '<p class="help">Estoque baixo, por si só, não indica necessidade de reposição. Considere eventos e histórico de indisponibilidade.</p>',
+     'buy-report-close','Fechar');
+   }catch(error){fail(error);}
+   return;
   }
   if(action==='buy-status'){
    if(!hasPermission('purchases.manage'))return;
    const order=state.purchaseOrders.find(o=>o.id===id),status=target.dataset.status;
    if(!order||!['enviado','finalizado','cancelado'].includes(status))return;
-   if(!window.confirm('Alterar compra #'+order.number+' para '+status+'? Isso não altera o estoque; registre o recebimento na Entrada.'))return;
+   if(!window.confirm('Alterar compra #'+order.number+' para '+status+'? Compras não movimentam estoque. Para recebimento, confirme a entrada em Produtos antes de concluir.'))return;
    return exec(async()=>assertOk(await db.rpc('set_purchase_order_status',{p_id:id,p_status:status})),
     'Situação da compra atualizada. O saldo físico não foi alterado.');
   }
@@ -4296,25 +4360,55 @@ async function handleSubmit(event){
     assertOk(await response);
    },'Fornecedor salvo.');
   }
+  if(type==='buy-report-close'){closeTopModal();return;}
+  if(type==='buy-eta-save'){
+   if(!hasPermission('purchases.manage'))return;
+   const days=Number(values.estimated_days);
+   if(!Number.isInteger(days)||days<1||days>365)return toast('Informe de 1 a 365 dias corridos.',true);
+   return exec(async()=>assertOk(await db.rpc('update_purchase_order_eta',{
+    p_id:form.dataset.id,p_days:days
+   })),'Previsão de chegada atualizada. O histórico foi preservado.');
+  }
   if(type==='buy-order-create'){
    if(!hasPermission('purchases.manage'))return;
-   const supplier=String(values.supplier_id||''),rows=[...form.querySelectorAll('[data-buy-product]')]
-    .filter(row=>row.dataset.supplier===supplier);
+   const days=Number(values.estimated_days);
+   if(!Number.isInteger(days)||days<1||days>365)return toast('Informe o prazo em dias corridos (1 a 365).',true);
+   const supplier=String(values.supplier_id||'');
+   const rows=[...form.querySelectorAll('[data-buy-product]')]
+    .filter(row=>row.dataset.supplier===supplier&&row.querySelector('[data-buy-select]')?.checked);
    const lines=[];
    for(const row of rows){
     const input=row.querySelector('[data-buy-quantity]');
-    const raw=input?.value??'0',qty=Number(raw);
-    if(raw===''||!Number.isInteger(qty)||qty<0||qty>1000000){
-     return toast('Revise as quantidades da compra (0 a 1.000.000).',true);
+    const qty=Number(input?.value);
+    if(!Number.isInteger(qty)||qty<1||qty>1000000){
+     return toast('Revise as quantidades de cada SKU selecionado (1 a 1.000.000).',true);
     }
-    if(qty)lines.push({product_id:input.dataset.product,quantity:qty});
+    lines.push({product_id:input.dataset.product,quantity:qty});
    }
-   if(!lines.length)return toast('Informe pelo menos uma quantidade.',true);
-   if(!window.confirm('Criar pedido para '+(state.suppliers.find(x=>x.id===supplier)?.name||'fornecedor')+
-     ' com '+lines.length+' SKU(s)? O estoque não será alterado.'))return;
-   return exec(async()=>assertOk(await db.rpc('save_purchase_order',{
-    p_supplier:supplier,p_items:lines,p_note:String(values.note||'').slice(0,1500)
-   })),'Pedido de compra criado. Imprima a ficha e marque como enviado após encaminhar ao fornecedor.');
+   if(!lines.length)return toast('Selecione uma ou mais variações para comprar.',true);
+   if(!window.confirm('Salvar pedido com '+lines.length+' SKU(s) e previsão de '+days+
+    ' dias corridos? O estoque não será alterado.'))return;
+   state.loading=true;
+   let id=null;
+   try{
+    id=assertOk(await db.rpc('save_purchase_order_with_eta',{
+     p_supplier:supplier,p_items:lines,p_note:String(values.note||'').slice(0,1500),p_estimated_days:days
+    }));
+    // Após a gravação, nunca reenviar o RPC se o download falhar.
+    const order=assertOk(await db.from('purchase_orders').select('*').eq('id',id).single());
+    const saved=assertOk(await db.from('purchase_order_items').select('*').eq('purchase_order_id',id));
+    await loadData();
+    closeTopModal();
+    await downloadBuyOrder(order,saved);
+    toast('Pedido salvo e PDF baixado. Confirme a encomenda depois de encaminhar o documento ao fornecedor.');
+   }catch(error){
+    fail(error);
+    if(id){
+     try{await loadData();closeTopModal();}catch(err){console.warn('Não foi possível atualizar a lista',err);}
+     toast('O pedido foi salvo, mas o PDF não foi baixado. Use Baixar PDF na lista de compras.',true);
+    }
+   }finally{state.loading=false;}
+   return;
   }
   if(type==='product-card-basic'){
     if(!hasPermission('products.edit')||isFranchisePortal())return;
@@ -5070,6 +5164,11 @@ document.addEventListener('input',event=>{
   }
   if(event.target.matches('[data-users-search]'))applyUserListFilter();
   if(event.target.matches('[data-buy-search]'))syncPurchaseForm(event.target.closest('form'));
+  if(event.target.matches('[data-buy-quantity]')){
+   const input=event.target;
+   if(input.value!==''&&!Number.isInteger(Number(input.value)))input.setCustomValidity('Informe unidades inteiras.');
+   else input.setCustomValidity('');
+  }
   if(event.target.matches('[data-balance-count]')){
     const field=event.target,panel=field.closest('[data-product-details]');
     if(!panel)return;
@@ -5225,6 +5324,10 @@ document.addEventListener('change',event=>{
   }
   if(event.target.matches('[data-users-filter-role]'))applyUserListFilter();
   if(event.target.matches('[data-buy-modal-supplier]'))syncPurchaseForm(event.target.closest('form'));
+  if(event.target.matches('[data-buy-select]')){
+   const row=event.target.closest('[data-buy-product]'),qty=row?.querySelector('[data-buy-quantity]');
+   if(qty){qty.disabled=!event.target.checked;if(event.target.checked)qty.focus();}
+  }
   if(event.target.matches('[data-buy-filter]')){state.purchaseSupplierFilter=event.target.value;render();return;}
   if(event.target.matches('[data-unified-status], [data-unified-destination], [data-unified-sort]')){
     const container=event.target.closest('.uo-page');

@@ -1,12 +1,12 @@
 // CDSB: compras administrativas. Criar/imprimir pedidos não altera saldo nem reservas.
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const f=n=>Number(n||0).toLocaleString('pt-BR');
-const fmtDate=s=>s?new Date(s).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
+const fmtDate=s=>s?new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(s))?s+'T12:00:00Z':s).toLocaleDateString('pt-BR',{timeZone:'America/Cuiaba',day:'2-digit',month:'2-digit',year:'numeric'}):'—';
 export function purchaseSuggestions(products,balances,reservations,orders=[],orderItems=[]){
  const stock=new Map(),held=new Map(),incoming=new Map();
  for(const b of balances)if(!b.event_id)stock.set(b.product_id,(stock.get(b.product_id)||0)+Number(b.quantity||0));
  for(const r of reservations)if(r.status==='ativa')held.set(r.product_id,(held.get(r.product_id)||0)+Number(r.quantity||0));
- const open=new Set(orders.filter(o=>['rascunho','enviado'].includes(o.status)).map(o=>o.id));
+ const open=new Set(orders.filter(o=>o.status==='enviado').map(o=>o.id));
  for(const it of orderItems)if(open.has(it.purchase_order_id))
   incoming.set(it.product_id,(incoming.get(it.product_id)||0)+Number(it.quantity||0));
  return products.filter(p=>p.active&&Number(p.min_stock||0)>0).map(p=>{
@@ -16,46 +16,104 @@ export function purchaseSuggestions(products,balances,reservations,orders=[],ord
   return {...p,physical,reserved,available,ordered,minimum,suggested};
  }).filter(p=>p.suggested>0).sort((a,b)=>b.suggested-a.suggested||a.name.localeCompare(b.name,'pt-BR'));
 }
-export function purchasesPage({products=[],suppliers=[],balances=[],reservations=[],orders=[],items=[],button,filter=''}) {
- const suggestions=purchaseSuggestions(products,balances,reservations,orders,items);
- const relevant=filter?suggestions.filter(p=>p.supplier_id===filter):suggestions;
- const none=suggestions.filter(p=>!p.supplier_id);
- const pending=orders.filter(o=>['rascunho','enviado'].includes(o.status)).length;
- const choices='<option value="">Todos os fornecedores</option>'+
- suppliers.filter(s=>s.active).map(s=>'<option value="'+h(s.id)+'"'+(filter===s.id?' selected':'')+'>'+h(s.name)+'</option>').join('');
- const body=relevant.slice(0,120).map(p=>
-  '<tr><td><strong>'+h(p.name)+'</strong><small>'+h([p.apparel_color,p.apparel_size,p.sku].filter(Boolean).join(' · '))+'</small></td>'+
-  '<td>'+h(suppliers.find(s=>s.id===p.supplier_id)?.name||'Sem fornecedor')+'</td>'+
-  '<td class="num">'+f(p.available)+'</td><td class="num">'+f(p.minimum)+'</td>'+
-  '<td class="num">'+f(p.ordered)+'</td><td class="num"><strong>'+f(p.suggested)+'</strong></td></tr>').join('');
- const list=orders.slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,25).map(o=>{
-  const s=suppliers.find(x=>x.id===o.supplier_id);
-  const count=items.filter(i=>i.purchase_order_id===o.id).reduce((n,x)=>n+Number(x.quantity||0),0);
-  const status={rascunho:'Rascunho',enviado:'Enviado ao fornecedor',finalizado:'Finalizado',cancelado:'Cancelado'}[o.status]||o.status;
-  return '<article class="buy-order"><div><strong>Compra #'+f(o.number)+'</strong><small>'+h(s?.name||'Fornecedor')+' · '+fmtDate(o.created_at)+' · '+f(count)+' unidades</small></div>'+
-   '<span class="buy-status">'+status+'</span><div class="buy-order-actions">'+
-   button('Imprimir','buy-print-order','data-id="'+h(o.id)+'"','small')+
-   (o.status==='rascunho'?button('Marcar enviado','buy-status','data-id="'+h(o.id)+'" data-status="enviado"','small primary'):'')+
-   (o.status==='enviado'?button('Finalizar','buy-status','data-id="'+h(o.id)+'" data-status="finalizado"','small'):'')+
+// Apenas pedidos efetivamente encomendados são anunciados como "a caminho".
+// Rascunhos não representam compromisso de aquisição, recebidos não são contabilizados.
+export function purchasePendingByProduct(orders=[],items=[]){
+ const open=new Map((orders||[]).filter(o=>o.status==='enviado').map(o=>[o.id,o]));
+ const pending=new Map();
+ for(const it of items||[]){
+  const order=open.get(it.purchase_order_id);if(!order)continue;
+  const current=pending.get(it.product_id)||{quantity:0,dates:[],orders:[]};
+  current.quantity+=Number(it.quantity||0);
+  if(order.expected_arrival_date)current.dates.push(order.expected_arrival_date);
+  current.orders.push(order.number);
+  pending.set(it.product_id,current);
+ }
+ return pending;
+}
+export function purchasingGroups(products=[],models=[],balances=[],reservations=[],orders=[],items=[]){
+ const existing=purchasePendingByProduct(orders,items);
+ const stock=new Map(),reserved=new Map(),groups=new Map();
+ for(const x of balances||[])if(!x.event_id)stock.set(x.product_id,(stock.get(x.product_id)||0)+Number(x.quantity||0));
+ for(const r of reservations||[])if(r.status==='ativa')reserved.set(r.product_id,(reserved.get(r.product_id)||0)+Number(r.quantity||0));
+ const byModel=new Map(models.map(m=>[m.id,m]));
+ for(const p of products.filter(p=>p.active&&!p.force_archived_at)){
+  const m=byModel.get(p.apparel_model_id);
+  const key=m?'model:'+m.id:'product:'+p.id;
+  if(!groups.has(key))groups.set(key,{key,title:m?.name||p.name,photo:m?.image_path||p.image_path,
+   supplier_id:p.supplier_id,variants:[],available:0,pending:0,minimum:0});
+  const group=groups.get(key);
+  const physical=stock.get(p.id)||0,free=Math.max(0,physical-(reserved.get(p.id)||0));
+  const enroute=existing.get(p.id)||{quantity:0,dates:[],orders:[]};
+  group.variants.push({...p,free,physical,pending:enroute.quantity,
+   pendingDate:enroute.dates.slice().sort()[0]||null});
+  group.available+=free;group.pending+=enroute.quantity;group.minimum+=Number(p.min_stock||0);
+ }
+ return [...groups.values()].sort((x,y)=>x.title.localeCompare(y.title,'pt-BR',{numeric:true}));
+}
+export function purchasesPage({products=[],models=[],suppliers=[],balances=[],reservations=[],orders=[],items=[],button,filter=''}) {
+ const groups=purchasingGroups(products,models,balances,reservations,orders,items);
+ const relevant=groups.filter(g=>!filter||g.supplier_id===filter);
+ const below=groups.filter(g=>g.variants.some(p=>p.min_stock>0&&p.free<p.min_stock&&p.pending===0));
+ const open=orders.filter(o=>['rascunho','enviado'].includes(o.status)).length;
+ const noSupplier=groups.filter(g=>!g.supplier_id).length;
+ const options='<option value="">Todos os fornecedores</option>'+
+  suppliers.filter(s=>s.active).map(s=>'<option value="'+h(s.id)+'"'+(filter===s.id?' selected':'')+'>'+h(s.name)+'</option>').join('');
+ const productCards=relevant.slice(0,150).map(g=>{
+  const supplier=suppliers.find(s=>s.id===g.supplier_id)?.name||'Sem fornecedor';
+  const image=g.photo?'<img data-photo-path="'+h(g.photo)+'" alt="Foto: '+h(g.title)+'" loading="lazy">':'<span class="buy-no-photo">Sem foto</span>';
+  const cards=g.variants.map(p=>{
+   const need=p.min_stock>p.free?Math.max(0,p.min_stock-p.free-p.pending):0;
+   const warning=p.pending?'Encomendado: '+f(p.pending)+' un. · '+(p.pendingDate?'prev. '+fmtDate(p.pendingDate):'sem previsão'):
+    (p.min_stock>0&&p.free<p.min_stock?'Abaixo do mínimo — avaliar histórico':'Estoque em avaliação');
+   return '<div class="buy-variant"><div class="buy-variant-name"><strong>'+h(p.apparel_size||'Único')+'</strong>'+
+    '<small>'+h([p.apparel_color!=='Única'?p.apparel_color:'',p.sku?'SKU '+p.sku:''].filter(Boolean).join(' · '))+'</small>'+
+    '<small>'+h(warning)+'</small></div><div class="buy-variant-values"><span>Disponível <b>'+f(p.free)+'</b></span>'+
+    '<span>Mínimo <b>'+f(p.min_stock)+'</b></span>'+
+    '<span>Sugestão <b>'+f(need)+'</b></span></div></div>';
+  }).join('');
+  return '<article class="buy-group-card"><div class="buy-group-head"><div class="buy-group-photo">'+image+'</div>'+
+   '<div class="buy-group-title"><h3>'+h(g.title)+'</h3><small>'+h(supplier)+' · '+g.variants.length+' variação(ões)</small>'+
+   '<div class="buy-group-metrics"><span>Livre: <b>'+f(g.available)+'</b></span>'+
+   '<span>Encomendado: <b>'+f(g.pending)+'</b></span></div></div></div>'+
+   '<div class="buy-variants">'+cards+'</div><div class="buy-group-actions">'+
+   button('Relatório de saídas','buy-product-report','data-group="'+h(g.key)+'"','small')+
+   (g.supplier_id?button('Selecionar para compra','buy-new','data-supplier="'+h(g.supplier_id)+'"','small primary'):'')+
+   '</div></article>';
+ }).join('');
+ const purchaseCards=orders.slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,40).map(o=>{
+  const supplier=suppliers.find(s=>s.id===o.supplier_id)?.name||'Fornecedor';
+  const its=items.filter(i=>i.purchase_order_id===o.id);
+  const total=its.reduce((n,i)=>n+Number(i.quantity||0),0);
+  const status={rascunho:'Rascunho',enviado:'Encomendado',finalizado:'Concluído',cancelado:'Cancelado'}[o.status]||o.status;
+  const overdue=o.status==='enviado'&&o.expected_arrival_date&&o.expected_arrival_date<new Date().toLocaleDateString('en-CA',{timeZone:'America/Cuiaba'});
+  return '<article class="buy-order"><div><strong>PC-'+f(o.number)+' · '+h(supplier)+'</strong>'+
+   '<small>'+f(its.length)+' SKU(s) · '+f(total)+' unidades · '+fmtDate(o.created_at)+'</small>'+
+   '<small>Prazo: '+(o.estimated_days?f(o.estimated_days)+' dias corridos':'não informado')+
+   ' · Previsão: '+fmtDate(o.expected_arrival_date)+(overdue?' · ATRASADO':'')+'</small></div>'+
+   '<span class="buy-status">'+h(status)+'</span><div class="buy-order-actions">'+
+   button('Baixar PDF','buy-print-order','data-id="'+h(o.id)+'"','small')+
+   (['rascunho','enviado'].includes(o.status)?button('Alterar previsão','buy-eta-edit','data-id="'+h(o.id)+'"','small'):'')+
+   (o.status==='rascunho'?button('Confirmar encomenda','buy-status','data-id="'+h(o.id)+'" data-status="enviado"','small primary'):'')+
+   (o.status==='enviado'?button('Concluir recebimento','buy-status','data-id="'+h(o.id)+'" data-status="finalizado"','small'):'')+
    (['rascunho','enviado'].includes(o.status)?button('Cancelar','buy-status','data-id="'+h(o.id)+'" data-status="cancelado"','small danger'):'')+
    '</div></article>';
  }).join('');
- return '<div class="buy-page"><header class="pagehead"><div><h1>Compras</h1><p>Reposição orientada pelo estoque disponível e pelo mínimo de cada SKU.</p></div>'+
- '<div class="actions">'+button('+ Pedido de compra','buy-new','','primary')+
- button('Fornecedores','buy-suppliers','','small')+'</div></header>'+
- '<div class="buy-stat-grid"><div><strong>'+f(suggestions.length)+'</strong><span>SKUs abaixo do mínimo</span></div>'+
- '<div><strong>'+f(pending)+'</strong><span>Compras em aberto</span></div>'+
- '<div><strong>'+f(none.length)+'</strong><span>Sem fornecedor definido</span></div></div>'+
- '<section class="panel"><header class="buy-section-head"><div><h2>Sugestões de reposição</h2>'+
- '<small>Disponível = físico − reserva ativa. Compras abertas são consideradas para evitar pedidos duplicados.</small></div>'+
- button('Imprimir relatório','buy-print-alerts','','small')+'</header>'+
- '<div class="buy-filters"><label>Fornecedor <select data-buy-filter>'+choices+'</select></label></div>'+
- '<div class="buy-table-wrap"><table class="buy-table"><thead><tr><th>Produto / SKU</th><th>Fornecedor</th>'+
- '<th>Disponível</th><th>Mínimo</th><th>Em compra</th><th>Sugestão</th></tr></thead><tbody>'+
- (body||'<tr><td colspan="6">Nenhum produto abaixo do mínimo neste filtro.</td></tr>')+'</tbody></table></div></section>'+
- '<section class="panel"><header class="buy-section-head"><h2>Pedidos de compra</h2></header>'+
- (list||'<p class="buy-empty">Nenhum pedido de compra ainda. Monte um pedido por fornecedor.</p>')+
- '</section><p class="buy-note">Pedidos de compra não alteram estoque. Ao receber mercadorias, registre a entrada física na seção Produtos → Entrada.</p></div>';
+ return '<div class="buy-page"><header class="pagehead"><div><h1>Compras</h1>'+
+  '<p>Selecione variações, compare estoques e histórico logístico e acompanhe encomendas.</p></div>'+
+  '<div class="actions">'+button('+ Pedido de compra','buy-new','','primary')+
+  button('Fornecedores','buy-suppliers','','small')+'</div></header>'+
+  '<div class="buy-stat-grid"><div><strong>'+f(below.length)+'</strong><span>Modelos abaixo do mínimo sem encomenda</span></div>'+
+  '<div><strong>'+f(open)+'</strong><span>Compras em aberto</span></div>'+
+  '<div><strong>'+f(noSupplier)+'</strong><span>Sem fornecedor</span></div></div>'+
+  '<section class="panel"><header class="buy-section-head"><div><h2>Catálogo para reposição</h2>'+
+  '<small>Estoque baixo não comprova demanda. Consulte as saídas antes de comprar.</small></div>'+
+  button('Imprimir relatório','buy-print-alerts','','small')+'</header>'+
+  '<div class="buy-filters"><label>Fornecedor <select data-buy-filter>'+options+'</select></label></div>'+
+  '<div class="buy-group-grid">'+(productCards||'<p class="buy-empty">Nenhum produto neste filtro.</p>')+'</div></section>'+
+  '<section class="panel"><header class="buy-section-head"><h2>Pedidos de compra</h2></header>'+
+  (purchaseCards||'<p class="buy-empty">Nenhum pedido cadastrado.</p>')+'</section>'+
+  '<p class="buy-note">Pedidos de compra não adicionam estoque físico. Apenas entradas confirmadas atualizam o saldo.</p></div>';
 }
 export function supplierListHTML(suppliers,button){
  return '<div class="supplier-list">'+suppliers.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(s=>
@@ -65,16 +123,24 @@ export function supplierListHTML(suppliers,button){
    button('Editar','buy-supplier-edit','data-id="'+h(s.id)+'"','small')+'</article>'
  ).join('')+'</div>';
 }
-export function purchaseOrderRows(products,suppliers,balances,reservations,orders,items){
- const sugg=new Map(purchaseSuggestions(products,balances,reservations,orders,items).map(p=>[p.id,p]));
- return products.filter(p=>p.active&&p.supplier_id).map(p=>{
-  const item=sugg.get(p.id),quantity=item?.suggested||0;
-  return '<div class="buy-product-row" data-buy-product data-supplier="'+h(p.supplier_id)+'" data-search="'+
-   h([p.name,p.sku,p.ean,p.apparel_size,p.apparel_color].filter(Boolean).join(' ').toLowerCase())+'">'+
-   '<div><strong>'+h(p.name)+'</strong><small>'+h([p.apparel_color,p.apparel_size,p.sku].filter(Boolean).join(' · '))+
-   (item?'<br>Sugestão '+f(item.suggested)+' · disponível '+f(item.available):'')+'</small></div>'+
-   '<input type="number" min="0" max="1000000" step="1" inputmode="numeric" data-buy-quantity data-product="'+h(p.id)+'" value="'+quantity+'">'+
-   '</div>';
+export function purchaseOrderRows(products,suppliers,balances,reservations,orders,items,models=[]){
+ const groups=purchasingGroups(products,models,balances,reservations,orders,items).filter(g=>g.supplier_id);
+ return groups.map(g=>{
+  const search=h([g.title,...g.variants.flatMap(p=>[p.sku,p.ean,p.apparel_size,p.apparel_color])].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR'));
+  const image=g.photo?'<img data-photo-path="'+h(g.photo)+'" alt="" loading="lazy">':'<span>▧</span>';
+  return '<article class="buy-cart-group" data-supplier="'+h(g.supplier_id)+'" data-search="'+search+'">'+
+   '<header><div class="buy-cart-photo">'+image+'</div><div><strong>'+h(g.title)+'</strong>'+
+   '<small>'+g.variants.length+' variações · livre '+f(g.available)+' · encomendado '+f(g.pending)+'</small></div></header>'+
+   g.variants.map(p=>{
+    const suggestion=Math.max(0,Number(p.min_stock||0)-p.free-p.pending);
+    return '<div class="buy-product-row" data-buy-product data-supplier="'+h(p.supplier_id)+'" data-search="'+search+'">'+
+     '<label><input type="checkbox" data-buy-select aria-label="Selecionar '+h(p.apparel_size||p.name)+'">'+
+     '<span><strong>'+h(p.apparel_size||'Único')+'</strong><small>SKU '+h(p.sku||'—')+
+     ' · Livre '+f(p.free)+' · Mín. '+f(p.min_stock)+' · A caminho '+f(p.pending)+
+     (suggestion?' · referência '+f(suggestion):'')+'</small></span></label>'+
+     '<input type="number" min="1" max="1000000" step="1" inputmode="numeric" data-buy-quantity data-product="'+h(p.id)+'" value="'+Math.max(1,suggestion)+'" disabled aria-label="Quantidade para '+h(p.name)+' '+h(p.apparel_size||'')+'">'+
+    '</div>';
+   }).join('')+'</article>';
  }).join('');
 }
 export function purchaseOrderDocument(order,supplier,items){

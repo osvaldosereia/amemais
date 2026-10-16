@@ -71,7 +71,7 @@ export function productGalleryPaths(group){
  }
  return selected;
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canEditProduct=null,canBalance=()=>false,canStockEntry=()=>false,canStockExit=()=>false,canShare=false,canLabel=false,expanded=false,historyForGroup=()=>[],categories=[],mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canEditProduct=null,canBalance=()=>false,canStockEntry=()=>false,canStockExit=()=>false,canShare=false,canLabel=false,expanded=false,historyForGroup=()=>[],categories=[],purchases=new Map(),mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
   const galleryPaths=productGalleryPaths(group);
@@ -105,6 +105,15 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const groupReserved=isProducts?active.reduce((sum,p)=>sum+qtyReserved(p.id),0):0;
   const groupAvailable=isProducts?active.reduce((sum,p)=>sum+qtyAvailable(p.id),0):count;
   const stockLabel=mode==='event'?'Na loja temporária':'Disponível';
+  const pending=active.map(p=>({id:p.id,record:purchases.get?.(p.id)})).filter(x=>x.record?.quantity>0);
+  const incomingCount=pending.reduce((n,x)=>n+Number(x.record.quantity||0),0);
+  const incomingDates=pending.flatMap(x=>x.record.dates||[]).sort();
+  const soonest=incomingDates[0]||null;
+  const localDate=soonest?new Date(soonest+'T12:00:00Z').toLocaleDateString('pt-BR',{timeZone:'America/Cuiaba'}):'não informada';
+  const arrivalChip=isProducts&&incomingCount>0?
+    '<div class="product-purchase-arrival" role="note">📦 <strong>Encomendado: '+fmt(incomingCount)+' un.</strong>'+
+    '<small>Previsão: '+h(localDate)+'</small></div>':'';
+
   const colors=[...new Set(active.map(p=>(p.apparel_color||'').trim()).filter(c=>c&&c!=='Única'))];
   const description=group.modelId
     ?(colors.length===1?colors[0]+' · ':colors.length>1?colors.length+' cores · ':'')+
@@ -147,6 +156,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
           (loc?'<span class="group-variant-location"><span aria-hidden="true">⌖</span>'+h(loc)+'</span>':'')+
           (!p.active?'<small class="product-variant-disabled">Inativo</small>':'')+
           '<small class="stock-variant-physical">Físico: <b>'+fmt(physical)+'</b> un.</small>'+
+          (purchases.get?.(p.id)?.quantity>0?'<small class="product-variant-purchase">📦 Encomendado: '+fmt(purchases.get(p.id).quantity)+' un. · Previsão '+h(purchases.get(p.id).dates?.slice().sort()[0]||'a definir')+'</small>':'')+
           '</div></div>'+stockHtml+
         ((skuAccess||canCount)?'<div class="group-variant-actions">'+
           (canCount?button('✓ Salvar','stock-free-save','data-id="'+h(p.id)+'" hidden','small primary variant-count-save'):'')+
@@ -271,6 +281,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<div class="product-card-location'+(locationMissing?' is-unknown':'')+'" aria-label="Localização do produto">'+
            '<span class="product-location-icon" aria-hidden="true">⌖</span>'+
            '<strong>'+h(location)+'</strong></div>'+
+        arrivalChip+
       '</div>'+
       (isProducts?'<div class="stock-total-breakdown">'+
           '<div class="stock-total-metric reserved"><small>Físico</small><strong>'+fmt(count)+'</strong><span>un.</span></div>'+
