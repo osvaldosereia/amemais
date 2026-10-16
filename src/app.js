@@ -83,7 +83,7 @@ const state = {
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
-  search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,activeStore:null,activeStoreTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
+  search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
@@ -804,27 +804,26 @@ function eventDetails(){
  const e=eventById(state.activeEvent);
  if(!e||e.deleted_at){state.activeEvent=null;state.view='lojas';return storesPage();}
  const members=state.members.filter(m=>m.event_id===e.id);
+ const lots=eventLotsOverview({event:e,batches:state.eventPickBatches,items:state.eventBatchItems,
+  products:state.items,button,canCreate:e.status!=='encerrado'&&(
+   (isManager()&&hasPermission('events.separate'))||
+   (hasPermission('events.request')&&Boolean(memberRole(e.id)))),
+  time:niceTime,codeForBatch:id=>orderCode('evento',id)});
  const summary=eventCompactDetail({
-  event:e,members,plan:state.eventPickPlans.find(x=>x.event_id===e.id),
-  planItems:state.eventPickItems,shipments:state.eventShipments,
-  balances:state.balances,movements:state.movements,
+  event:e,members,balances:state.balances,movements:state.movements,
   damageItems:state.damages,closure:state.consignationClosures.find(x=>x.event_id===e.id),
   products:state.items,models:state.apparelModels,groupInventory,photoButton,
-  h,button,niceDate,username,
-  canPlan:false,
+  h,button,niceDate,username,ordersMarkup:lots,tab:state.eventUnitTab,
+  canSettle:e.status==='ativo'&&(
+   (hasPermission('events.close')&&hasPermission('events.manage'))||
+   (hasPermission('events.request')&&memberRole(e.id)==='responsavel')),
   canClose:hasPermission('events.close')&&(hasPermission('events.manage')||memberRole(e.id)==='responsavel'),
   canManage:hasPermission('events.manage'),
-  canDelete:hasPermission('system.force_delete')||(hasPermission('events.manage')&&hasPermission('events.close')&&hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente'))
+  canDelete:hasPermission('system.force_delete')||(hasPermission('events.manage')&&hasPermission('events.close')&&
+   hasPermission('events.return')&&(isAdmin()||state.profile?.role==='gerente'))
  });
- const lots=eventLotsOverview({event:e,batches:state.eventPickBatches,items:state.eventBatchItems,
-  products:state.items,button,canCreate:e.status!=='encerrado'&&isManager()&&hasPermission('events.separate'),
-  time:niceTime,codeForBatch:id=>orderCode('evento',id)});
- return summary.replace('<header class="event-simple-head">',eventCoverCard(e)+'<header class="event-simple-head">')
-  .replace('<div class="event-simple-actions">',lots+
-    (e.status==='ativo'&&memberRole(e.id)==='responsavel'&&hasPermission('events.request')?
-      '<div class="event-cover-tools">'+button('Informar devolução e diferenças','event-settle','','small')+'</div>':'')+
-    (isManager()?'<div class="event-cover-tools">'+button(e.cover_path?'Trocar / excluir capa':'Adicionar capa','event-cover-edit','data-id="'+h(e.id)+'"','small')+'</div>':'')+
-    '<div class="event-simple-actions">');
+ return summary.replace('<header class="event-simple-head su-header">',
+  eventCoverCard(e,true)+'<header class="event-simple-head su-header">');
 }
 function damageStockPage(){
  if(!permittedView('avarias'))return '<div class="muteblock">Sem autorização.</div>';
@@ -3665,7 +3664,7 @@ async function handleClick(event){
     const ev=eventById(uid);
     if(!ev||ev.deleted_at||!permittedView('eventos')||
      !(hasPermission('events.read')||hasPermission('events.manage')||memberRole(uid)))return;
-    state.activeStore=null;state.activeEvent=uid;state.view='eventos';
+    state.activeStore=null;state.activeEvent=uid;state.eventUnitTab='resumo';state.view='eventos';
    }else if(type==='store'){
     const st=state.stores.find(s=>s.id===uid&&!s.is_primary&&!s.force_archived_at);
     if(!st||!(hasPermission('stores.manage')||assignedStore(uid)))return;
@@ -3729,10 +3728,16 @@ async function handleClick(event){
    });
    return;
   }
+  if(action==='event-unit-tab'){
+   if(!state.activeEvent||!eventById(state.activeEvent))return;
+   const tab=target.dataset.tab;
+   if(!['resumo','pedidos','mercadorias','fechamento','equipe','historico'].includes(tab))return;
+   state.eventUnitTab=tab;render();return;
+  }
   if(action==='event-cover-edit')return eventCoverModal(id);
   if(action==='event-new')return eventModal();
-  if(action==='event-detail'){state.view='eventos';state.activeEvent=id;render();window.scrollTo(0,0);return;}
-  if(action==='back-events'){state.activeEvent=null;state.eventWorkflow=null;state.view='lojas';render();return;}
+  if(action==='event-detail'){state.view='eventos';state.activeEvent=id;state.eventUnitTab='resumo';render();window.scrollTo(0,0);return;}
+  if(action==='back-events'){state.activeEvent=null;state.eventUnitTab='resumo';state.eventWorkflow=null;state.view='lojas';render();return;}
   if(action==='event-sale')return toast('O CDSB não registra vendas dos eventos.',true);
   if(action==='event-loss')return toast('Informe avarias e diferenças somente na conferência.',true);
   if(action==='event-transfer')return eventBatchModal(state.activeEvent);
