@@ -236,3 +236,12 @@
  .product-card-v3 .card-balance-search{flex-wrap:wrap}
  .product-card-v3 .card-balance-search button{flex:1 1 100%}
 }
+
+
+/* No seletor, tamanhos já cadastrados ficam visíveis mas não selecionáveis. */
+.add-sizes-picker .size-chip-existing{
+ display:inline-flex;align-items:center;justify-content:center;min-height:43px;
+ padding:8px 12px;background:#e8f5eb;border:1px solid #c8e2d0;
+ border-radius:9px;color:#176044;font-size:.88rem;font-weight:750;cursor:default;
+ opacity:.88;
+}
