@@ -83,7 +83,7 @@ function activity(d){
  const specs=[
  ['shipments','Envios concluídos','truck'],
  ['shipped_units','Unidades expedidas','box'],
- ['event_lots','Lotes de lojas temporárias','shop'],
+ ['event_lots','Pedidos de lojas temporárias','shop'],
  ['customer_orders','Pedidos avulsos','document']
  ];
  return specs.map(([key,title,visual])=>'<div class="tv-activity-item">'+icon(visual)+
@@ -426,7 +426,7 @@ function oneDetail(operational,manage,rankings){
  key==='categories'?['Categoria','30 dias','30 dias anteriores','Diferença']:['Indicador','Total'];
  const rows=oneDetailData(key,operational,manage,rankings);
  return '<div class="tv-one-overlay" data-action="close-detail"><aside class="tv-one-sheet" role="dialog" aria-modal="true" aria-label="'+esc(oneTitles[key])+'">'+
- '<header><div><small>AME MAIS ESTOQUE · relatório</small><h2>'+esc(oneTitles[key])+'</h2></div>'+
+ '<header><div><small>CDSB · relatório</small><h2>'+esc(oneTitles[key])+'</h2></div>'+
  '<button type="button" data-action="close-detail" aria-label="Fechar">×</button></header>'+
  '<div class="tv-one-sheet-body"><table><thead><tr>'+headers.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead>'+
  '<tbody>'+rows.map(row=>'<tr>'+row.map(value=>'<td>'+esc(value??'—')+'</td>').join('')+'</tr>').join('')+
@@ -451,7 +451,7 @@ function shell(data){
  '<section class="tv-one-ticker">'+headerAlert(data,state.management)+'</section>'+
  '<section class="tv-one-kpis">'+oneKpis(data,state.management)+'</section>'+
  '<section class="tv-one-main">'+oneGrid(data,state.management,state.rankings)+'</section>'+
- '<footer class="tv-one-footer"><span>AME MAIS ESTOQUE · Atualização a cada 30 segundos · tela única, sem rotação</span>'+
+ '<footer class="tv-one-footer"><span>CDSB · Atualização a cada 30 segundos · tela única, sem rotação</span>'+
  '<span>'+esc(live?'Dados atualizados':'Última atualização não confirmada')+'</span></footer>'+
  oneDetail(data,state.management,state.rankings)+'</main>';
  const detailBody=document.querySelector('.tv-one-sheet-body');
@@ -479,7 +479,7 @@ function advanceRotation(){
 }
 
 function message(title,detail){
- root.innerHTML='<div class="tv-entry"><img src="./ame-plus-logo.svg" alt="AME+ Store">'+
+ root.innerHTML='<div class="tv-entry"><img src="./cdsb-brand.jpg" alt="Centro de Distribuição São Bento">'+
  '<h1>'+esc(title)+'</h1><p>'+esc(detail)+'</p>'+
  '<a href="./index.html">Voltar ao AME MAIS Estoque</a></div>';
 }
@@ -534,7 +534,7 @@ async function boot(){
  });
  const {data:{user},error}=await db.auth.getUser();
  if(error||!user){
-  message('Entre no sistema','Faça login no AME MAIS Estoque como gerente ou administrador e reabra o Painel TV.');
+  message('Entre no sistema','Faça login no CDSB como gerente ou administrador e reabra o Painel TV.');
   return;
  }
  db.auth.onAuthStateChange((event)=>{
