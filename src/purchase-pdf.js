@@ -89,10 +89,10 @@ export async function createPurchasePDF(order,supplier,items,{products=[],models
  y+=10;
  for(const [i,g] of groups.entries()){
   const maxText=pdf.splitTextToSize(g.name||'Produto',145);
-  const blockH=Math.max(26,15+g.rows.length*7.8+maxText.length*4);
+  const blockH=Math.max(38,15+g.rows.length*7.8+maxText.length*4);
   ensure(blockH+5);
   const top=y;
-  pdf.setFillColor(244,247,251);pdf.roundedRect(left,top,184,Math.max(26,blockH),2,2,'F');
+  pdf.setFillColor(244,247,251);pdf.roundedRect(left,top,184,blockH,2,2,'F');
   const photo=images.get(g.imagePath);
   if(photo){try{pdf.addImage(photo,'JPEG',left+3,top+4,27,27);}catch(e){console.warn('Erro ao inserir foto',e);}}
   else{pdf.setDrawColor(218,226,238);pdf.rect(left+3,top+4,27,27);
