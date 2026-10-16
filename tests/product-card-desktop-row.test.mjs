@@ -7,7 +7,7 @@ const cards=await readFile(new URL('../src/stock-workflows.js',import.meta.url),
 const changed=css.split('/* Desktop: cinco ações e quatro indicadores na mesma linha. */')[1];
 test('regra nova opera somente no desktop e CSS recebe cache atualizado',()=>{
  assert.ok(changed,'Faltou bloco de layout desktop');
- assert.match(changed,/^@media\s*\(min-width:\s*761px\)/);
+ assert.match(changed.trimStart(),/^@media\s*\(min-width:\s*761px\)/);
  assert.doesNotMatch(changed,/@media\s*\(max-width:/);
  assert.match(index,/product-card-cdsb-square\.css\?v=20261016square2/);
  assert.equal(index.match(/product-card-cdsb-square\.css\?/g)?.length,1);
