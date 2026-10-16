@@ -23,7 +23,7 @@ test('modelo com várias variações possui um só card',()=>{
 });
 test('admin tem exclusão do modelo além da gestão por tamanho',()=>{
  const html=code.groupedCard(groups[0],props);
- assert.match(html,/Excluir produto \+ variações/);
+ assert.match(html,/Excluir produto e todas as variações/);
  assert.match(html,/data-action="product-model-delete"/);
  assert.match(html,/data-id="11111111-1111-4111-8111-111111111111"/);
  assert.match(html,/Editar produto/);
