@@ -31,23 +31,23 @@ test('ordena gôndolas numericamente, agrupa 03 com 3 e deixa sem endereço por 
  assert.equal(groupedThermalPickingLines([...order.lines,line('99','ZERO',0)]).flatMap(x=>x.lines).length,6);
 });
 
-test('tira a impressão A4 da separação, usa 80 mm, largura útil de 72 mm e altura dinâmica',()=>{
+test('tira a impressão A4 da separação, usa 57 mm, largura útil de 49 mm e altura dinâmica',()=>{
  const html=pickingThermalHTML(order,{printedAt:'15/10/2026 08:00'});
- assert.match(html,/80mm/);
- assert.match(html,/width:72mm/);
- assert.doesNotMatch(html,/size:A4|size:80mm auto/);
+ assert.match(html,/57mm/);
+ assert.match(html,/width:49mm/);
+ assert.doesNotMatch(html,/size:A4|size:57mm auto/);
  assert.match(html,/slip\.getBoundingClientRect\(\)\.height/);
  assert.match(html,/Math\.min\(3000,Math\.max\(40,heightMM\)\)/);
- assert.match(html,/window\.printSlip80/);
+ assert.match(html,/window\.printSlip57/);
  assert.doesNotMatch(html,/document\.images/);
- assert.match(html,/window\.addEventListener\("load",\(\)=>window\.printSlip80\(\)\)/);
+ assert.match(html,/window\.addEventListener\("load",\(\)=>window\.printSlip57\(\)\)/);
  assert.match(html,/TOTAL: 10 UNIDADES/);
 });
 test('imprime sem fotos, aproveita a largura para nome, EAN, SKU, variação, prateleira e quantidade',()=>{
  const html=pickingThermalHTML(order);
  assert.doesNotMatch(html,/class="pick-photo"|<img\b|SEM FOTO|photo\.webp/);
  assert.match(html,/\.pick-main\{display:block/);
- assert.match(html,/\.pick-name\{font-size:11pt/);
+ assert.match(html,/\.pick-name\{font-size:10.5pt/);
  assert.match(html,/Camiseta HDH preta/);
  assert.match(html,/EAN 000100005073/);
  assert.match(html,/CÓD. T-03/);

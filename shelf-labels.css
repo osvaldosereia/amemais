@@ -1,30 +1,41 @@
-/* Editor/visualização de etiquetas de gôndola 80 mm. Impressão é autônoma no popup. */
-.shelf-label-picker{display:flex;flex-direction:column;gap:14px}
+/* Prévia da etiqueta física para bobina térmica de 57 mm (área útil de 49 mm).
+   As dimensões da prévia acompanham o documento isolado de impressão. */
+.shelf-label-picker{display:flex;flex-direction:column;gap:14px;min-width:0}
 .shelf-label-picker>p:first-child,.shelf-label-help{font-size:.85rem;line-height:1.5;color:#526e62;margin:0}
 .shelf-label-preview-title,.shelf-label-variant-head{font-size:.95rem;font-weight:800;color:#164f39}
 .shelf-label-preview{display:flex;justify-content:center;align-items:center;border:1px solid #d5e5d9;
- background:#eaf1ec;border-radius:12px;padding:14px;overflow:auto}
-.shelf-label-preview .shelf-label{box-sizing:border-box;display:flex;flex-direction:column;
- background:#fff;color:#000;width:80mm;max-width:80mm;min-width:80mm;height:56mm;padding:2.5mm 4mm 2mm;
- font-family:Arial,sans-serif;gap:1mm;box-shadow:0 2px 12px #0002;overflow:hidden}
-.shelf-label-preview .shelf-label-heading{display:flex;align-items:center;justify-content:space-between}
-.shelf-label-preview .shelf-label-heading strong{font-size:10pt;letter-spacing:.1px}
-.shelf-label-preview .shelf-label-heading small{font-size:6.5pt;letter-spacing:.5px}
-.shelf-label-preview .shelf-label-place{border-top:1.4px solid #000;border-bottom:1.4px solid #000;
- display:flex;align-items:center;justify-content:space-between;padding:.9mm 0;gap:2mm}
-.shelf-label-preview .shelf-label-place>div{display:flex;flex-direction:column;gap:.5mm}
-.shelf-label-preview .shelf-label-place span{font-size:7pt;font-weight:700}
-.shelf-label-preview .shelf-label-place>div>strong{font-size:19pt;font-weight:900;line-height:1.1}
-.shelf-label-preview .shelf-label-shelf{text-align:right}
-.shelf-label-preview .shelf-label-shelf strong{font-size:17pt!important}
+ background:#eaf1ec;border-radius:12px;padding:14px;overflow:auto;min-width:0}
+.shelf-label-preview .shelf-label{box-sizing:border-box;flex:0 0 57mm;display:flex;flex-direction:column;
+ background:#fff;color:#000;width:57mm;max-width:57mm;min-width:57mm;height:70mm;min-height:70mm;
+ padding:2mm 4mm 1.5mm;font-family:Arial,Helvetica,sans-serif;gap:.75mm;
+ box-shadow:0 2px 12px #0002;overflow:hidden}
+.shelf-label-preview .shelf-label-heading{display:flex;align-items:center;justify-content:space-between;gap:1mm}
+.shelf-label-preview .shelf-label-heading strong{font-size:9pt;letter-spacing:.05px;white-space:nowrap}
+.shelf-label-preview .shelf-label-heading small{font-size:5.5pt;letter-spacing:0;white-space:nowrap}
+.shelf-label-preview .shelf-label-place{border-top:1.2px solid #000;border-bottom:1.2px solid #000;
+ display:flex;align-items:center;justify-content:space-between;padding:.7mm 0;gap:1mm}
+.shelf-label-preview .shelf-label-place>div{display:flex;flex-direction:column;gap:.5mm;min-width:0}
+.shelf-label-preview .shelf-label-place span{font-size:6.3pt;font-weight:700}
+.shelf-label-preview .shelf-label-place>div>strong{font-size:15pt;font-weight:900;line-height:1.1;overflow-wrap:anywhere}
+.shelf-label-preview .shelf-label-shelf{text-align:right;min-width:12mm}
+.shelf-label-preview .shelf-label-shelf strong{font-size:12pt!important}
 .shelf-label-preview .shelf-label-product{display:flex;flex-direction:column;gap:.7mm;min-height:11mm}
-.shelf-label-preview .shelf-label-product strong{font-size:11pt;line-height:1.12;font-weight:900;overflow-wrap:anywhere}
-.shelf-label-preview .shelf-label-product span{font-size:10.5pt;font-weight:800}
-.shelf-label-preview .shelf-label-code{margin-top:auto;display:flex;align-items:center;flex-direction:column;gap:.4mm}
-.shelf-label-preview .shelf-barcode{width:70mm;height:17mm;max-width:100%;display:block}
-.shelf-label-preview .shelf-label-code>strong{font-size:10pt;letter-spacing:1px;font-family:monospace}
-.shelf-label-preview .shelf-label-footer{border-top:1px solid #000;padding-top:.7mm;
- display:flex;justify-content:space-between;gap:2mm;font-size:7pt;font-weight:700}
+.shelf-label-preview .shelf-label-product strong{font-size:13pt;line-height:1.12;font-weight:900;
+ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.shelf-label-preview .shelf-label-product span{font-size:10pt;font-weight:800}
+.shelf-label-preview .shelf-label-identifiers{display:flex;flex-direction:column;gap:.65mm;padding:.65mm 0;
+ border-top:1px solid #222;min-width:0}
+.shelf-label-preview .shelf-label-identifiers>div{display:flex;align-items:baseline;gap:2mm;min-width:0}
+.shelf-label-preview .shelf-label-identifiers span{font-size:7.5pt;font-weight:800;min-width:7mm}
+.shelf-label-preview .shelf-label-identifiers strong{font-size:10pt;line-height:1.1;font-weight:850;
+ overflow-wrap:anywhere;min-width:0}
+.shelf-label-preview .shelf-label-code{margin-top:auto;display:flex;align-items:center;
+ flex-direction:column;justify-content:center;gap:.4mm;min-width:0}
+.shelf-label-preview .shelf-barcode{width:49mm;height:18mm;max-width:100%;display:block}
+.shelf-label-preview .shelf-label-code>strong{font-size:9pt;letter-spacing:.1px;
+ font-weight:800;font-family:monospace;overflow-wrap:anywhere;max-width:100%;text-align:center}
+.shelf-label-preview .shelf-label-footer{border-top:1px solid #000;padding-top:.5mm;
+ display:flex;justify-content:space-between;gap:1mm;font-size:5.5pt;font-weight:700}
 .shelf-label-variant-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .shelf-label-variant-head small{font-size:.76rem;font-weight:400;color:#668176}
 .shelf-label-variants{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow:auto}
@@ -44,26 +55,3 @@
 @media(max-width:450px){.shelf-label-preview{padding:6px}
  .shelf-label-option{padding:8px;gap:7px}
  .shelf-label-copies input{width:54px}}
-
-
-/* Etiqueta de gôndola 80 × 85 mm: prévia em escala física, idêntica à impressão. */
-.shelf-label-preview .shelf-label{
- height:85mm;min-height:85mm;padding:2.5mm 3.5mm 2mm;gap:1mm;
-}
-.shelf-label-preview .shelf-label-product{min-height:15mm;gap:1mm}
-.shelf-label-preview .shelf-label-product strong{
- font-size:17pt;line-height:1.12;font-weight:900;
- display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-}
-.shelf-label-preview .shelf-label-product span{font-size:12pt}
-.shelf-label-preview .shelf-label-identifiers{
- display:flex;flex-direction:column;gap:1mm;padding:1mm 0;border-top:1px solid #222;
-}
-.shelf-label-preview .shelf-label-identifiers>div{display:flex;align-items:baseline;gap:2mm;min-width:0}
-.shelf-label-preview .shelf-label-identifiers span{font-size:9pt;font-weight:800;min-width:9mm}
-.shelf-label-preview .shelf-label-identifiers strong{
- font-size:13pt;line-height:1.1;font-weight:850;color:#111;overflow-wrap:anywhere;
-}
-.shelf-label-preview .shelf-barcode{width:72mm;height:27mm;max-width:none}
-.shelf-label-preview .shelf-label-code>strong{font-size:12pt;letter-spacing:.4px;font-weight:800}
-@media(max-width:450px){.shelf-label-preview{justify-content:flex-start}}
