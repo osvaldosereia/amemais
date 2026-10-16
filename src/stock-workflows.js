@@ -151,7 +151,8 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<div><small>Livre</small><strong>'+fmt(free)+'</strong></div>'+
         '<label><small>Contado</small><input type="number" data-balance-count inputmode="numeric" min="'+reserved+
          '" max="1000000" step="1" value="'+physical+'" aria-label="Quantidade física contada · '+h(p.apparel_size||p.name)+'"'+
-         (!canBalance()?' disabled':'')+'></label></div></div>';
+         (!canBalance()?' disabled':'')+'></label></div>'+
+        (canEdit?'<button type="button" class="button small card-balance-edit-variant" data-action="'+(group.modelId?'apparel-variant-edit':'product-edit')+'" data-id="'+h(p.id)+'">Editar EAN / gôndola</button>':'')+'</div>';
   }).join('');
   const history=historyForGroup(group)||[];
   const stockTabs='<div class="card-workspace-tabs" role="tablist" aria-label="Estoque do produto">'+
@@ -208,12 +209,13 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       '<div class="card-editor-variation"><div><strong>'+h(p.apparel_size||'Único')+' · '+h(p.apparel_color||'')+'</strong>'+
       '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small>'+
       '<small>'+h([p.gondola?'Gôndola '+p.gondola:'',p.prateleira?'Prateleira '+p.prateleira:''].filter(Boolean).join(' · ')||'Localização não informada')+'</small></div>'+
-      direct('Editar variação','product-edit',p.id)+'</div>').join('')+'</div>'+
+      direct('Editar variação',group.modelId?'apparel-variant-edit':'product-edit',p.id)+'</div>').join('')+'</div>'+
       (group.modelId?direct('+ Adicionar variação','add-variants',group.modelId):'')+
+      (canRemoveEntireModel?direct('Excluir produto completo','product-model-delete',group.modelId,'danger'):'')+
+      (!group.modelId&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'danger'):'')+
       '<details class="card-editor-accordion card-admin-tools"><summary>Administração avançada</summary>'+
         '<p>Excluir pode afetar reservas e pedidos pendentes. O histórico concluído é preservado.</p>'+
-        (canRemoveEntireModel?direct('Excluir produto e todas as variações','product-model-delete',group.modelId,'danger'):
-          (canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'danger'):''))+
+        '<p>Exclusão integral disponível acima para perfis autorizados.</p>'+
       '</details></section>'+
     '<section data-editor-panel="fotos" hidden><p class="card-workspace-help">Edite a galeria de fotos do produto.</p>'+
       (group.modelId?direct('Gerenciar fotos','apparel-photo',group.modelId):
@@ -232,6 +234,8 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
        (canLabel?direct('Etiqueta 80 mm','shelf-label-open',main.id,'product-card-action-secondary'):'')+
        (canShare?direct('Compartilhar','share-product',main.id,'product-card-action-secondary'):'')+
        (group.modelId&&canEdit?direct('+ Variação','add-variants',group.modelId,'product-card-action-secondary'):'')+
+        (canRemoveEntireModel?direct('Excluir produto completo','product-model-delete',group.modelId,'danger product-card-delete-whole'):'')+
+        (!group.modelId&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'danger product-card-delete-whole'):'')+
       '</div></div>':'';
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
     '<div class="grouped-inventory-top">'+
