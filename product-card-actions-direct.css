@@ -1,105 +1,150 @@
-/* Ações diretas e legíveis nos cards do catálogo. */
-.products-panel .product-card-v3 .grouped-inventory-actions,
-.c-dashboard .product-card-v3 .grouped-inventory-actions{
-  display:grid!important;
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  gap:8px!important;
+/* AME MAIS — ações do card v5: objetivas, sempre visíveis, sem menu. */
+.products-panel .product-card-v3 .grouped-inventory-actions.product-card-actions-v5,
+.c-dashboard .product-card-v3 .grouped-inventory-actions.product-card-actions-v5{
+  display:flex!important;
+  flex-direction:column!important;
   align-items:stretch!important;
-  align-content:start!important;
-  min-width:0;
+  justify-content:center!important;
+  gap:7px!important;
+  padding:10px 18px 13px!important;
+  width:100%!important;
+  min-width:0!important;
   min-height:0!important;
+  border-top:1px solid #e7eee9;
+  background:#fff;
 }
-.products-panel .product-card-v3 .grouped-inventory-actions>button,
-.c-dashboard .product-card-v3 .grouped-inventory-actions>button{
+.products-panel .product-card-v3 .product-card-action-primary-row,
+.c-dashboard .product-card-v3 .product-card-action-primary-row{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  align-items:stretch;
+  gap:8px;
+  min-width:0;
+}
+.products-panel .product-card-v3 .product-card-action-secondary-row,
+.c-dashboard .product-card-v3 .product-card-action-secondary-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px 7px;
+  align-items:center;
+  min-width:0;
+  padding-top:3px;
+}
+.products-panel .product-card-v3 .product-card-actions-v5 button,
+.c-dashboard .product-card-v3 .product-card-actions-v5 button{
+  min-width:0!important;
+  max-width:none!important;
+  margin:0!important;
+  border-radius:9px!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere;
+  cursor:pointer;
+  font-family:inherit;
+  line-height:1.2!important;
+  box-shadow:none!important;
+}
+.products-panel .product-card-v3 .product-card-actions-v5 .product-card-action-primary,
+.c-dashboard .product-card-v3 .product-card-actions-v5 .product-card-action-primary{
   display:inline-flex!important;
   justify-content:center!important;
   align-items:center!important;
-  grid-column:auto!important;
-  grid-row:auto!important;
   width:100%!important;
-  max-width:none!important;
-  min-width:0!important;
-  min-height:42px!important;
-  padding:8px 9px!important;
-  flex:none!important;
-  border:1px solid #d1e1d5!important;
-  border-radius:10px!important;
+  min-height:43px!important;
+  padding:8px!important;
+  border:1px solid #cbded0!important;
   background:#fff!important;
-  color:#285940!important;
-  font-size:.78rem!important;
+  color:#18573b!important;
+  font-size:.79rem!important;
   font-weight:730!important;
-  line-height:1.2!important;
-  white-space:normal!important;
-  overflow-wrap:anywhere!important;
-  text-align:center;
-  cursor:pointer;
 }
-.products-panel .product-card-v3 .grouped-inventory-actions>.product-card-action-main,
-.c-dashboard .product-card-v3 .grouped-inventory-actions>.product-card-action-main{
+.products-panel .product-card-v3 .product-card-actions-v5 .product-card-action-stock,
+.c-dashboard .product-card-v3 .product-card-actions-v5 .product-card-action-stock,
+.products-panel .product-card-v3 .product-card-actions-v5 .product-card-sizes,
+.c-dashboard .product-card-v3 .product-card-actions-v5 .product-card-sizes{
   background:#176548!important;
   border-color:#176548!important;
-  color:white!important;
+  color:#fff!important;
 }
-.products-panel .product-card-v3 .grouped-inventory-actions>.product-card-action-edit,
-.c-dashboard .product-card-v3 .grouped-inventory-actions>.product-card-action-edit{
-  background:#eaf5ed!important;
-  border-color:#c1dfcb!important;
-  color:#17583b!important;
+.products-panel .product-card-v3 .product-card-actions-v5 .product-card-action-secondary,
+.c-dashboard .product-card-v3 .product-card-actions-v5 .product-card-action-secondary{
+  display:inline-flex!important;
+  justify-content:center!important;
+  align-items:center!important;
+  width:auto!important;
+  flex:0 1 auto!important;
+  min-height:33px!important;
+  padding:6px 10px!important;
+  border:1px solid #e0eae3!important;
+  background:#f8faf8!important;
+  color:#416950!important;
+  font-size:.73rem!important;
+  font-weight:670!important;
 }
-.products-panel .product-card-v3 .grouped-inventory-actions>.product-card-action-danger,
-.c-dashboard .product-card-v3 .grouped-inventory-actions>.product-card-action-danger{
-  background:#fff8f6!important;
-  border-color:#f0d8d2!important;
-  color:#a24437!important;
+.products-panel .product-card-v3 .product-card-actions-v5 .product-card-action-danger,
+.c-dashboard .product-card-v3 .product-card-actions-v5 .product-card-action-danger{
+  margin-left:auto!important;
+  border-color:#f0ddda!important;
+  background:#fff9f8!important;
+  color:#a33f32!important;
 }
-.products-panel .product-card-v3 .grouped-inventory-actions>button:focus-visible,
-.c-dashboard .product-card-v3 .grouped-inventory-actions>button:focus-visible{
-  outline:3px solid #79b79a;outline-offset:2px;
+.products-panel .product-card-v3 .product-card-actions-v5 button:focus-visible,
+.c-dashboard .product-card-v3 .product-card-actions-v5 button:focus-visible{
+  outline:3px solid #79b79a!important;
+  outline-offset:2px;
 }
-.products-panel .product-card-v3 .grouped-inventory-actions>button:hover,
-.c-dashboard .product-card-v3 .grouped-inventory-actions>button:hover{
-  filter:brightness(.97);
+.products-panel .product-card-v3 .product-card-actions-v5 button:hover,
+.c-dashboard .product-card-v3 .product-card-actions-v5 button:hover{filter:brightness(.965)}
+.products-panel .product-card-v3 .product-card-codes,
+.c-dashboard .product-card-v3 .product-card-codes{
+  color:#678473;
+  font-size:.73rem;
+  line-height:1.3;
+  overflow-wrap:anywhere;
 }
-.products-panel .product-card-v3 .stock-total-metric,
-.c-dashboard .product-card-v3 .stock-total-metric{
-  min-height:68px!important;
-  padding:9px 12px!important;
-}
-.products-panel .product-card-v3 .grouped-inventory-info,
-.c-dashboard .product-card-v3 .grouped-inventory-info{gap:5px;}
 @media(min-width:761px){
- .products-panel .product-card-v3,
- .c-dashboard .c-dashboard-recent-products .product-card-v3{
-   min-height:0!important;
-   grid-template-rows:auto auto auto auto!important;
- }
- .products-panel .product-card-v3 .grouped-inventory-actions,
- .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-actions{
-   grid-column:2!important;
-   grid-row:3!important;
-   padding:10px 18px 14px!important;
- }
-}
-@media(max-width:1100px){
- .products-panel .product-card-v3 .grouped-inventory-actions,
- .c-dashboard .product-card-v3 .grouped-inventory-actions{
-   grid-template-columns:repeat(2,minmax(0,1fr))!important;
- }
+  .products-panel .product-card-v3 .grouped-inventory-actions.product-card-actions-v5,
+  .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-actions.product-card-actions-v5{
+    grid-column:2!important;
+    grid-row:3!important;
+    align-self:end!important;
+  }
 }
 @media(max-width:760px){
- .products-panel .product-card-v3 .grouped-inventory-actions,
- .c-dashboard .product-card-v3 .grouped-inventory-actions{
-   width:100%!important;
-   padding:10px!important;
-   gap:7px!important;
- }
- .products-panel .product-card-v3 .grouped-inventory-actions>button,
- .c-dashboard .product-card-v3 .grouped-inventory-actions>button{
-   min-height:44px!important;
-   font-size:.77rem!important;
- }
- .products-panel .product-card-v3 .grouped-inventory-actions>.product-card-action-danger,
- .c-dashboard .product-card-v3 .grouped-inventory-actions>.product-card-action-danger{
-   grid-column:1/-1!important;
- }
+  .products-panel .product-card-v3 .grouped-inventory-actions.product-card-actions-v5,
+  .c-dashboard .product-card-v3 .grouped-inventory-actions.product-card-actions-v5{
+    padding:10px!important;
+    gap:8px!important;
+    order:2!important;
+  }
+  .products-panel .product-card-v3 .product-card-action-primary-row,
+  .c-dashboard .product-card-v3 .product-card-action-primary-row{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:7px;
+  }
+  .products-panel .product-card-v3 .product-card-action-primary-row>button:last-child:nth-child(odd),
+  .c-dashboard .product-card-v3 .product-card-action-primary-row>button:last-child:nth-child(odd){grid-column:1/-1}
+  .products-panel .product-card-v3 .product-card-actions-v5 .product-card-action-primary,
+  .c-dashboard .product-card-v3 .product-card-actions-v5 .product-card-action-primary{
+    min-height:45px!important;
+    font-size:.78rem!important;
+  }
+  .products-panel .product-card-v3 .product-card-action-secondary-row,
+  .c-dashboard .product-card-v3 .product-card-action-secondary-row{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;
+    padding:0;
+  }
+  .products-panel .product-card-v3 .product-card-actions-v5 .product-card-action-secondary,
+  .c-dashboard .product-card-v3 .product-card-actions-v5 .product-card-action-secondary{
+    min-height:39px!important;
+    width:100%!important;
+    padding:7px 6px!important;
+    margin:0!important;
+    font-size:.73rem!important;
+  }
+  .products-panel .product-card-v3 .product-card-actions-v5 .product-card-action-danger,
+  .c-dashboard .product-card-v3 .product-card-actions-v5 .product-card-action-danger{
+    grid-column:1/-1!important;
+  }
 }
