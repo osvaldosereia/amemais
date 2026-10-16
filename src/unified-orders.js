@@ -167,7 +167,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  if(canDelete&&!portal)management.push(button('Excluir pedido','admin-order-delete-open',data,'small danger'));
  if(!portal&&o.lines.length&&!waiting&&!['legado','solicitado','cancelado','expirado'].includes(o.status))
   secondary.push(button('Imprimir separação','order-print-thermal',data,'small'));
- const originLabel=event?'Loja temporária · Pedido '+String(o.sequence||1).padStart(2,'0'):
+ const originLabel=event?'Loja temporária':
   o.kind==='avulso'?(o.raw.source==='cliente'?'Cliente catálogo':
    o.raw.source==='compartilhado'?'Cliente link':'Pedido avulso'):
    o.destinationKind==='franquia'?'Franquia':'Loja / filial';
@@ -321,9 +321,8 @@ export function unifiedOrdersPage(orders,{
   '<div class="uo-list">'+(visible.length?cards:
     '<p class="uo-no-work">Nenhum pedido ou pedido aguardando separação.</p>')+'</div>'+
   '<p class="uo-empty-filter" data-unified-empty hidden>Nenhum item encontrado com estes filtros.</p>'+
-  (!separationOnly&&!portal&&!eventId&&canLink?'<details class="uo-customer-links"><summary>Links de acesso para clientes'+
-   (summaryLink?' · '+esc(summaryLink):'')+'</summary>'+linksMarkup+'</details>':'')+
-  '<p class="help">'+(eventId?'Monte lotes para esta loja, envie à separação e confirme o envio físico após conferir os produtos.':
+
+  '<p class="help">'+(eventId?'Faça pedidos para esta loja. Cada pedido segue para separação e depois para conferência e expedição.':
      'A reserva não reduz o estoque físico. A saída é registrada somente após a conferência completa.')+'</p>'+
  '</section>';
 }
