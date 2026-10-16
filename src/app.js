@@ -3638,6 +3638,18 @@ async function handleClick(event){
       p_kind:kind,p_order:id
     })),'Disponibilidade reavaliada. Consulte as faltas no pedido.');
   }
+  if(action==='order-group-location'||action==='order-group-model'){
+    const container=target.closest('[data-group-view]');
+    if(!container)return;
+    const mode=action==='order-group-model'?'model':'location';
+    container.dataset.groupView=mode;
+    container.querySelectorAll('.uo-group-switch button').forEach(el=>{
+      const selected=el.dataset.action===action;
+      el.classList.toggle('is-current',selected);
+      el.setAttribute('aria-pressed',String(selected));
+    });
+    return;
+  }
   if(action==='order-final-verify')return finalVerificationModal(target.dataset.kind,id);
   if(action==='verify-open-camera')return scanEAN(code=>{
     const form=document.querySelector('.modalback form[data-form="order-final-verify"]');
@@ -4722,7 +4734,8 @@ document.addEventListener('input',event=>{
   if(event.target.matches('[data-unified-search]')){
     const container=event.target.closest('.uo-page');
     filterUnifiedOrders(container,event.target.value,
-      container?.querySelector('[data-unified-status]')?.value||'todos');
+      container?.querySelector('[data-unified-status]')?.value||'todos',
+      container?.querySelector('[data-unified-destination]')?.value||'todos');
   }
   if(event.target.matches('form[data-form="avulso-picking"] [data-pick-qty],form[data-form="event-batch-picking"] [data-pick-qty]'))
     updateUnifiedPickingTotal(event.target.closest('form'));
@@ -4843,10 +4856,11 @@ document.addEventListener('change',event=>{
   if(event.target.matches('[data-users-filter-role]'))applyUserListFilter();
   if(event.target.matches('[data-buy-modal-supplier]'))syncPurchaseForm(event.target.closest('form'));
   if(event.target.matches('[data-buy-filter]')){state.purchaseSupplierFilter=event.target.value;render();return;}
-  if(event.target.matches('[data-unified-status]')){
+  if(event.target.matches('[data-unified-status], [data-unified-destination]')){
     const container=event.target.closest('.uo-page');
     filterUnifiedOrders(container,container?.querySelector('[data-unified-search]')?.value||'',
-      event.target.value);
+      container?.querySelector('[data-unified-status]')?.value||'todos',
+      container?.querySelector('[data-unified-destination]')?.value||'todos');
   }
   if(event.target.closest('form[data-form="sku-manage"]')){
     syncSkuManagerPreview(event.target.closest('form[data-form="sku-manage"]'));
