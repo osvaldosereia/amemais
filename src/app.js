@@ -2351,6 +2351,16 @@ function categoryModal(parentId=null,fromProduct=false,item=null){
   if(editing)form.dataset.id=item.id;
 }
 
+function gondolaModal(item=null){
+ if(!canManageGondolas())return toast('Sem permissão para cadastrar gôndolas.',true);
+ formModal(item?'Editar gôndola':'Nova gôndola',
+  '<div class="formgrid">'+field('Identificação da gôndola','name','text',item?.name||'',
+   'required minlength="1" maxlength="40" placeholder="Ex.: Gôndola 03"')+'</div>'+
+   '<p class="help">A gôndola fica disponível como seletor no cadastro de produtos e em cada variação. Alterar o nome não muda silenciosamente os produtos antigos; edite-os para transferir a localização.</p>',
+  'gondola-save',item?'Salvar gôndola':'Cadastrar gôndola');
+ const form=document.querySelector('.modalback form[data-form="gondola-save"]');
+ if(form&&item)form.dataset.id=item.id;
+}
 function tagModal(fromProduct=false){
   if(!hasPermission('tags.manage'))return;
   formModal('Criar tag',
@@ -3568,7 +3578,7 @@ async function handleClick(event){
   }
   if(action==='product-edit'){
     const item=product(id);
-    if(item?.apparel_model_id)return apparelVariantEditModal(item,{h,formModal});
+    if(item?.apparel_model_id)return apparelVariantEditModal(item,{h,formModal,gondolas:state.gondolas,procurementFields});
     return productModal(item);
   }
   if(action==='stock-focus-search'){
@@ -3826,6 +3836,19 @@ async function handleClick(event){
     return;
   }
   if(action==='member-add')return memberModal(id);
+  if(action==='gondola-new')return gondolaModal();
+  if(action==='gondola-edit'){
+   const loc=state.gondolas.find(g=>g.id===id);
+   if(loc)return gondolaModal(loc);
+   return;
+  }
+  if(action==='gondola-toggle'){
+   if(!canManageGondolas())return;
+   const loc=state.gondolas.find(g=>g.id===id);if(!loc)return;
+   if(!window.confirm((loc.active?'Desativar':'Ativar')+' a gôndola "'+loc.name+'"? Produtos já cadastrados não serão alterados.'))return;
+   return exec(async()=>assertOk(await db.from('gondolas').update({active:!loc.active}).eq('id',loc.id).select('id').single()),
+    'Situação da gôndola atualizada.');
+  }
   if(action==='category-new')return categoryModal();
   if(action==='category-child')return categoryModal(id);
   if(action==='category-edit')return categoryModal(null,false,state.categories.find(c=>c.id===id));
@@ -4219,6 +4242,19 @@ async function handleSubmit(event){
     return exec(async()=>assertOk(await db.rpc('admin_remove_order',{
       p_kind:kind,p_order_id:id,p_confirmation:confirmation
     })),'Pedido excluído da operação. Histórico de estoque preservado.');
+  }
+  if(type==='gondola-save'){
+   if(!canManageGondolas())return toast('Sem permissão para alterar gôndolas.',true);
+   const name=String(values.name||'').trim();
+   if(!name||name.length>40)return toast('Informe a identificação da gôndola com até 40 caracteres.',true);
+   const exists=state.gondolas.some(g=>g.name.toLocaleLowerCase('pt-BR')===name.toLocaleLowerCase('pt-BR')&&g.id!==form.dataset.id);
+   if(exists)return toast('Já existe uma gôndola com essa identificação.',true);
+   return exec(async()=>{
+    const record=form.dataset.id?
+     db.from('gondolas').update({name}).eq('id',form.dataset.id).select('id').single():
+     db.from('gondolas').insert({name}).select('id').single();
+    assertOk(await record);
+   },'Gôndola salva e disponível no cadastro.');
   }
   if(type==='buy-suppliers-list'){closeTopModal();return;}
   if(type==='buy-supplier-save'){
