@@ -23,7 +23,9 @@ test('login e Painel TV usam marca horizontal; favicon e PWA usam brasão',()=>{
  assert.match(tvPage,/rel="icon" type="image\/jpeg" href="\.\/cdsb-emblem\.jpg/);
  const m=JSON.parse(manifest);
  assert.equal(m.name,'CDSB — Centro de Distribuição São Bento');
- assert.match(m.icons[0].src,/cdsb-emblem\.jpg/);
+ assert.match(m.icons[0].src,/cdsb-app-icon\.svg/);
+ assert.ok(m.icons.some(icon=>/cdsb-emblem\.jpg/.test(icon.src)));
+ assert.equal(m.icons[0].sizes,'any');
  assert.match(tvTheme,/\.tv-one-header\{background:#fff/);
 });
 test('contraste visual padronizado para azul e dourado sem neutralizar falhas',()=>{
