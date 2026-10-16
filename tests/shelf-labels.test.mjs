@@ -74,5 +74,5 @@ test('ação está disponível no catálogo e no editor, com módulo versionado'
  assert.match(app,/shelf-label-one/);
  assert.match(app,/shelf-label-print/);
  assert.match(app,/Salve as alterações do produto antes de imprimir a etiqueta/);
- assert.match(index,/shelf-labels\.css\?v=20261015shelf1/);
+ assert.match(index,/shelf-labels\.css\?v=20261016label85/);
 });
