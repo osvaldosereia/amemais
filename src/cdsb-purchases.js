@@ -1,7 +1,7 @@
 // CDSB: compras administrativas. Criar/imprimir pedidos não altera saldo nem reservas.
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const f=n=>Number(n||0).toLocaleString('pt-BR');
-const fmtDate=s=>s?new Date(s).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
+const fmtDate=s=>s?new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(s))?s+'T12:00:00Z':s).toLocaleDateString('pt-BR',{timeZone:'America/Cuiaba',day:'2-digit',month:'2-digit',year:'numeric'}):'—';
 export function purchaseSuggestions(products,balances,reservations,orders=[],orderItems=[]){
  const stock=new Map(),held=new Map(),incoming=new Map();
  for(const b of balances)if(!b.event_id)stock.set(b.product_id,(stock.get(b.product_id)||0)+Number(b.quantity||0));
