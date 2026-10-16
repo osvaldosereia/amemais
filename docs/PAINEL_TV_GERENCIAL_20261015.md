@@ -72,3 +72,24 @@ A faixa fixa prioriza código curto do pedido, tipo de destino (franquia, loja p
 
 ### Segurança
 Uma segunda consulta, public.tv_management_snapshot(), é somente leitura e exige sessão autenticada, perfil ativo não arquivado e papel gerente/admin. Acesso anônimo revogado. Os textos são escapados na interface e os dados são atualizados a cada 30 segundos. Na falha de rede, os resultados antigos ficam identificados como não atualizados. Os relatórios não realizam movimentos de estoque nem alteram pedidos.
+
+
+## Atualização — Painel em tela única (16/10/2026)
+
+A rotação de páginas foi desativada: o painel mostra 12 cards ao mesmo tempo. O cabeçalho ficou mais discreto, os seis indicadores são permanentes e os dados são atualizados a cada 30 segundos.
+
+- **Operação:** fila prioritária, ocorrências identificadas por pedido/destino e avarias.
+- **Estoque:** dez menores saldos disponíveis, dez maiores saldos e produtos sem solicitações há mais de 90 dias.
+- **Demanda:** produtos mais solicitados em unidades nos últimos 30 dias, franquias e categorias.
+- **Eventos e apoio:** próximos eventos, encerrados, compras e produtividade.
+
+Cada card tem botão **Abrir ↗** que exibe uma gaveta lateral de detalhes, somente leitura. Um link adicional abre o sistema principal em nova aba.
+
+### Critérios dos rankings
+- Maior estoque: maior saldo disponível (físico menos reservado) na central.
+- Mais pedidos: soma das unidades solicitadas nos últimos 30 dias, excluídos os pedidos cancelados, considerando lojas/franquias, eventos e pedidos avulsos. Não significa vendas efetivas nem número de pedidos distintos.
+- Sem pedidos há mais de 90 dias: SKUs ativos, com saldo disponível positivo, cadastrados há mais de 90 dias, sem solicitação nesse período. A duração é contada desde o último pedido, ou desde o cadastro quando nunca houve pedidos.
+
+A consulta Supabase public.tv_product_rankings() é de leitura e retorna rankings para visualização resumida ou detalhada. Somente administradores e gerentes ativos podem acessar os dados; o papel anônimo não tem permissão de execução.
+
+Os capítulos históricos sobre rotação permanecem apenas como documentação da versão substituída.
