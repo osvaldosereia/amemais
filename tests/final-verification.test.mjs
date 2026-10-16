@@ -67,7 +67,7 @@ test('login e código de barras são integrados à interface, com CSS versionado
  assert.match(app,/save_order_final_verification/);
  assert.match(app,/event\.target\.matches\('\[data-verify-scan\]'\)/);
  assert.match(app,/verificationCanDispatch\(o,state\.orderVerificationRows\)/);
- assert.match(html,/final-verification\.css\?v=20261015finalverify1/);
+ assert.match(html,/final-verification\.css\?v=20261016fixcount1/);
 });
 
 
