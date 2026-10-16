@@ -357,7 +357,7 @@ export function unifiedOrdersPage(orders,{
    '<option value="antigos">Mais antigos</option>'+ 
    '<option value="prioridade">Prioridade operacional</option></select></label></div>'+ 
   '<div class="uo-list">'+(visible.length?cards:
-    '<p class="uo-no-work">Nenhum pedido ou pedido aguardando separação.</p>')+'</div>'+
+    '<div class="uo-no-work"><strong>Nenhum pedido ativo no momento.</strong><p>Quando uma unidade solicitar mercadorias, o pedido aparecerá aqui para separação e conferência. Use Novo pedido para começar.</p></div>')+'</div>'+
   '<p class="uo-empty-filter" data-unified-empty hidden>Nenhum item encontrado com estes filtros.</p>'+
 
   '<p class="help">'+(eventId?'Faça pedidos para esta loja. Cada pedido segue para separação e depois para conferência e expedição.':
