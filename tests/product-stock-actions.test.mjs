@@ -26,7 +26,7 @@ test('cada variação tem somente um comando Gerenciar visível no retrátil',()
  assert.doesNotMatch(html,/data-action="stock-group-modal"/);
  assert.doesNotMatch(html,/data-action="stock-modal"/);
  assert.match(html,/data-product-details/);
- assert.match(html,/Ver 3 tamanhos/);
+ assert.match(html,/Ver 3 variações/);
  assert.match(html,/Reservado<\/small><strong>6<\/strong>/);
  assert.match(html,/Livre<\/small><strong>30<\/strong>/);
 });
@@ -42,7 +42,7 @@ test('balanço rápido altera somente o Livre dentro do tamanho expandido',()=>{
  assert.match(html,/data-expected-physical="12" data-expected-reserved="2"/);
  assert.match(html,/value="10" data-initial="10"/);
  assert.match(html,/data-product-details open/);
- assert.match(html,/Ocultar 3 tamanhos/);
+ assert.match(html,/Ocultar 3 variações/);
  assert.doesNotMatch(html,/Cor \*/);
 });
 test('perfil de leitura não exibe operações de movimentação ou edição',()=>{
