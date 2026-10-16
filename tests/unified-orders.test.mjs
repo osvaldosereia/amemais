@@ -60,7 +60,7 @@ test('portal da franquia lista somente os seus pedidos sem exibir saldo central'
  assert.equal(out.length,1);
  const html=unifiedOrdersPage(out,{button,portal:true,canStore:true,canProcess:()=>false});
  assert.match(html,/Pedidos/);
- assert.match(html,/Montar pedido/);
+ assert.match(html,/Novo pedido/);
  assert.doesNotMatch(html,/Pedido avulso/);
  assert.doesNotMatch(html,/6 reservadas/);
  assert.doesNotMatch(html,/Confirmar saída/);
