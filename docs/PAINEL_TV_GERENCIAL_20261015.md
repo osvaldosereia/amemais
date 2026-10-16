@@ -41,3 +41,34 @@ A rotina de dados só responde para contas `staff_profiles` ativas, não arquiva
 - Interface: teste sintético da renderização de métricas, fila, alertas e histórico; dados HTML escapados.
 - Estilos: layout Full HD e adaptação para outras resoluções.
 - Não foi realizada inspeção visual física na TV de 32 polegadas. Ajustes finais de escala/overscan podem depender da TV e do sistema operacional.
+
+
+## Atualização: Painel Gerencial 360° (16/10/2026)
+
+URL: https://cdsb.net.br/painel-tv.html
+
+### Sete telas rotativas
+1. Operação ao vivo: 20 s
+2. Inteligência de estoque: 25 s
+3. Franquias e solicitações dos últimos 30 dias: 30 s
+4. Próximos eventos e separação por categoria: 25 s
+5. Eventos encerrados e devoluções por categoria: 30 s
+6. Avarias e comparativo de categorias: 30 s
+7. Compras e produtividade: 25 s
+
+O ciclo completo dura 3 minutos e 5 segundos. É possível pausar, avançar, retroceder, entrar em tela cheia e configurar o tempo de cada página entre 10 e 120 segundos. A preferência é salva no navegador. A atualização dos dados permanece a cada 30 segundos. Listas de franquias e eventos são paginadas entre as voltas.
+
+### Ocorrências com identificação completa
+A faixa fixa prioriza código curto do pedido, tipo de destino (franquia, loja própria, evento ou avulso), nome do destino, motivo do problema, produto, SKU e quantidades solicitada, identificada e faltante. As fontes incluem falhas de conferência, falta de reservas de pedidos e reduções de quantidades registradas na separação. Não são exibidos nomes nem telefones de clientes.
+
+### Análises
+- Estoque: 10 menores saldos disponíveis, gôndolas, mínimo e unidades reservadas.
+- Franquias: solicitadas e expedidas por categoria principal nos últimos 30 dias, incluindo franquias ativas sem pedidos.
+- Eventos futuros: quantidades solicitadas, separadas e enviadas por categoria.
+- Eventos encerrados: envio, devolução, não devolução e avarias por categoria. Não devolvido NÃO equivale a venda confirmada.
+- Avarias: quantidade e ocorrências por categoria dos últimos 30 dias.
+- Categorias: comparação da demanda dos últimos 30 dias com os 30 anteriores e gráfico de tendência de 14 dias.
+- Compras e produtividade: ordens de compra abertas e conferências e expedições do dia.
+
+### Segurança
+Uma segunda consulta, public.tv_management_snapshot(), é somente leitura e exige sessão autenticada, perfil ativo não arquivado e papel gerente/admin. Acesso anônimo revogado. Os textos são escapados na interface e os dados são atualizados a cada 30 segundos. Na falha de rede, os resultados antigos ficam identificados como não atualizados. Os relatórios não realizam movimentos de estoque nem alteram pedidos.
