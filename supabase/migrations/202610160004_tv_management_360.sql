@@ -168,7 +168,7 @@ damage_agg as (
  group by p.category
 ),
 demands as (
- select o.created_at day,i.product_id,i.quantity
+ select o.created_at demand_at,i.product_id,i.quantity
  from public.store_orders o join public.store_order_items i on i.order_id=o.id
  where o.status<>'cancelado' and o.created_at>=now()-interval '60 days'
  union all
@@ -183,14 +183,14 @@ demands as (
 ),
 demand_agg as (
  select coalesce(p.category,'Sem categoria') category,
- sum(d.quantity) filter(where d.day>=now()-interval '30 days')::integer current_units,
- sum(d.quantity) filter(where d.day<now()-interval '30 days')::integer previous_units
+ sum(d.quantity) filter(where d.demand_at>=now()-interval '30 days')::integer current_units,
+ sum(d.quantity) filter(where d.demand_at<now()-interval '30 days')::integer previous_units
  from demands d left join product_cats p on p.id=d.product_id group by p.category
 ),
 trend as (
- select (current_date-g.i)::date day,
+ select (current_date-g.i)::date dte,
   coalesce((select sum(d.quantity) from demands d
-    where (d.day at time zone 'America/Cuiaba')::date=(current_date-g.i)::date),0)::integer units
+    where (d.demand_at at time zone 'America/Cuiaba')::date=(current_date-g.i)::date),0)::integer units
  from generate_series(0,13) g(i)
 ),
 purchases as (
@@ -226,7 +226,7 @@ select case when (select ok from gate) then jsonb_build_object(
  'categories',coalesce((select jsonb_agg(row_to_json(v) order by v.current_units desc)
    from (select category,coalesce(current_units,0) current_units,coalesce(previous_units,0) previous_units
     from demand_agg order by current_units desc nulls last limit 16) v),'[]'::jsonb),
- 'trend',coalesce((select jsonb_agg(jsonb_build_object('day',day,'units',units) order by day) from trend),'[]'::jsonb),
+ 'trend',coalesce((select jsonb_agg(jsonb_build_object('day',dte,'units',units) order by dte) from trend),'[]'::jsonb),
  'purchases',jsonb_build_object(
    'open',(select count(*) from purchases),
    'sent',(select count(*) from purchases where status='enviado')
