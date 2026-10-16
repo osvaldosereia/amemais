@@ -19,8 +19,8 @@ test('AA003 mostra a etapa correta, localização e uma ação principal',()=>{
  const order=makeUnifiedOrders(args)[0];
  const html=unifiedOrderCard(order,{button:btn,canProcess:true,canVerify:true,canCancel:true,canDelete:true});
  for(const part of ['Lote #AA003','RETIRO ENCHEIVOS','A conferir',
-  'Separação concluída','Gôndola 03','000100005073','Conferir agora',
-  'Imprimir separação','Administração do pedido','Ver produtos e localizações'])
+  'Separação concluída','Gôndola 03','000100005073','Conferir pedido',
+  'Imprimir separação','Administração do pedido','Abrir pedido'])
   assert.ok(html.includes(part),part);
  assert.doesNotMatch(html,/Pronto para separar/);
  assert.doesNotMatch(html,/Confirmar saída/);
@@ -34,8 +34,9 @@ test('saída só aparece após conferência e permissão',()=>{
  const verified=unifiedOrderCard(order,{button:btn,canVerify:true,canDispatch:true,isVerified:true});
  assert.doesNotMatch(unverified,/event-batch-dispatch/);
  assert.doesNotMatch(denied,/event-batch-dispatch/);
- assert.match(verified,/event-batch-dispatch/);
- assert.match(verified,/Rever conferência/);
+ const ready=unifiedOrderCard({...order,workflow:{stage:'expedicao',items:{sku1:{requested:2,picked:2,counted:2}},has_difference:false}},{button:btn,canDispatch:true});
+ assert.match(ready,/order-op-send/);
+ assert.doesNotMatch(verified,/event-batch-dispatch/);
 });
 test('gôndola 03 e gôndola 3 agrupam e ordenam naturalmente',()=>{
  const groups=groupedOrderByLocation([
