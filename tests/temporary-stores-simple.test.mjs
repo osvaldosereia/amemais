@@ -36,12 +36,14 @@ test('complemento inicia com zero, sem alterar a primeira lista',()=>{
  assert.equal((html.match(/data-plan-qty[^>]*value="0"/g)||[]).length,4);
  assert.match(html,/Motivo do complemento/);
 });
-test('conferência mostra produtos bons, vendidos, avariados e perdidos por SKU',()=>{
+test('encerramento diferencia devolvidos, avariados e não devolvidos sem inventar vendas',()=>{
  const balances=plan.map(x=>({product_id:x.product_id,quantity:x.quantity}));
  const html=eventSettlementForm(eventPickingRows(products,models,plan),balances);
  assert.equal((html.match(/data-settle-row/g)||[]).length,4);
- for(const name of ['good','sold','damaged','lost'])assert.match(html,new RegExp('data-settle-field="'+name+'"'));
- assert.match(html,/Marcar restante vendido/);
+ for(const name of ['good','damaged','lost'])assert.match(html,new RegExp('data-settle-field="'+name+'"'));
+ assert.doesNotMatch(html,/data-settle-field="sold"/);
+ assert.match(html,/Não devolvidas/);
+ assert.match(html,/Não devolvidas não são classificadas como vendas/);
 });
 test('a home de loja em preparação permite impressão A4 e envio',()=>{
  const html=eventCompactDetail({event,plan:{revision:2},planItems:plan.map(x=>({...x,event_id:event.id})),
