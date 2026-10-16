@@ -11,7 +11,7 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261015categorymetadata2';
 import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261015categorymetadata2';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261015cardsfix5';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261016cards6';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261015sku1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
@@ -550,6 +550,11 @@ function productGroupCard(group){
     canQuickCount:()=>!isFranchisePortal()&&hasPermission('stock.balance')&&['admin','gerente','estoquista'].includes(state.profile?.role),
     canDeleteWholeModel:()=>isAdmin()&&hasPermission('system.force_delete'),
     canDeleteProduct:()=>hasPermission('products.delete')||hasPermission('system.force_delete'),
+    canEditProduct:()=>hasPermission('products.edit'),
+    canBalance:()=>!isFranchisePortal()&&hasPermission('stock.balance')&&['admin','gerente','estoquista'].includes(state.profile?.role),
+    canStockEntry:()=>hasPermission('stock.entry'),canStockExit:()=>hasPermission('stock.exit'),
+    historyForGroup:g=>state.movements.filter(m=>g.products.some(p=>p.id===m.product_id)).slice(0,10),
+    categories:state.categories,
     expanded:state.expandedProductGroups.has(group.key),canShare:canRegisterProducts(),
     canLabel:!isFranchisePortal()
   });
@@ -1867,7 +1872,7 @@ function manageSku(id,requestedMode=''){
  const model=state.apparelModels.find(m=>m.id===p.apparel_model_id);
  const availableModes=skuPanelModes.filter(m=>hasPermission(m.permission));
  if(!availableModes.length)return;
- const mode=availableModes.some(m=>m.key===requestedMode)?requestedMode:availableModes[0].key;
+ const mode=availableModes.some(m=>m.key===requestedMode)?requestedMode:'consulta';
  const physical=qtyStore(id),reserved=qtyReserved(id);
  const history=state.movements.filter(m=>m.product_id===id&&!m.event_id)
   .slice(0,15);
@@ -1904,7 +1909,8 @@ function manageSku(id,requestedMode=''){
 }
 function setSkuMode(form,mode){
  const p=product(form.dataset.id);
- if(!p||!skuPanelModes.some(m=>m.key===mode&&hasPermission(m.permission)))return;
+ if(!p)return;
+ if(mode!=='consulta'&&!skuPanelModes.some(m=>m.key===mode&&hasPermission(m.permission)))return;
  form.dataset.mode=mode;
  form.dataset.request=crypto.randomUUID();
  for(const tab of form.querySelectorAll('[data-action="sku-mode"]')){
@@ -1915,9 +1921,10 @@ function setSkuMode(form,mode){
  for(const section of form.querySelectorAll('[data-sku-section]'))
   section.hidden=section.dataset.skuSection!==mode;
  const label={entrada:'Confirmar entrada',saida:'Confirmar saída',
-  contagem:'Salvar conferência',edicao:'Salvar cadastro'}[mode];
+  contagem:'Salvar conferência',edicao:'Salvar cadastro',consulta:'Escolha uma operação'}[mode];
  const submit=form.querySelector('button[type="submit"]');
- if(submit)submit.textContent=label||'Salvar';
+ if(submit){submit.textContent=label||'Salvar';submit.disabled=mode==='consulta';}
+ if(mode==='consulta'){const preview=form.querySelector('[data-sku-preview]');if(preview)preview.textContent='Escolha Entrada, Saída, Conferir ou Editar para iniciar.';return;}
  syncSkuManagerPreview(form);
 }
 function syncSkuManagerPreview(form){
@@ -3185,21 +3192,92 @@ async function handleClick(event){
       if(status==='archived')state.showInactiveProducts=false;
     },'Produto excluído ou desativado para preservar o histórico.');
   }
-  if(action==='product-card-sizes'){
+  if(action==='product-card-sizes'||action==='product-card-edit-toggle'){
     const card=target.closest('[data-product-card]');
-    const details=card?.querySelector('[data-product-details]');
+    if(!card)return;
+    const openingStock=action==='product-card-sizes';
+    const details=card.querySelector(openingStock?'[data-product-details]':'[data-product-editor]');
+    const other=card.querySelector(openingStock?'[data-product-editor]':'[data-product-details]');
     if(!details)return;
-    details.open=!details.open;
+    const willOpen=!details.open;
+    if(other)other.open=false;
+    details.open=willOpen;
+    const stockButton=card.querySelector('[data-action="product-card-sizes"]');
+    const editButton=card.querySelector('[data-action="product-card-edit-toggle"]');
+    if(stockButton){
+      stockButton.setAttribute('aria-expanded',String(Boolean(card.querySelector('[data-product-details]')?.open)));
+      stockButton.innerHTML=(card.querySelector('[data-product-details]')?.open?'Ocultar estoque':'Ver estoque')+' <span aria-hidden="true">⌄</span>';
+    }
+    if(editButton){
+      editButton.setAttribute('aria-expanded',String(Boolean(card.querySelector('[data-product-editor]')?.open)));
+      editButton.innerHTML=(card.querySelector('[data-product-editor]')?.open?'Fechar edição':'Editar produto')+' <span aria-hidden="true">⌄</span>';
+    }
     const key=card.getAttribute('data-product-card');
-    if(details.open)state.expandedProductGroups.add(key);
+    if(openingStock&&willOpen)state.expandedProductGroups.add(key);
     else state.expandedProductGroups.delete(key);
-    target.setAttribute('aria-expanded',String(details.open));
-    const sizeCount=details.querySelectorAll('[data-product-id]').length;
-    const label=sizeCount===1?
-      (details.open?'Ocultar dados':'Ver dados'):
-      (details.open?'Ocultar ':'Ver ')+sizeCount+' variações';
-    target.innerHTML=label+' <span aria-hidden="true">⌄</span>';
+    if(willOpen)details.scrollIntoView({block:'nearest',behavior:'smooth'});
     return;
+  }
+  if(action==='product-stock-tab'||action==='product-editor-tab'){
+    const stock=action==='product-stock-tab';
+    const container=target.closest(stock?'[data-product-details]':'[data-product-editor]');
+    if(!container)return;
+    const selected=target.dataset.tab,attribute=stock?'data-stock-panel':'data-editor-panel';
+    for(const tab of container.querySelectorAll('[data-action="'+action+'"]')){
+      tab.setAttribute('aria-selected',String(tab.dataset.tab===selected));
+    }
+    for(const panel of container.querySelectorAll('['+attribute+']')){
+      panel.hidden=panel.getAttribute(attribute)!==selected;
+    }
+    return;
+  }
+  if(action==='product-stock-mode'){
+    const mode=target.dataset.mode;
+    if(!['entrada','saida','contagem'].includes(mode))return;
+    if(!hasPermission({entrada:'stock.entry',saida:'stock.exit',contagem:'stock.balance'}[mode]))return;
+    return manageSku(id,mode);
+  }
+  if(action==='product-balance-scan'){
+    try{
+      return scanEAN(code=>{
+        const container=target.closest('[data-product-details]');
+        const row=[...container.querySelectorAll('[data-balance-item]')].find(r=>{
+          const p=product(r.dataset.productId);
+          return p&&(p.ean===code||p.sku===code);
+        });
+        if(!row)return toast('EAN/SKU não pertence a este produto.',true);
+        const field=row.querySelector('[data-balance-count]');
+        field?.focus();field?.select();
+        row.scrollIntoView({block:'nearest',behavior:'smooth'});
+      });
+    }catch(error){fail(error);return;}
+  }
+  if(action==='product-balance-save'){
+    if(state.loading||isFranchisePortal()||!hasPermission('stock.balance')||
+       !['admin','gerente','estoquista'].includes(state.profile?.role))return;
+    const panel=target.closest('[data-product-details]');
+    if(!panel)return;
+    const rows=[...panel.querySelectorAll('[data-balance-item]')];
+    if(!rows.length||rows.length>100)return toast('Balanço aceita de 1 a 100 variações.',true);
+    const items=[];
+    for(const row of rows){
+      const value=row.querySelector('[data-balance-count]')?.value?.trim();
+      if(!/^(0|[1-9][0-9]{0,6})$/.test(value||'')||Number(value)>1000000)
+        return toast('Informe a quantidade física contada de todas as variações.',true);
+      const expected=Number(row.dataset.expected),reserved=Number(row.dataset.reserved);
+      if(Number(value)<reserved)return toast('Contagem menor que a quantidade reservada.',true);
+      items.push({product_id:row.dataset.productId,expected,reserved,counted:Number(value)});
+    }
+    const differences=items.filter(x=>x.counted!==x.expected);
+    const note=panel.querySelector('[data-balance-note]')?.value?.trim()||'';
+    if(differences.length&&note.length<5)
+      return toast('Explique a divergência em pelo menos 5 caracteres.',true);
+    if(differences.length&&!window.confirm('Salvar balanço de '+items.length+
+      ' variações, com '+differences.length+' diferença(s)? O estoque físico será ajustado e auditado.'))
+      return;
+    return exec(async()=>assertOk(await db.rpc('quick_stock_count_batch',{
+      p_items:items,p_note:note||null
+    })),'Balanço de '+items.length+' variações registrado em uma única operação.');
   }
   if(action==='stock-free-save'){
     if(!hasPermission('stock.balance')||!['admin','gerente','estoquista'].includes(state.profile?.role)
@@ -3851,6 +3929,27 @@ async function handleSubmit(event){
    return exec(async()=>assertOk(await db.rpc('save_purchase_order',{
     p_supplier:supplier,p_items:lines,p_note:String(values.note||'').slice(0,1500)
    })),'Pedido de compra criado. Imprima a ficha e marque como enviado após encaminhar ao fornecedor.');
+  }
+  if(type==='product-card-basic'){
+    if(!hasPermission('products.edit')||isFranchisePortal())return;
+    const name=String(values.name||'').trim();
+    const category=String(values.category_id||'').trim();
+    const tags=[...new Set(String(values.tags||'').split(',').map(x=>x.trim()).filter(Boolean))];
+    if(!name||name.length>180||!state.categories.some(cat=>cat.id===category)||
+       tags.length>30||tags.some(t=>t.length>60))
+      return toast('Confira o nome, a categoria e as tags do produto.',true);
+    const id=form.dataset.id;
+    if(form.dataset.isModel==='true'){
+      return exec(async()=>assertOk(await db.rpc('update_product_model_basic',{
+        p_model:id,p_name:name,p_tags:tags,p_category:category
+      })),'Dados gerais do produto atualizados.');
+    }
+    return exec(async()=>{
+      const changed=assertOk(await db.from('products').update({
+        name,tags,category_id:category
+      }).eq('id',id).select('id').maybeSingle());
+      if(!changed)throw new Error('Produto não atualizado. Verifique sua permissão.');
+    },'Dados gerais atualizados.');
   }
   if(type==='product-new'||type==='product-edit'){
     if(!canRegisterProducts())return;
@@ -4539,6 +4638,18 @@ document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
   if(event.target.matches('[data-users-search]'))applyUserListFilter();
   if(event.target.matches('[data-buy-search]'))syncPurchaseForm(event.target.closest('form'));
+  if(event.target.matches('[data-balance-count]')){
+    const field=event.target,panel=field.closest('[data-product-details]');
+    if(!panel)return;
+    const changes=[...panel.querySelectorAll('[data-balance-item]')].filter(r=>
+      Number(r.querySelector('[data-balance-count]')?.value)!==Number(r.dataset.expected));
+    const note=panel.querySelector('[data-balance-note]');
+    if(note)note.closest('label').hidden=changes.length===0;
+    const status=panel.querySelector('[data-balance-status]');
+    if(status)status.textContent=changes.length?changes.length+' variação(ões) com diferença':'Nenhuma diferença identificada';
+    field.closest('[data-balance-row]')?.classList.toggle('has-difference',
+      Number(field.value)!==Number(field.closest('[data-balance-item]')?.dataset.expected));
+  }
   if(event.target.matches('[data-count-free]')){
     const input=event.target,row=input.closest('[data-product-id]');
     const save=row?.querySelector('[data-action="stock-free-save"]');
