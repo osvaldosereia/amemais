@@ -34,22 +34,22 @@ test('Enter no código de tamanho não cadastra produto, mas envio explícito co
  assert.equal(preventScannerSubmit(z.event),false);
 });
 test('cadastro inicial tem campos de gôndola e prateleira por variação',()=>{
- assert.match(variantSource,/name="size_gondola"/);
+ assert.match(variantSource,/gondolaSelectHTML\('size_gondola'/);
  assert.match(variantSource,/name="size_prateleira"/);
- assert.match(variantSource,/gondola:get\('size_gondola'\)/);
+ assert.match(variantSource,/const gondola=get\('size_gondola'\)/);
  assert.match(variantSource,/prateleira:get\('size_prateleira'\)/);
 });
 test('cada variação da aba balanço oferece edição direta de EAN e gôndola',()=>{
  assert.match(workflowSource,/Editar EAN \/ gôndola/);
- assert.match(workflowSource,/data-action="product-edit"/);
+ assert.match(workflowSource,/group.modelId\?'apparel-variant-edit':'product-edit'/);
  assert.match(appSource,/if\(action==='product-edit'\)/);
  assert.match(apparelSource,/name="ean"/);
- assert.match(apparelSource,/name="gondola"/);
+ assert.match(apparelSource,/gondolaSelectHTML\('gondola'/);
  assert.match(apparelSource,/name="prateleira"/);
 });
 test('exclusão de produto completo fica no card da lista e na edição autorizada',()=>{
  assert.match(workflowSource,/Excluir produto completo/);
- assert.match(workflowSource,/data-action="product-model-delete"/);
+ assert.match(workflowSource,/direct\('Excluir produto completo','product-model-delete'/);
  assert.match(workflowSource,/data-editor-panel="variacoes"/);
  assert.match(appSource,/if\(action==='product-model-delete'\)/);
  assert.match(appSource,/isAdmin\(\).*hasPermission\('system.force_delete'\)/);
