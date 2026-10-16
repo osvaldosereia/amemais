@@ -8,7 +8,7 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({
 }[ch]));
 const dt=(time,opts)=>new Intl.DateTimeFormat('pt-BR',{timeZone:timezone,...opts}).format(new Date(time));
 const niceTime=v=>v?dt(v,{hour:'2-digit',minute:'2-digit'}):'—';
-const niceDate=v=>v?dt(v,{day:'2-digit',month:'short',year:'numeric'}):'—';
+const niceDate=v=>v?dt(/^\d{4}-\d{2}-\d{2}$/.test(String(v))?v+'T12:00:00Z':v,{day:'2-digit',month:'short',year:'numeric'}):'—';
 const n=v=>fmt.format(Number(v)||0);
 const state={snapshot:null,management:null,managementError:null,error:null,loading:false,lastSuccess:0,lastManagement:0,accessDenied:false,pageIndex:0,paused:false,nextSwap:0,subpages:{},settingsOpen:false};
 let db=null;
