@@ -51,6 +51,7 @@ export function finalVerificationMarkup(order,rows=[]){
   '<label class="field"><span>Leitura do EAN ou código interno</span>'+
    '<input type="search" name="verify_barcode" data-verify-scan autocomplete="off" autocapitalize="off" spellcheck="false"'+
    ' placeholder="Passe o leitor ou digite o código e pressione Enter"></label>'+
+  '<button type="button" class="button verify-camera-action" data-action="verify-open-camera">📷 Ler pela câmera</button>'+
   '<div class="verify-feedback" data-verify-feedback role="status" aria-live="polite">'+
    (progress.complete?'Conferência completa. Pedido liberado para confirmar a saída.':
     'Passe um produto no leitor para informar sua quantidade.')+'</div>'+
