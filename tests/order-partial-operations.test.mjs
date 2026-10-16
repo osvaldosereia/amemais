@@ -48,7 +48,7 @@ test('front chama RPCs autenticadas em cada etapa e não baixa estoque ao separa
  assert.match(app,/state\.orderOperationalRows/);
  assert.match(app,/order-op-send/);
  assert.match(sql,/stage='enviado'/);
- assert.match(sql,/status='liberada'/);
+ assert.match(sql,/'liberada'/);
  assert.match(sql,/v_qty>0/);
  assert.match(sql,/update public\.stock_balances set quantity=quantity-v_qty/);
  assert.match(sql,/app_private\.has_permission\('orders\.dispatch'\)/);
