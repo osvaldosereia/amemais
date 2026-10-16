@@ -1,0 +1,19 @@
+/* CDSB — painel gerencial em tela única, alto contraste para TV de 32 polegadas */
+:root{--deep:#102d50;--ink:#1c304a;--muted:#6a7889;--border:#dce3ea;--green:#246548}
+html,body{background:#f3f5f8;color:#19344f}
+.tv-one-shell{background:#f4f6f9}
+.tv-one-header{background:#fff;border-color:#dce3eb;box-shadow:0 1px 6px #132e5011}
+.tv-one-logo{width:155px;min-width:155px;height:45px;display:flex;align-items:center;justify-content:center}
+.tv-one-logo img{width:100%;height:43px;object-fit:contain;display:block}
+.tv-one-title{border-left:1px solid #d5dee8}
+.tv-one-title h1{color:#102d50}
+.tv-one-title small,.tv-one-header-right{color:#617289}
+.tv-one-header-right button{background:#f8fafc;border-color:#dbe3eb;color:#1d466f}
+.tv-one-kpi,.tv-one-card{border-color:#dae2eb;background:#fff;box-shadow:0 1px 6px #17385b0c}
+.tv-one-card h2,.tv-one-kpi strong{color:#102d50}
+.tv-one-sheet{background:#fff}
+.tv-one-card [data-action="open-detail"]{color:#174b78}
+.tv-one-ticker{border-color:#ead8b9;background:#fcf8ee}
+.tv-live{color:#225e48}
+@media(max-width:900px){.tv-one-logo{width:115px;min-width:115px}.tv-one-logo img{height:39px}}
+@media(max-width:550px){.tv-one-logo{width:94px;min-width:94px}.tv-one-logo img{height:35px}}
