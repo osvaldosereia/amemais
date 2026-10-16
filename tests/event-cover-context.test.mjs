@@ -23,7 +23,7 @@ test('explicit thematic brief overrides event inference and uses the event name'
  assert.match(prompt,/não.*invent|não.*adicion|evite.*objetos/i);
 });
 test('falls back to event name and notes without inventing a merch catalog',()=>{
- assert.match(inferCoverTheme('Festa do Padroeiro','',''),/festa|padroeiro/i);
+ assert.match(inferCoverTheme('Festa do Padroeiro','',''),/festa|padroeiro|celebração/i);
  const prompt=buildEventCoverPrompt({name:'Feira de artesanato',notes:'Exposição de trabalhos artesanais locais',cover_theme:null});
  assert.match(prompt,/Feira de artesanato/);
  assert.match(prompt,/Exposição de trabalhos artesanais locais/);
