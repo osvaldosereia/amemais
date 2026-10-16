@@ -64,3 +64,18 @@ test('sem alterar pedido solicitado, preserva snapshot de diferença na auditori
  assert.match(sql,/SHIPMENT_COMPLETED/);
  assert.match(sql,/v_item\.quantity-v_qty/);
 });
+
+
+test('recebimento de filial nunca credita mais do que foi enviado',()=>{
+ assert.match(sql,/create or replace function public\.receive_store_order_checked/i);
+ assert.match(sql,/v_effective:=coalesce\(v_shipped,it\.quantity\)/);
+ assert.match(sql,/qty>v_effective/);
+ assert.match(sql,/quantity=quantity\+v_effective/);
+ assert.match(sql,/if v_effective=0 then continue;/);
+ assert.match(app,/op\.items\?\.\[x\.product_id\]\?\.counted/);
+});
+test('revisão de lote invalida separação e conferência anteriores',()=>{
+ assert.match(sql,/reset_operational_progress_on_batch_revision/);
+ assert.match(sql,/new\.revision is distinct from old\.revision/);
+ assert.match(sql,/event_batch_reset_operational_progress/);
+});
