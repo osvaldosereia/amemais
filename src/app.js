@@ -1984,7 +1984,8 @@ async function saveSkuManager(form){
  const confirmation=mode==='edicao'?'Confirmar a atualização do cadastro deste SKU?':
    mode==='contagem'?'Confirmar contagem de '+op.quantity+' unidade(s) de '+p.name+
     '? A diferença será registrada no histórico.':
-   'Confirmar '+(mode==='entrada'?'entrada':'saída')+' de '+op.quantity+' unidade(s) de '+p.name+'?';
+   'Confirmar '+(mode==='entrada'?'entrada':'saída')+' de '+op.quantity+' unidade(s) de '+p.name+
+   (mode==='saida'&&op.reason==='avaria'?' por avaria? A baixa é imediata; se reparar, registre uma nova entrada.':'?');
  if(!window.confirm(confirmation))return;
  return exec(async()=>{
    if(mode==='edicao'){
@@ -2000,11 +2001,6 @@ async function saveSkuManager(form){
        p_operation:'entrada',p_items:[{product_id:p.id,quantity:op.quantity,expected:physical}],
        p_destination_id:null,p_note:op.note||null,p_request_id:form.dataset.request
      }));
-   }else if(op.reason==='avaria'){
-     assertOk(await db.rpc('quarantine_central_stock',{
-       p_product:p.id,p_quantity:op.quantity,p_expected:physical,
-       p_note:op.note,p_request:form.dataset.request
-     }));
    }else{
      assertOk(await db.rpc('record_stock_exception',{
        p_product_id:p.id,p_quantity:op.quantity,p_expected:physical,
@@ -2015,7 +2011,7 @@ async function saveSkuManager(form){
  },mode==='edicao'?'Cadastro do SKU atualizado.':
    mode==='contagem'?'Contagem registrada com histórico e reservas protegidas.':
    mode==='entrada'?'Entrada de fornecedor registrada.':
-   op.reason==='avaria'?'Avaria suspensa do estoque disponível.':'Saída excepcional registrada.');
+   op.reason==='avaria'?'Avaria baixada imediatamente, com justificativa no histórico.':'Saída excepcional registrada.');
 }
 // Operação pontual diretamente no card, sempre em SKU real e sem simular pedidos.
 function stockModal(id=null,groupKey=null){
@@ -2051,7 +2047,7 @@ function stockModal(id=null,groupKey=null){
         ])+
         '<div data-single-recipient hidden>'+field('Quem recebeu?','recipient','text','','maxlength="120" placeholder="Nome ou identificação"')+'</div>'+
         textareaField('Justificativa obrigatória','details')+
-        '<p class="help">Avarias ficam em análise, fora do estoque disponível; podem ser recuperadas ou descartadas. Demais motivos geram baixa definitiva. Unidades reservadas não podem sair.</p>'+
+        '<p class="help">Avarias geram baixa imediata, com justificativa. Se a peça for recuperada, registre uma entrada manual. Unidades reservadas não podem ser baixadas.</p>'+
       '</div>'+
     '</div>','stock-single-movement','Confirmar movimentação');
   const form=document.querySelector('.modalback form[data-form="stock-single-movement"]');
@@ -4144,17 +4140,13 @@ async function handleSubmit(event){
       if(['diretoria','doacao'].includes(reason)&&(recipient.length<2||recipient.length>120))
         return toast('Identifique quem recebeu o produto.',true);
     }
-    const action=kind==='entrada'?'entrada':reason==='avaria'?'envio para análise':'baixa definitiva';
+    const action=kind==='entrada'?'entrada':reason==='avaria'?'baixa imediata por avaria':'baixa definitiva';
     if(!window.confirm('Confirmar '+action+' de '+qty+' unidade(s) de '+p.name+'?'))return;
     return exec(async()=>{
       if(kind==='entrada'){
         assertOk(await db.rpc('stock_operation_batch',{
           p_operation:'entrada',p_items:[{product_id:id,quantity:qty,expected}],
           p_destination_id:null,p_note:note||null,p_request_id:requestId
-        }));
-      }else if(reason==='avaria'){
-        assertOk(await db.rpc('quarantine_central_stock',{
-          p_product:id,p_quantity:qty,p_expected:expected,p_note:details,p_request:requestId
         }));
       }else{
         assertOk(await db.rpc('record_stock_exception',{
@@ -4165,7 +4157,7 @@ async function handleSubmit(event){
         }));
       }
     },kind==='entrada'?'Entrada de fornecedor registrada.':
-      reason==='avaria'?'Avaria em análise: unidade fora do estoque disponível.':'Baixa excepcional registrada com motivo e justificativa.');
+      reason==='avaria'?'Baixa por avaria registrada. Se recuperar, faça uma entrada manual.':'Baixa excepcional registrada com motivo e justificativa.');
   }
   if(type==='stock-operation'){
     return saveStockOperation(form);
