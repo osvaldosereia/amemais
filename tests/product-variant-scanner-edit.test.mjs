@@ -34,10 +34,10 @@ test('Enter no código de tamanho não cadastra produto, mas envio explícito co
  assert.equal(preventScannerSubmit(z.event),false);
 });
 test('cadastro inicial tem campos de gôndola e prateleira por variação',()=>{
- assert.match(variantSource,/gondolaSelectHTML\('size_gondola'/);
+ assert.match(variantSource,/productSizeGondolaSelectHTML\('size_gondola'/);
  assert.match(variantSource,/name="size_prateleira"/);
  assert.match(variantSource,/const gondola=get\('size_gondola'\)/);
- assert.match(variantSource,/prateleira:get\('size_prateleira'\)/);
+ assert.match(variantSource,/const gondola=get\('size_gondola'\),prateleira=get\('size_prateleira'\)/);
 });
 test('cada variação da aba balanço oferece edição direta de EAN e gôndola',()=>{
  assert.match(workflowSource,/Editar EAN \/ gôndola/);
