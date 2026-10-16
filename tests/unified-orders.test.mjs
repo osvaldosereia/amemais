@@ -46,14 +46,14 @@ test('pedidos com falta mostram quantidade original, reservada e diferença',()=
  assert.match(html,/order-shortage-adjust/);
  assert.doesNotMatch(html,/avulso-dispatch/);
 });
-test('pedido reservado mostra conferência; separado mostra saída',()=>{
+test('pedido reservado inicia separação; separado segue para conferência',()=>{
  const base=makeUnifiedOrders(props).find(x=>x.kind==='avulso');
  const reserved=unifiedOrderCard({...base,status:'reservado',missing:0},{button,canProcess:true});
  const separated=unifiedOrderCard({...base,status:'separado',missing:0},{button,canProcess:true,canDispatchStock:true,isVerified:true});
- assert.match(reserved,/avulso-pick/);
- assert.doesNotMatch(reserved,/avulso-dispatch/);
- assert.match(separated,/avulso-dispatch/);
- assert.doesNotMatch(separated,/avulso-pick/);
+ assert.match(reserved,/order-op-pick/);
+ assert.doesNotMatch(reserved,/order-op-send/);
+ assert.match(separated,/order-op-check/);
+ assert.doesNotMatch(separated,/order-op-send/);
 });
 test('portal da franquia lista somente os seus pedidos sem exibir saldo central',()=>{
  const out=makeUnifiedOrders({...props,portal:true,userId:'operator'});
