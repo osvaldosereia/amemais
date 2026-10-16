@@ -1,0 +1,90 @@
+/* CDSB | Fila compacta de pedidos. Sobrescreve apenas a apresentação;
+   a reserva, a conferência e a expedição permanecem no fluxo existente. */
+.uo-page .uo-summary{gap:8px}
+.uo-page .uo-summary>.uo-summary-item{
+ display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+ background:#fff;border:1px solid #dbe3ed;border-radius:11px;min-width:0;
+ min-height:66px;padding:11px 13px;text-align:left;cursor:pointer;
+ color:#102d50;gap:6px;font:inherit;transition:border-color .15s,background-color .15s
+}
+.uo-page .uo-summary>.uo-summary-item small{color:#607389;font-size:.73rem;white-space:normal}
+.uo-page .uo-summary>.uo-summary-item strong{font-size:1.56rem;color:#102d50;line-height:1}
+.uo-page .uo-summary>.uo-summary-item:hover,
+.uo-page .uo-summary>.uo-summary-item:focus-visible{border-color:#c7a35f;outline-offset:2px}
+.uo-page .uo-summary>.uo-summary-item.is-current{border:2px solid #b38a43;background:#fdf9f0;padding:10px 12px}
+.uo-page .uo-tools{grid-template-columns:minmax(0,1fr) 175px 175px 180px;gap:8px}
+.uo-page .uo-tools :is(input,select){border-color:#d5dfe9;color:#102d50}
+.uo-page .uo-compact-card{gap:9px;padding:13px 17px;border:1px solid #dce5ee;border-radius:13px;box-shadow:0 3px 10px #102d5010}
+.uo-compact-card .uo-compact-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;position:relative}
+.uo-compact-card .uo-head{gap:3px}
+.uo-compact-title{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.uo-compact-title h3{color:#102d50!important;font-size:1.05rem!important;line-height:1.28}
+.uo-compact-card .uo-head>strong{color:#1b4a6f;font-size:.85rem;line-height:1.35}
+.uo-compact-card .uo-head>small{color:#718094;font-size:.72rem}
+.uo-compact-title .uo-pill{font-size:.68rem!important;padding:5px 9px!important;max-width:none}
+.uo-issue-chip{display:inline-flex;background:#fff1e8;color:#9e4a2c;font-size:.68rem;
+ font-weight:800;padding:5px 9px;border-radius:999px;white-space:nowrap}
+.uo-compact-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(195px,270px);gap:16px;align-items:center}
+.uo-compact-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;align-items:center}
+.uo-compact-metrics>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.uo-compact-metrics>div+div{border-left:1px solid #e5ebf0;padding-left:15px}
+.uo-compact-metrics small{color:#748293;font-size:.71rem}
+.uo-compact-metrics strong{color:#102d50;font-size:1.08rem;line-height:1.2;overflow-wrap:break-word;font-variant-numeric:tabular-nums}
+.uo-compact-metrics .uo-stage-text{font-size:.88rem}
+.uo-compact-operation{display:flex;flex-direction:column;align-items:stretch;gap:6px}
+.uo-compact-operation .uo-next-step{color:#58718b;font-size:.74rem;font-weight:650;line-height:1.35;text-align:right}
+.uo-compact-card .uo-primary-action>.button{width:100%;min-height:40px;padding:9px 12px;font-size:.84rem;border-radius:8px}
+.uo-compact-card .uo-exception-badge{display:flex;align-items:flex-start;gap:7px;
+ padding:8px 10px;font-size:.76rem;line-height:1.35;background:#fff8f2;border-color:#efcabb}
+.uo-compact-card .uo-order-open{border:0;background:transparent;border-radius:0;overflow:visible}
+.uo-compact-card .uo-order-open>summary{display:inline-flex;align-items:center;min-height:29px;
+ padding:3px 0!important;margin:0;font-size:.77rem;font-weight:760;
+ background:transparent!important;color:#315b80!important;border:0!important;cursor:pointer}
+.uo-compact-card .uo-order-open>summary:hover{text-decoration:underline}
+.uo-compact-card .uo-order-open[open]{border-top:1px solid #e8edf2;padding-top:5px}
+.uo-compact-card .uo-order-open>.uo-product-preview,
+.uo-compact-card .uo-order-open>.uo-product-summary{margin:9px 0}
+.uo-compact-card .uo-order-open>.uo-details{margin:9px 0 4px}
+.uo-compact-card .uo-order-open>.uo-operational-actions{padding:8px 0}
+.uo-compact-card .uo-order-open>.uo-shortage{margin:8px 0}
+.uo-compact-card .uo-difference-list{margin:9px 0}
+.uo-compact-card .uo-admin-actions{border:0;padding:0;align-self:flex-start;position:relative;flex:none}
+.uo-compact-card .uo-admin-actions>summary{list-style:none;display:grid;place-items:center;
+ border:1px solid #dfe7ed;border-radius:8px;width:34px;height:34px;min-height:34px;
+ background:#fff;padding:0;color:#102d50;font-size:1.6rem;line-height:1;cursor:pointer}
+.uo-compact-card .uo-admin-actions>summary::-webkit-details-marker{display:none}
+.uo-compact-card .uo-admin-actions[open]>summary{background:#edf2f7;border-color:#c7a35f}
+.uo-compact-card .uo-admin-popover{position:absolute;z-index:40;right:0;top:39px;
+ width:min(270px,80vw);background:#fff;border:1px solid #dce5ee;border-radius:10px;
+ box-shadow:0 9px 25px #102d5020;padding:11px}
+.uo-compact-card .uo-admin-popover p{margin:0 0 8px;font-size:.72rem;line-height:1.4;color:#60758a}
+.uo-compact-card .uo-admin-popover .uo-actions{display:grid;grid-template-columns:1fr;gap:5px}
+.uo-compact-card .uo-admin-popover .uo-actions .button{min-height:36px;width:100%;text-align:left}
+.uo-visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;
+ clip:rect(0,0,0,0);white-space:nowrap;clip-path:inset(50%)}
+@media(max-width:1050px){
+ .uo-page .uo-tools{grid-template-columns:minmax(0,1fr) repeat(3,minmax(125px,160px))}
+}
+@media(max-width:760px){
+ .uo-page .uo-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .uo-page .uo-summary>.uo-summary-item{padding:10px;min-height:60px}
+ .uo-page .uo-summary>.uo-summary-item.is-current{padding:9px}
+ .uo-page .uo-tools{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .uo-page .uo-search{grid-column:1/-1}
+ .uo-page .uo-compact-card{padding:12px;gap:9px}
+ .uo-compact-main{grid-template-columns:minmax(0,1fr);gap:10px}
+ .uo-compact-metrics{gap:4px}
+ .uo-compact-metrics>div+div{padding-left:9px}
+ .uo-compact-metrics strong{font-size:.91rem}
+ .uo-compact-metrics .uo-stage-text{font-size:.78rem}
+ .uo-compact-operation{flex-direction:column;align-items:stretch}
+ .uo-compact-operation .uo-next-step{text-align:left;font-size:.72rem}
+ .uo-compact-card .uo-primary-action>.button{width:100%;min-height:44px}
+ .uo-compact-title{gap:6px}
+ .uo-compact-title h3{font-size:.98rem!important}
+ .uo-compact-card .uo-order-open>summary{min-height:32px}
+}
+@media(max-width:380px){
+ .uo-compact-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .uo-compact-metrics strong{font-size:.82rem}
+}

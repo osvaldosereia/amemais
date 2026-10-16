@@ -134,10 +134,40 @@ function orderWorkflow(o,verified=false){
  if(status==='expirado')return ['Reserva expirada','closed','Prazo de reserva expirado'];
  return [...(statuses[status]||[status,'pending']),'Saída/encerramento registrado'];
 }
+// Ocorrências atuais são diferentes de alterações históricas justificadas.
+export function activeOrderIssues(o,{hasIssue=false}={}){
+ const terminal=['enviado','despachado','concluido','recebido','recebido_divergente','cancelado','expirado'].includes(o.status);
+ if(terminal)return [];
+ const issues=[];
+ if(o.status==='pendente_estoque'&&o.missing>0){
+  issues.push({type:'shortage',text:'Falta '+n(o.missing)+' unidade'+(o.missing===1?'':'s')+' para atender o pedido.'});
+ }
+ if(o.workflow?.has_difference){
+  for(const line of o.lines){
+   const row=o.workflow.items?.[line.id]||{};
+   const expected=Number(line.quantity||0);
+   let detail='';
+   if(row.picked!=null&&Number(row.picked)!==expected)
+    detail='Separado '+n(row.picked)+' de '+n(expected);
+   else if(row.counted!=null&&Number(row.counted)!==expected)
+    detail='Conferido '+n(row.counted)+' de '+n(expected);
+   else if(row.counted!=null&&row.picked!=null&&Number(row.counted)!==Number(row.picked))
+    detail='Conferido '+n(row.counted)+'; separado '+n(row.picked);
+   if(detail){
+    const reason=row.check_reason||row.pick_reason;
+    issues.push({type:'difference',text:(line.modelTitle||line.name)+': '+detail+(reason?' · '+reason:'')});
+   }
+  }
+ }
+ if(hasIssue&&!issues.some(i=>i.type==='difference'))
+  issues.push({type:'difference',text:'Há diferença registrada na conferência final. Revise os itens antes do envio.'});
+ return issues;
+}
 export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canDelete=false,canReceive=false,
  canDispatch=false,canDispatchStock=false,canVerify=false,isVerified=false,canAdjust=false,hasIssue=false,portal=false,time=x=>x}={}){
  const info=orderWorkflow(o,isVerified);
- const hasOccurrence=Boolean(hasIssue||o.workflow?.has_difference||o.missing>0||o.adjustments.some(a=>Number(a.original_quantity)!==Number(a.revised_quantity)));
+ const issues=activeOrderIssues(o,{hasIssue});
+ const hasOccurrence=issues.length>0;
  const data='data-id="'+esc(o.id)+'" data-kind="'+esc(o.kind)+'"';
  const process=canProcess&&!portal;
  const event=o.kind==='evento';
@@ -213,59 +243,63 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  const waitingText=event?
   'Aguardando reposição. As unidades disponíveis continuam reservadas; assim que chegar mercadoria, o sistema completa a reserva.':
   'Faltam unidades. Aguarde a reposição ou solicite ao responsável um ajuste justificado.';
- return '<article class="uo-card uo-operational" data-order-card data-search="'+esc([
+ const separationLabel=stage==='separacao'||inProgress?'Em andamento':
+  stage==='conferencia'||o.status==='separado'?'Concluída':
+  stage==='expedicao'||stage==='enviado'||terminal?'Finalizada':
+  waiting?'Com falta':'A iniciar';
+ const priority=waiting?0:issues.some(i=>i.type==='difference')?1:
+  stage==='conferencia'||o.status==='separado'?2:stage==='expedicao'?3:
+  stage==='separacao'||inProgress?4:ready?5:6;
+ const managementMenu=management.length?
+  '<details class="uo-admin-actions"><summary aria-label="Administração do pedido" title="Administração do pedido">'+
+   '<span aria-hidden="true">⋮</span><span class="uo-visually-hidden">Administração do pedido</span></summary>'+
+   '<div class="uo-admin-popover"><p>Alterações administrativas podem modificar reservas ou a separação.</p>'+
+   '<div class="uo-actions">'+management.join('')+'</div></div></details>':'';
+ const issueBanner=issues.length?'<div class="uo-exception-badge" role="status"><span aria-hidden="true">⚠</span>'+
+  '<span>'+esc(issues[0].text)+(issues.length>1?' · +'+n(issues.length-1)+' ocorrência(s)':'')+'</span></div>':'';
+ return '<article class="uo-card uo-operational uo-compact-card" data-order-card data-search="'+esc([
   o.id,o.code,o.target,o.origin,originLabel,...o.adjustments.map(a=>a.reason||''),...o.lines.flatMap(l=>[l.name,l.modelTitle,l.size,l.sku,l.ean,l.gondola])].join(' ').toLocaleLowerCase('pt-BR'))+
   '" data-order-id="'+esc(o.id)+'" data-order-kind="'+esc(o.kind)+'" data-order-status="'+esc(o.status)+'" data-order-destination="'+
-   (o.destinationKind|| (event?'evento':o.kind==='avulso'?'avulso':'loja'))+
+   esc(o.destinationKind|| (event?'evento':o.kind==='avulso'?'avulso':'loja'))+
+   '" data-order-created="'+esc(o.created_at||'')+'" data-order-priority="'+priority+
    '" data-order-verified="'+(o.workflow?.stage==='expedicao'?'true':'false')+'" data-order-stage="'+esc(o.workflow?.stage||'')+'" data-order-issue="'+hasOccurrence+'">'+
-  '<header><div class="uo-head"><small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small>'+
-   '<h3>'+'Pedido #'+esc(o.code||'—')+'</h3>'+
-   '<strong>'+esc(o.target)+'</strong></div>'+
-   '<span class="uo-pill '+info[1]+'">'+esc(info[0])+'</span></header>'+
-  '<div class="uo-metrics"><span>'+n(o.total)+' unidades · '+groups.length+' modelo(s) · '+o.lines.length+' SKU(s)</span>'+
-   (!portal&&!terminal&&!unchecked?'<span>'+n(o.reserved)+' reservadas</span>':'')+
-   (waiting&&o.missing?'<span class="uo-alert">'+n(o.missing)+' faltam</span>':'')+
-  '</div>'+
-  '<p class="uo-next-step '+(waiting?'is-shortage':'')+'">'+esc(info[2])+'</p>'+
-  (hasOccurrence?'<p class="uo-exception-badge">⚠ Pedido com divergência · Abra para consultar os itens</p>':'')+
-  (waiting&&!portal?'<p class="uo-shortage">'+waitingText+'</p>':'')+
-  (o.status==='legado'?'<p class="uo-shortage">Pedido anterior ao novo sistema de reservas. Prepare o pedido para entrar na fila.</p>':'')+
-  (o.status==='expirado'?'<p class="uo-shortage">Prazo de confirmação expirado. Histórico preservado.</p>':'')+
-  '<details class="uo-order-open"><summary>Abrir pedido · '+n(o.lines.length)+' SKU(s) · '+n(o.total)+' unidades</summary>'+
-  preview+
-  (o.workflow?.has_difference?'<section class="uo-difference-list"><strong>⚠ Divergências por produto</strong>'+
-   o.lines.filter(l=>{
-    const r=o.workflow.items?.[l.id]||{};
-    return (r.picked!=null&&Number(r.picked)!==Number(l.quantity))||
-     (r.counted!=null&&Number(r.counted)!==Number(l.quantity))||
-     (r.counted!=null&&r.picked!=null&&Number(r.counted)!==Number(r.picked));
-   }).map(l=>{
-    const r=o.workflow.items?.[l.id]||{};
-    return '<p><b>'+esc(l.modelTitle||l.name)+(l.size?' · '+esc(l.size):'')+'</b> · Solicitado '+n(l.quantity)+
-      ' · Separado '+n(r.picked)+' · Conferido '+(r.counted==null?'Pendente':n(r.counted))+
-      ' · Motivo: '+esc(r.check_reason||r.pick_reason||'Não informado')+'</p>';
-   }).join('')+'</section>':'')+
-  '<div class="uo-operational-actions">'+
-   (primary.length?'<div class="uo-primary-action">'+primary.join('')+'</div>':'')+
-   (secondary.length?'<div class="uo-secondary-actions">'+secondary.join('')+'</div>':'')+
-  '</div>'+
-  '<details class="uo-details"'+(o.lines.length>1?'':'')+'><summary>Ver produtos e localizações ('+
-    n(o.lines.length)+' SKUs)</summary>'+
-   '<div class="uo-list-view" data-group-view="location">'+
-    '<div class="uo-group-switch" role="group" aria-label="Organização dos produtos">'+
-     '<button type="button" class="is-current" data-action="order-group-location" aria-pressed="true">Por gôndola</button>'+
-     '<button type="button" data-action="order-group-model" aria-pressed="false">Por modelo</button></div>'+
-    '<div class="uo-location-list">'+gondolaContent+'</div>'+
-    '<div class="uo-model-list">'+content+'</div></div>'+
-   (o.adjustments.length?'<div class="uo-audit"><strong>Alterações justificadas</strong>'+
-    o.adjustments.slice(-8).map(a=>'<p>'+esc(a.original_quantity)+' → '+esc(a.revised_quantity)+' un. · '+esc(a.reason)+'</p>').join('')+'</div>':'')+'</details>'+
-  (o.externalReference?'<small>Referência externa: '+esc(o.externalReference)+'</small>':'')+
-  '</details>'+
-  (management.length?'<details class="uo-admin-actions"><summary>'+
-   (canDelete?'Administração do pedido':'Gerenciar pedido')+'</summary>'+
-   '<p>Alterações administrativas podem cancelar reservas ou exigir nova separação.</p>'+
-   '<div class="uo-actions">'+management.join('')+'</div></details>':'')+
-  '</article>';
+  '<header class="uo-compact-header"><div class="uo-head">'+
+   '<div class="uo-compact-title"><h3>Pedido #'+esc(o.code||'—')+'</h3>'+
+   '<span class="uo-pill '+info[1]+'">'+esc(info[0])+'</span>'+
+   (hasOccurrence?'<span class="uo-issue-chip">'+(issues.some(i=>i.type==='difference')?'Divergência':'Falta')+'</span>':'')+'</div>'+
+   '<strong>'+esc(o.target)+'</strong>'+
+   '<small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small></div>'+managementMenu+'</header>'+
+  '<div class="uo-compact-main">'+
+   '<div class="uo-compact-metrics" aria-label="Resumo do pedido">'+
+    '<div><small>Produtos</small><strong>'+n(groups.length)+'</strong></div>'+
+    '<div><small>Unidades</small><strong>'+n(o.total)+' unidades</strong></div>'+
+    '<div><small>Separação</small><strong class="uo-stage-text">'+esc(separationLabel)+'</strong></div>'+
+   '</div>'+
+   '<div class="uo-compact-operation">'+
+    '<p class="uo-next-step '+(waiting?'is-shortage':'')+'">'+esc(info[2])+'</p>'+
+    (primary.length?'<div class="uo-primary-action">'+primary.join('')+'</div>':'')+
+   '</div></div>'+
+  issueBanner+
+  '<details class="uo-order-open"><summary>Abrir pedido · Ver detalhes · '+n(o.lines.length)+' SKU(s)</summary>'+
+    preview+
+    (issues.length?'<section class="uo-difference-list"><strong>Ocorrências atuais</strong>'+
+      issues.map(i=>'<p>'+esc(i.text)+'</p>').join('')+'</section>':'')+
+    (waiting&&!portal?'<p class="uo-shortage">'+esc(waitingText)+'</p>':'')+
+    (o.status==='legado'?'<p class="uo-shortage">Pedido anterior ao novo sistema de reservas. Prepare o pedido para entrar na fila.</p>':'')+
+    (o.status==='expirado'?'<p class="uo-shortage">Prazo de confirmação expirado. Histórico preservado.</p>':'')+
+    (secondary.length?'<div class="uo-operational-actions"><div class="uo-secondary-actions">'+secondary.join('')+'</div></div>':'')+
+    '<details class="uo-details"><summary>Produtos e localizações ('+n(o.lines.length)+' SKUs)</summary>'+
+     '<div class="uo-list-view" data-group-view="location">'+
+      '<div class="uo-group-switch" role="group" aria-label="Organização dos produtos">'+
+       '<button type="button" class="is-current" data-action="order-group-location" aria-pressed="true">Por gôndola</button>'+
+       '<button type="button" data-action="order-group-model" aria-pressed="false">Por modelo</button></div>'+
+      '<div class="uo-location-list">'+gondolaContent+'</div>'+
+      '<div class="uo-model-list">'+content+'</div></div>'+
+     (o.adjustments.length?'<div class="uo-audit"><strong>Alterações justificadas (histórico)</strong>'+
+       o.adjustments.slice(-8).map(a=>'<p>'+esc(a.original_quantity)+' → '+esc(a.revised_quantity)+' un. · '+esc(a.reason)+'</p>').join('')+'</div>':'')+
+    '</details>'+
+    (o.externalReference?'<small>Referência externa: '+esc(o.externalReference)+'</small>':'')+
+  '</details></article>';
 }
 export function unifiedOrdersPage(orders,{
  button=()=>'',time=x=>x,portal=false,separationOnly=false,
@@ -293,11 +327,11 @@ export function unifiedOrdersPage(orders,{
     'Pedidos de lojas próprias, franquias e lojas temporárias em uma fila única.')+'</p></div>'+
    '<div class="actions">'+actions+'</div></div>'+
   '<div class="uo-summary" aria-label="Andamento dos pedidos">'+
-   '<div><small>A separar</small><strong>'+toPick+'</strong></div>'+
-   '<div><small>Em separação</small><strong>'+separating+'</strong></div>'+
-   '<div><small>A conferir</small><strong>'+toVerify+'</strong></div>'+
-   '<div><small>Em expedição</small><strong>'+readyToDispatch+'</strong></div>'+
-   '<div><small>Com falta</small><strong>'+waiting+'</strong></div></div>'+
+   '<button type="button" class="uo-summary-item" data-action="uo-summary-filter" data-status="a_separar" aria-pressed="false"><small>A separar</small><strong>'+toPick+'</strong></button>'+
+   '<button type="button" class="uo-summary-item" data-action="uo-summary-filter" data-status="em_separacao" aria-pressed="false"><small>Em separação</small><strong>'+separating+'</strong></button>'+
+   '<button type="button" class="uo-summary-item" data-action="uo-summary-filter" data-status="a_conferir" aria-pressed="false"><small>A conferir</small><strong>'+toVerify+'</strong></button>'+
+   '<button type="button" class="uo-summary-item" data-action="uo-summary-filter" data-status="pronto_saida" aria-pressed="false"><small>Em expedição</small><strong>'+readyToDispatch+'</strong></button>'+
+   '<button type="button" class="uo-summary-item" data-action="uo-summary-filter" data-status="pendente_estoque" aria-pressed="false"><small>Com falta</small><strong>'+waiting+'</strong></button></div>'+
   '<div class="uo-tools"><label class="uo-search">Buscar'+
    '<input type="search" data-unified-search placeholder="Pedido, destino, modelo, gôndola, SKU ou EAN…" autocomplete="off"></label>'+
    '<label class="uo-filter">Etapa<select data-unified-status>'+
@@ -317,7 +351,11 @@ export function unifiedOrdersPage(orders,{
    (destinationTypes.has('franquia')?'<option value="franquia">Franquia</option>':'')+
    (destinationTypes.has('loja')?'<option value="loja">Loja própria</option>':'')+
    (destinationTypes.has('avulso')?'<option value="avulso">Pedido avulso</option>':'')+
-   '</select></label></div>'+
+   '</select></label>'+ 
+   '<label class="uo-filter">Ordenar<select data-unified-sort>'+ 
+   '<option value="recentes">Mais recentes</option>'+ 
+   '<option value="antigos">Mais antigos</option>'+ 
+   '<option value="prioridade">Prioridade operacional</option></select></label></div>'+ 
   '<div class="uo-list">'+(visible.length?cards:
     '<p class="uo-no-work">Nenhum pedido ou pedido aguardando separação.</p>')+'</div>'+
   '<p class="uo-empty-filter" data-unified-empty hidden>Nenhum item encontrado com estes filtros.</p>'+
@@ -326,7 +364,7 @@ export function unifiedOrdersPage(orders,{
      'A reserva não reduz o estoque físico. A saída é registrada somente após a conferência completa.')+'</p>'+
  '</section>';
 }
-export function filterUnifiedOrders(container,query,status,destination='todos'){
+export function filterUnifiedOrders(container,query,status,destination='todos',sort='recentes'){
  const q=String(query||'').trim().toLocaleLowerCase('pt-BR');
  let visible=0;
  for(const card of container.querySelectorAll('[data-order-card]')){
@@ -345,6 +383,23 @@ export function filterUnifiedOrders(container,query,status,destination='todos'){
   const matchDestination=!destination||destination==='todos'||card.dataset.orderDestination===destination;
   card.hidden=!match||!matchDestination||!card.dataset.search.includes(q);
   if(!card.hidden)visible++;
+ }
+ const list=container.querySelector('.uo-list');
+ if(list?.appendChild){
+  const cards=[...container.querySelectorAll('[data-order-card]')];
+  const timeOf=card=>Date.parse(card.dataset.orderCreated||'')||0;
+  cards.sort((a,b)=>{
+   if(sort==='prioridade'){
+    const byPriority=Number(a.dataset.orderPriority??6)-Number(b.dataset.orderPriority??6);
+    if(byPriority)return byPriority;
+   }
+   return sort==='antigos'?timeOf(a)-timeOf(b):timeOf(b)-timeOf(a);
+  }).forEach(card=>list.appendChild(card));
+ }
+ for(const chip of container.querySelectorAll('[data-action="uo-summary-filter"]')){
+  const active=chip.dataset.status===status;
+  chip.classList?.toggle('is-current',active);
+  chip.setAttribute?.('aria-pressed',String(active));
  }
  const empty=container.querySelector('[data-unified-empty]');
  if(empty)empty.hidden=visible!==0;
