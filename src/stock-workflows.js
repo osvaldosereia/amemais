@@ -253,9 +253,12 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
        (canLabel?direct('Etiqueta 57 mm','shelf-label-open',main.id,'product-card-action-secondary'):'')+
        (canShare?direct('Compartilhar','share-product',main.id,'product-card-action-secondary'):'')+
        (group.modelId&&canEdit?direct('+ Variação','add-variants',group.modelId,'product-card-action-secondary'):'')+
+      '</div>'+
+      (canRemoveEntireModel||(!group.modelId&&canDeleteProduct())?
+       '<div class="product-card-action-danger-row">'+
         (canRemoveEntireModel?direct('Excluir produto e todas as variações','product-model-delete',group.modelId,'danger product-card-delete-whole'):'')+
         (!group.modelId&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'danger product-card-delete-whole'):'')+
-      '</div></div>':'';
+       '</div>':'')+'</div>':'';
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
     '<div class="grouped-inventory-top">'+
       '<div class="grouped-inventory-photo">'+photo+photoQuickAction+'</div>'+
