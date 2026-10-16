@@ -30,8 +30,8 @@ const mock={
  recent:[{code:'AA003',kind:'evento',text:'Conferência concluída',at:'2026-10-15T19:33:00Z'}]
 };
 test('modo TV possui página independente, 16:9, fullscreen e atualização periódica',()=>{
- assert.match(page,/tv-dashboard\.js\?v=20261016tv360v4/);
- assert.match(page,/tv-dashboard\.css\?v=20261016tv360v4/);
+ assert.match(page,/tv-dashboard\.js\?v=20261016tvone1/);
+ assert.match(page,/tv-dashboard\.css\?v=20261016tvone1/);
  assert.match(css,/height:100dvh/);
  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
  assert.match(css,/grid-template-rows:minmax/);
@@ -40,29 +40,27 @@ test('modo TV possui página independente, 16:9, fullscreen e atualização peri
  assert.match(script,/getUser\(\)/);
  assert.match(script,/db\.rpc\('tv_operations_snapshot'\)/);
 });
-test('os KPIs e a fila mostram apenas números e códigos retornados pelo banco',()=>{
+test('os 12 cards ficam visíveis na mesma tela, com mini botões abrir',()=>{
  const {shell,state,root}=makeDashboard();
- state.lastSuccess=Date.now();
- state.snapshot=mock;
+ state.lastSuccess=Date.now();state.snapshot=mock;state.management=management;
  shell(mock);
- for(const title of ['A separar','A conferir','Conferidos','Enviados hoje',
-  'Fila prioritária','Atenção do gerente','Atividade do dia','Últimas movimentações']){
-  assert.ok(root.innerHTML.includes(title),title);
- }
+ const titles=['Fila prioritária','Ocorrências identificadas','Avarias',
+  '10 produtos com menor estoque','10 produtos com maior estoque','Sem pedidos há +90 dias',
+  'Produtos mais pedidos','Franquias','Categorias','Próximos eventos','Eventos encerrados',
+  'Compras e produtividade'];
+ for(const name of titles)assert.ok(root.innerHTML.includes(name),name);
+ assert.equal((root.innerHTML.match(/data-action="open-detail"/g)||[]).length,12);
  assert.match(root.innerHTML,/AA003/);
- assert.match(root.innerHTML,/1h 5min/);
- assert.match(root.innerHTML,/326/);
- assert.match(root.innerHTML,/Ao vivo/);
+ assert.match(root.innerHTML,/Sem estoque/);
  assert.doesNotMatch(root.innerHTML,/telefone|customer_phone/i);
 });
-test('exibe estado vazio e mantém segurança contra nomes HTML maliciosos',()=>{
+test('informações em HTML são escapadas e relatório vazio é identificado',()=>{
  const {shell,state,root}=makeDashboard();
- state.lastSuccess=Date.now();state.snapshot=mock;
- shell({...mock,priority:[{...mock.priority[0],destination:'<script>alert(1)</script>'}],
-  recent:[]});
+ state.lastSuccess=Date.now();state.snapshot=mock;state.management=management;
+ shell({...mock,priority:[{...mock.priority[0],destination:'<script>alert(1)</script>'}]});
  assert.doesNotMatch(root.innerHTML,/<script>alert\(1\)<\/script>/);
  assert.match(root.innerHTML,/&lt;script&gt;/);
- assert.match(root.innerHTML,/Nenhuma movimentação recente/);
+ assert.match(root.innerHTML,/Nenhum produto encontrado/);
 });
 test('consulta do banco restringe gerente/admin, oculta removidos e não expõe PII',()=>{
  assert.match(sql,/p\.role IN \('admin','gerente'\)/);
@@ -100,15 +98,14 @@ const management={
  trend:[{day:'2026-10-15',units:18},{day:'2026-10-16',units:30}],
  purchases:{open:3,sent:2},quality:{checks_today:7}
 };
-test('sete telas rotativas mantêm leitura adequada e tempos por relatório',()=>{
- const {screens}=makeDashboard();
- assert.equal(screens.length,7);
- assert.deepEqual(screens.map(s=>s.seconds),[20,25,30,25,30,30,25]);
- assert.match(script,/setInterval\(advanceRotation,1000\)/);
- assert.match(script,/if\(action==='toggle-rotation'\)/);
- assert.match(script,/if\(action==='next-screen'\)/);
- assert.match(script,/if\(action==='previous-screen'\)/);
- assert.match(css,/tv-four-grid/);
+test('tela única substitui a rotação automática e preserva atualização a cada 30 segundos',()=>{
+ assert.match(css,/tv-one-grid/);
+ assert.match(css,/tv-one-header/);
+ assert.match(script,/timer=setInterval\(refresh,30000\)/);
+ assert.doesNotMatch(script,/rotationTimer=setInterval/);
+ assert.match(script,/db\.rpc\('tv_product_rankings'\)/);
+ assert.match(script,/data-action="open-detail"/);
+ assert.match(script,/data-action="close-detail"/);
 });
 test('alerta informa código do pedido, tipo de destino, nome, produto e diferença',()=>{
  const {shell,state,root}=makeDashboard();
@@ -119,7 +116,7 @@ test('alerta informa código do pedido, tipo de destino, nome, produto e diferen
  assert.match(root.innerHTML,/Franquia Centro/);
  assert.match(root.innerHTML,/Produto não encontrado na separação/);
  assert.match(root.innerHTML,/Camiseta HDH/);
- assert.match(root.innerHTML,/10 \/ Identificado 8/);
+ assert.match(root.innerHTML,/Solicitado 10 · Identificado 8/);
 });
 test('qualquer texto da ocorrência é escapado para não injetar código na TV',()=>{
  const {shell,state,root}=makeDashboard();
@@ -128,18 +125,27 @@ test('qualquer texto da ocorrência é escapado para não injetar código na TV'
  assert.doesNotMatch(root.innerHTML,/<script>alert\(99\)<\/script>/);
  assert.match(root.innerHTML,/&lt;script&gt;alert/);
 });
-test('painel organiza estoque, franquias, eventos, avarias, categorias e comparativos',()=>{
+test('os relatórios detalhados usam o padrão de gaveta do sistema',()=>{
  const {shell,state,root}=makeDashboard();
  state.management=management;state.snapshot=mock;state.lastSuccess=Date.now();
- const expected=[
-  '10 produtos com menor estoque','Franquia Centro','Feira 2026',
-  'Feira encerrada','Avarias por categoria','Compras e abastecimento'
- ];
- for(let i=1;i<7;i++){
-  state.pageIndex=i;shell(mock);
-  assert.match(root.innerHTML,new RegExp(expected[i-1]));
-  if(i===5)assert.match(root.innerHTML,/tv-compare-bars/);
- }
+ state.detailReport='franchises';shell(mock);
+ assert.match(root.innerHTML,/role="dialog"/);
+ assert.match(root.innerHTML,/Franquia Centro/);
+ assert.match(root.innerHTML,/data-action="close-detail"/);
+ assert.match(root.innerHTML,/Abrir sistema/);
+ state.detailReport='categories';shell(mock);
+ assert.match(root.innerHTML,/Camisetas/);
+ assert.match(root.innerHTML,/140/);
+});
+test('rankings apresentam maiores, mais solicitados e parados sem confundir com vendas',()=>{
+ const {shell,state,root}=makeDashboard();
+ state.snapshot=mock;state.management=management;state.lastSuccess=Date.now();
+ state.rankings={top_stock:[{name:'Camiseta HDH',sku:'SKU-5',available:100,physical:102}],
+  most_ordered:[{name:'Boné HDH',sku:'SKU-6',requested_30d:60,available:10}],
+  dormant:[{name:'Calça social',sku:'SKU-7',days_without_order:130,available:9}]};
+ shell(mock);
+ for(const x of ['100','Boné HDH','60','Calça social','130'])assert.match(root.innerHTML,new RegExp(x));
+ assert.doesNotMatch(root.innerHTML,/Tendência de demanda · 14 dias/);
 });
 test('gestão 360 restringe o snapshot, não usa dados pessoais nem confunde venda com não devolução',()=>{
  assert.match(managementSQL,/p\.role in \('admin','gerente'\)/);
@@ -159,4 +165,15 @@ test('datas do calendário de eventos respeitam Cuiabá sem recuar um dia',()=>{
  const {niceDate}=makeDashboard();
  assert.match(niceDate('2026-10-20'),/20/);
  assert.match(managementSQL,/America\/Cuiaba/);
+});
+
+test('ranking de 90 dias filtra estoques não disponíveis e produtos novos',async()=>{
+ const rankingSQL=await readFile(new URL('../supabase/migrations/202610160005_tv_product_rankings.sql',import.meta.url),'utf8');
+ assert.match(rankingSQL,/created_at<now\(\)-interval '90 days'/);
+ assert.match(rankingSQL,/last_order_at<now\(\)-interval '90 days'/);
+ assert.match(rankingSQL,/available>0/);
+ assert.match(rankingSQL,/tv_product_rankings/);
+ assert.match(rankingSQL,/p\.role in \('admin','gerente'\)/);
+ assert.match(rankingSQL,/revoke all on function public\.tv_product_rankings/);
+ assert.doesNotMatch(rankingSQL,/customer_name|customer_phone/);
 });
