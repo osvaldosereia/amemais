@@ -4647,7 +4647,7 @@ document.addEventListener('input',event=>{
     if(note)note.closest('label').hidden=changes.length===0;
     const status=panel.querySelector('[data-balance-status]');
     if(status)status.textContent=changes.length?changes.length+' variação(ões) com diferença':'Nenhuma diferença identificada';
-    field.closest('[data-balance-row]')?.classList.toggle('has-difference',
+    field.closest('[data-balance-item]')?.classList.toggle('has-difference',
       Number(field.value)!==Number(field.closest('[data-balance-item]')?.dataset.expected));
   }
   if(event.target.matches('[data-count-free]')){
