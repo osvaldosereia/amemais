@@ -37,6 +37,8 @@ export function renderStoreUnitCard(loc,orders,ctx){
  const admin=loc.type==='event'?ctx.canManageEvent:ctx.canManageStores;
  const controls=admin?[
   loc.type==='store'?ctx.button('Editar cadastro','store-edit','data-id="'+esc(loc.id)+'"','small'):'',
+  loc.type==='store'?ctx.button(loc.active?'Desativar loja':'Ativar loja','store-toggle','data-id="'+esc(loc.id)+'"','small'):'',
+  loc.type==='store'&&!ctx.canForceDelete?ctx.button('Excluir cadastro','store-delete','data-id="'+esc(loc.id)+'"','small danger'):'' ,
   loc.type==='event'?ctx.button('Editar capa','event-cover-edit','data-id="'+esc(loc.id)+'"','small'):'',
   ctx.canForceDelete?ctx.button('Excluir cadastro','force-delete-preview','data-kind="'+(loc.type==='event'?'event':'store')+'" data-id="'+esc(loc.id)+'"','small danger'):''
  ].filter(Boolean).join(''):'';
