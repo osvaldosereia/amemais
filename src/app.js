@@ -17,12 +17,12 @@ import {catalogSortOptions,availableGondolas,gondolaKey,catalogMatchesQuery,orde
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261016damage-direct1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
-import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261016dest1';
+import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261016stores1';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261016compact1';
 import {operationalFormMarkup,operationalDifferenceRows} from './order-operations.js?v=20261016partial1';
 import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,findVerificationProduct} from './final-verification.js?v=20261016orderflow1';
 import {pickingThermalHTML} from './thermal-picking.js?v=20261016dest1';
-import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261016dest1';
+import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261016stores1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261016dest1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
@@ -506,6 +506,8 @@ function render(){
     '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-expanded="false" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>';
   hydrateImages();
+  const hub=root.querySelector('.sh-hub');
+  if(hub)filterStoreHub(hub,state.storeHubFilter.search,state.storeHubFilter.type,state.storeHubFilter.status);
 }
 
 function pageContent(){
