@@ -128,18 +128,23 @@ franchise_agg as (
  select franchise,category,sum(quantity)::integer requested,
  sum(case when dispatched then quantity else 0 end)::integer shipped
  from franchise_lines group by franchise,category
+ union all
+ select s.name,'Sem pedidos'::text,0::integer,0::integer
+ from public.stores s
+ where s.kind='franquia' and s.active and s.force_archived_at is null
+ and not exists(select 1 from franchise_lines l where l.store_id=s.id)
 ),
 event_in_progress as (
  select e.id event_id,e.name event_name,e.starts_at,
    coalesce(p.category,'Sem categoria') category,
-   sum(i.quantity)::integer requested,
-   sum(case when b.status in ('separado','enviado') then i.quantity
-            else least(greatest(coalesce(i.picked,0),0),i.quantity) end)::integer prepared,
-   sum(case when b.status='enviado' then i.quantity else 0 end)::integer sent
+   coalesce(sum(i.quantity),0)::integer requested,
+   coalesce(sum(case when b.status in ('separado','enviado') then i.quantity
+            else least(greatest(coalesce(i.picked,0),0),i.quantity) end),0)::integer prepared,
+   coalesce(sum(case when b.status='enviado' then i.quantity else 0 end),0)::integer sent
  from public.events e
- join public.event_pick_batches b on b.event_id=e.id
+ left join public.event_pick_batches b on b.event_id=e.id
    and b.status<>'cancelado'
- join public.event_pick_batch_items i on i.batch_id=b.id
+ left join public.event_pick_batch_items i on i.batch_id=b.id
  left join product_cats p on p.id=i.product_id
  where e.deleted_at is null and e.status in ('rascunho','ativo')
    and (e.ends_at is null or e.ends_at>=current_date-1)
