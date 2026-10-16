@@ -124,6 +124,8 @@ function orderWorkflow(o,verified=false){
  if(status==='em_separacao')return ['Em separação','picked','Separação em andamento'];
  if(status==='separado'&&!verified)return ['A conferir','checking','Separação concluída · Aguardando conferência final'];
  if(status==='separado'&&verified)return ['Conferido','complete','Conferência concluída · Aguardando confirmação da saída'];
+ if(status==='cancelado')return ['Cancelado','closed','Pedido cancelado · reservas liberadas'];
+ if(status==='expirado')return ['Reserva expirada','closed','Prazo de reserva expirado'];
  return [...(statuses[status]||[status,'pending']),'Saída/encerramento registrado'];
 }
 export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=false,canDelete=false,canReceive=false,
@@ -232,7 +234,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
   '</div>'+
   '<p class="uo-next-step '+(waiting?'is-shortage':'')+'">'+esc(info[2])+'</p>'+
   (waiting&&!portal?'<p class="uo-shortage">'+waitingText+'</p>':'')+
-  (o.status==='legado'?'<p class="uo-shortage">Pedido anterior ao sistema de reservas. Prepare o pedido para entrar na fila.</p>':'')+
+  (o.status==='legado'?'<p class="uo-shortage">Pedido anterior ao novo sistema de reservas. Prepare o pedido para entrar na fila.</p>':'')+
   (o.status==='expirado'?'<p class="uo-shortage">Prazo de confirmação expirado. Histórico preservado.</p>':'')+
   preview+
   '<div class="uo-operational-actions">'+
@@ -263,7 +265,7 @@ export function unifiedOrdersPage(orders,{
 }={}){
  const active=['legado','solicitado','reservado','aprovado','aguardando','em_separacao','separado'];
  const visible=separationOnly?orders.filter(o=>active.includes(o.status)||o.status==='pendente_estoque'):orders;
- const toPick=orders.filter(o=>['legado','solicitado','reservado','aprovado','aguardando'].includes(o.status)).length;
+ const toPick=orders.filter(o=>['reservado','aprovado','aguardando'].includes(o.status)).length;
  const separating=orders.filter(o=>o.status==='em_separacao').length;
  const toVerify=orders.filter(o=>o.status==='separado'&&!isVerified(o)).length;
  const readyToDispatch=orders.filter(o=>o.status==='separado'&&isVerified(o)).length;
@@ -294,7 +296,8 @@ export function unifiedOrdersPage(orders,{
    '<input type="search" data-unified-search placeholder="Pedido, destino, modelo, gôndola, SKU ou EAN…" autocomplete="off"></label>'+
    '<label class="uo-filter">Etapa<select data-unified-status>'+
    '<option value="todos">Todas</option>'+
-   '<option value="a_separar">A separar</option>'+
+   '<option value="a_separar">A separar</option>'+ 
+   '<option value="a_preparar">A preparar</option>'+ 
    '<option value="em_separacao">Em separação</option>'+
    '<option value="a_conferir">A conferir</option>'+
    '<option value="pronto_saida">Prontos para saída</option>'+
@@ -323,7 +326,8 @@ export function filterUnifiedOrders(container,query,status,destination='todos'){
  for(const card of container.querySelectorAll('[data-order-card]')){
   const s=card.dataset.orderStatus,verified=card.dataset.orderVerified==='true';
   const match=status==='todos'||!status||
-   (status==='a_separar'&&['legado','solicitado','reservado','aprovado','aguardando'].includes(s))||
+   (status==='a_separar'&&['reservado','aprovado','aguardando'].includes(s))||
+   (status==='a_preparar'&&['legado','solicitado'].includes(s))||
    (status==='em_separacao'&&s==='em_separacao')||
    (status==='a_conferir'&&s==='separado'&&!verified)||
    (status==='pronto_saida'&&s==='separado'&&verified)||
