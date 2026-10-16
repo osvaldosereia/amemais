@@ -84,7 +84,7 @@ test('produto único mostra ações diretas e permite gerenciar o SKU',()=>{
   isManager:()=>true,canRegisterProducts:()=>true,canMoveStock:()=>true,
   canManageSku:()=>true,canDeleteProduct:()=>true,canShare:true,canLabel:true
  });
- assert.match(html,/Ver SKU \/ estoque/);
+ assert.match(html,/Gerenciar SKU/);
  for(const action of ['sku-manage','product-edit','shelf-label-open','share-product','product-delete'])
   assert.match(html,new RegExp('data-action="'+action+'"'));
  assert.doesNotMatch(html,/product-card-more/);
