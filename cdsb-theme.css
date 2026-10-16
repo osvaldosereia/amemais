@@ -74,3 +74,52 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
  .mobile-c-app .content{padding-top:18px}
  .brand-login img{max-width:300px}
 }
+
+
+/* Consolidação de componentes operacionais sob a identidade azul/dourado. */
+:root{
+  color-scheme:light;
+  --primary:#102d50;
+  --primary-hover:#1c446e;
+  --accent:#c7a35f;
+  --background:#f6f7f9;
+  --surface:#ffffff;
+  --text-primary:#21344b;
+}
+.mobile-c-app .content{background:#f6f7f9}
+.mobile-c-app .sidebar{background:#fff}
+.mobile-c-app .sidebar .brand-lockup{height:143px;min-height:143px;max-height:143px;padding:21px 9px!important;background:#fff}
+.mobile-c-app .sidebar .brand-lockup .cdsb-brand-logo{max-width:208px;max-height:100px;object-fit:contain}
+.mobile-c-app .pagehead{margin-bottom:18px}
+.mobile-c-app .uo-card,.mobile-c-app .store-card,.mobile-c-app .stock-card,
+.mobile-c-app .panel,.mobile-c-app .card{border-color:#dce2e8}
+.mobile-c-app .uo-card h3,
+.mobile-c-app .uo-next-step,
+.mobile-c-app .uo-gondola-group>header strong,
+.mobile-c-app .uo-gondola-line>b,
+.mobile-c-app .uo-metrics{color:#102d50}
+.mobile-c-app .uo-pill.checking{background:#eaf0f8;color:#234971}
+.mobile-c-app .uo-pill.ready{background:#eaf0f8;color:#234971}
+.mobile-c-app .uo-primary-action .button,
+.mobile-c-app .uo-operational-actions .button.primary{background:#102d50;border-color:#102d50;color:#fff}
+.mobile-c-app .uo-order-open>summary{background:#f3f6fa;color:#102d50}
+.mobile-c-app .uo-order-open[open]>summary{background:#eaf0f8;color:#102d50;border-color:#d8e2ee}
+.mobile-c-app .uo-group-switch button.is-current{color:#102d50;background:#fff}
+.mobile-c-app .uo-filter select:focus,
+.mobile-c-app .uo-search input:focus,
+.mobile-c-app .store-order-product input:focus,
+.mobile-c-app .op-fields input:focus{border-color:#c7a35f;outline:2px solid #c7a35f55}
+.mobile-c-app .uo-summary strong{color:#102d50}
+.mobile-c-app .op-summary,.mobile-c-app .op-line.is-selected{background:#eff4fa;border-color:#c7a35f;color:#102d50}
+.mobile-c-app .op-scanner>.button{border-color:#c7a35f;color:#102d50;background:#fff}
+.mobile-c-app .uo-exception-badge,.mobile-c-app .uo-difference-list{border-color:#e5b39b;background:#fff6f2;color:#963f2b}
+.mobile-c-app .brand-login{border:0}
+.mobile-c-app .login-wrap,.login-wrap{background:linear-gradient(180deg,#f5f7fa 0%,#fff 100%)}
+.mobile-c-app .login{background:#fff}
+.mobile-c-app .field input,.mobile-c-app .field select,.mobile-c-app .field textarea{color:#21344b}
+.mobile-c-app .uo-admin-actions>summary{color:#5c7086}
+.mobile-c-app .uo-admin-actions[open]>summary{color:#102d50;background:#ecf2f8}
+@media(max-width:760px){
+ .mobile-c-app .sidebar .brand-lockup{display:none!important}
+ .mobile-c-app .topbar{background:#fff}
+}
