@@ -1421,7 +1421,7 @@ function ordersPage(separationOnly=false){
    scope?.type==='store'?(state.stores.find(s=>s.id===scope.id)?.name||'Loja'):
    scope?.type==='event'?(eventById(scope.id)?.name||'Loja temporária'):'';
  const contextHeader=scope?
-  '<div class="sh-context"><div>'+button('← Lojas','store-hub-back','','small')+
+  '<div class="sh-context"><div>'+button(scope?.type==='store'||scope?.type==='event'?'← Voltar à unidade':'← Lojas','store-hub-back','','small')+
   '<strong>'+h(contextTitle)+'</strong><span>'+(scope.mode==='pending'?'Pedidos em andamento':
     scope.mode==='history'?'Histórico de pedidos':'Todos os pedidos')+'</span></div>'+
   button('Mostrar todos os pedidos','store-hub-reset','','small')+'</div>':'';
