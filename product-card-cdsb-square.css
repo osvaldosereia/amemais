@@ -490,3 +490,29 @@
   min-width:0!important;min-height:43px!important;
  }
 }
+
+/* Aviso de encomendas: fora do saldo físico/livre, visível no card e na variação. */
+.product-card-v3 .product-purchase-arrival{
+ background:#f4ebd8!important;border:1px solid #dfc894!important;color:#102d50!important;
+ border-radius:9px;padding:7px 10px!important;display:flex!important;gap:4px!important;
+ align-items:center!important;flex-wrap:wrap!important;font-size:.77rem!important;
+ line-height:1.25!important;max-width:100%!important;
+}
+.product-card-v3 .product-purchase-arrival small{font-size:.71rem!important;color:#425875!important}
+.product-card-v3 .product-variant-purchase{color:#6d551e!important;font-weight:700!important;display:block}
+@media(min-width:761px){
+ .products-panel .product-card-v3 .grouped-inventory-info>.product-purchase-arrival,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-info>.product-purchase-arrival{
+  grid-column:2/6!important;grid-row:5!important;justify-self:start!important;margin-top:4px!important;
+ }
+ .products-panel .product-card-v3 .grouped-inventory-top,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-top{
+  grid-template-rows:min-content min-content min-content 1fr auto!important;
+ }
+}
+@media(max-width:760px){
+ .products-panel .product-card-v3 .grouped-inventory-info>.product-purchase-arrival,
+ .c-dashboard .c-dashboard-recent-products .product-card-v3 .grouped-inventory-info>.product-purchase-arrival{
+  font-size:.7rem!important;margin-top:4px!important;
+ }
+}
