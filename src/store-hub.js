@@ -23,7 +23,7 @@ export function locationOrders(all,scope,mode='all'){
   mode==='history'?list.filter(isHistoricalOrder):list;
 }
 function itemRow(o,scope,ctx){
- const label=o.kind==='evento'?'Lote '+String(o.sequence||'?').padStart(2,'0'):'Pedido';
+ const label='Pedido';
  const attrs='data-location-type="'+esc(scope.type)+'" data-location-id="'+esc(scope.id||'central')+
   '" data-order-kind="'+esc(o.kind)+'" data-order-id="'+esc(o.id)+'"';
  const activeAction=()=>{
@@ -135,7 +135,7 @@ export function renderStoreHub({stores=[],events=[],orders=[],context={}}){
   (ctx.showCentral?group('Loja Central','Unidade Cristo Rei · pedidos e histórico exclusivos da loja.',centralItems,orders,ctx,
     'Loja Cristo Rei não cadastrada ou sem acesso.'):'')+
   (ctx.showFranchises?group('Franquias','Pedidos enviados à central e histórico de atendimento.',franchiseItems,orders,ctx,'Nenhuma franquia cadastrada ou acessível.'):'')+
-  (ctx.showEvents?group('Lojas Temporárias','Lotes de reposição e envios para cada evento.',eventItems,orders,ctx,'Nenhuma loja temporária cadastrada ou acessível.'):'')+
+  (ctx.showEvents?group('Lojas Temporárias','Pedidos e envios para cada loja temporária.',eventItems,orders,ctx,'Nenhuma loja temporária cadastrada ou acessível.'):'')+
   (branchItems.length?group('Filiais próprias','Movimentações e pedidos das filiais próprias.',branchItems,orders,ctx,''):'')+
   '<p class="sh-footer-help">A separação, a impressão A4 e a baixa física continuam na seção Pedidos. O histórico permanece vinculado à unidade.</p></div>';
 }
