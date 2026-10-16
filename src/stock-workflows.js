@@ -1,3 +1,4 @@
+import {gondolaSelectHTML} from './gondolas.js?v=20261016gondolas1';
 // AME MAIS: consultas agrupadas, inclusão de tamanhos e logística dos eventos.
 // Sem estoque paralelo: cada linha representa um produto/variação real.
 const sizes=['P','M','G','GG','XGG','XXGG','EXGG','PP','Único'];
@@ -260,14 +261,16 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     stockWorkspace+edition+
     '</article>';
 }
-function sizeLine(size){
+function sizeLine(size,gondolas=[]){
   return '<div class="add-size-row" data-extra-size="'+esc(size)+'" hidden>'+
     '<div class="add-size-title"><strong>'+size+'</strong><span>Nova variação</span></div>'+
     '<label>SKU <small>(automático se vazio)</small><input name="sku" maxlength="80" disabled placeholder="Gerar automaticamente"></label>'+
     '<label>EAN <small>(opcional)</small><input name="ean" inputmode="numeric" maxlength="14" disabled placeholder="8 a 14 dígitos"></label>'+
+    gondolaSelectHTML('gondola',gondolas,'',{label:'Gôndola da nova variação',disabled:true})+
+    '<label>Prateleira<input name="prateleira" maxlength="40" disabled placeholder="Ex.: B"></label>'+
     '<label>Estoque inicial<input name="quantity" type="number" inputmode="numeric" min="0" max="1000000" step="1" value="0" disabled required></label></div>';
 }
-export function addSizesContent(model,variants,choices=[]){
+export function addSizesContent(model,variants,choices=[],gondolas=[]){
   const color=variants.find(p=>p.active)?.apparel_color||'Única';
   const existing=new Set(variants.filter(p=>p.active&&
     String(p.apparel_color||'').toLocaleLowerCase('pt-BR')===color.toLocaleLowerCase('pt-BR'))
@@ -281,7 +284,7 @@ export function addSizesContent(model,variants,choices=[]){
       '<span class="size-chip size-chip-existing" title="Variação já cadastrada" aria-label="'+esc(size)+' já existe">'+esc(size)+' ✓</span>':
       '<button type="button" data-action="extra-size-toggle" data-size="'+esc(size)+
       '" class="size-chip" aria-pressed="false">'+esc(size)+'</button>').join('')+'</div>'+
-    '<div class="extra-size-list">'+available.map(sizeLine).join('')+'</div>':
+    '<div class="extra-size-list">'+available.map(size=>sizeLine(size,gondolas)).join('')+'</div>':
     '<p class="note">Todas as variações da categoria já estão cadastradas, ou a categoria ainda não possui variações. Atualize em Categorias.</p>');
 }
 export function updateExtraSizeButtons(form,products){
@@ -293,7 +296,7 @@ export function updateExtraSizeButtons(form,products){
     if(taken){
       const row=form.querySelector('[data-extra-size="'+btn.dataset.size+'"]');
       if(row&&!row.hidden){
-        row.hidden=true;row.querySelectorAll('input').forEach(el=>el.disabled=true);
+        row.hidden=true;row.querySelectorAll('input,select').forEach(el=>el.disabled=true);
         btn.classList.remove('selected');btn.setAttribute('aria-pressed','false');
       }
     }
@@ -306,7 +309,7 @@ export function toggleExtraSize(form,size){
   const enable=row.hidden;
   row.hidden=!enable;btn.classList.toggle('selected',enable);
   btn.setAttribute('aria-pressed',String(enable));
-  row.querySelectorAll('input').forEach(el=>el.disabled=!enable);
+  row.querySelectorAll('input,select').forEach(el=>el.disabled=!enable);
 }
 export function collectExtraSizes(form,products){
   const color=(form.querySelector('[name="new_color"]')?.value||'Única').trim();
@@ -323,7 +326,7 @@ export function collectExtraSizes(form,products){
     if(ean&&!/^[0-9]{8,14}$/.test(ean))throw new Error('EAN inválido: '+size);
     if(raw===''||!Number.isInteger(quantity)||quantity<0||quantity>1000000)
       throw new Error('Quantidade inválida: '+size);
-    return {size,color,sku,ean,quantity};
+    return {size,color,sku,ean,gondola:take('gondola'),prateleira:take('prateleira'),quantity};
   });
 }
 export function eventBatchContent(items,models,qtyStore,photoButton){
