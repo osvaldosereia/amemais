@@ -1102,7 +1102,7 @@ async function saveEventBatchPicking(form,finish=false){
  const order=unifiedOrderById('evento',form.dataset.batch);
  if(!order)return;
  const complete=items.every((x,i)=>x.picked===order.lines.find(l=>l.id===x.product_id)?.quantity);
- if(finish&&!complete)return toast('Confira todas as unidades. Se faltarem peças, peça ao gerente para revisar o lote.',true);
+ if(finish&&!complete)return toast('Confira todas as unidades. Se faltarem peças, peça ao gerente para revisar o pedido.',true);
  return exec(async()=>{
   const status=assertOk(await db.rpc('save_event_batch_picking',{
     p_batch:form.dataset.batch,p_items:items
@@ -2796,12 +2796,12 @@ async function forceDeletePreview(kind,id){
      '</b> · SKU '+h(p.sku||'—')+' · Físico '+qtyStore(p.id)+
      ' · Reservado '+qtyReserved(p.id)+'</li>').join('')+'</ul></div>':'';
   const explanation=kind==='model'?
-   'TODOS os tamanhos e cores serão removidos do catálogo na mesma operação. Saldos físicos serão baixados com registro de auditoria; reservas serão liberadas e pedidos/lotes pendentes que contenham alguma dessas variações serão cancelados. Os pedidos e as movimentações já concluídos permanecem no histórico.':
+   'TODOS os tamanhos e cores serão removidos do catálogo na mesma operação. Saldos físicos serão baixados com registro de auditoria; reservas serão liberadas e pedidos pendentes que contenham alguma dessas variações serão cancelados. Os pedidos e as movimentações já concluídos permanecem no histórico.':
    kind==='product'?
-   'A variação deixa de aparecer no catálogo. Os saldos serão baixados com auditoria, as reservas serão liberadas e pedidos/lotes pendentes relacionados serão cancelados.':
+   'A variação deixa de aparecer no catálogo. Os saldos serão baixados com auditoria, as reservas serão liberadas e pedidos pendentes relacionados serão cancelados.':
    kind==='store'?
    'A loja sai da relação operacional. Pedidos pendentes são cancelados e reservas liberadas. O histórico permanece. Filiais com mercadorias ainda em estoque devem devolver antes.':
-   'A loja temporária deixa de aparecer. Lotes não enviados são cancelados e o estoque restante retorna ao CDSB. O histórico é preservado.';
+   'A loja temporária deixa de aparecer. Pedidos não enviados são cancelados e o estoque restante retorna ao CDSB. O histórico é preservado.';
   formModal('Exclusão avançada · '+data.name,
    '<p class="help"><b>Atenção: exclusão administrativa de '+labels[kind]+'.</b> Revise os números antes de autorizar.</p>'+
    '<div class="force-delete-summary">'+warnings.map(t=>'<div>'+t+'</div>').join('')+'</div>'+
@@ -3617,7 +3617,7 @@ async function handleClick(event){
    if(!e||e.deleted_at||!isManager()||!hasPermission('events.close')||!hasPermission('events.return'))return;
    const remaining=state.balances.filter(b=>b.event_id===id).reduce((sum,b)=>sum+Number(b.quantity||0),0);
    formModal('Excluir loja temporária · '+e.name,
-    '<p class="help">Esta operação arquiva a loja e cancela lotes ainda não enviados. As '+remaining+
+    '<p class="help">Esta operação arquiva a loja e cancela pedidos ainda não enviados. As '+remaining+
     ' unidade(s) ainda no local serão devolvidas automaticamente à central. Vendas e baixas anteriores não serão revertidas. O histórico ficará preservado.</p>'+
     '<label class="field"><span>Código de autorização</span><input name="delete_code" type="password" autocomplete="off" required minlength="4" maxlength="80" placeholder="Informe o código de exclusão"></label>',
     'event-delete-confirm','Excluir e devolver estoque');
@@ -3737,7 +3737,7 @@ async function handleClick(event){
     const kind=target.dataset.kind,order=unifiedOrderById(kind,id);
     if(!order||!['avulso','loja','evento'].includes(kind))return toast('Pedido não encontrado.',true);
     const code=order.code;
-    formModal('Excluir '+(kind==='evento'?'lote':'pedido')+' #'+code,
+    formModal('Excluir pedido #'+code,
       '<div class="note"><strong>Exclusão administrativa</strong><p>Este registro sairá da lista de Pedidos e das filas operacionais. Se ainda estiver em andamento, será cancelado e suas reservas serão liberadas. Movimentações de estoque já realizadas e registros de auditoria serão preservados.</p></div>'+
       '<p class="help">Para confirmar, digite exatamente <strong>'+h(code)+'</strong>.</p>'+
       field('Código de confirmação','confirmation','text','','required autocomplete="off" maxlength="5" autocapitalize="characters"'),
