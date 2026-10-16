@@ -354,3 +354,89 @@ drop trigger if exists event_batch_reset_operational_progress on public.event_pi
 create trigger event_batch_reset_operational_progress
 after update of revision on public.event_pick_batches
 for each row execute function public.reset_operational_progress_on_batch_revision();
+
+-- Recebimentos de filiais não podem creditar unidades que não foram expedidas.
+CREATE OR REPLACE FUNCTION public.receive_store_order(p_order uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare v_order public.store_orders%rowtype;v_item record;v_kind text;v_shipped integer;v_effective integer;
+begin
+ if not app_private.has_permission('orders.receive') then raise exception 'Sem permissao para receber';end if;
+ select * into v_order from public.store_orders where id=p_order for update;
+ if not found or v_order.status<>'despachado' then raise exception 'Pedido nao esta em transito';end if;
+ if not app_private.can_access_store(v_order.to_store_id) then raise exception 'Sem acesso ao destino';end if;
+ select kind into v_kind from public.stores where id=v_order.to_store_id and active;
+ if v_kind is null or v_kind='franquia' then raise exception 'Franquia nao possui estoque interno controlado';end if;
+ for v_item in select * from public.store_order_items where order_id=p_order order by product_id loop
+   select (p.items->(v_item.product_id::text)->>'counted')::integer into v_shipped
+   from public.order_operational_progress p
+   where p.kind='loja' and p.order_id=p_order and p.stage='enviado';
+   v_effective:=coalesce(v_shipped,v_item.quantity);
+   if v_effective<0 or v_effective>v_item.quantity then raise exception 'Envio inconsistente';end if;
+   if v_effective=0 then continue;end if;
+   insert into public.store_stock(store_id,product_id,quantity)
+   values(v_order.to_store_id,v_item.product_id,0) on conflict do nothing;
+   perform 1 from public.store_stock where store_id=v_order.to_store_id
+      and product_id=v_item.product_id for update;
+   update public.store_stock set quantity=quantity+v_effective,updated_at=now()
+     where store_id=v_order.to_store_id and product_id=v_item.product_id;
+   insert into public.store_transfer_log(order_id,store_id,product_id,delta,actor_id,operation)
+     values(p_order,v_order.to_store_id,v_item.product_id,v_effective,auth.uid(),'recebimento');
+ end loop;
+ update public.store_orders set status='recebido',received_by=auth.uid(),received_at=now() where id=p_order;
+ insert into public.audit_log(entity,entity_id,action,actor_id) values('store_orders',p_order::text,'RECEIVED',auth.uid());
+end;$function$
+;
+CREATE OR REPLACE FUNCTION public.receive_store_order_checked(p_order uuid, p_items jsonb, p_reason text DEFAULT NULL::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare o public.store_orders%rowtype;it record;v jsonb;qty integer;seen uuid[]:='{}';missing integer:=0;v_shipped integer;v_effective integer;
+begin
+ if not app_private.has_permission('orders.receive') then raise exception 'Sem permissão para receber';end if;
+ select * into o from public.store_orders where id=p_order for update;
+ if not found or o.status<>'despachado' then raise exception 'Pedido não está em trânsito';end if;
+ if not app_private.can_access_store(o.to_store_id) or not exists(
+ select 1 from public.stores where id=o.to_store_id and kind='filial' and active)
+ then raise exception 'Destino não é filial autorizada';end if;
+ if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items) not between 1 and 100 then raise exception 'Conferência inválida';end if;
+ for v in select value from jsonb_array_elements(p_items) loop
+  if coalesce(v->>'product_id','') !~ '^[0-9a-fA-F-]{36}$' or coalesce(v->>'quantity','') !~ '^(0|[1-9][0-9]{0,6})$'
+  then raise exception 'Item inválido';end if;
+  if (v->>'product_id')::uuid=any(seen) then raise exception 'SKU repetido';end if;
+  seen:=array_append(seen,(v->>'product_id')::uuid);
+ end loop;
+ if (select count(*) from public.store_order_items where order_id=p_order)<>array_length(seen,1)
+ then raise exception 'Conferência deve incluir todos os SKUs';end if;
+ for it in select * from public.store_order_items where order_id=p_order order by product_id loop
+  select (x->>'quantity')::integer into qty from jsonb_array_elements(p_items) x where (x->>'product_id')::uuid=it.product_id;
+  select (p.items->(it.product_id::text)->>'counted')::integer into v_shipped
+   from public.order_operational_progress p
+   where p.kind='loja' and p.order_id=p_order and p.stage='enviado';
+  v_effective:=coalesce(v_shipped,it.quantity);
+  if qty is null or qty>v_effective then raise exception 'Recebimento acima do que foi enviado para %',it.product_id;end if;
+  if qty<v_effective then
+    missing:=missing+v_effective-qty;
+    if length(btrim(coalesce(p_reason,''))) not between 5 and 250 then raise exception 'Justifique divergências de recebimento';end if;
+  end if;
+  insert into public.store_order_receipts(order_id,product_id,expected_quantity,received_quantity,reason,actor_id)
+   values(p_order,it.product_id,v_effective,qty,case when qty<v_effective then btrim(p_reason) end,auth.uid());
+  if qty>0 then
+   insert into public.store_stock(store_id,product_id,quantity) values(o.to_store_id,it.product_id,0) on conflict do nothing;
+   perform 1 from public.store_stock where store_id=o.to_store_id and product_id=it.product_id for update;
+   update public.store_stock set quantity=quantity+qty,updated_at=now() where store_id=o.to_store_id and product_id=it.product_id;
+   insert into public.store_transfer_log(order_id,store_id,product_id,delta,actor_id,operation)
+   values(p_order,o.to_store_id,it.product_id,qty,auth.uid(),'recebimento');
+  end if;
+ end loop;
+ update public.store_orders set status=case when missing>0 then 'recebido_divergente' else 'recebido' end,
+ received_by=auth.uid(),received_at=now() where id=p_order;
+ insert into public.audit_log(entity,entity_id,action,actor_id,details)
+ values('store_orders',p_order::text,'RECEIVED_CHECKED',auth.uid(),jsonb_build_object('missing_units',missing,'reason',p_reason));
+end;$function$
+;
