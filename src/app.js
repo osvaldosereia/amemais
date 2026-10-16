@@ -880,6 +880,21 @@ function refreshEventLotCounter(form){
  const submit=form.querySelector('button[type="submit"]');
  if(submit)submit.disabled=models<1||models>10||Boolean(form.__lotPicker?.invalid);
 }
+function operationalLocateSku(form,rawCode){
+ const order=unifiedOrderById(form?.dataset.kind,form?.dataset.order);
+ if(!order)return;
+ const code=String(rawCode||'').trim();
+ if(!code)return;
+ const matches=order.lines.filter(line=>line.ean===code||line.sku===code);
+ if(matches.length!==1)return toast(matches.length?'EAN/SKU ambíguo neste pedido.':'Produto não pertence ao pedido.',true);
+ const row=[...form.querySelectorAll('[data-op-line]')].find(el=>el.dataset.product===matches[0].id);
+ if(!row)return;
+ form.querySelectorAll('.op-line.is-selected').forEach(el=>el.classList.remove('is-selected'));
+ row.classList.add('is-selected');
+ row.scrollIntoView({behavior:'smooth',block:'center'});
+ row.querySelector('[data-op-qty]')?.focus({preventScroll:true});
+ toast('SKU localizado: '+(matches[0].modelTitle||matches[0].name)+'. Informe a quantidade encontrada.');
+}
 function operationalModal(kind,id,mode='separacao'){
  const order=unifiedOrderById(kind,id);
  if(!order||isFranchisePortal())return toast('Pedido indisponível.',true);
@@ -3722,6 +3737,10 @@ async function handleClick(event){
     });
     return;
   }
+  if(action==='order-op-camera')return scanEAN(code=>{
+    const form=document.querySelector('.modalback form[data-form="order-operational"]');
+    if(form)operationalLocateSku(form,code);
+  });
   if(action==='order-op-pick')return operationalModal(target.dataset.kind,id,'separacao');
   if(action==='order-op-check')return operationalModal(target.dataset.kind,id,'conferencia');
   if(action==='order-op-finish')return submitOperational(target.closest('form'),true);
@@ -4749,6 +4768,13 @@ document.addEventListener('click',event=>{
   handleClick(event).catch(fail);
 });
 document.addEventListener('keydown',event=>{
+  if(event.key==='Enter'&&event.target.matches('[data-op-barcode]')){
+    event.preventDefault();
+    const input=event.target,form=input.closest('form[data-form="order-operational"]');
+    operationalLocateSku(form,input.value);
+    input.value='';
+    return;
+  }
   if(event.key==='Enter'&&event.target.matches('[data-balance-scan-input]')){
     event.preventDefault();
     const input=event.target,panel=input.closest('[data-product-details]');
