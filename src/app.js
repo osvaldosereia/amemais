@@ -847,7 +847,7 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
  const groups=eventPickingRows(state.items,state.apparelModels,saved,
   id=>Math.max(0,free.get(id)||0));
  const canSeeAvailable=isManager();
- formModal((batch?'Editar lote #'+orderCode('evento',batch.id):'Novo lote')+' · '+e.name,
+ formModal((batch?'Editar pedido #'+orderCode('evento',batch.id):'Novo pedido')+' · '+e.name,
   eventLotForm(lotCatalogMarkup(groups,state.categories,state.apparelModels,{showAvailable:canSeeAvailable}),
    {edit:Boolean(batch),number:batch?.sequence,note:batch?.note||''}),
   'event-batch-write',batch?'Salvar nova revisão':'Enviar à separação');
@@ -874,11 +874,11 @@ function refreshEventLotCounter(form){
  })();
  const target=form.querySelector('[data-event-lot-counter]');
  if(target){
-  target.textContent=models+' de 10 modelos · '+total+' unidades selecionadas';
-  target.classList.toggle('is-over-limit',models>10);
+  target.textContent=models+' modelo(s) · '+total+' unidades selecionadas';
+  target.classList.remove('is-over-limit');
  }
  const submit=form.querySelector('button[type="submit"]');
- if(submit)submit.disabled=models<1||models>10||Boolean(form.__lotPicker?.invalid);
+ if(submit)submit.disabled=models<1||Boolean(form.__lotPicker?.invalid);
 }
 function operationalLocateSku(form,rawCode){
  const order=unifiedOrderById(form?.dataset.kind,form?.dataset.order);
@@ -1449,8 +1449,11 @@ function ordersPage(separationOnly=false){
   canEventBatch:canCreateContextLot,
   eventId:contextEvent?.id||'',
   canAvulso:!contextEvent&&!portal&&hasPermission('orders.internal'),
-  canStore:!contextEvent&&(hasPermission('orders.central')||hasPermission('orders.franchise')),
-  canLink:!contextEvent&&!portal&&hasPermission('catalog.manage')
+  canStore:hasPermission('orders.central')||hasPermission('orders.franchise'),
+  canEventBatch:!portal&&state.events.some(e=>['rascunho','ativo'].includes(e.status)&&
+    ((isManager()&&hasPermission('events.separate'))||
+     (hasPermission('events.request')&&Boolean(memberRole(e.id))))),
+  canLink:false
  });
 }
 function customerAccessLinkModal(label,url){
@@ -2708,7 +2711,31 @@ function categoryFranchiseMin(p){
  const chain=categoryChain(category).slice().reverse();
  return Number(chain.find(c=>c.franchise_min_qty!=null)?.franchise_min_qty||0);
 }
-function storeOrderModal(){
+function orderDestinationPicker(){
+ const context=state.ordersContext;
+ const storeDestinations=state.stores.filter(x=>x.active&&!x.is_primary&&assignedStore(x.id)&&
+   ((x.kind==='franquia'&&hasPermission('orders.franchise'))||
+    (x.kind==='filial'&&hasPermission('orders.central'))));
+ const eventDestinations=isFranchisePortal()?[]:state.events.filter(x=>
+   ['rascunho','ativo'].includes(x.status)&&
+   ((isManager()&&hasPermission('events.separate'))||
+    (hasPermission('events.request')&&Boolean(memberRole(x.id)))));
+ const options=[
+   ...storeDestinations.map(x=>['store:'+x.id,
+     (x.kind==='franquia'?'Franquia · ':'Loja própria · ')+x.name]),
+   ...eventDestinations.map(x=>['event:'+x.id,'Loja temporária · '+x.name])
+ ];
+ if(!options.length)return toast('Nenhuma unidade cadastrada disponível para pedido.',true);
+ const preferred=context?.type==='event'?'event:'+context.id:
+  context?.type==='store'?'store:'+context.id:'';
+ const selected=options.some(x=>x[0]===preferred)?preferred:options[0][0];
+ formModal('Novo pedido',
+   '<p class="help">Escolha a unidade que receberá os produtos do CD. Não há lotes: cada solicitação é um pedido independente.</p>'+
+   selectField('Unidade de destino','destination',options,selected)+
+   '<p class="help">Ao confirmar os itens, o sistema reserva automaticamente a quantidade integral de cada produto.</p>',
+   'unified-order-destination','Continuar');
+}
+function storeOrderModal(preselectId=''){
  const main=state.stores.find(x=>x.is_primary&&x.active);
  if(!main)return toast('Estoque central não cadastrado.',true);
  const targets=state.stores.filter(x=>x.active&&!x.is_primary&&assignedStore(x.id)&&
@@ -2723,7 +2750,7 @@ function storeOrderModal(){
   (categoryFranchiseMin(p)?'<small class="franchise-order-min">Mínimo franquia: '+categoryFranchiseMin(p)+' un. por tamanho/SKU</small>':'')+'</div>'+
   '<input type="number" inputmode="numeric" min="0" max="1000000" step="1" value="0" data-store-order-qty data-id="'+h(p.id)+'" aria-label="Quantidade de '+h(p.name)+'"></div>').join('');
  formModal('Montar solicitação de mercadorias','<div class="formgrid">'+
-  selectField('Unidade solicitante','to_store_id',targets.map(x=>[x.id,x.name]))+
+  selectField('Unidade de destino','to_store_id',targets.map(x=>[x.id,(x.kind==='franquia'?'Franquia · ':'Loja própria · ')+x.name]),preselectId)+
   '<div class="field wide"><span>Buscar por nome, SKU ou EAN</span><input type="search" data-store-order-search placeholder="Buscar produtos…"></div>'+
   '<section class="wide store-order-products">'+rows+'</section>'+
   textareaField('Observação (opcional)','note')+'</div><div class="note">O pedido reserva imediatamente as unidades livres. Faltas são registradas sem reduzir silenciosamente a quantidade solicitada. A saída física acontece após conferência.</div>',
@@ -3795,20 +3822,7 @@ async function handleClick(event){
       toast('EAN conferido: '+(counted+1)+' / '+max);
     });
   }
-  if(action==='unified-order-new'){
-    const contextEvent=state.ordersContext?.type==='event'?eventById(state.ordersContext.id):null;
-    if(contextEvent)return eventBatchModal(contextEvent.id);
-    const canAv=hasPermission('orders.internal')&&!isFranchisePortal();
-    const canStore=hasPermission('orders.central')||hasPermission('orders.franchise');
-    if(!canAv&&!canStore)return;
-    if(canAv&&canStore)return formModal('Criar pedido',
-      selectField('Para quem é o pedido?','kind',[
-       ['avulso','Cliente · pedido avulso'],['loja','Loja própria ou franquia']
-      ])+'<p class="help">Para abastecer uma loja temporária, abra a loja em Lojas e use Montar lote.</p>',
-      'unified-order-type','Continuar');
-    if(canAv)return openAvulsoOrderModal();
-    return storeOrderModal();
-  }
+  if(action==='unified-order-new')return orderDestinationPicker();
   if(action==='order-new')return openAvulsoOrderModal();
   if(action==='order-assign-event'){
     if(!hasPermission('orders.assign'))return;return orderEventModal(id);
@@ -4335,10 +4349,11 @@ async function handleSubmit(event){
     closeTopModal();stockModal(id);
     return;
   }
-  if(type==='unified-order-type'){
-    if(values.kind==='avulso')return openAvulsoOrderModal();
-    if(values.kind==='loja')return storeOrderModal();
-    return toast('Escolha um tipo de pedido.',true);
+  if(type==='unified-order-destination'){
+    const destination=String(values.destination||'');
+    if(destination.startsWith('store:'))return storeOrderModal(destination.slice(6));
+    if(destination.startsWith('event:'))return eventBatchModal(destination.slice(6));
+    return toast('Escolha uma unidade cadastrada.',true);
   }
   if(type==='order-create'){
     if(!hasPermission('orders.internal'))return;
@@ -4380,18 +4395,18 @@ async function handleSubmit(event){
       (!batchId&&hasPermission('events.request')&&Boolean(memberRole(eid)))))return;
     let items;try{items=collectEventPlan(form);}catch(error){return toast(error.message,true);}
     const models=selectedEventModels(items,state.items);
-    if(!items.length||models>10)return toast('Selecione entre 1 e 10 modelos diferentes por lote. Variações não contam como modelos adicionais.',true);
+    if(!items.length)return toast('Selecione ao menos um produto para o pedido.',true);
     const note=String(values.note||'').trim();
     if(note.length>180)return toast('Observação longa demais.',true);
     if(batchId){
-      if(!window.confirm('Revisar lote? Quantidades já conferidas serão zeradas para uma nova separação.'))return;
+      if(!window.confirm('Editar pedido? A separação e a conferência anteriores precisarão ser refeitas.'))return;
       return exec(async()=>assertOk(await db.rpc('revise_event_pick_batch',{
         p_batch:batchId,p_items:items,p_note:note||null
-      })),'Lote revisado e reservas recalculadas. A separação precisará ser conferida novamente.');
+      })),'Pedido alterado. A separação e conferência deverão ser feitas novamente.');
     }
     return exec(async()=>assertOk(await db.rpc('create_event_pick_batch',{
       p_event:eid,p_items:items,p_note:note||null
-    })),'Lote criado! Aparecerá em Pedidos, com reserva automática.');
+    })),'Pedido criado e reservado integralmente. Ele aparecerá na fila de Pedidos.');
   }
   if(type==='event-batch-picking')return saveEventBatchPicking(form,false);
   if(type==='event-batch-cancel'){
@@ -4630,7 +4645,7 @@ async function handleSubmit(event){
       return toast('Informe quantidades válidas.',true);
     const items=lines.filter(x=>x.quantity>0);
     if(!items.length)return toast('Selecione ao menos um produto.',true);
-    if(items.length>100)return toast('Limite de 100 produtos por pedido.',true);
+    if(items.length>5000)return toast('Pedido excede o limite técnico de segurança de 5.000 SKUs.',true);
     const target=state.stores.find(x=>x.id===values.to_store_id);
     if(!target||!target.active||!assignedStore(target.id)||
       (target.kind==='franquia'&&!hasPermission('orders.franchise'))||
