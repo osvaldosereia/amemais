@@ -6,6 +6,7 @@ const uo=await readFile(new URL('../src/unified-orders.js',import.meta.url),'utf
 const app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
 const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
 const sql=await readFile(new URL('../supabase/migrations/20261015_final_hybrid_barcode_verification.sql',import.meta.url),'utf8');
+const verificationCss=await readFile(new URL('../final-verification.css',import.meta.url),'utf8');
 const ui=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const mod=await import('data:text/javascript;base64,'+Buffer.from(uo).toString('base64'));
 const order={kind:'evento',id:'order-1',code:'AA003',status:'separado',adjustments:[],lines:[
@@ -67,4 +68,45 @@ test('login e código de barras são integrados à interface, com CSS versionado
  assert.match(app,/event\.target\.matches\('\[data-verify-scan\]'\)/);
  assert.match(app,/verificationCanDispatch\(o,state\.orderVerificationRows\)/);
  assert.match(html,/final-verification\.css\?v=20261015finalverify1/);
+});
+
+
+test('divergência salva mostra botão Corrigir quantidade com SKU persistido',()=>{
+ const diverged=[{kind:'evento',order_id:'order-1',product_id:'p1',
+  counted_quantity:5,expected_quantity:10,scanned_code:'000100005073'}];
+ const html=ui.finalVerificationMarkup(order,diverged);
+ assert.match(html,/Divergência/);
+ assert.match(html,/5 \/ 10 un\./);
+ assert.match(html,/data-action="verify-edit-item" data-id="p1"/);
+ assert.match(html,/Corrigir quantidade/);
+ assert.equal((html.match(/data-action="verify-edit-item"/g)||[]).length,1);
+ const corrected=[{...diverged[0],counted_quantity:10},
+  {kind:'evento',order_id:'order-1',product_id:'p2',counted_quantity:1,expected_quantity:1}];
+ assert.equal(ui.verificationCanDispatch(order,corrected),true);
+ assert.match(ui.finalVerificationMarkup(order,corrected),/Recontar/);
+});
+test('correção sem EAN previamente confirmado não autoriza atalho manual',()=>{
+ const oldRecord=[{kind:'evento',order_id:'order-1',product_id:'p1',
+  counted_quantity:5,expected_quantity:10}];
+ assert.doesNotMatch(ui.finalVerificationMarkup(order,oldRecord),
+  /data-action="verify-edit-item"/);
+});
+test('ao corrigir, reutiliza código auditado, carrega contagem anterior e sobrescreve no RPC',()=>{
+ assert.match(app,/function verificationEditItem\(form,productId\)/);
+ assert.match(app,/stored\.scanned_code/);
+ assert.match(app,/findVerificationProduct\(order,stored\.scanned_code\)/);
+ assert.match(app,/verificationSelectLine\(form,line,stored\.scanned_code,line\.actual\)/);
+ assert.match(app,/input\.value=previousCount===null\?'':String\(previousCount\)/);
+ assert.match(app,/if\(action==='verify-edit-item'\)/);
+ assert.match(app,/p_scanned_code:item\.scannedCode,p_counted:qty/);
+ assert.match(app,/select\('kind,order_id,product_id,expected_quantity,counted_quantity,scanned_code,verified_by,verified_at'\)/);
+ assert.match(sql,/ON CONFLICT\(kind,order_id,product_id\) DO UPDATE/);
+ assert.match(sql,/counted_quantity=excluded\.counted_quantity/);
+ assert.match(sql,/verified_at=excluded\.verified_at/);
+ assert.match(sql,/FINAL_COUNT_RECORDED/);
+});
+test('mobile: botão de corrigir permanece tocável e painel de edição se expande',()=>{
+ assert.match(verificationCss,/verify-edit-button/);
+ assert.match(verificationCss,/min-height:44px/);
+ assert.match(verificationCss,/verify-selected-help/);
 });
