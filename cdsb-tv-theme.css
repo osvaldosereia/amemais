@@ -32,3 +32,15 @@ html,body{background:#f3f5f8;color:#19344f}
  .tv-one-logo{width:123px;min-width:123px;height:40px}
  .tv-one-logo img{width:100%;height:auto;max-height:40px}
 }
+
+/* TV 360°: pedidos de compra recentes, com chegada e atrasos. */
+.tv-one-card .tv-buy-recent,.tv-one-grid .tv-buy-recent{display:flex;flex-direction:column;gap:5px;min-height:0;overflow:hidden}
+.tv-buy-recent-row{display:grid;grid-template-columns:64px minmax(0,1fr) minmax(105px,35%);
+ gap:7px;align-items:center;border-bottom:1px solid #dde5f0;padding:7px 2px;color:#102d50}
+.tv-buy-recent-row:last-child{border:0}
+.tv-buy-recent-row>b{font-size:clamp(.72rem,.86vw,1rem);white-space:nowrap}
+.tv-buy-recent-row>span{font-weight:700;font-size:clamp(.68rem,.78vw,.92rem);min-width:0;overflow:hidden;
+ text-overflow:ellipsis;white-space:nowrap}
+.tv-buy-recent-row strong{font-size:clamp(.62rem,.7vw,.82rem);font-weight:700;text-align:right}
+.tv-buy-recent-row small{display:block;font-weight:400;color:#65768b;padding-top:3px;font-size:.9em}
+.tv-buy-recent-row.is-late>strong{color:#a23836}
