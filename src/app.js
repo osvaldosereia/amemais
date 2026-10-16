@@ -24,6 +24,9 @@ import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,fin
 import {pickingThermalHTML} from './thermal-picking.js?v=20261016dest1';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261016stores1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261016dest1';
+import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCartAction,
+ setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
+ confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261016cart1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage} from './cdsb-purchases.js?v=20261015buy1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
@@ -858,6 +861,8 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
  if(form){
   form.dataset.event=e.id;form.dataset.batch=batch?.id||'';
   form.closest('.modal')?.classList.add('lot-catalog-modal');
+  form.dataset.orderDestination=e.name;
+  if(!batch){const submit=form.querySelector('.modalfooter button[type="submit"]');if(submit)submit.textContent='Revisar pedido';}
   mountLotCatalog(form,{groups,categories:state.categories,models:state.apparelModels,
     showAvailable:canSeeAvailable,onRender:()=>{hydrateImages();}});
   refreshEventLotCounter(form);
@@ -2767,20 +2772,24 @@ function storeOrderModal(preselectId=''){
   ((x.kind==='franquia'&&hasPermission('orders.franchise'))||
    (x.kind==='filial'&&hasPermission('orders.central'))));
  if(!targets.length)return toast('Não há unidade habilitada para solicitar mercadorias.',true);
- const portal=isFranchisePortal();
- const rows=state.items.filter(p=>p.active).map(p=>
-  '<div class="store-order-product" data-store-row data-filter="'+h([p.name,p.ean,p.sku,p.apparel_color,p.apparel_size].join(' ').toLocaleLowerCase('pt-BR'))+'">'+
-  '<div><strong>'+h(p.name)+'</strong><small>'+h([p.apparel_color,p.apparel_size,p.sku,p.ean].filter(Boolean).join(' · '))+
-  (portal?'':' · Livre na central: '+qtyAvailable(p.id)+' un.')+'</small>'+ 
-  (categoryFranchiseMin(p)?'<small class="franchise-order-min">Mínimo franquia: '+categoryFranchiseMin(p)+' un. por tamanho/SKU</small>':'')+'</div>'+
-  '<input type="number" inputmode="numeric" min="0" max="1000000" step="1" value="0" data-store-order-qty data-id="'+h(p.id)+'" aria-label="Quantidade de '+h(p.name)+'"></div>').join('');
- formModal('Montar solicitação de mercadorias','<div class="formgrid">'+
-  selectField('Unidade de destino','to_store_id',targets.map(x=>[x.id,(x.kind==='franquia'?'Franquia · ':'Loja própria · ')+x.name]),preselectId)+
-  '<div class="field wide"><span>Buscar por nome, SKU ou EAN</span><input type="search" data-store-order-search placeholder="Buscar produtos…"></div>'+
-  '<section class="wide store-order-products">'+rows+'</section>'+
-  textareaField('Observação (opcional)','note')+'</div><div class="note">O pedido reserva imediatamente as unidades livres. Faltas são registradas sem reduzir silenciosamente a quantidade solicitada. A saída física acontece após conferência.</div>',
-  'store-order-create','Enviar solicitação');
+ if(!preselectId&&!isFranchisePortal())return orderDestinationPicker();
+ const target=targets.find(x=>x.id===preselectId)||(!preselectId?targets[0]:null);
+ if(!target)return toast('Unidade de destino indisponível ou não autorizada.',true);
+ const destination=(target.kind==='franquia'?'Franquia · ':'Loja própria · ')+target.name;
+ const groups=makeOrderCatalog(state.items,state.apparelModels,
+  p=>qtyAvailable(p.id),
+  p=>target.kind==='franquia'?categoryFranchiseMin(p):0);
+ formModal('Montar pedido · '+target.name,
+   '<input type="hidden" name="to_store_id" value="'+h(target.id)+'">'+
+   orderCartMarkup(groups,{destination})+
+   '<div class="order-cart-note">'+textareaField('Observação (opcional)','note')+'</div>'+
+   '<p class="order-cart-guidance">A reserva só será feita após revisar e confirmar o pedido. A saída física ocorre depois da conferência.</p>',
+   'store-order-create','Revisar pedido');
+ const form=document.querySelector('.modalback form[data-form="store-order-create"]');
+ if(!form)return;
+ mountOrderCart(form,{groups,destination,onRender:hydrateImages});
 }
+
 function storeModal(item=null){
  if(!hasPermission('stores.manage'))return;
  formModal(item?'Editar loja':'Nova loja','<div class="formgrid">'+
@@ -3020,6 +3029,13 @@ async function scanInto(selector, scope=document){
 async function handleClick(event){
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id,view,user,event:eventId,target:scanTarget}=target.dataset;
+  if(action==='order-cart-edit'){
+   const form=target.closest('form');if(form)editOrderReview(form);return;
+  }
+  if(action.startsWith('order-cart-')){
+   const form=target.closest('form[data-form="store-order-create"]');
+   if(form&&orderCartAction(form,target))return;
+  }
   if(action==='view'){closeMobileNavigation(false);switchView(view);return;}
   if(action==='open-tv'){
     if(!state.profile?.active||!['admin','gerente'].includes(state.profile.role))
@@ -4473,6 +4489,8 @@ async function handleSubmit(event){
         p_batch:batchId,p_items:items,p_note:note||null
       })),'Pedido alterado. A separação e conferência deverão ser feitas novamente.');
     }
+    if(!confirmEventOrderReview(form,{items,note,destination:form.dataset.orderDestination||eventById(eid)?.name||'Loja temporária',
+     products:state.items}))return;
     return exec(async()=>assertOk(await db.rpc('create_event_pick_batch',{
       p_event:eid,p_items:items,p_note:note||null
     })),'Pedido criado e reservado integralmente. Ele aparecerá na fila de Pedidos.');
@@ -4708,13 +4726,7 @@ async function handleSubmit(event){
   }
   if(type==='store-order-create'){
     if(!canUseStoreOrders())return;
-    const lines=[...form.querySelectorAll('[data-store-order-qty]')].map(el=>({
-      product_id:el.dataset.id,quantity:Number(el.value||0)}));
-    if(lines.some(x=>!Number.isInteger(x.quantity)||x.quantity<0||x.quantity>1000000))
-      return toast('Informe quantidades válidas.',true);
-    const items=lines.filter(x=>x.quantity>0);
-    if(!items.length)return toast('Selecione ao menos um produto.',true);
-    if(items.length>5000)return toast('Pedido excede o limite técnico de segurança de 5.000 SKUs.',true);
+    let items;try{items=collectOrderCartItems(form);}catch(error){return toast(error.message,true);}
     const target=state.stores.find(x=>x.id===values.to_store_id);
     if(!target||!target.active||!assignedStore(target.id)||
       (target.kind==='franquia'&&!hasPermission('orders.franchise'))||
@@ -4724,6 +4736,8 @@ async function handleSubmit(event){
      if(invalid){const prod=product(invalid.product_id);
       return toast('Mínimo para '+(prod?.name||'produto')+' · '+(prod?.apparel_size||'Único')+': '+categoryFranchiseMin(prod)+' unidades por SKU.',true);}
     }
+    if(!confirmOrderCartReview(form,{items,note:String(values.note||''),
+       destination:(target.kind==='franquia'?'Franquia · ':'Loja própria · ')+target.name}))return;
     const main=state.stores.find(x=>x.is_primary);
     await exec(async()=>assertOk(await db.rpc('create_store_order',{
       p_from_store:main.id,p_to_store:values.to_store_id,
@@ -4854,6 +4868,14 @@ document.addEventListener('click',event=>{
   handleClick(event).catch(fail);
 });
 document.addEventListener('keydown',event=>{
+  if(event.key==='Enter'&&event.target.matches('[data-order-cart-search]')){
+   event.preventDefault();
+   const form=event.target.closest('form[data-form="store-order-create"]');
+   const code=event.target.value.trim();
+   if(code&&!orderCartSearchKey(form,code)&&/^[0-9]{8,14}$/.test(code))
+     toast('Código não corresponde a um SKU/EAN único no catálogo.',true);
+   return;
+  }
   if(event.key==='Enter'&&event.target.matches('[data-op-barcode]')){
     event.preventDefault();
     const input=event.target,form=input.closest('form[data-form="order-operational"]');
@@ -4903,6 +4925,18 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-order-cart-search]')){
+   const form=event.target.closest('form[data-form="store-order-create"]');
+   renderOrderCart(form,{resetPage:true});
+   return;
+  }
+  if(event.target.matches('[data-order-cart-qty]')){
+   const form=event.target.closest('form[data-form="store-order-create"]');
+   if(!setOrderCartQuantity(form,event.target.dataset.id,event.target.value))
+    event.target.setCustomValidity('Quantidade inválida (0 a 1.000.000).');
+   else event.target.setCustomValidity('');
+   return;
+  }
   if(event.target.matches('[data-store-hub-search]')){
    state.storeHubFilter.search=event.target.value;
    filterStoreHub(event.target.closest('.sh-hub'),state.storeHubFilter.search,
