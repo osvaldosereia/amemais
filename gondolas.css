@@ -1,0 +1,21 @@
+/* Gôndolas cadastradas no CDSB */
+.gondolas-page{display:flex;flex-direction:column;gap:20px;min-width:0}
+.gondolas-page .pagehead{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
+.gondolas-page .pagehead h1{margin:0;color:#112f51}
+.gondolas-page .pagehead p{margin:6px 0 0;color:#627c91}
+.gondolas-list{border:1px solid #dce5ee;border-radius:14px;background:#fff;overflow:hidden}
+.gondolas-list .panelhead{display:flex;justify-content:space-between;align-items:center;padding:15px 18px;border-bottom:1px solid #e5ecf2}
+.gondolas-list .panelhead h2{font-size:1.05rem;color:#112f51;margin:0}
+.gondolas-list .panelhead span{color:#718698;font-size:.76rem}
+.gondola-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:13px 17px;border-bottom:1px solid #e8edf2}
+.gondola-row:last-child{border-bottom:0}
+.gondola-row>div:first-child{display:flex;flex-direction:column;gap:5px;min-width:0}
+.gondola-row strong{color:#102e50;font-size:.91rem}
+.gondola-row small{color:#73879b;font-size:.74rem}
+.gondola-row .actions{display:flex;gap:7px;flex-wrap:wrap}
+.gondola-select-field select{width:100%;min-height:44px}
+.gondola-select-field small{font-size:.72rem;color:#718297;margin-top:4px}
+.card-balance-edit-variant{min-height:36px;font-size:.72rem;white-space:normal!important}
+.product-card-delete-whole{background:#fff7f6!important;color:#a23535!important;border:1px solid #ecc8c8!important}
+.product-card-delete-whole:hover{background:#ffebea!important}
+@media(max-width:650px){.gondola-row .actions{width:100%}.gondola-row .actions .button{min-height:44px;flex:1}.card-balance-edit-variant{width:100%}}

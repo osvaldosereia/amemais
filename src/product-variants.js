@@ -1,4 +1,16 @@
 import {makeVariationCards,makeVariationChips,resolveCategoryVariations} from './category-variations.js?v=20261015categorymetadata2';
+// Espelho local do seletor: módulos de catálogo devem permanecer independentes de DOM/imports.
+const productSizeGondolaSelectHTML=(name,locations=[],current='',opts={})=>{
+ const esc=v=>String(v??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[x]));
+ const selected=String(current||'');
+ const list=(locations||[]).filter(x=>x.active||x.name===selected).slice();
+ if(selected&&!list.some(x=>x.name===selected))list.push({name:selected,active:false});
+ list.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR',{numeric:true}));
+ return '<label class="field"><span>'+esc(opts.label||'Gôndola')+'</span><select name="'+esc(name)+'"'+(opts.disabled?' disabled':'')+'>'+
+ '<option value=""'+(!selected?' selected':'')+'>Sem gôndola definida</option>'+
+ list.map(x=>'<option value="'+esc(x.name)+'"'+(x.name===selected?' selected':'')+'>'+esc(x.name)+(x.active?'':' (antiga)')+'</option>').join('')+
+ '</select></label>';
+};
 // Cadastro único de produtos: variações de roupas sem outra seção de navegação.
 export const STANDARD_SIZES=['P','M','G','GG','XGG','XXGG','EXGG'];
 const safe=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -10,6 +22,8 @@ function sizeCard(size){
     '<label class="field"><span>Código interno (SKU)</span><input name="size_sku" maxlength="80" disabled autocomplete="off" placeholder="Gerado automaticamente se vazio"></label>'+
     '<label class="field"><span>EAN (se houver)</span><div class="inline apparel-ean"><input name="size_ean" maxlength="14" inputmode="numeric" disabled placeholder="Código de barras">'+
     '<button class="button small" type="button" data-action="size-scan" aria-label="Ler EAN do tamanho '+size+'">📷</button></div></label>'+
+    productSizeGondolaSelectHTML('size_gondola',[], '', {label:'Gôndola deste tamanho',disabled:true})+
+    '<label class="field"><span>Prateleira deste tamanho (opcional)</span><input name="size_prateleira" maxlength="40" disabled placeholder="Ex.: B"></label>'+
     '<label class="field"><span>Estoque inicial *</span><input name="size_qty" type="number" step="1" min="0" max="1000000" value="0" disabled required inputmode="numeric"></label>'+
     '</div></div>';
 }
@@ -40,7 +54,7 @@ export function setSizesMode(form,checked){
     .forEach(input=>input.disabled=!checked);
   for(const row of panel.querySelectorAll('[data-size-variant]')){
     const enabled=checked&&!row.hidden;
-    row.querySelectorAll('input').forEach(input=>input.disabled=!enabled);
+    row.querySelectorAll('input,select').forEach(input=>input.disabled=!enabled);
   }
   const single=form.querySelector('[data-single-fields]');
   if(single){
@@ -59,7 +73,7 @@ export function setSizeSelected(form,size,enabled){
   row.hidden=!enabled;
   chip.classList.toggle('selected',enabled);
   chip.setAttribute('aria-pressed',String(enabled));
-  row.querySelectorAll('input').forEach(input=>input.disabled=!enabled);
+  row.querySelectorAll('input,select').forEach(input=>input.disabled=!enabled);
 
 }
 export function collectSizeVariants(form){
@@ -80,9 +94,11 @@ export function collectSizeVariants(form){
       throw new Error('O EAN "'+ean+'" foi repetido em dois tamanhos. Cada código deve identificar apenas uma variação.');
     if(ean)usedEans.add(ean);
     if(ean&&!/^[0-9]{8,14}$/.test(ean))throw new Error('EAN inválido no tamanho '+size+'.');
+    const gondola=get('size_gondola'),prateleira=get('size_prateleira');
+    if(gondola.length>40||prateleira.length>40)throw new Error('Gôndola ou prateleira inválida no tamanho '+size+'.');
     if(text===''||!Number.isInteger(quantity)||quantity<0||quantity>1000000)
       throw new Error('Estoque inválido no tamanho '+size+'.');
-    return {size,color,sku,ean:ean||null,quantity};
+    return {size,color,sku,ean:ean||null,gondola,prateleira,quantity};
   });
 }
 export async function saveSizedProduct(form,{db,assertOk,state,categoryChain,chosenCategory,productTagValues,closeTopModal,loadData,toast,saveGallery,saveProcurement}){
