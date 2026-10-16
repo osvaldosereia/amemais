@@ -159,15 +159,15 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
  else if(canReceive&&o.kind==='loja'&&o.status==='despachado')
   primary.push(button('Conferir recebimento','store-order-receive',data,'small primary'));
  if(event&&canCancel&&!terminal){
-  management.push(button('Editar lote','event-batch-edit',data,'small'));
-  management.push(button('Cancelar lote','event-batch-cancel',data,'small danger'));
+  management.push(button('Editar pedido','event-batch-edit',data,'small'));
+  management.push(button('Cancelar pedido','event-batch-cancel',data,'small danger'));
  }else if(!event&&canCancel&&['legado','solicitado','pendente_estoque','aprovado','reservado','separado'].includes(o.status)){
   management.push(button('Cancelar pedido',o.kind==='avulso'?'avulso-cancel':'store-order-cancel',data,'small danger'));
  }
  if(canDelete&&!portal)management.push(button('Excluir pedido','admin-order-delete-open',data,'small danger'));
  if(!portal&&o.lines.length&&!waiting&&!['legado','solicitado','cancelado','expirado'].includes(o.status))
   secondary.push(button('Imprimir separação','order-print-thermal',data,'small'));
- const originLabel=event?'Loja temporária · Lote '+String(o.sequence||1).padStart(2,'0'):
+ const originLabel=event?'Loja temporária · Pedido '+String(o.sequence||1).padStart(2,'0'):
   o.kind==='avulso'?(o.raw.source==='cliente'?'Cliente catálogo':
    o.raw.source==='compartilhado'?'Cliente link':'Pedido avulso'):
    o.destinationKind==='franquia'?'Franquia':'Loja / filial';
@@ -219,7 +219,7 @@ export function unifiedOrderCard(o,{button=()=>'',canProcess=false,canCancel=fal
    (o.destinationKind|| (event?'evento':o.kind==='avulso'?'avulso':'loja'))+
    '" data-order-verified="'+(o.workflow?.stage==='expedicao'?'true':'false')+'" data-order-stage="'+esc(o.workflow?.stage||'')+'" data-order-issue="'+hasOccurrence+'">'+
   '<header><div class="uo-head"><small>'+esc(originLabel)+' · '+esc(time(o.created_at))+'</small>'+
-   '<h3>'+(event?'Lote #':'Pedido #')+esc(o.code||'—')+'</h3>'+
+   '<h3>'+'Pedido #'+esc(o.code||'—')+'</h3>'+
    '<strong>'+esc(o.target)+'</strong></div>'+
    '<span class="uo-pill '+info[1]+'">'+esc(info[0])+'</span></header>'+
   '<div class="uo-metrics"><span>'+n(o.total)+' unidades · '+groups.length+' modelo(s) · '+o.lines.length+' SKU(s)</span>'+
@@ -285,15 +285,12 @@ export function unifiedOrdersPage(orders,{
   canDispatch:canDispatch(o),canDispatchStock:canDispatchStock(o),
   canVerify:canVerify(o),isVerified:isVerified(o),canAdjust:canAdjust(o),hasIssue:hasIssue(o)})).join('');
  const actions=!separationOnly?
-   (eventId
-     ? (canEventBatch?button('+ Montar lote para esta loja','event-batch-new','data-event="'+esc(eventId)+'"','primary'):'')
-     : (((canAvulso||canStore)?button(portal?'+ Montar pedido':'+ Novo pedido','unified-order-new','','primary'):'')+
-       (canLink?button('+ Link para cliente','customer-link-new','','small'):''))):'';
+   ((canStore||canEventBatch)?button('+ Novo pedido','unified-order-new','','primary'):''):'';
  return '<section class="uo-page">'+
   '<div class="pagehead"><div><h1>'+(separationOnly?'Separação':'Pedidos')+'</h1>'+
-   '<p>'+(eventId?'Abastecimento desta loja temporária. Cada lote segue para separação no CDSB.':
-   separationOnly?'Fila dos separadores · pedidos e lotes de lojas temporárias.':
-    'Todos os pedidos e remessas de lojas temporárias em uma fila única.')+'</p></div>'+
+   '<p>'+(eventId?'Pedidos desta loja temporária seguem diretamente para separação no CD.':
+   separationOnly?'Fila de separação de todos os pedidos.':
+    'Pedidos de lojas próprias, franquias e lojas temporárias em uma fila única.')+'</p></div>'+
    '<div class="actions">'+actions+'</div></div>'+
   '<div class="uo-summary" aria-label="Andamento dos pedidos">'+
    '<div><small>A separar</small><strong>'+toPick+'</strong></div>'+
@@ -322,7 +319,7 @@ export function unifiedOrdersPage(orders,{
    (destinationTypes.has('avulso')?'<option value="avulso">Pedido avulso</option>':'')+
    '</select></label></div>'+
   '<div class="uo-list">'+(visible.length?cards:
-    '<p class="uo-no-work">Nenhum pedido ou lote aguardando separação.</p>')+'</div>'+
+    '<p class="uo-no-work">Nenhum pedido ou pedido aguardando separação.</p>')+'</div>'+
   '<p class="uo-empty-filter" data-unified-empty hidden>Nenhum item encontrado com estes filtros.</p>'+
   (!separationOnly&&!portal&&!eventId&&canLink?'<details class="uo-customer-links"><summary>Links de acesso para clientes'+
    (summaryLink?' · '+esc(summaryLink):'')+'</summary>'+linksMarkup+'</details>':'')+
@@ -409,7 +406,7 @@ export function pickingA4HTML(order,{printedAt='',brand='AME+ STORE',photoUrls={
    '<td class="write"></td><td class="center check"></td></tr>').join('')+
   '</tbody></table></div></section>').join('');
  const name=order.kind==='evento'?'LOTE DE EVENTO':'PEDIDO';
- const code=order.kind==='evento'?'Lote '+String(order.sequence||'').padStart(2,'0'):'Pedido';
+ const code=order.kind==='evento'?'Pedido '+String(order.sequence||'').padStart(2,'0'):'Pedido';
  const reserve=order.reserved>0?' · Reservado: '+n(order.reserved):'';
  const shortage=order.missing>0?' · Faltando: '+n(order.missing):'';
  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'+
