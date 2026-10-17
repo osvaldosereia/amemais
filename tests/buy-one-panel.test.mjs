@@ -5,7 +5,7 @@ const read=p=>readFile(new URL('../'+p,import.meta.url),'utf8');
 const source=await read('src/cdsb-purchases.js');
 const app=await read('src/app.js');
 const css=await read('buy-one-panel.css');
-const migration=await read('supabase/migrations/20261017174500_purchase_drafts_supplier_minimum.sql');
+const migration=await read('supabase/migrations/20261017175111_purchase_drafts_supplier_minimum_20261017.sql');
 const {purchasesPage,purchasingGroups}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const products=['P','M','G'].map((name,i)=>({id:'p'+i,name:'CAMISETA',
  apparel_model_id:'model1',apparel_size:name,sku:'SKU-'+name,min_stock:5,
