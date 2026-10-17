@@ -1615,6 +1615,19 @@ function supplierFormModal(supplier=null){
  if(form)form.dataset.id=supplier?.id||'';
 }
 
+function procurementTaskModal(){
+ if(!hasPermission('purchases.manage'))return;
+ const assignees=state.users.filter(u=>u.active&&!u.archived_at);
+ formModal('Nova tarefa de acompanhamento',
+  '<p class="help">A tarefa aparece no painel do responsável e na seção Compras. Nenhuma mensagem externa será enviada.</p>'+
+  '<div class="formgrid">'+
+   field('Tarefa','title','text','','required minlength="3" maxlength="160"')+
+   selectField('Fornecedor','supplier_id',[['','Sem fornecedor'],...state.suppliers.filter(s=>s.active).map(s=>[s.id,s.name])],'')+
+   selectField('Responsável','assigned_to',[['','Sem responsável'],...assignees.map(u=>[u.id,u.full_name])],state.user?.id||'')+
+   field('Prazo','due_date','date','','')+
+   textareaField('Instruções','description','')+
+  '</div>','buy-task-create','Criar tarefa');
+}
 function savePurchaseCart(){
  state.purchaseCart=cleanPurchaseCart(state.purchaseCart,state.items);
  try{sessionStorage.setItem('cdsb-purchase-cart:'+state.user.id,serializePurchaseCart(state.purchaseCart));}
@@ -4306,7 +4319,17 @@ async function handleClick(event){
    if(!isAdmin())return;
    state.usersAdminArchived=!state.usersAdminArchived;render();return;
   }
-  if(action==='user-edit')return userEditModal(id);
+  if(action==='buy-task-new')return procurementTaskModal();
+   if(action==='buy-task-status'){
+    const task=state.procurementTasks.find(t=>t.id===id);
+    const next=target.dataset.status;
+    if(!task||!['pendente','em_andamento','concluida','cancelada'].includes(next))return;
+    if(!hasPermission('purchases.manage')&&task.assigned_to!==state.user?.id)return;
+    return exec(async()=>assertOk(await db.rpc('set_procurement_task_status',{
+      p_id:id,p_status:next
+    })),'Tarefa atualizada.');
+   }
+   if(action==='user-edit')return userEditModal(id);
   if(action==='user-delete'){
    if(!isAdmin()||id===state.user?.id)return;
    const u=state.users.find(x=>x.id===id);
@@ -4443,6 +4466,19 @@ async function handleSubmit(event){
      db.from('gondolas').insert({name}).select('id').single();
     assertOk(await record);
    },'Gôndola salva e disponível no cadastro.');
+  }
+  if(type==='buy-task-create'){
+   if(!hasPermission('purchases.manage'))return;
+   let draft;
+   try{draft=procurementTaskDraft(values);}
+   catch(error){return toast(error.message,true);}
+   if(draft.supplier_id&&!state.suppliers.some(s=>s.id===draft.supplier_id&&s.active))
+    return toast('Fornecedor inativo ou não encontrado.',true);
+   if(draft.assigned_to&&!state.users.some(u=>u.id===draft.assigned_to&&u.active&&!u.archived_at))
+    return toast('Responsável inválido.',true);
+   return exec(async()=>assertOk(await db.from('procurement_tasks').insert({
+    ...draft,created_by:state.user?.id
+   })),'Tarefa criada e disponibilizada ao responsável.');
   }
   if(type==='buy-suppliers-list'){closeTopModal();return;}
   if(type==='buy-supplier-save'){
