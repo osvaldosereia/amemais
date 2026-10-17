@@ -236,7 +236,7 @@ async function loadData(){
   if(hasPermission('purchases.manage')){
    resources.push(['purchaseOrders',db.from('purchase_orders').select('*').order('created_at',{ascending:false}).limit(600)]);
    resources.push(['purchaseItems',db.from('purchase_order_items').select('*').limit(12000)]);
-    resources.push(['procurementTasks',db.from('procurement_tasks').select('*').order('due_date',{ascending:true}).limit(1000)]);
+
   }
   if(!isFranchisePortal()&&(hasPermission('orders.separate')||hasPermission('events.separate')||hasPermission('events.read')||hasPermission('events.manage'))){
     resources.push(['eventPickBatches',db.from('event_pick_batches').select('*').order('created_at',{ascending:false}).limit(2000)]);
@@ -272,6 +272,7 @@ async function loadData(){
   }
   resources.push(['ownPermissions',db.rpc('my_permissions').then(r=>({data:(r.data||[]).map(x=>x.permission),error:r.error}))]);
   resources.push(['staffStores',db.from('staff_stores').select('*').limit(5000)]);
+  resources.push(['procurementTasks',db.from('procurement_tasks').select('*').order('due_date',{ascending:true}).limit(1000)]);
   if(isAdmin()){
     resources.push(['userPermissions',db.from('staff_permissions').select('*').limit(5000)]);
     resources.push(['staffContactDetails',db.from('staff_contact_details').select('*').limit(1000)]);
@@ -565,7 +566,8 @@ function pageContent(){
   if(state.view==='lojas')return storesPage();
   if(state.view==='lojas-admin')return storesAdminPage();
   if(state.view==='pedidos-lojas')return ordersPage();
-  return dashboard();
+  return dashboard()+(state.procurementTasks.some(t=>t.assigned_to===state.user?.id&&['pendente','em_andamento'].includes(t.status))?
+   procurementTasksHTML(state.procurementTasks.filter(t=>t.assigned_to===state.user?.id),state.suppliers,state.users,button,false):'');
 }
 function permanentPage(){
  const units=state.stores.filter(s=>!s.is_primary&&assignedStore(s.id)&&s.kind==='franquia'&&s.active);
