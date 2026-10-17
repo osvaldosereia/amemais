@@ -3334,7 +3334,9 @@ function userModal(){
     field('Telefone / WhatsApp','phone','text','','maxlength="60"')+
     field('Cargo','job_title','text','','maxlength="120"')+
     field('Setor','department','text','','maxlength="120"')+
-    selectField('Função','role',Object.entries(roles),'evento')+
+    selectField('Função operacional','role',Object.entries(roles),'evento')+
+    selectField('Perfil gerenciado (opcional)','access_profile_id',
+      [['','Manter permissões da função'],...state.accessProfiles.filter(p=>p.is_active&&p.role_kind!=='admin').map(p=>[p.id,p.name])],'')+
     permissionFields('')+
     field('Senha inicial','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"',
       'Mínimo de 6 caracteres. Sem exigência de símbolos ou maiúsculas. A senha não será enviada por email.')+
@@ -4662,6 +4664,17 @@ async function handleClick(event){
     if(!hasPermission('stores.manage')||!window.confirm('Excluir esta loja sem histórico?'))return;
     await exec(async()=>assertOk(await db.from('stores').delete().eq('id',id)),'Loja excluída.');return;
   }
+  if(action==='access-tab'){
+    if(!isAdmin())return;
+    const next=target.dataset.tab;
+    if(['pessoas','perfis','vinculos','auditoria'].includes(next)){state.accessTab=next;render();}
+    return;
+  }
+  if(action==='access-profile-new')return accessProfileModal();
+  if(action==='access-profile-edit')return accessProfileModal(id);
+  if(action==='access-profile-copy')return accessProfileModal(id,true);
+  if(action==='user-workspace')return userWorkspaceModal(id,'cadastro');
+  if(action==='user-workspace-tab')return userWorkspaceModal(id,target.dataset.tab);
   if(action==='users-provision'){
    if(!isAdmin()||state.loading)return;
    if(!window.confirm('Criar as 6 contas-padrão do CDSB com senhas temporárias fortes? Usuários atuais não serão bloqueados nem apagados. As senhas serão mostradas uma única vez nesta tela.'))return;
@@ -5606,6 +5619,36 @@ async function handleSubmit(event){
       assertOk(await req);
     },'Loja salva.');return;
   }
+  if(type==='access-profile-save'){
+    if(!isAdmin())return;
+    const perms=[...form.querySelectorAll('[name="profile_permission"]:checked')].map(x=>x.value);
+    if(!perms.length)return toast('Selecione ao menos uma permissão.',true);
+    const role=String(values.role_kind||''),name=String(values.name||'').trim();
+    const old=state.accessProfiles.find(x=>x.id===form.dataset.id);
+    const affected=state.profileAssignments.filter(x=>x.profile_id===old?.id&&x.managed).length;
+    if(affected&&(!window.confirm('Este perfil está em uso por '+affected+' usuário(s). Aplicar as novas permissões a todos?')))
+      return;
+    return exec(async()=>assertOk(await db.rpc('save_access_profile',{
+      p_id:old?.id||null,p_name:name,p_description:String(values.description||'').trim(),
+      p_role_kind:role,p_permissions:perms,p_is_active:Boolean(form.querySelector('[name="is_active"]')?.checked)
+    })),'Perfil salvo. As permissões dos usuários gerenciados foram atualizadas.');
+  }
+  if(type==='access-profile-assign'){
+    if(!isAdmin()||form.dataset.id===state.user?.id)return;
+    const profile=state.accessProfiles.find(p=>p.id===values.profile_id&&p.is_active);
+    if(!profile||profile.role_kind==='admin')return toast('Selecione um perfil válido.',true);
+    const stores=[...form.querySelectorAll('[name="scope_store"]:checked')].map(el=>el.value);
+    const events=[...form.querySelectorAll('[name="scope_event"]:checked')].map(el=>el.value);
+    const current=state.users.find(u=>u.id===form.dataset.id);
+    if(!current||current.role==='admin')return toast('Conta protegida.',true);
+    const count=accessProfilePermissions(profile.id).length;
+    if(!window.confirm('Aplicar '+count+' permissões do perfil "'+profile.name+
+       '" ao usuário '+current.full_name+'? As permissões individuais anteriores serão substituídas.'))return;
+    return exec(async()=>assertOk(await db.rpc('assign_access_profile',{
+      p_user_id:current.id,p_profile_id:profile.id,p_store_ids:stores,p_event_ids:events
+    })),'Perfil e vínculos atualizados.');
+  }
+  if(type==='user-workspace-read'){closeTopModal();return;}
   if(type==='user-permissions'){
     if(!isAdmin()||form.dataset.id===state.user?.id)return;
     const uid=form.dataset.id,perms=[...form.querySelectorAll('[name="perm"]:checked')].map(x=>x.value);
@@ -5618,7 +5661,8 @@ async function handleSubmit(event){
       assertOk(await db.rpc('set_staff_access_v2',{
         p_user_id:uid,p_role:values.role,p_permissions:perms,p_store_ids:stores,p_event_ids:eventIds
       }));
-    },'Autorizações atualizadas.');return;
+      assertOk(await db.rpc('detach_access_profile',{p_user_id:uid}));
+    },'Autorizações individuais atualizadas.');return;
   }
   if(type==='user-edit'){
     if(!isAdmin())return;
@@ -5657,6 +5701,11 @@ async function handleSubmit(event){
       if(values.role==='evento'&&eventIds.length&&created?.user_id)
        assertOk(await db.rpc('set_staff_access_v2',{
          p_user_id:created.user_id,p_role:'evento',p_permissions:permissions,p_store_ids:[],p_event_ids:eventIds
+       }));
+      if(values.access_profile_id&&created?.user_id)
+       assertOk(await db.rpc('assign_access_profile',{
+         p_user_id:created.user_id,p_profile_id:values.access_profile_id,
+         p_store_ids:store_ids,p_event_ids:eventIds
        }));
     },'Usuário cadastrado. Entregue a senha ao colaborador por um canal seguro.');
     return;
@@ -6006,6 +6055,17 @@ document.addEventListener('change',event=>{
   }
   if(event.target.closest('form[data-form="sku-manage"]')){
     syncSkuManagerPreview(event.target.closest('form[data-form="sku-manage"]'));
+  }
+  if(event.target.matches('form[data-form="user-new"] select[name="access_profile_id"]')){
+    const form=event.target.closest('form');
+    const profile=state.accessProfiles.find(p=>p.id===event.target.value);
+    if(profile){
+      const input=form.querySelector('[name="role"]');
+      if(input){input.value=profile.role_kind;input.dispatchEvent(new Event('change',{bubbles:true}));}
+      const allowed=accessProfilePermissions(profile.id);
+      form.querySelectorAll('[name="perm"]').forEach(el=>el.checked=allowed.includes(el.value));
+    }
+    return;
   }
   if(event.target.matches('form[data-form="user-new"] select[name="role"]')){
     const defaults=permissionDefaults[event.target.value]||[];
