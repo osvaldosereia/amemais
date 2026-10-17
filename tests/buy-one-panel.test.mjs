@@ -25,6 +25,18 @@ test('card só tem Abrir compra, sem Usar sugestões ou Conferir/Revisar pedido'
  assert.match(page,/Adicionar ao pedido/);
  assert.match(page,/data-buy-outflow=/);
 });
+test('card de Compras exibe apenas disponível e mínimo comercial, sem alertas redundantes',()=>{
+ const page=purchasesPage({...args,expanded:new Set(['model:model1'])});
+ const card=page.split('class="buy-group-card buy-quick-card"')[1].split('</article>')[0];
+ assert.match(card,/Disponível <b>/);
+ assert.match(card,/Pedido mínimo <b>/);
+ assert.match(card,/Disponível \/ pedido mínimo/);
+ assert.doesNotMatch(card,/Estoque mín\.|class="buy-need|Falta <b>|faltam \d+ un\./i);
+ assert.doesNotMatch(card,/Abaixo do mínimo|Estoque em avaliação|avaliar histórico/);
+ assert.match(card,/data-action="buy-open-group"/);
+ assert.match(card,/data-action="buy-add-to-draft"/);
+ assert.match(card,/data-buy-inline-qty/);
+});
 test('quantidades iniciais vêm do pedido mínimo do fornecedor, não do estoque mínimo',()=>{
  const page=purchasesPage({...args,expanded:new Set(['model:model1'])});
  assert.match(page,/data-buy-inline-qty data-product="p0" value="12"/);
