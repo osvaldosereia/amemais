@@ -381,3 +381,39 @@
  .buy-page .buy-order-actions .button{flex:1 1 48%}
  .buy-receipt-item{grid-template-columns:minmax(0,1fr) 95px;padding:9px;gap:8px}
 }
+
+/* Revisão de compras: cards nunca devem ser comprimidos pelo flexbox do modal.
+   Sem flex-shrink:0, pedidos com muitos modelos aparecem como linhas vazias. */
+.modalback:not(.tax-backdrop)>.modal.buy-review-modal{
+ width:min(760px,100vw);
+}
+.modalback:not(.tax-backdrop)>.modal.buy-review-modal>form[data-form="buy-order-create"]{
+ min-width:0;
+}
+.modalback .buy-review-cards{
+ flex:0 1 auto;
+ min-height:min(190px,32dvh);
+ max-height:min(54dvh,660px);
+ overflow-y:auto;
+ overflow-x:hidden;
+ overscroll-behavior:contain;
+ scrollbar-gutter:stable;
+ align-content:start;
+}
+.modalback .buy-review-cards>.buy-review-card{
+ flex:0 0 auto;
+ min-height:max-content;
+ width:100%;
+}
+.modalback .buy-review-card-head,
+.modalback .buy-review-variants,
+.modalback .buy-review-variant{min-width:0}
+.modalback .buy-review-photo{flex-shrink:0}
+.modalback .buy-review-card-head .button{flex-shrink:0}
+@media(max-width:760px){
+ .modalback:not(.tax-backdrop)>.modal.buy-review-modal{
+  width:100%;max-width:100%;
+ }
+ .modalback .buy-review-cards{min-height:min(170px,28dvh);max-height:min(48dvh,540px);scrollbar-gutter:auto}
+ .modalback .buy-review-card-head .button{flex-shrink:1}
+}
