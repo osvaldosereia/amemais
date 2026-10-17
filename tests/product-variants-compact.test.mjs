@@ -48,7 +48,7 @@ test('balanço e movimentação aparecem em seção fechada, preservando control
  assert.match(html,/data-action="product-stock-mode"/);
  assert.doesNotMatch(html,/<details class="product-advanced-stock" open/);
 });
-test('card fechado contém todos os saldos, com layout de três colunas',()=>{
+test('card fechado contém todos os saldos, com layout de três colunas',async()=>{
  const header=html.split('grouped-inventory-top')[1].split('grouped-inventory-actions')[0];
  assert.match(header,/Disponível/);
  assert.match(header,/Físico/);
