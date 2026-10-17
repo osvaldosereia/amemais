@@ -104,5 +104,5 @@ test('eventos de filtro e busca usam estado independente de Produtos',()=>{
  assert.match(css,/\.buy-variation-disclosure\[open\]/);
  assert.match(css,/@media\(max-width:760px\)/);
  assert.match(html,/cdsb-purchases\.css\?v=20261017reviewfix1/);
- assert.match(app,/cdsb-purchases\.js\?v=20261017drafts1/);
+ assert.match(app,/cdsb-purchases\.js\?v=20261017clean1/);
 });
