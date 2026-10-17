@@ -40,7 +40,7 @@ test('ações, edição de foto fora da imagem, saldos e variações continuam n
  assert.match(card,/product-card-photo-quick/);
  assert.match(card,/product-card-icon-toolbar/);
  assert.doesNotMatch(card,/product-card-utilities/);
- assert.match(card,/data-action="product-card-sizes"/);
+ assert.match(card,/'product-card-sizes','layers'/);
  assert.match(card,/Ver variações/);
  assert.match(card,/Editar produto/);
  assert.match(card,/data-product-details/);
