@@ -30,8 +30,9 @@ import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCar
  setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
  confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261016cart1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
-import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261016buycart1';
+import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261017directory1';
 import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSummary,purchaseCartBySupplier,purchaseCartReviewGroups,serializePurchaseCart,parsePurchaseCart} from './purchase-cart.js?v=20261016buycart1';
+import {supplierDirectoryPayload,staffDirectoryPayload,procurementTaskDraft,supplierInsights,procurementTasksHTML} from './directory-automation.js?v=20261017directory1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
 import {renderOperationsDashboard} from './dashboard-home.js?v=20261016home1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
@@ -90,7 +91,7 @@ const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],gondolas:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],orderOperationalRows:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
-  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],procurementTasks:[],staffContactDetails:[],purchaseSupplierFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -235,6 +236,7 @@ async function loadData(){
   if(hasPermission('purchases.manage')){
    resources.push(['purchaseOrders',db.from('purchase_orders').select('*').order('created_at',{ascending:false}).limit(600)]);
    resources.push(['purchaseItems',db.from('purchase_order_items').select('*').limit(12000)]);
+
   }
   if(!isFranchisePortal()&&(hasPermission('orders.separate')||hasPermission('events.separate')||hasPermission('events.read')||hasPermission('events.manage'))){
     resources.push(['eventPickBatches',db.from('event_pick_batches').select('*').order('created_at',{ascending:false}).limit(2000)]);
@@ -270,8 +272,10 @@ async function loadData(){
   }
   resources.push(['ownPermissions',db.rpc('my_permissions').then(r=>({data:(r.data||[]).map(x=>x.permission),error:r.error}))]);
   resources.push(['staffStores',db.from('staff_stores').select('*').limit(5000)]);
+  resources.push(['procurementTasks',db.from('procurement_tasks').select('*').order('due_date',{ascending:true}).limit(1000)]);
   if(isAdmin()){
     resources.push(['userPermissions',db.from('staff_permissions').select('*').limit(5000)]);
+    resources.push(['staffContactDetails',db.from('staff_contact_details').select('*').limit(1000)]);
   }
   if(hasPermission('movements.read') || hasPermission('users.manage')){
     resources.push(['audits',db.from('audit_log').select('id,entity,entity_id,action,actor_id,created_at').order('created_at',{ascending:false}).limit(100)]);
@@ -549,7 +553,8 @@ function pageContent(){
   if(state.view==='produtos')return productsPage();
   if(state.view==='compras')return purchasesPage({products:state.items,suppliers:state.suppliers,balances:state.balances,
    reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,models:state.apparelModels,categories:state.categories,tags:state.tags,
-   button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog,cart:state.purchaseCart,expanded:state.purchaseExpanded});
+   button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog,cart:state.purchaseCart,expanded:state.purchaseExpanded})+
+   procurementTasksHTML(state.procurementTasks,state.suppliers,state.users,button,hasPermission('purchases.manage'));
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):storesPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
@@ -561,7 +566,8 @@ function pageContent(){
   if(state.view==='lojas')return storesPage();
   if(state.view==='lojas-admin')return storesAdminPage();
   if(state.view==='pedidos-lojas')return ordersPage();
-  return dashboard();
+  return dashboard()+(state.procurementTasks.some(t=>t.assigned_to===state.user?.id&&['pendente','em_andamento'].includes(t.status))?
+   procurementTasksHTML(state.procurementTasks.filter(t=>t.assigned_to===state.user?.id),state.suppliers,state.users,button,false):'');
 }
 function permanentPage(){
  const units=state.stores.filter(s=>!s.is_primary&&assignedStore(s.id)&&s.kind==='franquia'&&s.active);
@@ -1468,7 +1474,8 @@ function usersPage(){
  const entry=u=>'<article class="um-user" data-user-row data-user-filter="'+h([u.full_name,u.username,profileLabel(u)].join(' ').toLowerCase())+'" data-user-role="'+h(u.role)+'">'+
   '<div class="um-user-main"><span class="um-avatar" aria-hidden="true">'+h((u.full_name||'?').slice(0,1).toUpperCase())+'</span>'+
    '<div class="um-user-names"><strong>'+h(u.full_name)+'</strong><small>@'+h(u.username)+'</small></div></div>'+
-  '<div class="um-user-details"><span class="um-role">'+h(profileLabel(u))+'</span>'+
+  '<div class="um-user-details"><span class="um-role">'+h(profileLabel(u))+'</span>'+ 
+   (state.staffContactDetails.find(d=>d.user_id===u.id)?.job_title?'<small class="um-linked">'+h(state.staffContactDetails.find(d=>d.user_id===u.id).job_title)+'</small>':'')+
    '<span class="pill '+(u.archived_at?'encerrado':u.active?'ativo':'encerrado')+'">'+(u.archived_at?'Excluído':u.active?'Ativo':'Bloqueado')+'</span>'+
    (u.role==='franquia'?'<small class="um-linked">'+h(state.stores.filter(s=>state.staffStores.some(a=>a.user_id===u.id&&a.store_id===s.id)).map(x=>x.name).join(', ')||'Sem loja vinculada')+'</small>':'')+
   '</div><div class="um-user-actions">'+
@@ -1580,7 +1587,7 @@ async function saveModelProcurement(modelId,form){
 }
 function supplierManagerModal(){
  if(!hasPermission('purchases.manage'))return;
- formModal('Fornecedores',supplierListHTML(state.suppliers,button)+
+ formModal('Fornecedores',supplierListHTML(state.suppliers,button,{products:state.items,orders:state.purchaseOrders,tasks:state.procurementTasks})+
   '<div class="actions">'+button('+ Novo fornecedor','buy-supplier-new','','primary')+'</div>',
   'buy-supplier-list','Fechar');
 }
@@ -1592,6 +1599,15 @@ function supplierFormModal(supplier=null){
   field('Telefone / WhatsApp','phone','text',supplier?.phone||'','maxlength="60"')+
   field('Email','email','email',supplier?.email||'','maxlength="180"')+
   field('CNPJ / documento','document','text',supplier?.document||'','maxlength="35"')+
+  field('Razão social','legal_name','text',supplier?.legal_name||'','maxlength="180"')+
+  field('Função do contato','contact_role','text',supplier?.contact_role||'','maxlength="100"')+
+  field('WhatsApp comercial','whatsapp','tel',supplier?.whatsapp||'','maxlength="60"')+
+  field('Site','website','url',supplier?.website||'','maxlength="250" placeholder="https://"')+
+  field('Endereço','address','text',supplier?.address||'','maxlength="500"')+
+  selectField('Canal preferido','preferred_channel',[['','Não informado'],['whatsapp','WhatsApp'],['telefone','Telefone'],['email','E-mail'],['outro','Outro']],supplier?.preferred_channel||'')+
+  field('Prazo habitual de entrega (dias)','delivery_days','number',supplier?.delivery_days??'','min="1" max="365" step="1"')+
+  field('Pedido mínimo (R$)','minimum_order_amount','text',supplier?.minimum_order_amount??'','inputmode="decimal" placeholder="0,00"')+
+  textareaField('Condições de pagamento','payment_terms',supplier?.payment_terms||'')+
   textareaField('Observações','notes',supplier?.notes||'')+
   (supplier?selectField('Situação','active',[['true','Ativo'],['false','Inativo']],String(supplier.active)):'')+
   '</div>','buy-supplier-save','Salvar fornecedor');
@@ -1599,6 +1615,19 @@ function supplierFormModal(supplier=null){
  if(form)form.dataset.id=supplier?.id||'';
 }
 
+function procurementTaskModal(){
+ if(!hasPermission('purchases.manage'))return;
+ const assignees=state.users.filter(u=>u.active&&!u.archived_at);
+ formModal('Nova tarefa de acompanhamento',
+  '<p class="help">A tarefa aparece no painel do responsável e na seção Compras. Nenhuma mensagem externa será enviada.</p>'+
+  '<div class="formgrid">'+
+   field('Tarefa','title','text','','required minlength="3" maxlength="160"')+
+   selectField('Fornecedor','supplier_id',[['','Sem fornecedor'],...state.suppliers.filter(s=>s.active).map(s=>[s.id,s.name])],'')+
+   selectField('Responsável','assigned_to',[['','Sem responsável'],...assignees.map(u=>[u.id,u.full_name])],state.user?.id||'')+
+   field('Prazo','due_date','date','','')+
+   textareaField('Instruções','description','')+
+  '</div>','buy-task-create','Criar tarefa');
+}
 function savePurchaseCart(){
  state.purchaseCart=cleanPurchaseCart(state.purchaseCart,state.items);
  try{sessionStorage.setItem('cdsb-purchase-cart:'+state.user.id,serializePurchaseCart(state.purchaseCart));}
@@ -2582,11 +2611,15 @@ function userEditModal(id){
  const target=state.users.find(u=>u.id===id);
  if(!target||target.archived_at)return;
  formModal('Editar dados · '+target.full_name,
-  '<p class="help">Altere o nome e o usuário de login. O perfil e as unidades são editados em “Perfil e acessos”.</p>'+
+  '<p class="help">Altere os dados cadastrais e profissionais. Perfil, lojas e eventos permanecem em “Perfil e acessos”.</p>'+ 
   '<div class="formgrid">'+
   field('Nome completo','full_name','text',target.full_name,'required minlength="2" maxlength="120"')+
   field('Nome de usuário (login)','username','text',target.username,
    'required minlength="3" maxlength="32" autocapitalize="none" autocomplete="off"')+
+  field('Telefone / WhatsApp','phone','text',state.staffContactDetails.find(d=>d.user_id===id)?.phone||'','maxlength="60"')+
+  field('Cargo','job_title','text',state.staffContactDetails.find(d=>d.user_id===id)?.job_title||'','maxlength="120"')+
+  field('Setor','department','text',state.staffContactDetails.find(d=>d.user_id===id)?.department||'','maxlength="120"')+
+  textareaField('Observações administrativas','internal_notes',state.staffContactDetails.find(d=>d.user_id===id)?.internal_notes||'')+
   '</div>','user-edit','Salvar alterações');
  const form=document.querySelector('.modalback form[data-form="user-edit"]');
  if(form)form.dataset.id=id;
@@ -2961,6 +2994,9 @@ function userModal(){
   formModal('Cadastrar usuário','<div class="formgrid">'+
     field('Nome completo','full_name','text','','required minlength="2" maxlength="120" autocomplete="name"')+
     field('Usuário','username','text','','required minlength="3" maxlength="32" autocapitalize="none"')+
+    field('Telefone / WhatsApp','phone','text','','maxlength="60"')+
+    field('Cargo','job_title','text','','maxlength="120"')+
+    field('Setor','department','text','','maxlength="120"')+
     selectField('Função','role',Object.entries(roles),'evento')+
     permissionFields('')+
     field('Senha inicial','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"',
@@ -4283,7 +4319,17 @@ async function handleClick(event){
    if(!isAdmin())return;
    state.usersAdminArchived=!state.usersAdminArchived;render();return;
   }
-  if(action==='user-edit')return userEditModal(id);
+  if(action==='buy-task-new')return procurementTaskModal();
+   if(action==='buy-task-status'){
+    const task=state.procurementTasks.find(t=>t.id===id);
+    const next=target.dataset.status;
+    if(!task||!['pendente','em_andamento','concluida','cancelada'].includes(next))return;
+    if(!hasPermission('purchases.manage')&&task.assigned_to!==state.user?.id)return;
+    return exec(async()=>assertOk(await db.rpc('set_procurement_task_status',{
+      p_id:id,p_status:next
+    })),'Tarefa atualizada.');
+   }
+   if(action==='user-edit')return userEditModal(id);
   if(action==='user-delete'){
    if(!isAdmin()||id===state.user?.id)return;
    const u=state.users.find(x=>x.id===id);
@@ -4421,18 +4467,24 @@ async function handleSubmit(event){
     assertOk(await record);
    },'Gôndola salva e disponível no cadastro.');
   }
+  if(type==='buy-task-create'){
+   if(!hasPermission('purchases.manage'))return;
+   let draft;
+   try{draft=procurementTaskDraft(values);}
+   catch(error){return toast(error.message,true);}
+   if(draft.supplier_id&&!state.suppliers.some(s=>s.id===draft.supplier_id&&s.active))
+    return toast('Fornecedor inativo ou não encontrado.',true);
+   if(draft.assigned_to&&!state.users.some(u=>u.id===draft.assigned_to&&u.active&&!u.archived_at))
+    return toast('Responsável inválido.',true);
+   return exec(async()=>assertOk(await db.from('procurement_tasks').insert({
+    ...draft,created_by:state.user?.id
+   })),'Tarefa criada e disponibilizada ao responsável.');
+  }
   if(type==='buy-suppliers-list'){closeTopModal();return;}
   if(type==='buy-supplier-save'){
    if(!hasPermission('purchases.manage'))return;
-   const name=String(values.name||'').trim();
-   if(name.length<2||name.length>150)return toast('Informe o nome do fornecedor.',true);
-   const payload={
-    name,contact_name:String(values.contact_name||'').trim().slice(0,140)||null,
-    phone:String(values.phone||'').trim().slice(0,60)||null,
-    email:String(values.email||'').trim().slice(0,180)||null,
-    document:String(values.document||'').trim().slice(0,35)||null,
-    notes:String(values.notes||'').trim().slice(0,1500)||null
-   };
+   let payload;
+   try{payload=supplierDirectoryPayload(values);}catch(error){return toast(error.message,true);}
    if(form.dataset.id)payload.active=values.active==='true';
    return exec(async()=>{
     const response=form.dataset.id?
@@ -5110,7 +5162,9 @@ async function handleSubmit(event){
      return toast('Informe nome e usuário válidos.',true);
     return exec(async()=>{await invokeManageUser('edit',{
      user_id:form.dataset.id,full_name:name,username
-    });},'Dados cadastrais atualizados.');
+    });
+    assertOk(await db.from('staff_contact_details').upsert({user_id:form.dataset.id,...staffDirectoryPayload(values)},{onConflict:'user_id'}));
+   },'Dados profissionais atualizados.');
   }
   if(type==='user-role'){
     if(!isAdmin() || form.dataset.id===state.user.id)return;
@@ -5133,6 +5187,7 @@ async function handleSubmit(event){
         username:String(values.username||'').trim(),
         role:values.role,password,permissions,store_ids
       });
+      if(created?.user_id)assertOk(await db.from('staff_contact_details').upsert({user_id:created.user_id,...staffDirectoryPayload(values)},{onConflict:'user_id'}));
       const eventIds=[...form.querySelectorAll('[name="event_member"]:checked')].map(x=>x.value);
       if(values.role==='evento'&&eventIds.length&&created?.user_id)
        assertOk(await db.rpc('set_staff_access_v2',{
