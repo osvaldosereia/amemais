@@ -1,12 +1,12 @@
-/* Prévia da etiqueta física para bobina térmica de 57 mm (área útil de 49 mm).
+/* Prévia da etiqueta física para bobina térmica de 80 mm (área útil de 72 mm).
    As dimensões da prévia acompanham o documento isolado de impressão. */
 .shelf-label-picker{display:flex;flex-direction:column;gap:14px;min-width:0}
 .shelf-label-picker>p:first-child,.shelf-label-help{font-size:.85rem;line-height:1.5;color:#526e62;margin:0}
 .shelf-label-preview-title,.shelf-label-variant-head{font-size:.95rem;font-weight:800;color:#164f39}
 .shelf-label-preview{display:flex;justify-content:center;align-items:center;border:1px solid #d5e5d9;
  background:#eaf1ec;border-radius:12px;padding:14px;overflow:auto;min-width:0}
-.shelf-label-preview .shelf-label{box-sizing:border-box;flex:0 0 57mm;display:flex;flex-direction:column;
- background:#fff;color:#000;width:57mm;max-width:57mm;min-width:57mm;height:70mm;min-height:70mm;
+.shelf-label-preview .shelf-label{box-sizing:border-box;flex:0 0 80mm;display:flex;flex-direction:column;
+ background:#fff;color:#000;width:80mm;max-width:80mm;min-width:80mm;height:70mm;min-height:70mm;
  padding:2mm 4mm 1.5mm;font-family:Arial,Helvetica,sans-serif;gap:.75mm;
  box-shadow:0 2px 12px #0002;overflow:hidden}
 .shelf-label-preview .shelf-label-heading{display:flex;align-items:center;justify-content:space-between;gap:1mm}
@@ -31,7 +31,7 @@
  overflow-wrap:anywhere;min-width:0}
 .shelf-label-preview .shelf-label-code{margin-top:auto;display:flex;align-items:center;
  flex-direction:column;justify-content:center;gap:.4mm;min-width:0}
-.shelf-label-preview .shelf-barcode{width:49mm;height:18mm;max-width:100%;display:block}
+.shelf-label-preview .shelf-barcode{width:72mm;height:18mm;max-width:100%;display:block}
 .shelf-label-preview .shelf-label-code>strong{font-size:9pt;letter-spacing:.1px;
  font-weight:800;font-family:monospace;overflow-wrap:anywhere;max-width:100%;text-align:center}
 .shelf-label-preview .shelf-label-footer{border-top:1px solid #000;padding-top:.5mm;
