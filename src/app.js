@@ -2904,7 +2904,8 @@ function userWorkspaceModal(id,tab='cadastro'){
     '</section></div>'+
     '<div class="ac-access-summary"><strong>Acesso efetivo atual</strong><p>'+
       state.userPermissions.filter(x=>x.user_id===id).map(x=>h(x.permission)).join(' · ')+'</p></div>'+
-    '<p class="help">A atribuição do perfil conserva o histórico e modifica somente os acessos da pessoa selecionada.</p>';
+    button('Personalizar permissões individualmente','user-role','data-id="'+h(id)+'"','small')+
+    '<p class="help">Ao personalizar as permissões, a conta deixa de herdar alterações futuras do perfil. A atribuição de um perfil gerenciado substitui as permissões individuais.</p>';
   }
  }else if(active==='seguranca'){
   content='<div class="ac-security-list"><p>Status: <strong>'+(user.active?'Ativo':'Bloqueado')+'</strong></p>'+
