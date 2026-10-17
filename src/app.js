@@ -3626,7 +3626,7 @@ async function handleClick(event){
     const editButton=card.querySelector('[data-action="product-card-edit-toggle"]');
     if(stockButton){
       stockButton.setAttribute('aria-expanded',String(Boolean(card.querySelector('[data-product-details]')?.open)));
-      stockButton.innerHTML=(card.querySelector('[data-product-details]')?.open?'Ocultar estoque':'Ver estoque')+' <span aria-hidden="true">⌄</span>';
+      stockButton.innerHTML=(card.querySelector('[data-product-details]')?.open?'Ocultar variações':'Ver variações')+' <span aria-hidden="true">⌄</span>';
     }
     if(editButton){
       editButton.setAttribute('aria-expanded',String(Boolean(card.querySelector('[data-product-editor]')?.open)));
