@@ -315,3 +315,69 @@
 .directory-task-status{font-size:.73rem;color:#587087;font-weight:700}
 .directory-task-actions button{font-size:.75rem;min-height:38px}
 @media(max-width:760px){.directory-tasks{padding:13px;margin-top:12px}.directory-tasks-head,.directory-task{flex-direction:column;align-items:stretch}.directory-task-actions{justify-content:flex-end}.supplier-directory-card{flex-direction:column}.supplier-directory-card>button{width:100%}}
+
+
+/* Central de Compras v2: navegação e densidade operacional (somente módulo Compras). */
+.buy-page{gap:14px;--buy-blue:#102d50;--buy-border:#d8e2ee}
+.buy-page .pagehead{gap:12px}
+.buy-page .pagehead p{max-width:680px}
+.buy-tabs{display:flex;align-items:stretch;gap:5px;border-bottom:1px solid #d8e2ee;overflow-x:auto;padding:0 1px;scrollbar-width:thin}
+.buy-tab{border:0;border-bottom:3px solid transparent;background:transparent;color:#536b83;padding:14px 18px 11px;font-size:.86rem;font-weight:700;white-space:nowrap;cursor:pointer}
+.buy-tab:hover,.buy-tab:focus-visible{background:#edf3f9;color:#102d50}
+.buy-tab.is-active{color:#102d50;border-bottom-color:#c7a35f;background:#f4f7fb}
+.buy-page .buy-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.buy-page .buy-stat-grid button{appearance:none;display:flex;flex-direction:column;gap:7px;align-items:flex-start;text-align:left;cursor:pointer;background:#f6f8fc;border:1px solid #d8e2ee;border-radius:13px;padding:15px;color:#102d50;min-width:0}
+.buy-page .buy-stat-grid button:hover,.buy-page .buy-stat-grid button:focus-visible{border-color:#c7a35f;outline-offset:2px}
+.buy-page .buy-stat-grid button strong{font-size:1.5rem;line-height:1.1;color:#102d50}
+.buy-page .buy-stat-grid button span{font-size:.77rem;color:#61758e}
+.buy-page .buy-group-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+.buy-page .buy-group-card{width:100%}
+.buy-page .buy-group-head{align-items:center;gap:15px;padding:15px}
+.buy-page .buy-group-photo{flex-basis:112px;width:112px}
+.buy-page .buy-group-title h3{font-size:.98rem}
+.buy-page .buy-shortage-chip{color:#8b4e18;background:#fff3df;border-color:#edcd91}
+.buy-page .buy-need.is-low{background:#fff1db;border-color:#e9c785;color:#8b4e18;font-weight:750}
+.buy-page .buy-group-actions{justify-content:flex-end;gap:9px}
+.buy-page .buy-group-actions .button{flex:0 1 auto;min-width:142px}
+.buy-page .buy-variant{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:9px;padding:12px 5px}
+.buy-page .buy-variant-pick{min-width:0}
+.buy-page .buy-inline-order{min-width:170px}
+.buy-page .buy-variant-values{gap:5px}
+.buy-page .buy-catalog-toolbar{gap:9px;padding:13px 16px}
+.buy-page .buy-only-toggle{display:inline-flex;align-items:center;gap:8px;font-size:.79rem;color:#102d50;font-weight:700;cursor:pointer;min-height:36px}
+.buy-page .buy-only-toggle input{width:17px;height:17px;accent-color:#102d50}
+.buy-page .buy-filter-tools{justify-content:space-between}
+.buy-page .buy-filter-tools .buy-result-count{margin-left:auto}
+.buy-page .buy-order{background:#fff;align-items:flex-start}
+.buy-page .buy-order .buy-status{margin-top:4px}
+.buy-page .buy-order-actions{max-width:45%;justify-content:flex-end}
+.buy-receipt-intro{margin:0 0 13px;color:#586c82;font-size:.82rem;line-height:1.5}
+.buy-receipt-list{display:flex;flex-direction:column;gap:8px;max-height:56vh;overflow:auto;padding:3px}
+.buy-receipt-item{display:grid;grid-template-columns:minmax(0,1fr) 115px;align-items:center;gap:12px;border:1px solid #d8e2ee;border-radius:11px;padding:12px;background:#fff}
+.buy-receipt-item strong{font-size:.86rem;color:#102d50}
+.buy-receipt-item small{display:block;font-size:.73rem;color:#687f92;margin-top:5px}
+.buy-receipt-item label{font-size:.74rem;font-weight:750;color:#102d50}
+.buy-receipt-item input{width:100%;min-height:42px;padding:8px;border:1px solid #bbcddd;border-radius:8px;font-size:1rem;font-weight:800;text-align:center;margin-top:4px}
+.buy-receipt-note{color:#65788b;font-size:.77rem;margin-top:12px}
+@media(max-width:900px){
+ .buy-page .buy-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .buy-page .buy-order-actions{max-width:none;width:100%;justify-content:flex-start}
+ .buy-page .buy-variant{grid-template-columns:1fr}
+ .buy-page .buy-inline-order{justify-content:flex-start;padding-left:28px}
+}
+@media(max-width:600px){
+ .buy-page .buy-tabs{margin-right:-6px}
+ .buy-page .buy-tab{padding:13px 10px;font-size:.78rem}
+ .buy-page .buy-stat-grid{gap:7px}
+ .buy-page .buy-stat-grid button{padding:11px;min-height:78px}
+ .buy-page .buy-stat-grid button strong{font-size:1.28rem}
+ .buy-page .buy-stat-grid button span{font-size:.7rem}
+ .buy-page .buy-group-head{padding:11px;align-items:flex-start;gap:11px}
+ .buy-page .buy-group-photo{width:100px;flex-basis:100px}
+ .buy-page .buy-group-actions .button{flex:1 1 100%}
+ .buy-page .buy-variant-values{padding-left:28px}
+ .buy-page .buy-inline-order label{width:100%;justify-content:space-between}
+ .buy-page .buy-catalog-toolbar{padding:11px}
+ .buy-page .buy-order-actions .button{flex:1 1 48%}
+ .buy-receipt-item{grid-template-columns:minmax(0,1fr) 95px;padding:9px;gap:8px}
+}
