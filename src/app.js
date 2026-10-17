@@ -5257,6 +5257,12 @@ document.addEventListener('keydown',event=>{
     else if(document.querySelector('.modalback'))closeTopModal();
   }
 });
+document.addEventListener('toggle',event=>{
+ const details=event.target;
+ if(!details.matches?.('[data-buy-expand]')||!details.isConnected)return;
+ if(details.open)state.purchaseExpanded.add(details.dataset.buyExpand);
+ else state.purchaseExpanded.delete(details.dataset.buyExpand);
+},true);
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
   if(event.target.matches('[data-order-cart-search]')){
@@ -5277,6 +5283,33 @@ document.addEventListener('input',event=>{
      state.storeHubFilter.type,state.storeHubFilter.status);
   }
   if(event.target.matches('[data-users-search]'))applyUserListFilter();
+  if(event.target.matches('[data-buy-inline-qty]')){
+    const input=event.target,id=input.dataset.product;
+    const selected=input.closest('[data-buy-sku]')?.querySelector('[data-buy-inline-select]')?.checked;
+    if(!selected)return;
+    if(!validPurchaseQty(input.value)){
+      input.setCustomValidity('Informe 1 a 1.000.000 unidades inteiras.');
+      state.purchaseCart.delete(id);
+    }else {
+      input.setCustomValidity('');
+      state.purchaseCart=setPurchaseCartItem(state.purchaseCart,id,input.value);
+    }
+    savePurchaseCart();updatePurchaseCartDisplay();return;
+  }
+  if(event.target.matches('[data-buy-review-qty]')){
+    const input=event.target,id=input.dataset.product;
+    const form=input.closest('form[data-form="buy-order-create"]');
+    if(!form)return;
+    if(!validPurchaseQty(input.value)){
+      input.setCustomValidity('Quantidade inteira obrigatória (1 a 1.000.000).');
+    }else{
+      input.setCustomValidity('');
+      state.purchaseCart=setPurchaseCartItem(state.purchaseCart,id,input.value);
+      savePurchaseCart();
+      updatePurchaseReviewTotals(form.querySelector('[name="supplier_id"]')?.value||'');
+    }
+    return;
+  }
   if(event.target.id==='buy-catalog-search'){
    updatePurchaseSearch(event.target.value);
    return;
@@ -5441,6 +5474,19 @@ document.addEventListener('change',event=>{
     if(form?.__lotPicker)filterLotCatalog(form,{resetPage:true});
   }
   if(event.target.matches('[data-users-filter-role]'))applyUserListFilter();
+  if(event.target.matches('[data-buy-inline-select]')){
+    const input=event.target,id=input.dataset.product,sku=input.closest('[data-buy-sku]');
+    const qty=sku?.querySelector('[data-buy-inline-qty]');
+    if(!qty)return;
+    qty.disabled=!input.checked;
+    if(input.checked){
+      if(!validPurchaseQty(qty.value))qty.value='1';
+      state.purchaseCart=setPurchaseCartItem(state.purchaseCart,id,qty.value);
+    }else state.purchaseCart.delete(id);
+    savePurchaseCart();updatePurchaseCartDisplay();
+    if(input.checked)qty.focus({preventScroll:true});
+    return;
+  }
   if(event.target.matches('[data-buy-modal-supplier]'))syncPurchaseForm(event.target.closest('form'));
   if(event.target.matches('[data-buy-select]')){
    const row=event.target.closest('[data-buy-product]'),qty=row?.querySelector('[data-buy-quantity]');
