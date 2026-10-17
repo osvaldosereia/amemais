@@ -256,19 +256,28 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const primaryEdit=canEdit?
     '<button type="button" class="button product-card-action-primary" data-action="product-card-edit-toggle" aria-expanded="false">'+
       'Editar produto <span aria-hidden="true">⌄</span></button>':'';
+  // Ações essenciais na superfície do card; utilitários ficam acessíveis em detalhes.
+  // Estoques físico, reservado, disponível, foto e gôndola permanecem sempre visíveis.
+  const hasUtilities=isProducts&&(canLabel||canShare||(group.modelId&&canEdit)||
+    canRemoveEntireModel||(!group.modelId&&canDeleteProduct()));
   const actions=isProducts?
     '<div class="grouped-inventory-actions product-card-actions-v5" aria-label="Ações de '+h(group.title)+'">'+
       '<div class="product-card-action-primary-row">'+primaryStock+primaryEdit+'</div>'+
-      '<div class="product-card-action-secondary-row">'+
-       (canLabel?direct('Etiqueta 57 mm','shelf-label-open',main.id,'product-card-action-secondary'):'')+
-       (canShare?direct('Compartilhar','share-product',main.id,'product-card-action-secondary'):'')+
-       (group.modelId&&canEdit?direct('+ Variação','add-variants',group.modelId,'product-card-action-secondary'):'')+
-      '</div>'+
-      (canRemoveEntireModel||(!group.modelId&&canDeleteProduct())?
-       '<div class="product-card-action-danger-row">'+
-        (canRemoveEntireModel?direct('Excluir produto e todas as variações','product-model-delete',group.modelId,'danger product-card-delete-whole'):'')+
-        (!group.modelId&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'danger product-card-delete-whole'):'')+
-       '</div>':'')+'</div>':'';
+      (hasUtilities?'<details class="product-card-utilities">'+
+        '<summary>Mais opções <span aria-hidden="true">⌄</span></summary>'+
+        '<div class="product-card-utilities-content">'+
+          '<div class="product-card-action-secondary-row">'+
+            (canLabel?direct('Etiqueta 57 mm','shelf-label-open',main.id,'product-card-action-secondary'):'')+
+            (canShare?direct('Compartilhar','share-product',main.id,'product-card-action-secondary'):'')+
+            (group.modelId&&canEdit?direct('+ Variação','add-variants',group.modelId,'product-card-action-secondary'):'')+
+          '</div>'+
+          (canRemoveEntireModel||(!group.modelId&&canDeleteProduct())?
+           '<div class="product-card-action-danger-row">'+
+             (canRemoveEntireModel?direct('Excluir produto e todas as variações','product-model-delete',group.modelId,'danger product-card-delete-whole'):'')+
+             (!group.modelId&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'danger product-card-delete-whole'):'')+
+           '</div>':'')+'</div></details>':'')+
+    '</div>':'';
+
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
     '<div class="grouped-inventory-top">'+
       '<div class="grouped-inventory-photo">'+photo+photoQuickAction+'</div>'+
