@@ -30,7 +30,8 @@ import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCar
  setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
  confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261016cart1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
-import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261016buysearch1';
+import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261016buycart1';
+import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSummary,purchaseCartBySupplier,purchaseCartReviewGroups,serializePurchaseCart,parsePurchaseCart} from './purchase-cart.js?v=20261016buycart1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
 import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261016label57';
@@ -88,7 +89,7 @@ const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],gondolas:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],orderOperationalRows:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
-  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0},userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -289,6 +290,13 @@ async function loadData(){
   }
   const results=await Promise.all(resources.map(async ([key,request])=>[key,await request]));
   for(const [key,result] of results) state[key]=assertOk(result)||[];
+  if(state.purchaseCartUser!==state.user.id){
+    state.purchaseCartUser=state.user.id;
+    try{state.purchaseCart=parsePurchaseCart(sessionStorage.getItem('cdsb-purchase-cart:'+state.user.id));}
+    catch{state.purchaseCart=new Map();}
+    state.purchaseExpanded=new Set();
+  }
+  state.purchaseCart=cleanPurchaseCart(state.purchaseCart,state.items);
   state.orderCodeMap=new Map(state.orderCodes.map(r=>[r.kind+':'+r.order_id,r.code]));
   const hiddenOrders=new Set(state.removedOrders.map(x=>x.kind+':'+x.order_id));
   state.orders=state.orders.filter(x=>!hiddenOrders.has('avulso:'+x.id));
@@ -540,7 +548,7 @@ function pageContent(){
   if(state.view==='produtos')return productsPage();
   if(state.view==='compras')return purchasesPage({products:state.items,suppliers:state.suppliers,balances:state.balances,
    reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,models:state.apparelModels,categories:state.categories,tags:state.tags,
-   button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog});
+   button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog,cart:state.purchaseCart,expanded:state.purchaseExpanded});
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):storesPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
@@ -1648,35 +1656,100 @@ function supplierFormModal(supplier=null){
  const form=document.querySelector('.modalback form[data-form="buy-supplier-save"]');
  if(form)form.dataset.id=supplier?.id||'';
 }
-function syncPurchaseForm(form){
- if(!form)return;
- const selected=form.querySelector('[data-buy-modal-supplier]')?.value;
- const q=(form.querySelector('[data-buy-search]')?.value||'').toLocaleLowerCase('pt-BR').trim();
- let visible=0;
- for(const group of form.querySelectorAll('.buy-cart-group')){
-  group.hidden=!(group.dataset.supplier===selected&&(!q||group.dataset.search.includes(q)));
-  if(!group.hidden)visible+=group.querySelectorAll('[data-buy-product]').length;
- }
- const counter=form.querySelector('[data-buy-count]');
- if(counter)counter.textContent=visible+' variação(ões) encontradas';
+
+function savePurchaseCart(){
+ state.purchaseCart=cleanPurchaseCart(state.purchaseCart,state.items);
+ try{sessionStorage.setItem('cdsb-purchase-cart:'+state.user.id,serializePurchaseCart(state.purchaseCart));}
+ catch(error){console.warn('Carrinho mantido somente nesta sessão',error);}
 }
-function purchaseNewModal(selected=null){
+function updatePurchaseCartDisplay(){
+ const summary=purchaseCartSummary(state.purchaseCart,state.items);
+ const dock=document.querySelector('[data-buy-cart-dock]');
+ if(dock){
+  dock.hidden=!summary.skus;
+  const label=dock.querySelector('[data-buy-cart-summary]');
+  if(label)label.textContent=summary.skus+' SKU(s) · '+summary.units+' unidades · '+summary.suppliers+' fornecedor(es)';
+ }
+ for(const label of document.querySelectorAll('[data-buy-picked]')){
+  const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+    state.purchaseOrders,state.purchaseItems).find(g=>g.key===label.dataset.buyPicked);
+  if(!group)continue;
+  const selected=group.variants.filter(p=>state.purchaseCart.has(p.id));
+  const units=selected.reduce((n,p)=>n+Number(state.purchaseCart.get(p.id)||0),0);
+  label.textContent=selected.length?selected.length+' tamanho(s) · '+units+' un.':'';
+ }
+}
+function purchaseReviewFormValues(){
+ const form=document.querySelector('form[data-form="buy-order-create"]');
+ return {days:form?.elements.namedItem('estimated_days')?.value||'15',
+  note:form?.elements.namedItem('note')?.value||''};
+}
+function purchaseReviewModal(supplierId=null,keep={}){
  if(!hasPermission('purchases.manage'))return;
- const suppliers=state.suppliers.filter(s=>s.active);
- if(!suppliers.length)return toast('Cadastre um fornecedor antes de montar a compra.',true);
- const supplierId=selected&&suppliers.some(s=>s.id===selected)?selected:suppliers[0].id;
- const rows=purchaseOrderRows(state.items,suppliers,state.balances,state.stockReservations,state.purchaseOrders,state.purchaseItems,state.apparelModels);
- formModal('Montar pedido de compra','<div class="formgrid">'+
-  selectField('Fornecedor','supplier_id',suppliers.map(s=>[s.id,s.name]),supplierId,'data-buy-modal-supplier')+
-  '<label class="field wide"><span>Buscar produto, EAN ou SKU</span><input type="search" data-buy-search placeholder="Buscar produtos do fornecedor"></label>'+
-  '<div class="buy-product-list wide">'+rows+'</div>'+
-  '<small class="wide help" data-buy-count></small>'+
-  field('Prazo estimado de chegada (dias corridos)','estimated_days','number','15','required min="1" max="365" step="1" inputmode="numeric"')+
-  textareaField('Observações para o fornecedor','note')+'</div>'+
-  '<div class="note">As sugestões consideram estoque mínimo, reservas e compras em aberto. Quantidades podem ser editadas. A emissão não movimenta estoque.</div>',
+ const batches=purchaseCartBySupplier(state.purchaseCart,state.items);
+ if(!batches.size)return toast('Selecione pelo menos uma variação e informe a quantidade no card.',true);
+ if(!supplierId&&batches.size>1){
+  const rows=[...batches.entries()].map(([id,lines])=>{
+   const supplier=state.suppliers.find(s=>s.id===id);
+   const units=lines.reduce((n,x)=>n+x.quantity,0);
+   return '<article class="buy-review-supplier"><div><strong>'+h(supplier?.name||'Fornecedor')+'</strong>'+
+    '<small>'+lines.length+' SKU(s) · '+units+' unidades</small></div>'+
+    button('Revisar pedido','buy-review-supplier','data-supplier="'+h(id)+'"','small primary')+'</article>';
+  }).join('');
+  formModal('Carrinho · Selecione o fornecedor',
+   '<p class="help">Cada fornecedor recebe um pedido próprio. As outras seleções permanecem no carrinho.</p>'+rows,
+   'buy-choose-supplier','Fechar');
+  return;
+ }
+ const supplier=supplierId||[...batches.keys()][0];
+ const lines=batches.get(supplier);
+ if(!lines?.length)return purchaseReviewModal();
+ const groups=purchaseCartReviewGroups(state.purchaseCart,state.items,state.apparelModels,supplier);
+ const supplierName=state.suppliers.find(x=>x.id===supplier)?.name||'Fornecedor';
+ const html=groups.map(group=>{
+  const photo=group.photo?'<img data-photo-path="'+h(group.photo)+'" alt="Foto de '+h(group.title)+'">':
+   '<span class="buy-no-photo">Sem foto</span>';
+  return '<article class="buy-review-card" data-buy-review-group="'+h(group.key)+'">'+
+   '<header class="buy-review-card-head"><div class="buy-review-photo">'+photo+'</div>'+
+   '<div class="buy-review-card-title"><strong>'+h(group.title)+'</strong>'+
+   '<small>'+h(supplierName)+' · '+group.rows.length+' variação(ões)</small>'+
+   '<span data-buy-review-model-total="'+h(group.key)+'">Total: '+group.total+' un.</span></div>'+
+   button('Remover modelo','buy-cart-remove-model','data-group="'+h(group.key)+'" data-supplier="'+h(supplier)+'"','small danger')+
+   '</header><div class="buy-review-variants">'+group.rows.map(p=>
+    '<div class="buy-review-variant" data-buy-review-item="'+h(p.id)+'">'+
+    '<div><strong>'+h(p.apparel_size||'Único')+'</strong>'+
+    '<small>SKU '+h(p.sku||'—')+(p.ean?' · EAN '+h(p.ean):'')+'</small></div>'+
+    '<label>Quantidade <input type="number" data-buy-review-qty data-product="'+h(p.id)+'"'+
+    ' min="1" max="1000000" step="1" inputmode="numeric" required value="'+p.quantity+'"></label>'+
+    button('Remover','buy-cart-remove','data-id="'+h(p.id)+'" data-supplier="'+h(supplier)+'"','small danger')+
+    '</div>').join('')+'</div></article>';
+ }).join('');
+ const total=lines.reduce((sum,line)=>sum+line.quantity,0);
+ formModal('Revisar pedido · '+supplierName,
+  '<p class="help">Confira as quantidades por tamanho antes de gerar o PDF. Não altera o estoque.</p>'+
+  '<div class="buy-review-cards">'+html+'</div>'+
+  '<div class="buy-review-summary"><strong data-buy-review-total>'+
+   groups.length+' modelo(s) · '+lines.length+' SKU(s) · '+total+' unidades</strong></div>'+
+  '<div class="formgrid">'+
+   '<input type="hidden" name="supplier_id" value="'+h(supplier)+'">'+
+   field('Prazo estimado de chegada (dias corridos)','estimated_days','number',keep.days||'15',
+    'required min="1" max="365" step="1" inputmode="numeric"')+
+   textareaField('Observações para o fornecedor','note',keep.note||'')+'</div>'+
+  '<p class="help">O sistema salvará um pedido exclusivo para este fornecedor e baixará um PDF A4 com foto, tamanhos e quantidades.</p>',
   'buy-order-create','Salvar pedido e baixar PDF');
- syncPurchaseForm(document.querySelector('.modalback form[data-form="buy-order-create"]'));
  hydrateImages();
+}
+function updatePurchaseReviewTotals(supplierId){
+ const groups=purchaseCartReviewGroups(state.purchaseCart,state.items,state.apparelModels,supplierId);
+ for(const group of groups){
+  const node=[...document.querySelectorAll('[data-buy-review-model-total]')]
+   .find(el=>el.dataset.buyReviewModelTotal===group.key);
+  if(node)node.textContent='Total: '+group.total+' un.';
+ }
+ const total=groups.reduce((n,g)=>n+g.total,0);
+ const label=document.querySelector('[data-buy-review-total]');
+ if(label)label.textContent=groups.length+' modelo(s) · '+
+  groups.reduce((n,g)=>n+g.rows.length,0)+' SKU(s) · '+total+' unidades';
 }
 async function downloadBuyOrder(order,lines){
  if(!order)return toast('Compra não encontrada.',true);
