@@ -1,10 +1,28 @@
 -- CDSB: cadastros conectados e acompanhamento operacional sem alteração de estoque.
 -- Campos opcionais preservam integralmente as pessoas, fornecedores e pedidos existentes.
-ALTER TABLE public.staff_profiles
- ADD COLUMN IF NOT EXISTS phone text,
- ADD COLUMN IF NOT EXISTS job_title text,
- ADD COLUMN IF NOT EXISTS department text,
- ADD COLUMN IF NOT EXISTS internal_notes text;
+-- Os contatos ficam separados do perfil de autenticação, cuja política de leitura
+-- já é mais ampla (por exemplo, equipes de eventos). Só admins consultam contatos.
+CREATE TABLE IF NOT EXISTS public.staff_contact_details(
+ user_id uuid PRIMARY KEY REFERENCES public.staff_profiles(id) ON DELETE CASCADE,
+ phone text,
+ job_title text,
+ department text,
+ internal_notes text,
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.staff_contact_details ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS staff_contact_admin_read ON public.staff_contact_details;
+CREATE POLICY staff_contact_admin_read ON public.staff_contact_details FOR SELECT TO authenticated
+ USING(app_private.has_permission('users.manage'));
+DROP POLICY IF EXISTS staff_contact_admin_insert ON public.staff_contact_details;
+CREATE POLICY staff_contact_admin_insert ON public.staff_contact_details FOR INSERT TO authenticated
+ WITH CHECK(app_private.has_permission('users.manage'));
+DROP POLICY IF EXISTS staff_contact_admin_update ON public.staff_contact_details;
+CREATE POLICY staff_contact_admin_update ON public.staff_contact_details FOR UPDATE TO authenticated
+ USING(app_private.has_permission('users.manage'))
+ WITH CHECK(app_private.has_permission('users.manage'));
+GRANT SELECT,INSERT,UPDATE ON public.staff_contact_details TO authenticated;
+REVOKE ALL ON public.staff_contact_details FROM anon;
 ALTER TABLE public.suppliers
  ADD COLUMN IF NOT EXISTS legal_name text,
  ADD COLUMN IF NOT EXISTS contact_role text,
