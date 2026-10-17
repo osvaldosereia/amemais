@@ -111,7 +111,10 @@ BEGIN
     (COALESCE(NEW.sent_at,now())::date+COALESCE(NEW.estimated_days,15)));
   INSERT INTO public.procurement_tasks
    (supplier_id,purchase_order_id,assigned_to,title,description,task_kind,status,due_date,created_by)
-  VALUES(NEW.supplier_id,NEW.id,NEW.created_by,
+  VALUES(NEW.supplier_id,NEW.id,
+    CASE WHEN EXISTS(SELECT 1 FROM public.staff_profiles
+      WHERE id=NEW.created_by AND active AND archived_at IS NULL)
+      THEN NEW.created_by ELSE NULL END,
     'Acompanhar entrega PC-'||NEW.number::text,
     'Confirmar entrega e divergências do pedido de compra.', 'delivery_followup',
     'pendente',v_due,NEW.created_by)
