@@ -108,8 +108,7 @@ BEGIN
    'previous_status',v_status,'reservations_released',v_released,
    'movements_preserved',true);
 END;
-$function$
-
+$function$;
 
 REVOKE ALL ON FUNCTION public.admin_remove_order(text,uuid,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_remove_order(text,uuid,text) TO authenticated;
