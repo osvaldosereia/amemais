@@ -552,7 +552,8 @@ function pageContent(){
   if(state.view==='produtos')return productsPage();
   if(state.view==='compras')return purchasesPage({products:state.items,suppliers:state.suppliers,balances:state.balances,
    reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,models:state.apparelModels,categories:state.categories,tags:state.tags,
-   button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog,cart:state.purchaseCart,expanded:state.purchaseExpanded});
+   button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog,cart:state.purchaseCart,expanded:state.purchaseExpanded})+
+   procurementTasksHTML(state.procurementTasks,state.suppliers,state.users,button,hasPermission('purchases.manage'));
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):storesPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
@@ -1471,7 +1472,8 @@ function usersPage(){
  const entry=u=>'<article class="um-user" data-user-row data-user-filter="'+h([u.full_name,u.username,profileLabel(u)].join(' ').toLowerCase())+'" data-user-role="'+h(u.role)+'">'+
   '<div class="um-user-main"><span class="um-avatar" aria-hidden="true">'+h((u.full_name||'?').slice(0,1).toUpperCase())+'</span>'+
    '<div class="um-user-names"><strong>'+h(u.full_name)+'</strong><small>@'+h(u.username)+'</small></div></div>'+
-  '<div class="um-user-details"><span class="um-role">'+h(profileLabel(u))+'</span>'+
+  '<div class="um-user-details"><span class="um-role">'+h(profileLabel(u))+'</span>'+ 
+   (state.staffContactDetails.find(d=>d.user_id===u.id)?.job_title?'<small class="um-linked">'+h(state.staffContactDetails.find(d=>d.user_id===u.id).job_title)+'</small>':'')+
    '<span class="pill '+(u.archived_at?'encerrado':u.active?'ativo':'encerrado')+'">'+(u.archived_at?'Excluído':u.active?'Ativo':'Bloqueado')+'</span>'+
    (u.role==='franquia'?'<small class="um-linked">'+h(state.stores.filter(s=>state.staffStores.some(a=>a.user_id===u.id&&a.store_id===s.id)).map(x=>x.name).join(', ')||'Sem loja vinculada')+'</small>':'')+
   '</div><div class="um-user-actions">'+
@@ -2585,11 +2587,15 @@ function userEditModal(id){
  const target=state.users.find(u=>u.id===id);
  if(!target||target.archived_at)return;
  formModal('Editar dados · '+target.full_name,
-  '<p class="help">Altere o nome e o usuário de login. O perfil e as unidades são editados em “Perfil e acessos”.</p>'+
+  '<p class="help">Altere os dados cadastrais e profissionais. Perfil, lojas e eventos permanecem em “Perfil e acessos”.</p>'+ 
   '<div class="formgrid">'+
   field('Nome completo','full_name','text',target.full_name,'required minlength="2" maxlength="120"')+
   field('Nome de usuário (login)','username','text',target.username,
    'required minlength="3" maxlength="32" autocapitalize="none" autocomplete="off"')+
+  field('Telefone / WhatsApp','phone','text',state.staffContactDetails.find(d=>d.user_id===id)?.phone||'','maxlength="60"')+
+  field('Cargo','job_title','text',state.staffContactDetails.find(d=>d.user_id===id)?.job_title||'','maxlength="120"')+
+  field('Setor','department','text',state.staffContactDetails.find(d=>d.user_id===id)?.department||'','maxlength="120"')+
+  textareaField('Observações administrativas','internal_notes',state.staffContactDetails.find(d=>d.user_id===id)?.internal_notes||'')+
   '</div>','user-edit','Salvar alterações');
  const form=document.querySelector('.modalback form[data-form="user-edit"]');
  if(form)form.dataset.id=id;
@@ -2964,6 +2970,9 @@ function userModal(){
   formModal('Cadastrar usuário','<div class="formgrid">'+
     field('Nome completo','full_name','text','','required minlength="2" maxlength="120" autocomplete="name"')+
     field('Usuário','username','text','','required minlength="3" maxlength="32" autocapitalize="none"')+
+    field('Telefone / WhatsApp','phone','text','','maxlength="60"')+
+    field('Cargo','job_title','text','','maxlength="120"')+
+    field('Setor','department','text','','maxlength="120"')+
     selectField('Função','role',Object.entries(roles),'evento')+
     permissionFields('')+
     field('Senha inicial','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"',
@@ -5113,7 +5122,9 @@ async function handleSubmit(event){
      return toast('Informe nome e usuário válidos.',true);
     return exec(async()=>{await invokeManageUser('edit',{
      user_id:form.dataset.id,full_name:name,username
-    });},'Dados cadastrais atualizados.');
+    });
+    assertOk(await db.from('staff_contact_details').upsert({user_id:form.dataset.id,...staffDirectoryPayload(values)},{onConflict:'user_id'}));
+   },'Dados profissionais atualizados.');
   }
   if(type==='user-role'){
     if(!isAdmin() || form.dataset.id===state.user.id)return;
@@ -5136,6 +5147,7 @@ async function handleSubmit(event){
         username:String(values.username||'').trim(),
         role:values.role,password,permissions,store_ids
       });
+      if(created?.user_id)assertOk(await db.from('staff_contact_details').upsert({user_id:created.user_id,...staffDirectoryPayload(values)},{onConflict:'user_id'}));
       const eventIds=[...form.querySelectorAll('[name="event_member"]:checked')].map(x=>x.value);
       if(values.role==='evento'&&eventIds.length&&created?.user_id)
        assertOk(await db.rpc('set_staff_access_v2',{
