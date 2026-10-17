@@ -14,5 +14,5 @@ if (insecure) {
     </section>
   </main>`;
 } else {
-  await import('./app.js?v=20261016buyeta1');
+  await import('./app.js?v=20261016buysearch1');
 }
