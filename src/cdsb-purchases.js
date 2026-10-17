@@ -170,7 +170,6 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
   const categoryId=g.variants.find(p=>p.category_id)?.category_id;
   const categoryName=categories.find(c=>String(c.id)===String(categoryId))?.name||'—';
   const isExpanded=expanded.has(g.key);
-  const canSuggest=Boolean(groupShortage&&g.supplier_id);
   const commonAttrs='data-group="'+h(g.key)+'"';
   const image=g.photo?'<img data-photo-path="'+h(g.photo)+'" alt="Foto: '+h(g.title)+'" loading="lazy">':'<span class="buy-no-photo">Sem foto</span>';
   const picked=g.variants.filter(p=>cart.has(p.id));
@@ -179,7 +178,8 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    const need=p.min_stock>p.free?Math.max(0,p.min_stock-p.free-p.pending):0;
    const warning=p.pending?'Encomendado: '+f(p.pending)+' un. · '+(p.pendingDate?'prev. '+fmtDate(p.pendingDate):'sem previsão'):
     (p.min_stock>0&&p.free<p.min_stock?'Abaixo do mínimo — avaliar histórico':'Estoque em avaliação');
-   const selected=cart.has(p.id),quantity=selected?Number(cart.get(p.id)):Math.max(1,need);
+   const moq=Math.max(1,Number(p.minimum_order_quantity||1));
+   const selected=cart.has(p.id),quantity=selected?Number(cart.get(p.id)):moq;
    return '<div class="buy-variant" data-buy-sku="'+h(p.id)+'" data-buy-group="'+h(g.key)+'">'+
     '<div class="buy-variant-pick"><label class="buy-variant-name">'+
     '<input type="checkbox" data-buy-inline-select data-product="'+h(p.id)+'"'+(selected?' checked':'')+(g.supplier_id?'':' disabled')+
@@ -188,8 +188,9 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
     '<small>'+h([p.apparel_color!=='Única'?p.apparel_color:'',p.sku?'SKU '+p.sku:''].filter(Boolean).join(' · '))+'</small>'+
     '<small>'+h(warning)+'</small></span></label>'+
     '<div class="buy-variant-values"><span>Disponível <b>'+f(p.free)+'</b></span>'+
-    '<span>Mínimo <b>'+f(p.min_stock)+'</b></span>'+
-    '<span class="buy-need'+(need?' is-low':'')+'">Sugestão <b>'+f(need)+'</b></span></div></div>'+
+    '<span>Estoque mín. <b>'+f(p.min_stock)+'</b></span>'+
+    '<span class="buy-need'+(need?' is-low':'')+'">Falta <b>'+f(need)+'</b></span>'+ 
+    '<span class="buy-moq">Pedido mínimo <b>'+f(moq)+'</b></span></div></div>'+
     '<div class="buy-inline-order"><label>Quantidade a pedir <input type="number" min="1" max="1000000" step="1"'+
     ' inputmode="numeric" data-buy-inline-qty data-product="'+h(p.id)+'" value="'+String(quantity)+'"'+
     (selected&&g.supplier_id?'':' disabled')+' aria-label="Quantidade para tamanho '+h(p.apparel_size||'Único')+'"></label></div></div>';
@@ -206,8 +207,6 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    '<button type="button" class="buy-card-action'+(primary?' is-primary':'')+'" data-action="'+actionName+'" '+
    commonAttrs+' '+extra+' aria-label="'+h(text)+'" title="'+h(text)+'"'+(disabled?' disabled':'')+'>'+
    ico(kind)+'<span class="buy-action-label">'+h(text)+'</span></button>';
-  const reportLabel='Ver saídas 30/90 dias';
-  const suggestionLabel='Usar sugestões · '+f(groupShortage)+' un.';
   return '<article class="buy-group-card buy-quick-card" data-buy-card="'+h(g.key)+'">'+
    '<div class="buy-group-head"><div class="buy-group-photo">'+image+'</div>'+
     '<div class="buy-group-title"><h3>'+h(g.title)+'</h3>'+
@@ -222,14 +221,13 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    '<div class="buy-card-toolbar" role="group" aria-label="Operações para '+h(g.title)+'">'+
      action(isExpanded?'Fechar compra':'Abrir compra','buy-open-group','cart',
       'aria-expanded="'+String(isExpanded)+'" aria-controls="buy-panel-'+h(g.key)+'"',true)+
-     action(suggestionLabel,'buy-suggest-group','magic','',false,!canSuggest)+
-     action(reportLabel,'buy-product-report','chart')+
+
      '<span class="buy-card-selected" data-buy-picked="'+h(g.key)+'" aria-live="polite">'+
       (pickedUnits?picked.length+' tamanho(s) · '+f(pickedUnits)+' un.':'Nenhuma variação selecionada')+'</span>'+
    '</div>'+
    '<details class="buy-variation-disclosure buy-one-panel" id="buy-panel-'+h(g.key)+'" data-buy-expand="'+h(g.key)+'"'+(isExpanded?' open':'')+'>'+
     '<summary class="buy-panel-accessible-summary">Variações, quantidades e histórico de saídas de '+h(g.title)+'</summary>'+
-    '<div class="buy-panel-column-head" aria-hidden="true"><span>Tamanho / SKU</span><span>Estoque e sugestão</span><span>Quantidade</span></div>'+
+    '<div class="buy-panel-column-head" aria-hidden="true"><span>Tamanho / SKU</span><span>Estoque / mínimo do fornecedor</span><span>Quantidade a pedir</span></div>'+
     '<div class="buy-variants">'+cards+'</div>'+
     '<section class="buy-panel-history" data-buy-outflow="'+h(g.key)+'" aria-live="polite">'+
       '<div class="buy-panel-history-head"><strong>Saídas do CD · 30/90 dias</strong>'+
@@ -238,7 +236,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
     '<div class="buy-panel-footer"><strong data-buy-panel-total="'+h(g.key)+'">'+
       (pickedUnits?picked.length+' tamanho(s) · '+f(pickedUnits)+' unidades':'Selecione as variações para montar o pedido')+
      '</strong>'+
-     '<button type="button" class="button primary" data-action="buy-review" data-supplier="'+h(g.supplier_id||'')+'" data-buy-panel-review="'+h(g.key)+'"'+(pickedUnits?'':' hidden')+'>Revisar seleção</button>'+
+     '<button type="button" class="button primary" data-action="buy-add-to-draft" data-group="'+h(g.key)+'" data-buy-panel-review="'+h(g.key)+'"'+(pickedUnits?'':' hidden')+'>Adicionar ao pedido</button>'+
     '</div>'+
    '</details></article>';
  }).join('');
@@ -254,16 +252,14 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    '<small>Prazo: '+(o.estimated_days?f(o.estimated_days)+' dias corridos':'não informado')+
    ' · Previsão: '+fmtDate(o.expected_arrival_date)+(overdue?' · ATRASADO':'')+'</small></div>'+
    '<span class="buy-status">'+h(status)+'</span><div class="buy-order-actions">'+
-   button('Baixar PDF','buy-print-order','data-id="'+h(o.id)+'"','small')+
-   (['rascunho','enviado'].includes(o.status)?button('Alterar previsão','buy-eta-edit','data-id="'+h(o.id)+'"','small'):'')+
-   (o.status==='rascunho'?button('Confirmar encomenda','buy-status','data-id="'+h(o.id)+'" data-status="enviado"','small primary'):'')+
-   (['enviado','recebido_parcial'].includes(o.status)?button('Conferir recebimento','buy-receive','data-id="'+h(o.id)+'"','small primary'):'')+
+   button('Abrir pedido','buy-order-open','data-id="'+h(o.id)+'"','small primary')+
+   (['enviado','recebido_parcial'].includes(o.status)?button('Conferir recebimento','buy-receive','data-id="'+h(o.id)+'"','small'):'')+
    (['rascunho','enviado'].includes(o.status)?button('Cancelar','buy-status','data-id="'+h(o.id)+'" data-status="cancelado"','small danger'):'')+
    '</div></article>';
  }).join('');
  return '<div class="buy-page"><header class="pagehead"><div><h1>Compras</h1>'+
   '<p>Selecione variações, compare estoques e histórico logístico e acompanhe encomendas.</p></div>'+
-  '<div class="actions">'+(cartSkus?button('Revisar pedido','buy-review','','primary'):'')+
+  '<div class="actions">'+button('Pedidos de compra','buy-tab','data-tab="pedidos"','primary')+
   button('Gerenciar fornecedores','buy-suppliers','','small')+'</div></header>'+
   '<nav class="buy-tabs" aria-label="Áreas de Compras">'+
   [['reposicao','Reposição'],['pedidos','Pedidos de compra'],['acompanhamento','Acompanhamento'],['fornecedores','Fornecedores']].map(([id,label])=>
