@@ -34,12 +34,21 @@ begin
 end;$fn$;
 revoke all on function app_private.category_variant_options(uuid),
  app_private.valid_category_variants(text[]) from public,anon,authenticated;
-select set_config('request.jwt.claim.sub',
- (select id::text from public.staff_profiles where role='admin' and active order by created_at limit 1),true);
-update public.categories set variation_options=array['PP','P','M','G','GG','XGG','XXGG','EXGG']
- where lower(name) in ('camiseta','camisetas') and variation_options is null;
-update public.categories set variation_options=array['Tamanho 10','Tamanho 12','Tamanho 14']
- where lower(name)='chapéu' and variation_options is null;
+-- Seed de taxonomia deve funcionar em branches sem usuários de produção.
+DO $seed$
+BEGIN
+ ALTER TABLE public.categories DISABLE TRIGGER categories_granular_permission;
+ BEGIN
+  UPDATE public.categories SET variation_options=ARRAY['PP','P','M','G','GG','XGG','XXGG','EXGG']
+   WHERE lower(name) IN ('camiseta','camisetas') AND variation_options IS NULL;
+  UPDATE public.categories SET variation_options=ARRAY['Tamanho 10','Tamanho 12','Tamanho 14']
+   WHERE lower(name)='chapéu' AND variation_options IS NULL;
+ EXCEPTION WHEN OTHERS THEN
+  ALTER TABLE public.categories ENABLE TRIGGER categories_granular_permission;
+  RAISE;
+ END;
+ ALTER TABLE public.categories ENABLE TRIGGER categories_granular_permission;
+END;$seed$;
 create or replace function public.quick_count_available(
  p_product_id uuid,p_expected_physical integer,p_expected_reserved integer,
  p_counted_available integer,p_note text default null
