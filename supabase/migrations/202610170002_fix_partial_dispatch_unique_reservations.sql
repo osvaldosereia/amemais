@@ -63,11 +63,13 @@ begin
    if v_physical is null or v_physical<v_qty then raise exception 'Estoque insuficiente no SKU %',v_item.product_id;end if;
   end if;
   -- One reservation per order/SKU: unique indexes forbid a second historical row.
-  -- Keep the original reserved quantity, record the effective shipment in
-  -- operational_progress.items, and close the reservation atomically.
-  -- The unshipped difference is derived from requested - counted.
+  -- When shipped, consumed quantity must equal actually dispatched units.
+  -- The unshipped amount is derived from order_items.quantity minus progress.items.counted,
+  -- preserving the original request and the discrepancy reason in operational audit.
+  -- With counted=0, the original reservation is released with no stock movement.
   update public.stock_reservations
-     set status=case when v_qty>0 then 'consumida' else 'liberada' end,
+     set quantity=case when v_qty>0 then v_qty else quantity end,
+         status=case when v_qty>0 then 'consumida' else 'liberada' end,
          ended_by=auth.uid(),ended_at=now()
    where product_id=v_item.product_id and status='ativa'
      and ((p_kind='loja' and order_id=p_order)
