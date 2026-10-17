@@ -5314,12 +5314,6 @@ document.addEventListener('input',event=>{
    updatePurchaseSearch(event.target.value);
    return;
   }
-  if(event.target.matches('[data-buy-search]'))syncPurchaseForm(event.target.closest('form'));
-  if(event.target.matches('[data-buy-quantity]')){
-   const input=event.target;
-   if(input.value!==''&&!Number.isInteger(Number(input.value)))input.setCustomValidity('Informe unidades inteiras.');
-   else input.setCustomValidity('');
-  }
   if(event.target.matches('[data-balance-count]')){
     const field=event.target,panel=field.closest('[data-product-details]');
     if(!panel)return;
@@ -5486,11 +5480,6 @@ document.addEventListener('change',event=>{
     savePurchaseCart();updatePurchaseCartDisplay();
     if(input.checked)qty.focus({preventScroll:true});
     return;
-  }
-  if(event.target.matches('[data-buy-modal-supplier]'))syncPurchaseForm(event.target.closest('form'));
-  if(event.target.matches('[data-buy-select]')){
-   const row=event.target.closest('[data-buy-product]'),qty=row?.querySelector('[data-buy-quantity]');
-   if(qty){qty.disabled=!event.target.checked;if(event.target.checked)qty.focus();}
   }
   if(event.target.matches('[data-buy-catalog]')){
     const field=event.target.dataset.buyCatalog;
