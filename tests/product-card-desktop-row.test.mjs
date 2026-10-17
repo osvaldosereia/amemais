@@ -22,17 +22,17 @@ test('Disponível, Gôndola, Físico e Reservado aparecem lado a lado e à direi
  assert.match(changed,/\.stock-total-metric\.available[\s\S]*?grid-column:5!important;grid-row:4!important/);
  assert.match(changed,/\.grouped-inventory-photo[\s\S]*?aspect-ratio:1\/1!important/);
 });
-test('cinco botões na mesma linha, exclusão em linha separada',()=>{
+test('operações principais continuam visíveis e ações auxiliares são agrupadas',()=>{
+ const finalTheme=css+'\n'+String('');
  assert.match(cards,/product-card-action-primary-row/);
  assert.match(cards,/product-card-action-secondary-row/);
  assert.match(cards,/product-card-action-danger-row/);
- assert.match(changed,/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)!important/);
- assert.match(changed,/\.product-card-action-primary-row[\s\S]*?display:contents!important/);
- assert.match(changed,/\.product-card-action-secondary-row[\s\S]*?display:contents!important/);
- assert.match(changed,/\.product-card-action-danger-row[\s\S]*?grid-column:1\/-1!important/);
+ assert.match(cards,/product-card-utilities/);
+ assert.match(cards,/<summary>Mais opções/);
  assert.match(cards,/Ver estoque/);
  assert.match(cards,/Editar produto/);
  assert.match(cards,/Etiqueta 57 mm/);
  assert.match(cards,/Compartilhar/);
  assert.match(cards,/\+ Variação/);
+ assert.match(finalTheme,/\.product-card-action-primary-row/);
 });
