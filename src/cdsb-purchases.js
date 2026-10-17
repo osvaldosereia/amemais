@@ -238,7 +238,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
     '<div class="buy-panel-footer"><strong data-buy-panel-total="'+h(g.key)+'">'+
       (pickedUnits?picked.length+' tamanho(s) · '+f(pickedUnits)+' unidades':'Selecione as variações para montar o pedido')+
      '</strong>'+
-     button('Revisar seleção','buy-review','data-supplier="'+h(g.supplier_id||'')+'" data-buy-panel-review="'+h(g.key)+'"','small primary')+
+     '<button type="button" class="button primary" data-action="buy-review" data-supplier="'+h(g.supplier_id||'')+'" data-buy-panel-review="'+h(g.key)+'"'+(pickedUnits?'':' hidden')+'>Revisar seleção</button>'+
     '</div>'+
    '</details></article>';
  }).join('');
