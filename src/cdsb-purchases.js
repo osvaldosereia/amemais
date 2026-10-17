@@ -166,7 +166,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    const selected=cart.has(p.id),quantity=selected?Number(cart.get(p.id)):1;
    return '<div class="buy-variant" data-buy-sku="'+h(p.id)+'" data-buy-group="'+h(g.key)+'">'+
     '<div class="buy-variant-pick"><label class="buy-variant-name">'+
-    '<input type="checkbox" data-buy-inline-select data-product="'+h(p.id)+'"'+(selected?' checked':'')+
+    '<input type="checkbox" data-buy-inline-select data-product="'+h(p.id)+'"'+(selected?' checked':'')+(g.supplier_id?'':' disabled')+
     ' aria-label="Selecionar tamanho '+h(p.apparel_size||'Único')+' do '+h(g.title)+'">'+
     '<span><strong>'+h(p.apparel_size||'Único')+'</strong>'+
     '<small>'+h([p.apparel_color!=='Única'?p.apparel_color:'',p.sku?'SKU '+p.sku:''].filter(Boolean).join(' · '))+'</small>'+
@@ -176,7 +176,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
     '<span>Sugestão <b>'+f(need)+'</b></span></div></div>'+
     '<div class="buy-inline-order"><label>Quantidade a pedir <input type="number" min="1" max="1000000" step="1"'+
     ' inputmode="numeric" data-buy-inline-qty data-product="'+h(p.id)+'" value="'+String(quantity)+'"'+
-    (selected?'':' disabled')+' aria-label="Quantidade para tamanho '+h(p.apparel_size||'Único')+'"></label></div></div>';
+    (selected&&g.supplier_id?'':' disabled')+' aria-label="Quantidade para tamanho '+h(p.apparel_size||'Único')+'"></label></div></div>';
   }).join('');
   return '<article class="buy-group-card"><div class="buy-group-head"><div class="buy-group-photo">'+image+'</div>'+
    '<div class="buy-group-title"><h3>'+h(g.title)+'</h3><small>'+h(supplier)+' · '+g.variants.length+' variação(ões)</small>'+
