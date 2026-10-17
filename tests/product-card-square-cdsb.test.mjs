@@ -12,7 +12,7 @@ const finalTheme=await readFile(new URL('../operational-clean-ui.css',import.met
 test('nova camada visual é a última folha CSS e usa a identidade CDSB',()=>{
  assert.match(index,/product-card-cdsb-square\.css\?v=20261016square2/);
  const lastCss=index.match(/<link\s+rel="stylesheet"[^>]+>/g).at(-1);
- assert.match(lastCss,/product-card-desktop-compact\.css/);
+ assert.match(lastCss,/product-card-actions-icons\.css/);
  assert.ok(index.indexOf('product-card-desktop-compact.css')>index.indexOf('product-card-clean-v8.css'));
  assert.match(baseTheme,/--cdsb-blue:#102d50/);
  assert.match(baseTheme,/--cdsb-gold:#c7a35f/);
@@ -31,14 +31,14 @@ test('fotos quadradas em desktop e mobile sem tocar nas imagens originais',()=>{
  assert.match(css,/aspect-ratio:\s*1\s*\/\s*1/);
 });
 test('ações de pedido e estoque permanecem, mas exclusão fica separada visualmente',()=>{
- assert.match(cards,/data-action="product-card-sizes"/);
- assert.match(cards,/data-action="product-card-edit-toggle"/);
+ assert.match(cards,/'product-card-sizes','layers'/);
+ assert.match(cards,/'product-card-edit-toggle'/);
  assert.match(cards,/shelf-label-open/);
  assert.match(cards,/share-product/);
  assert.match(cards,/add-variants/);
  assert.match(cards,/product-model-delete/);
  assert.match(cards,/product-gallery-quick/);
- assert.match(cards,/product-card-action-danger-row/);
+ assert.match(cards,/product-icon-danger/);
  assert.match(css,/\.product-card-action-danger-row/);
 });
 test('cores operacionais usam azul e dourado, vermelho só em exclusão/sem estoque',()=>{
@@ -53,5 +53,5 @@ test('cores operacionais usam azul e dourado, vermelho só em exclusão/sem esto
 test('galeria de seis imagens e os links de edição ficam preservados',()=>{
  assert.match(gallery,/Até 6 fotos/);
  assert.match(gallery,/gallery\.length>6/);
- assert.match(cards,/aria-label="Editar fotos/);
+ assert.match(cards,/'Editar fotos de '\+group.title/);
 });

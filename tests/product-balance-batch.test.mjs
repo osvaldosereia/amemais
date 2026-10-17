@@ -28,7 +28,8 @@ test('quatro tamanhos são renderizados no mesmo formulário retrátil de contag
  assert.match(html,/data-balance-scan-input/);
  assert.match(html,/data-action="product-balance-save"/);
  assert.match(html,/data-expected="35" data-reserved="1"/);
- assert.match(html,/data-editor-panel="fotos"/);
+ assert.doesNotMatch(html,/data-editor-panel="fotos"/);
+ assert.match(html,/data-action="product-gallery-quick"/);
  assert.match(html,/data-editor-panel="variacoes"/);
  assert.match(html,/data-editor-panel="geral"/);
  assert.doesNotMatch(html,/data-action="stock-free-save"/);

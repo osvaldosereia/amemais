@@ -90,12 +90,26 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const active=group.products.filter(p=>p.active);
   const isProducts=mode==='products';
   const canEdit=isProducts&&(canEditProduct?canEditProduct():canRegisterProducts());
-  // Atalho contextual: o editor de fotos abre diretamente sem acessar as abas de cadastro.
-  const photoQuickAction=canEdit?
-    '<button type="button" class="product-card-photo-quick" data-action="product-gallery-quick" data-id="'+h(group.modelId||main.id)+'" data-is-model="'+String(Boolean(group.modelId))+'" '+
-    'aria-label="Editar fotos de '+h(group.title)+'" title="Editar fotos do produto" >'+
-    '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+
-    '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/><path d="m14.5 5.5 4 4"/></svg></button>':'';
+  // Ícones acessíveis sem dependências externas. Ações mantêm seus handlers originais.
+  const cardIcon=(name)=>{
+    const paths={
+      layers:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+      pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/><path d="m14.5 5.5 4 4"/>',
+      camera:'<path d="M14.5 4h-5l-2 3H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3.5l-2-3Z"/><circle cx="12" cy="13" r="3"/>',
+      tag:'<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1"/>',
+      share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.1M8.7 13.3l6.6 4.1"/>',
+      plus:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/>',
+      trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 10v7M14 10v7"/>'
+    };
+    return '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+paths[name]+'</svg>';
+  };
+  const cardAction=(label,action,icon,{id=null,css='',attrs=''}={})=>
+    '<button type="button" class="product-icon-action '+css+'" data-action="'+action+'"'+
+    (id?' data-id="'+h(id)+'"':'')+' aria-label="'+h(label)+'" title="'+h(label)+'"'+
+    attrs+'>'+cardIcon(icon)+'</button>';
+  const photoQuickAction=canEdit?cardAction('Editar fotos de '+group.title,
+    'product-gallery-quick','camera',{id:group.modelId||main.id,css:'product-card-photo-quick',
+    attrs:' data-is-model="'+String(Boolean(group.modelId))+'"'}):'';
 
   const canMove=isProducts&&canMoveStock();
   const skuAccess=isProducts&&canManageSku();
@@ -258,8 +272,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     '<summary>Editar cadastro do produto</summary>'+
     '<div class="card-workspace-tabs" role="tablist" aria-label="Editar produto">'+
       '<button type="button" data-action="product-editor-tab" data-tab="geral" role="tab" aria-selected="true">Geral</button>'+
-      '<button type="button" data-action="product-editor-tab" data-tab="variacoes" role="tab" aria-selected="false">Variações</button>'+
-      '<button type="button" data-action="product-editor-tab" data-tab="fotos" role="tab" aria-selected="false">Fotos</button></div>'+
+      '<button type="button" data-action="product-editor-tab" data-tab="variacoes" role="tab" aria-selected="false">Variações</button></div>'+
     '<section data-editor-panel="geral"><form data-form="product-card-basic" data-id="'+h(model?.id||main.id)+'" data-is-model="'+Boolean(group.modelId)+'">'+
       '<details class="card-editor-accordion" open><summary>Dados gerais</summary>'+
         '<label>Nome do produto<input name="name" maxlength="180" required value="'+h(basicName)+'"></label>'+
@@ -281,36 +294,25 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<p>Excluir pode afetar reservas e pedidos pendentes. O histórico concluído é preservado.</p>'+
         '<p>Exclusão integral disponível acima para perfis autorizados.</p>'+
       '</details></section>'+
-    '<section data-editor-panel="fotos" hidden><p class="card-workspace-help">Edite a galeria de fotos do produto.</p>'+
-      (group.modelId?direct('Gerenciar fotos','apparel-photo',group.modelId):
-        direct('Gerenciar fotos','product-edit',main.id))+'</section>'+
+
    '</details>':'';
-  const primaryStock=isProducts?
-    '<button type="button" class="button product-card-action-primary product-card-action-stock" data-action="product-card-sizes" '+
-      'aria-expanded="'+String(Boolean(expanded))+'" data-variation-count="'+sizeCount+'">Ver variações ('+sizeCount+') <span aria-hidden="true">›</span></button>':'';
-  const primaryEdit=canEdit?
-    '<button type="button" class="button product-card-action-primary" data-action="product-card-edit-toggle" aria-expanded="false">'+
-      'Editar produto <span aria-hidden="true">⌄</span></button>':'';
-  // Ações essenciais na superfície do card; utilitários ficam acessíveis em detalhes.
-  // Estoques físico, reservado, disponível, foto e gôndola permanecem sempre visíveis.
-  const hasUtilities=isProducts&&(canLabel||canShare||(group.modelId&&canEdit)||
-    canRemoveEntireModel||(!group.modelId&&canDeleteProduct()));
+  const primaryStock=isProducts?cardAction('Ver variações ('+sizeCount+')',
+    'product-card-sizes','layers',{css:'product-card-action-primary product-card-action-stock',
+    attrs:' aria-expanded="'+String(Boolean(expanded))+'" data-variation-count="'+sizeCount+'"'}):'';
+  const primaryEdit=canEdit?cardAction('Editar produto','product-card-edit-toggle',
+    'pencil',{css:'product-card-action-primary product-card-edit-icon',
+    attrs:' aria-expanded="false"'}):'';
+  // Ícones visíveis na mesma faixa: nenhum menu "Mais opções".
   const actions=isProducts?
-    '<div class="grouped-inventory-actions product-card-actions-v5" aria-label="Ações de '+h(group.title)+'">'+
-      '<div class="product-card-action-primary-row">'+primaryStock+primaryEdit+'</div>'+
-      (hasUtilities?'<details class="product-card-utilities">'+
-        '<summary>Mais opções <span aria-hidden="true">⌄</span></summary>'+
-        '<div class="product-card-utilities-content">'+
-          '<div class="product-card-action-secondary-row">'+
-            (canLabel?direct('Etiqueta 80 mm','shelf-label-open',main.id,'product-card-action-secondary'):'')+
-            (canShare?direct('Compartilhar','share-product',main.id,'product-card-action-secondary'):'')+
-            (group.modelId&&canEdit?direct('+ Variação','add-variants',group.modelId,'product-card-action-secondary'):'')+
-          '</div>'+
-          (canRemoveEntireModel||(!group.modelId&&canDeleteProduct())?
-           '<div class="product-card-action-danger-row">'+
-             (canRemoveEntireModel?direct('Excluir produto e todas as variações','product-model-delete',group.modelId,'danger product-card-delete-whole'):'')+
-             (!group.modelId&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'danger product-card-delete-whole'):'')+
-           '</div>':'')+'</div></details>':'')+
+    '<div class="grouped-inventory-actions product-card-actions-v5 product-card-icon-toolbar" role="group" aria-label="Ações de '+h(group.title)+'">'+
+      primaryStock+primaryEdit+photoQuickAction+
+      (canLabel?cardAction('Etiqueta 80 mm','shelf-label-open','tag',{id:main.id}):'')+
+      (canShare?cardAction('Compartilhar produto','share-product','share',{id:main.id}):'')+
+      (group.modelId&&canEdit?cardAction('Adicionar variação','add-variants','plus',{id:group.modelId}):'')+
+      (canRemoveEntireModel?cardAction('Excluir produto e todas as variações','product-model-delete','trash',
+        {id:group.modelId,css:'product-icon-danger product-card-delete-whole'}):'')+
+      (!group.modelId&&canDeleteProduct()?cardAction('Excluir produto','product-delete','trash',
+        {id:main.id,css:'product-icon-danger product-card-delete-whole'}):'')+
     '</div>':'';
 
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
@@ -318,7 +320,6 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       '<div class="grouped-inventory-photo">'+photo+'</div>'+
       '<div class="grouped-inventory-info">'+
         '<small class="product-card-description">'+h(description)+'</small>'+ 
-        photoQuickAction+
         '<strong class="product-card-name">'+h(group.title)+'</strong>'+
         (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':'')+
         (!isProducts?'<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+

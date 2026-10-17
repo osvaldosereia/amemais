@@ -1,0 +1,72 @@
+/* AME MAIS | Ações visíveis por ícones, desktop e celular.
+ * Esta folha deve ser a última do catálogo para neutralizar grades e dropdowns antigos. */
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-actions.product-card-actions-v5.product-card-icon-toolbar{
+  display:flex!important;flex-direction:row!important;align-items:center!important;
+  justify-content:flex-start!important;flex-wrap:wrap!important;
+  gap:8px!important;min-height:0!important;width:100%!important;
+  padding:8px 14px 12px!important;margin:0!important;
+  border-top:1px solid #e4ebf3!important;background:#fff!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-action{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  flex:0 0 46px!important;align-self:center!important;
+  width:46px!important;min-width:46px!important;max-width:46px!important;
+  height:44px!important;min-height:44px!important;max-height:44px!important;
+  margin:0!important;padding:0!important;border:1px solid #cbd8e6!important;
+  border-radius:10px!important;background:#f7f9fc!important;color:#102d50!important;
+  box-shadow:none!important;cursor:pointer!important;
+  font-size:initial!important;line-height:1!important;
+  transition:background .16s,border-color .16s!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-action>svg{
+  display:block!important;flex:0 0 21px!important;width:21px!important;
+  height:21px!important;pointer-events:none!important;stroke:currentColor!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-card-action-stock{
+  background:#102d50!important;border-color:#102d50!important;color:#fff!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-action.is-active{
+  background:#e8eff9!important;border-color:#8daace!important;color:#102d50!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-card-photo-quick{
+  position:static!important;top:auto!important;right:auto!important;
+  display:inline-flex!important;order:initial!important;justify-self:auto!important;
+  border-radius:10px!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-danger{
+  margin-left:auto!important;border-color:#efc9c5!important;
+  background:#fff6f5!important;color:#a52c2c!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-action:hover{
+  background:#e9f0f9!important;border-color:#91aaca!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-card-action-stock:hover{
+  background:#1c446e!important;color:#fff!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-danger:hover{
+  background:#fee7e6!important;border-color:#c77c74!important;color:#932727!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-action:focus-visible{
+  outline:3px solid #c7a35f!important;outline-offset:2px!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-editor .card-workspace-tabs{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+}
+@media(max-width:760px){
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-actions.product-card-actions-v5.product-card-icon-toolbar{
+    display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    grid-auto-rows:44px!important;gap:7px!important;justify-items:stretch!important;
+    padding:9px 12px 11px!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-action{
+    width:100%!important;min-width:0!important;max-width:none!important;
+    height:44px!important;min-height:44px!important;max-height:44px!important;
+    flex:initial!important;grid-column:auto!important;grid-row:auto!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-danger{
+    margin-left:0!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .mobile-c-app .products-panel .product-card-v3 .product-card-icon-toolbar>button.product-icon-action{transition:none!important}
+}

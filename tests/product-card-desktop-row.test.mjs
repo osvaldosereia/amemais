@@ -11,7 +11,8 @@ const card=await read('src/stock-workflows.js');
 
 test('layout compacto desktop é a última camada e mantém os estilos mobile precedentes',()=>{
  const links=[...index.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map(m=>m[1]);
- assert.match(links.at(-1),/product-card-desktop-compact\.css\?v=20261017desktopcompact1/);
+ assert.match(links.at(-1),/product-card-actions-icons\.css\?v=20261017icons1/);
+ assert.match(links.at(-2),/product-card-desktop-compact\.css\?v=20261017desktopcompact1/);
  assert.ok(links.findIndex(x=>x.includes('product-card-clean-v8.css'))<links.length-1);
  assert.match(css,/@media \(min-width:761px\)/);
  assert.match(css,/@media \(min-width:761px\) and \(max-width:1180px\)/);
@@ -37,13 +38,13 @@ test('ações, edição de foto fora da imagem, saldos e variações continuam n
  assert.match(card,/grouped-inventory-info/);
  assert.match(card,/stock-total-breakdown/);
  assert.match(card,/product-card-photo-quick/);
- assert.match(card,/product-card-action-primary-row/);
- assert.match(card,/product-card-utilities/);
- assert.match(card,/data-action="product-card-sizes"/);
+ assert.match(card,/product-card-icon-toolbar/);
+ assert.doesNotMatch(card,/product-card-utilities/);
+ assert.match(card,/'product-card-sizes','layers'/);
  assert.match(card,/Ver variações/);
  assert.match(card,/Editar produto/);
  assert.match(card,/data-product-details/);
- assert.match(css,/\.grouped-inventory-info>\.product-card-photo-quick\{[\s\S]*?position:absolute!important;right:0!important;top:0!important/);
+ assert.match(card,/product-card-photo-quick/);
  assert.match(css,/\.grouped-inventory-photo :is\(\.product-gallery-arrow,\.product-gallery-count\)\{[\s\S]*?display:none!important/);
 });
 

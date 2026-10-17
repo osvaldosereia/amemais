@@ -47,12 +47,13 @@ test('permissões ocultam informações e atalhos administrativos sem acesso',()
  assert.doesNotMatch(html,/data-action="product-new"|data-dashboard-product-query/);
  assert.doesNotMatch(html,/data-action="open-tv"/);
 });
-test('menu de produtos concentra utilitários sem esconder os saldos',async()=>{
+test('faixa de ícones expõe utilitários sem esconder os saldos',async()=>{
  const workflow=await read('src/stock-workflows.js'),css=await read('operational-clean-ui.css');
- assert.match(workflow,/product-card-utilities/);
- assert.match(workflow,/<summary>Mais opções/);
- assert.match(workflow,/product-card-action-secondary-row/);
- assert.match(workflow,/product-card-action-danger-row/);
+ assert.match(workflow,/product-card-icon-toolbar/);
+ assert.match(workflow,/cardAction\('Etiqueta 80 mm'/);
+ assert.match(workflow,/cardAction\('Compartilhar produto'/);
+ assert.match(workflow,/product-icon-danger/);
+ assert.doesNotMatch(workflow,/<summary>Mais opções/);
  assert.match(workflow,/stock-total-breakdown/);
  assert.match(workflow,/product-card-location/);
  assert.match(css,/\.product-card-utilities\[open\]/);

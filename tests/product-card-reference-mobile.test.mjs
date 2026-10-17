@@ -25,10 +25,12 @@ test('foto não contém botão de edição; atalho permanece fora da imagem e re
  const html=groupedCard(groupInventory([product],[model])[0],options);
  const photo=html.split('<div class="grouped-inventory-photo">')[1].split('<div class="grouped-inventory-info">')[0];
  assert.doesNotMatch(photo,/product-card-photo-quick/);
- const info=html.split('<div class="grouped-inventory-info">')[1];
- assert.match(info,/product-card-photo-quick/);
- assert.match(info,/data-action="product-gallery-quick"/);
- assert.match(info,/aria-label="Editar fotos/);
+ const info=html.split('<div class="grouped-inventory-info">')[1].split('grouped-inventory-actions')[0];
+ assert.doesNotMatch(info,/product-card-photo-quick/);
+ const toolbar=html.split('product-card-icon-toolbar')[1].split('</div>')[0];
+ assert.match(toolbar,/product-card-photo-quick/);
+ assert.match(toolbar,/data-action="product-gallery-quick"/);
+ assert.match(toolbar,/aria-label="Editar fotos/);
  assert.match(info,/product-card-name/);
  const blocked=groupedCard(groupInventory([product],[model])[0],
   {...options,canEditProduct:()=>false,canRegisterProducts:()=>false});

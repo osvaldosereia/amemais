@@ -27,7 +27,7 @@ test('admin tem exclusão do modelo além da gestão por tamanho',()=>{
  assert.match(html,/data-action="product-model-delete"/);
  assert.match(html,/data-id="11111111-1111-4111-8111-111111111111"/);
  assert.match(html,/Editar produto/);
- assert.match(html,/\+ Variação/);
+ assert.match(html,/aria-label="Adicionar variação"/);
  assert.match(html,/data-action="product-card-sizes"/);
  assert.doesNotMatch(html,/product-card-more/);
 });
