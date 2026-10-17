@@ -31,8 +31,8 @@ test('fotos quadradas em desktop e mobile sem tocar nas imagens originais',()=>{
  assert.match(css,/aspect-ratio:\s*1\s*\/\s*1/);
 });
 test('ações de pedido e estoque permanecem, mas exclusão fica separada visualmente',()=>{
- assert.match(cards,/data-action="product-card-sizes"/);
- assert.match(cards,/data-action="product-card-edit-toggle"/);
+ assert.match(cards,/'product-card-sizes','layers'/);
+ assert.match(cards,/'product-card-edit-toggle'/);
  assert.match(cards,/shelf-label-open/);
  assert.match(cards,/share-product/);
  assert.match(cards,/add-variants/);
@@ -53,5 +53,5 @@ test('cores operacionais usam azul e dourado, vermelho só em exclusão/sem esto
 test('galeria de seis imagens e os links de edição ficam preservados',()=>{
  assert.match(gallery,/Até 6 fotos/);
  assert.match(gallery,/gallery\.length>6/);
- assert.match(cards,/aria-label="Editar fotos/);
+ assert.match(cards,/'Editar fotos de '\+group.title/);
 });
