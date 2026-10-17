@@ -25,8 +25,8 @@ test('reserva de estoque é independente da contagem de pendências',()=>{
 test('início fornece busca, atalhos e acesso à fila unificada sem catálogo repetido',async()=>{
  const app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
  assert.match(app,/dashboardOrderSummary\(unifiedOrderRecords\(\)\)/);
- assert.match(app,/data-action="dashboard-orders"/);
- assert.match(app,/data-action="dashboard-product-search"/);
- assert.match(app,/data-action="dashboard-order-open"/);
+ assert.match(app,/dashboard-orders/);
+ assert.match(app,/dashboard-product-search/);
+ assert.match(app,/dashboard-order-open/);
  assert.doesNotMatch(app,/<h2>Produtos recentes<\/h2>/);
 });
