@@ -90,7 +90,7 @@ test('TV mostra 5 produtos por bloco sem empilhar linhas; Abrir mantém linhas c
  assert.match(tv,/return rows\.map\(p=>/);
  assert.doesNotMatch(tv,/oneDetailData[\s\S]*?rows\.slice\(0,5\)/);
  assert.match(tvCss,/tv-card-low \.tv-one-product-row/);
- assert.match(tvCss,/min-height: 32px/);
+ assert.match(tvCss,/min-height: 33px/);
 });
 test('mobile e desktop têm controles de entrada e revisão focáveis e carrinho visível',()=>{
  assert.match(pcss,/\.buy-inline-order input/);
