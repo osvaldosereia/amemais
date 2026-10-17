@@ -556,7 +556,7 @@ function pageContent(){
   if(state.view==='compras')return purchasesPage({products:state.items,suppliers:state.suppliers,balances:state.balances,
    reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,models:state.apparelModels,categories:state.categories,tags:state.tags,
    button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog,cart:state.purchaseCart,expanded:state.purchaseExpanded,
-   orderFilter:state.purchaseOrderFilter,tab:state.purchaseTab,tasksHTML:procurementTasksHTML(state.procurementTasks,state.suppliers,state.users,button,true)});
+   orderFilter:state.purchaseOrderFilter,tab:state.purchaseTab,tasks:state.procurementTasks,tasksHTML:procurementTasksHTML(state.procurementTasks,state.suppliers,state.users,button,true)});
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):storesPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
