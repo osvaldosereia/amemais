@@ -11,7 +11,7 @@ export function groupPurchaseItems(items,products=[],models=[]){
   const p=catalog.get(item.product_id),model=models.find(m=>m.id===p?.apparel_model_id);
   const key=modelKey(p)||'unknown:'+item.id;
   if(!groups.has(key))groups.set(key,{name:model?.name||p?.name||item.product_name,
-   imagePath:model?.image_path||p?.image_path||null,rows:[]});
+   imagePath:model?.image_path||p?.image_path||model?.image_paths?.[0]||p?.image_paths?.[0]||null,rows:[]});
   groups.get(key).rows.push({...item,color:p?.apparel_color||'',size:p?.apparel_size||''});
  }
  return [...groups.values()];
@@ -93,7 +93,7 @@ export async function createPurchasePDF(order,supplier,items,{products=[],models
   for(const [chunkIndex,chunk] of chunks.entries()){
   const title=(g.name||'Produto')+(chunkIndex?' (continuação)':'');
   const maxText=pdf.splitTextToSize(title,145);
-  const blockH=Math.max(38,15+chunk.length*11+maxText.length*4);
+  const blockH=Math.max(38,19+chunk.length*11+maxText.length*4);
   ensure(blockH+5);
   const top=y;
   pdf.setFillColor(244,247,251);pdf.roundedRect(left,top,184,blockH,2,2,'F');
@@ -116,6 +116,11 @@ export async function createPurchasePDF(order,supplier,items,{products=[],models
    pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);setText(...ink);
    pdf.text(format(row.quantity)+' un.',right-4,iy,{align:'right'});
    iy+=11;
+  }
+  if(chunkIndex===chunks.length-1){
+   const groupTotal=g.rows.reduce((sum,r)=>sum+Number(r.quantity||0),0);
+   pdf.setFont('helvetica','bold');pdf.setFontSize(9);setText(...ink);
+   pdf.text('TOTAL DO MODELO: '+format(groupTotal)+' un.',right-4,top+blockH-5,{align:'right'});
   }
   y=top+blockH+5;
   }
