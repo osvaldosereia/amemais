@@ -40,7 +40,7 @@ export function accessCenterHTML({users=[],profiles=[],assignments=[],stores=[],
    '<div class="ac-profile-main"><strong>'+e(p.name)+'</strong><small>'+e(p.description||'Sem descrição')+'</small>'+
    '<span class="ac-profile-meta">'+assigned+' usuário(s) · '+(p.is_system?'Perfil-base protegido':p.role_kind==='gerente'?'Equipe interna':p.role_kind==='franquia'?'Franquia':p.role_kind==='evento'?'Loja temporária':p.role_kind==='consulta'?'Consulta':'Separação')+
    (p.is_active?'':' · Inativo')+'</span></div>'+
-   (p.is_system?'<span class="ac-static-chip">Protegido</span>':button('Editar','access-profile-edit','data-id="'+e(p.id)+'"','small')+
+   (p.is_system?'<span class="ac-static-chip">Protegido</span>'+button('Duplicar','access-profile-copy','data-id="'+e(p.id)+'"','small'):button('Editar','access-profile-edit','data-id="'+e(p.id)+'"','small')+
     button('Duplicar','access-profile-copy','data-id="'+e(p.id)+'"','small'))+
    '</article>';
  }).join('');
