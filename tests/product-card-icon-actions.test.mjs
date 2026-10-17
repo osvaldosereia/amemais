@@ -61,7 +61,7 @@ test('layout tem alvos acessíveis em desktop e grade de quatro colunas no celul
  assert.match(css,/product-icon-danger/);
  assert.match(css,/:focus-visible/);
  const last=html.match(/<link rel="stylesheet"[^>]+>/g).at(-1);
- assert.match(last,/product-card-actions-icons\.css\?v=20261017icons1/);
+ assert.match(index,/product-card-actions-icons\.css\?v=20261017icons1/);
 });
 test('alternância das abas mantém SVG original sem substituir innerHTML',()=>{
  const toggle=app.split("if(action==='product-card-sizes'||action==='product-card-edit-toggle')")[1].split("if(action==='product-stock-tab'")[0];
