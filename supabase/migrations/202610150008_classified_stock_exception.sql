@@ -7,19 +7,37 @@ alter table public.stock_operation_batches add column if not exists exception_re
  check(exception_reason in ('avaria','extravio','diretoria','doacao','outro'));
 alter table public.stock_operation_batches add column if not exists exception_recipient text
  check(exception_recipient is null or length(exception_recipient) between 2 and 120);
--- A migração executa os inserts como administrador autorizado; trigger de permissão continua ativo.
-select set_config('request.jwt.claim.sub',
- (select id::text from public.staff_profiles where role='admin' and active order by created_at limit 1),true);
-insert into public.stock_destinations(name,description,active,created_by,system_reason)
-select v.name,'Destino de baixa excepcional classificada',true,auth.uid(),v.reason
-from (values
- ('avaria','Baixa excepcional · Avaria'),
- ('extravio','Baixa excepcional · Extravio ou perda'),
- ('diretoria','Baixa excepcional · Uso da diretoria'),
- ('doacao','Baixa excepcional · Doação'),
- ('outro','Baixa excepcional · Outro motivo')
-) as v(reason,name)
-where not exists(select 1 from public.stock_destinations d where d.system_reason=v.reason);
+-- Migração precisa funcionar em branch sem usuários de produção.
+-- Apenas durante este seed transacional, desabilitar o trigger de permissão
+-- específico desta tabela (nunca as restrições de integridade do banco).
+-- Executado pelo papel de migração privilegiado; restaura antes de encerrar.
+DO $seed$
+DECLARE v_trigger text;
+BEGIN
+ SELECT t.tgname INTO v_trigger FROM pg_trigger t
+ WHERE t.tgrelid='public.stock_destinations'::regclass
+   AND NOT t.tgisinternal
+   AND t.tgfoid='app_private.guard_permission_mutation()'::regprocedure
+ LIMIT 1;
+ IF v_trigger IS NULL THEN RAISE EXCEPTION 'Trigger de autorização não encontrado'; END IF;
+ EXECUTE format('ALTER TABLE public.stock_destinations DISABLE TRIGGER %I',v_trigger);
+ BEGIN
+  INSERT INTO public.stock_destinations(name,description,active,created_by,system_reason)
+  SELECT v.name,'Destino de baixa excepcional classificada',true,null,v.reason
+  FROM (VALUES
+   ('avaria','Baixa excepcional · Avaria'),
+   ('extravio','Baixa excepcional · Extravio ou perda'),
+   ('diretoria','Baixa excepcional · Uso da diretoria'),
+   ('doacao','Baixa excepcional · Doação'),
+   ('outro','Baixa excepcional · Outro motivo')
+  ) AS v(reason,name)
+  WHERE NOT EXISTS(SELECT 1 FROM public.stock_destinations d WHERE d.system_reason=v.reason);
+ EXCEPTION WHEN OTHERS THEN
+  EXECUTE format('ALTER TABLE public.stock_destinations ENABLE TRIGGER %I',v_trigger);
+  RAISE;
+ END;
+ EXECUTE format('ALTER TABLE public.stock_destinations ENABLE TRIGGER %I',v_trigger);
+END;$seed$;
 create or replace function public.record_stock_exception(
  p_product_id uuid,p_quantity integer,p_expected integer,
  p_reason text,p_details text,p_recipient text,p_request_id uuid
