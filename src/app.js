@@ -1571,8 +1571,10 @@ function photoChooser(item){return galleryMarkup(item);}
 function procurementFields(item=null){
  return '<section class="form-section wide"><div class="section-head"><strong>Reposição e compras</strong>'+
   '<small>Controle por SKU/variação; não altera o estoque atual</small></div>'+
-  '<div class="formgrid">'+field('Estoque mínimo (unidades)','min_stock','number',item?.min_stock??0,
-    'min="0" max="1000000" step="1"','Ao ficar abaixo desse limite, aparece na sugestão de compras.')+
+  '<div class="formgrid">'+field('Estoque mínimo para reposição','min_stock','number',item?.min_stock??0,
+    'min="0" max="1000000" step="1"','Define alerta de reposição, não o mínimo de compra.')+
+  field('Pedido mínimo do fornecedor por variação','minimum_order_quantity','number',item?.minimum_order_quantity??1,
+    'min="1" max="1000000" step="1" required','Quantidade mínima aceita pelo fornecedor ao comprar este SKU.')+
   selectField('Fornecedor padrão','supplier_id',[['','Sem fornecedor'],...state.suppliers.filter(s=>s.active||s.id===item?.supplier_id).map(s=>[s.id,s.name])],item?.supplier_id||'')+
   '</div><p class="help">Cadastre fornecedores na seção Compras. Para modelos com variações, o mínimo vale por tamanho/SKU.</p></section>';
 }
@@ -1581,11 +1583,15 @@ function procurementValues(form){
  if(raw===''||!Number.isInteger(min)||min<0||min>1000000)throw Error('Estoque mínimo deve ser de 0 a 1.000.000 unidades.');
  const supplier=form.elements.namedItem('supplier_id')?.value||null;
  if(supplier&&!state.suppliers.some(s=>s.id===supplier&&s.active))throw Error('Fornecedor inválido ou inativo.');
- return {supplier_id:supplier,min_stock:min};
+ const minimumRaw=form.elements.namedItem('minimum_order_quantity')?.value??'1',minimumOrderQuantity=Number(minimumRaw);
+ if(minimumRaw===''||!Number.isInteger(minimumOrderQuantity)||minimumOrderQuantity<1||minimumOrderQuantity>1000000)
+  throw Error('Pedido mínimo do fornecedor deve ser de 1 a 1.000.000 unidades.');
+ return {supplier_id:supplier,min_stock:min,minimum_order_quantity:minimumOrderQuantity};
 }
 async function saveModelProcurement(modelId,form){
  const v=procurementValues(form);
  assertOk(await db.rpc('set_apparel_procurement',{p_model:modelId,p_supplier:v.supplier_id,p_min_stock:v.min_stock}));
+ assertOk(await db.from('products').update({minimum_order_quantity:v.minimum_order_quantity}).eq('apparel_model_id',modelId));
 }
 function supplierManagerModal(){
  if(!hasPermission('purchases.manage'))return;
@@ -4756,7 +4762,8 @@ async function handleSubmit(event){
       if(!editing){const procurement=procurementValues(form);
        assertOk(await db.rpc('set_product_procurement',{
         p_product:productId,p_supplier:procurement.supplier_id,p_min_stock:procurement.min_stock
-       }));}
+       }));
+       assertOk(await db.from('products').update({minimum_order_quantity:procurement.minimum_order_quantity}).eq('id',productId));}
       if(galleryHasChanges(form)){
         try{
           const existing=editing?product(id):null;
