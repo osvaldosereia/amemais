@@ -135,7 +135,7 @@ export function filterPurchaseGroups(groups=[],filters={},categories=[]){
  });
 }
 
-export function purchasesPage({products=[],models=[],suppliers=[],categories=[],tags=[],balances=[],reservations=[],orders=[],items=[],button,filter='',catalog={},cart=new Map(),expanded=new Set(),tab='reposicao',tasksHTML=''}) {
+export function purchasesPage({products=[],models=[],suppliers=[],categories=[],tags=[],balances=[],reservations=[],orders=[],items=[],button,filter='',catalog={},cart=new Map(),expanded=new Set(),tab='reposicao',tasksHTML='',orderFilter=''}) {
  const groups=purchasingGroups(products,models,balances,reservations,orders,items);
  const cartCount=[...cart.values()].reduce((n,q)=>n+(Number(q)||0),0);
  const cartSkus=cart.size;
@@ -203,7 +203,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    (pickedUnits?button('Revisar seleção','buy-review','data-supplier="'+h(g.supplier_id)+'"','small primary'):'')+
    '</div></article>';
  }).join('');
- const purchaseCards=orders.slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,40).map(o=>{
+ const purchaseCards=orders.filter(o=>orderFilter==='abertas'?['rascunho','enviado','recebido_parcial'].includes(o.status):orderFilter==='atrasadas'?['enviado','recebido_parcial'].includes(o.status)&&o.expected_arrival_date&&o.expected_arrival_date<today:true).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,40).map(o=>{
   const supplier=suppliers.find(s=>s.id===o.supplier_id)?.name||'Fornecedor';
   const its=items.filter(i=>i.purchase_order_id===o.id);
   const total=its.reduce((n,i)=>n+Number(i.quantity||0),0);
@@ -264,8 +264,8 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
   '<div class="buy-dock-heading"><strong>Meu pedido de compra</strong>'+
   '<small data-buy-cart-summary>'+f(cartSkus)+' SKU(s) · '+f(cartCount)+' unidades · '+f(cartSuppliers)+' fornecedor(es)</small></div>'+
   button('Revisar pedido','buy-review','','primary')+'</aside>':'')+
-  (tab==='pedidos'?'<section class="panel"><header class="buy-section-head"><h2>Pedidos de compra · fornecedores</h2></header>'+
-  (purchaseCards||'<p class="buy-empty">Nenhum pedido cadastrado.</p>')+'</section>':'')+
+  (tab==='pedidos'?'<section class="panel"><header class="buy-section-head"><div><h2>Pedidos de compra · fornecedores</h2><small>Pedidos feitos aos fornecedores, não às lojas ou franquias.</small></div>'+ (orderFilter?button('Ver todos','buy-orders-all','','small'):'')+'</header>'+
+  (purchaseCards||'<p class="buy-empty">Nenhum pedido corresponde ao filtro selecionado.</p>')+'</section>':'')+
   (tab==='acompanhamento'?tasksHTML:'')+
   (tab==='fornecedores'?'<section class="panel"><header class="buy-section-head"><h2>Fornecedores</h2>'+button('Novo fornecedor','buy-supplier-new','','small primary')+'</header>'+supplierListHTML(suppliers,button,{products,orders})+'</section>':'')+
   '<p class="buy-note">Pedidos de compra de fornecedores são independentes dos pedidos das lojas. Somente recebimentos conferidos atualizam o estoque físico.</p></div>';
