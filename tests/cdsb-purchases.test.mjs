@@ -40,7 +40,8 @@ test('tela do comprador possui seletores, fornecedor e impressão de relatório'
  const html=purchasesPage({products,suppliers:[supplier],balances,reservations,
   orders,items:orderItems,button:(label,action,attrs='')=>
    '<button data-action="'+action+'" '+attrs+'>'+label+'</button>'});
- assert.match(html,/data-action="buy-review"/);
+ assert.match(html,/data-action="buy-open-group"/);
+ assert.doesNotMatch(html,/data-action="buy-review"/);
  assert.match(html,/data-action="buy-suppliers"/);
  assert.match(html,/data-action="buy-print-alerts"/);
  assert.match(html,/Fábrica São Bento/);
