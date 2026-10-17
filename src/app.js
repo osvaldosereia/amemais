@@ -1803,7 +1803,8 @@ function purchaseDraftDetails(order){
     field('Prazo estimado de chegada (dias)','estimated_days','number',order.estimated_days||supplier?.delivery_days||15,'required min="1" max="365"')+
     textareaField('Observações para o fornecedor','note',order.note||'')+'</div>'+
     '<p class="help">Conferir e preparar PDF não envia mensagens automaticamente. Compartilhe o PDF com o fornecedor e então registre o envio.</p>'+
-    (items.length?button('Já enviei ao fornecedor','buy-draft-mark-sent','data-id="'+h(order.id)+'"','small'):''):
+    (items.length&&order.expected_arrival_date?button('Baixar PDF','buy-print-order','data-id="'+h(order.id)+'"','small'):'')+
+    (items.length&&order.expected_arrival_date?button('Já enviei ao fornecedor','buy-draft-mark-sent','data-id="'+h(order.id)+'"','small'):''):
    '') ,
   draft?'buy-draft-confirm':'buy-draft-readonly',draft?'Conferir e preparar PDF':'Fechar');
  const form=document.querySelector('form[data-form="'+(draft?'buy-draft-confirm':'buy-draft-readonly')+'"]');
@@ -3743,6 +3744,14 @@ async function handleClick(event){
   if(action==='buy-draft-mark-sent'){
    const order=state.purchaseOrders.find(o=>o.id===id);
    if(!order||order.status!=='rascunho')return;
+   if(!order.estimated_days||!order.expected_arrival_date)
+     return toast('Confira o pedido e prepare o PDF antes de registrar o envio.',true);
+   const form=document.querySelector('form[data-form="buy-draft-confirm"]');
+   const dirty=[...(form?.querySelectorAll('[data-draft-qty]')||[])].some(input=>
+     Number(input.value)!==Number(state.purchaseItems.find(i=>i.purchase_order_id===id&&i.product_id===input.dataset.draftQty)?.quantity));
+   if(dirty||String(form?.elements.namedItem('estimated_days')?.value||'')!==String(order.estimated_days)||
+      String(form?.elements.namedItem('note')?.value||'').trim()!==String(order.note||'').trim())
+     return toast('Existem mudanças não conferidas. Clique em Conferir e preparar PDF primeiro.',true);
    if(!window.confirm('Confirma que este pedido já foi enviado efetivamente ao fornecedor? Esta ação apenas registra o envio, não transmite mensagens.'))return;
    return exec(async()=>{
     assertOk(await db.rpc('set_purchase_order_status',{p_id:id,p_status:'enviado'}));
@@ -4743,9 +4752,10 @@ async function handleSubmit(event){
     saved=true;
     const fresh=assertOk(await db.from('purchase_orders').select('*').eq('id',order.id).single());
     const items=assertOk(await db.from('purchase_order_items').select('*').eq('purchase_order_id',order.id));
-    closeTopModal();
-    await loadData();await downloadBuyOrder(fresh,items);
-    toast('Pedido conferido e PDF preparado. Envie ao fornecedor e registre o envio no pedido.');
+    await loadData();
+    purchaseDraftDetails(state.purchaseOrders.find(o=>o.id===order.id));
+    await downloadBuyOrder(fresh,items);
+    toast('Pedido conferido e PDF preparado. Envie ao fornecedor e clique em Já enviei nesta mesma tela.');
    }catch(error){
     fail(error);
     if(saved){
