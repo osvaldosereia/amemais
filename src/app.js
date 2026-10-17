@@ -4718,7 +4718,7 @@ async function handleSubmit(event){
     assertOk(await db.rpc('add_purchase_draft_items',{p_order:orderId,p_items:lines}));
     for(const line of lines)state.purchaseCart.delete(line.product_id);
     savePurchaseCart();
-    closeTopModal();state.purchaseTab='pedidos';
+    closeTopModal();
     await loadData();
     toast(lines.length+' variação(ões) adicionada(s). Pode acrescentar outros produtos ao mesmo pedido.');
    }catch(error){fail(error);}finally{state.loading=false;}
