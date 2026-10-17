@@ -24,9 +24,11 @@ test('reserva de estoque é independente da contagem de pendências',()=>{
 });
 test('início fornece busca, atalhos e acesso à fila unificada sem catálogo repetido',async()=>{
  const app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
- assert.match(app,/dashboardOrderSummary\(unifiedOrderRecords\(\)\)/);
- assert.match(app,/dashboard-orders/);
- assert.match(app,/dashboard-product-search/);
- assert.match(app,/dashboard-order-open/);
- assert.doesNotMatch(app,/<h2>Produtos recentes<\/h2>/);
+ const home=await readFile(new URL('../src/dashboard-home.js',import.meta.url),'utf8');
+ assert.match(app,/renderOperationsDashboard\(/);
+ assert.match(home,/dashboardOrderSummary\(unifiedOrderRecords\(\)\)/);
+ assert.match(home,/data-action="dashboard-orders"/);
+ assert.match(home,/data-action="dashboard-product-search"/);
+ assert.match(home,/data-action="dashboard-order-open"/);
+ assert.doesNotMatch(home,/<h2>Produtos recentes<\/h2>/);
 });
