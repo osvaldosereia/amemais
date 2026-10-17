@@ -95,6 +95,11 @@ begin
   end if;
   v_total:=v_total+v_qty;
  end loop;
+ -- Never mark an order as dispatched when no physical unit was shipped.
+ -- Review the discrepancy or cancel the order through the proper workflow.
+ if v_total=0 then
+  raise exception 'Nenhuma unidade conferida para expedição; revise ou cancele o pedido';
+ end if;
  if p_kind='loja' then
   update public.store_orders set status='despachado',dispatched_by=auth.uid(),dispatched_at=now() where id=p_order;
  elsif p_kind='avulso' then
