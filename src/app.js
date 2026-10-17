@@ -2763,6 +2763,173 @@ function assertFranchiseProfile(form,role,perms,storeIds){
    storeIds.length!==1||!state.stores.some(x=>x.id===storeIds[0]&&x.active&&x.kind==='franquia'))
    throw new Error('O perfil Franquia exige apenas Consultar produtos e Solicitar para franquia, vinculado a uma única franquia ativa.');
 }
+// A central mantém a classificação técnica legada, enquanto os perfis novos
+// definem permissões reais por meio de atribuições explícitas.
+const accessRoleKinds=[
+ ['gerente','Equipe interna (CDSB)'],['estoquista','Separação (CDSB)'],
+ ['consulta','Consulta'],['evento','Loja temporária'],['franquia','Loja permanente']
+];
+function accessProfilePermissions(profileId){
+ return state.accessProfilePermissions.filter(x=>x.profile_id===profileId).map(x=>x.permission);
+}
+function accessProfileModal(profileId=null,duplicate=false){
+ if(!isAdmin())return;
+ const original=state.accessProfiles.find(p=>p.id===profileId);
+ if(profileId&&!original)return toast('Perfil não encontrado.',true);
+ if(original&&!duplicate&&original.is_system)return toast('Duplique um perfil-base para personalizar suas permissões.',true);
+ const role=original?.role_kind==='admin'?'gerente':original?.role_kind||'gerente';
+ const permissions=original?accessProfilePermissions(original.id):['products.read','purchases.manage'];
+ const groups=new Map();
+ for(const [code,label] of permissionCatalog){
+  const kind=code.split('.')[0];
+  const title={products:'Produtos',stock:'Estoque',orders:'Pedidos',events:'Eventos',
+   movements:'Relatórios',categories:'Categorias',tags:'Tags',catalog:'Catálogo',
+   stores:'Lojas',purchases:'Compras',users:'Administração',system:'Segurança'}[kind]||'Outros';
+  if(!groups.has(title))groups.set(title,[]);
+  groups.get(title).push('<label class="ac-permission" data-access-permission="'+h(code)+'">'+
+    '<input type="checkbox" name="profile_permission" value="'+h(code)+'"'+
+    (permissions.includes(code)?' checked':'')+'><span>'+h(label)+'</span></label>');
+ }
+ const grid=[...groups.entries()].map(([name,items])=>
+  '<fieldset class="ac-permission-group"><legend>'+h(name)+'</legend><div class="ac-permission-grid">'+items.join('')+'</div></fieldset>').join('');
+ formModal((duplicate?'Duplicar perfil · ':original?'Editar perfil · ':'Criar perfil')+(original?.name||'Novo'),
+  '<p class="help">Um perfil reúne permissões reutilizáveis. Os perfis-base são protegidos e podem ser duplicados.</p>'+
+  '<div class="formgrid">'+
+   field('Nome do perfil','name','text',duplicate?'Cópia de '+original.name:original?.name||'',
+    'required minlength="3" maxlength="90"')+
+   selectField('Tipo de atuação','role_kind',accessRoleKinds,role)+
+   textareaField('Descrição e responsabilidades','description',original?.description||'')+
+  '</div><section class="ac-permissions"><h3>Permissões do perfil</h3>'+
+  '<p class="help">Permissões críticas são exclusivas da administração. A atuação nas lojas continua limitada aos vínculos.</p>'+
+  grid+'</section>'+
+  '<label class="ac-check"><input type="checkbox" name="is_active" value="true"'+
+   (original?.is_active===false&&!duplicate?'':' checked')+'> Perfil ativo</label>',
+  'access-profile-save',duplicate?'Criar cópia':original?'Salvar perfil':'Criar perfil');
+ const form=document.querySelector('form[data-form="access-profile-save"]');
+ if(form){form.dataset.id=duplicate?'':original?.id||'';form.querySelector('[name="role_kind"]')?.addEventListener('change',()=>syncAccessProfileChoices(form,true));syncAccessProfileChoices(form,false);}
+}
+function syncAccessProfileChoices(form,reset=false){
+ const role=form.querySelector('[name="role_kind"]')?.value;
+ const required={
+  estoquista:['products.read','orders.read','orders.separate'],
+  evento:['products.read','events.read','events.request'],
+  franquia:['products.read','orders.franchise']
+ };
+ const readOnly=new Set(['products.read','orders.read','stores.read','movements.read','movements.export','events.read']);
+ for(const row of form.querySelectorAll('[data-access-permission]')){
+  const input=row.querySelector('input'),p=input?.value;
+  const allowed=role==='gerente'? !['users.manage','events.sell','system.force_delete'].includes(p):
+   role==='consulta'?readOnly.has(p):required[role]?.includes(p);
+  row.hidden=!allowed;
+  if(!allowed)input.checked=false;
+  if(reset&&required[role])input.checked=required[role].includes(p);
+ }
+}
+function setupProfileAssignmentScope(form){
+ const select=form.querySelector('[name="profile_id"]');
+ if(!select)return;
+ const refresh=()=>{
+  const role=state.accessProfiles.find(x=>x.id===select.value)?.role_kind;
+  const stores=form.querySelector('[data-scope-stores]'),events=form.querySelector('[data-scope-events]');
+  if(stores)stores.hidden=role==='evento'||role==='consulta';
+  if(events)events.hidden=role!=='evento';
+  for(const field of form.querySelectorAll('[name="scope_store"]')){
+   const store=state.stores.find(x=>x.id===field.value);
+   const wrapper=field.closest('label');
+   const visible=role==='gerente'||(role==='franquia'&&store?.kind==='franquia')||
+    (role==='estoquista'&&store?.is_primary);
+   if(wrapper)wrapper.hidden=!visible;
+   if(!visible)field.checked=false;
+   if(role==='estoquista'&&store?.is_primary)field.checked=true;
+  }
+  for(const field of form.querySelectorAll('[name="scope_event"]'))if(role!=='evento')field.checked=false;
+ };
+ select.addEventListener('change',refresh);
+ form.addEventListener('change',event=>{
+  if(event.target.matches('[name="scope_store"]')&&select.value&&
+   state.accessProfiles.find(x=>x.id===select.value)?.role_kind==='franquia'&&event.target.checked){
+    form.querySelectorAll('[name="scope_store"]').forEach(x=>{if(x!==event.target)x.checked=false;});
+  }
+ });
+ refresh();
+}
+function userWorkspaceModal(id,tab='cadastro'){
+ if(!isAdmin())return;
+ const user=state.users.find(u=>u.id===id);
+ if(!user)return;
+ const active=['cadastro','perfil','vinculos','seguranca','historico'].includes(tab)?tab:'cadastro';
+ const myAccount=id===state.user?.id;
+ const assignment=state.profileAssignments.find(a=>a.user_id===id);
+ const profile=state.accessProfiles.find(p=>p.id===assignment?.profile_id);
+ const managed=Boolean(assignment?.managed);
+ const protectedAccount=user.role==='admin';
+ const heading='<div class="ac-workspace-identity"><strong>'+h(user.full_name)+'</strong><small>@'+h(user.username)+
+  ' · '+h(profile?.name||roles[user.role]||'Sem perfil')+' · '+(user.active?'Ativo':'Bloqueado')+'</small></div>';
+ const tabs=[['cadastro','Cadastro'],['perfil','Perfil e acessos'],['vinculos','Vínculos'],['seguranca','Segurança'],['historico','Histórico']]
+  .map(([key,label])=>'<button type="button" class="ac-workspace-tab'+(active===key?' is-selected':'')+
+   '" data-action="user-workspace-tab" data-id="'+h(id)+'" data-tab="'+key+'">'+label+'</button>').join('');
+ const contact=state.staffContactDetails.find(x=>x.user_id===id);
+ let content='',type='user-workspace-read',label='Fechar';
+ if(active==='cadastro'){
+  type='user-edit';label='Salvar dados';
+  content='<div class="formgrid">'+
+   field('Nome completo','full_name','text',user.full_name,'required minlength="2" maxlength="120"')+
+   field('Usuário de acesso','username','text',user.username,'required minlength="3" maxlength="32"')+
+   field('Telefone / WhatsApp','phone','text',contact?.phone||'','maxlength="60"')+
+   field('Cargo','job_title','text',contact?.job_title||'','maxlength="120"')+
+   field('Setor','department','text',contact?.department||'','maxlength="120"')+
+   textareaField('Observações administrativas','internal_notes',contact?.internal_notes||'')+
+   '</div>';
+ }else if(active==='perfil'||active==='vinculos'){
+  if(protectedAccount){
+   content='<p class="ac-protected">Administradores CDSB são protegidos. Seus acessos não podem ser alterados nesta central.</p>';
+  }else{
+   type='access-profile-assign';label='Salvar perfil e vínculos';
+   const profileList=state.accessProfiles.filter(p=>p.is_active&&p.role_kind!=='admin')
+    .map(p=>[p.id,p.name+(p.is_system?' · base':'')]);
+   const storeSelection=new Set(state.staffStores.filter(x=>x.user_id===id).map(x=>x.store_id));
+   const eventSelection=new Set(state.members.filter(x=>x.user_id===id).map(x=>x.event_id));
+   content='<p class="help">'+(managed?'Perfil gerenciado: mudanças no perfil poderão atingir este usuário.':
+     'Acesso legado preservado: escolher um perfil gerenciado aplicará suas permissões explicitamente.')+'</p>'+
+    selectField('Perfil principal','profile_id',profileList,profile?.role_kind==='admin'?'':assignment?.profile_id||'')+
+    '<div class="ac-scope-columns"><section data-scope-stores><h3>Unidades autorizadas</h3>'+
+     state.stores.filter(x=>x.active).map(store=>
+      '<label class="ac-choice"><input type="checkbox" name="scope_store" value="'+h(store.id)+'"'+
+      (storeSelection.has(store.id)?' checked':'')+'><span>'+h(store.name)+
+      '<small>'+h(store.kind)+(store.is_primary?' · CDSB':'')+'</small></span></label>').join('')+
+    '</section><section data-scope-events><h3>Eventos autorizados</h3>'+
+     state.events.filter(x=>!x.deleted_at&&['ativo','rascunho'].includes(x.status)).map(event=>
+      '<label class="ac-choice"><input type="checkbox" name="scope_event" value="'+h(event.id)+'"'+
+      (eventSelection.has(event.id)?' checked':'')+'><span>'+h(event.name)+'</span></label>').join('')+
+    '</section></div>'+
+    '<div class="ac-access-summary"><strong>Acesso efetivo atual</strong><p>'+
+      state.userPermissions.filter(x=>x.user_id===id).map(x=>h(x.permission)).join(' · ')+'</p></div>'+
+    '<p class="help">A atribuição do perfil conserva o histórico e modifica somente os acessos da pessoa selecionada.</p>';
+  }
+ }else if(active==='seguranca'){
+  content='<div class="ac-security-list"><p>Status: <strong>'+(user.active?'Ativo':'Bloqueado')+'</strong></p>'+
+   (myAccount?button('Alterar minha senha','my-password','','small'):
+    button('Redefinir senha','set-user-password','data-id="'+h(id)+'"','small')+
+    button(user.active?'Bloquear acesso':'Reativar acesso','user-toggle','data-id="'+h(id)+'"','small')+
+    button('Arquivar usuário','user-delete','data-id="'+h(id)+'"','small danger'))+
+   '</div><p class="help">O arquivamento preserva movimentos, pedidos e registros de auditoria.</p>';
+ }else{
+  const log=state.audits.filter(x=>x.entity==='staff_profiles'&&x.entity_id===id).slice(0,40);
+  content='<div class="ac-workspace-history">'+(log.length?log.map(x=>
+   '<div><strong>'+h(x.action)+'</strong><small>'+h(niceTime(x.created_at))+'</small></div>').join(''):
+   '<p class="help">Nenhuma alteração recente encontrada no histórico carregado.</p>')+'</div>';
+ }
+ formModal('Gerenciar usuário · '+user.full_name,heading+
+  '<nav class="ac-workspace-tabs" aria-label="Áreas do usuário">'+tabs+'</nav>'+
+  '<section class="ac-workspace-panel">'+content+'</section>',type,label);
+ const form=document.querySelector('form[data-form="'+type+'"]');
+ if(form)form.dataset.id=id;
+ if(type==='access-profile-assign')setupProfileAssignmentScope(form);
+ if(type==='user-workspace-read')form?.querySelector('button[type="submit"]')?.setAttribute('hidden','');
+ if(type==='user-edit'||type==='access-profile-assign'){
+  const modal=form?.closest('.modal');if(modal)modal.classList.add('ac-workspace-modal');
+ }
+}
 function userRoleModal(id){
  if(!isAdmin()||id===state.user?.id)return;
  const target=state.users.find(x=>x.id===id);
