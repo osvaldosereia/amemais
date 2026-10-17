@@ -127,3 +127,89 @@
  .buy-cart-group>header{padding:8px}
 }
 @media(max-width:380px){.buy-group-photo{width:90px;flex-basis:90px}.buy-group-title h3{font-size:.85rem}}
+
+
+/* Compras: filtros espelhados do catálogo, variações inicialmente recolhidas. */
+.buy-page .buy-catalog-toolbar{
+ display:flex;flex-direction:column;gap:10px;padding:14px 18px 13px;
+ border-bottom:1px solid var(--buy-border);background:#fff;
+}
+.buy-page .buy-catalog-toolbar .product-search-row{display:flex;width:100%;min-width:0}
+.buy-page .buy-catalog-toolbar .product-search-row input{
+ min-height:46px;width:100%;max-width:none;min-width:0;
+ border:1px solid #cbd9e9;border-radius:10px;
+ padding:11px 13px;background:#fff;color:var(--buy-blue);font-size:.91rem;
+}
+.buy-page .buy-catalog-toolbar .product-filter-row{display:flex;gap:9px;flex-wrap:wrap}
+.buy-page .buy-catalog-toolbar .product-filter-chip{
+ min-height:40px;max-width:100%;
+ border:1px solid #d5dfed;border-radius:9px;
+ background:#f8fafc;color:var(--buy-blue);padding:8px 13px;display:flex;
+ align-items:center;gap:10px;font-weight:700;font-size:.79rem;
+}
+.buy-page .buy-catalog-toolbar .catalog-sorting-row{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;width:100%;
+}
+.buy-page .buy-catalog-toolbar .catalog-filter-field{
+ display:flex;flex-direction:column;min-width:0;gap:5px;
+ font-size:.75rem;color:var(--buy-blue);font-weight:700;
+}
+.buy-page .buy-catalog-toolbar .catalog-filter-field select{
+ display:block;width:100%;min-width:0;max-width:100%;
+ min-height:42px;padding:8px 11px;
+ border:1px solid #cbd9e9;border-radius:9px;background:#fff;color:var(--buy-blue);
+}
+.buy-page .buy-filter-tools{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.buy-page .buy-result-count{color:#61758d;font-size:.75rem;font-weight:650}
+.buy-page .buy-catalog-toolbar :is(button,input,select):focus-visible,
+.buy-page .buy-variation-disclosure>summary:focus-visible{
+ outline:3px solid var(--buy-gold);outline-offset:2px;
+}
+.buy-variation-disclosure{
+ border-top:1px solid #e8edf4;background:#fff;min-width:0;
+}
+.buy-variation-disclosure>summary{
+ list-style:none;display:flex;align-items:center;justify-content:space-between;
+ gap:10px;min-height:46px;padding:11px 13px;
+ cursor:pointer;color:var(--buy-blue);font-size:.8rem;
+}
+.buy-variation-disclosure>summary::-webkit-details-marker{display:none}
+.buy-variation-disclosure>summary strong{font-size:.81rem;font-weight:800}
+.buy-variation-disclosure>summary .buy-expand-caption{
+ font-size:.74rem;color:#5a708c;display:flex;align-items:center;gap:6px;
+}
+.buy-variation-disclosure>summary .buy-expand-caption::after{
+ content:'⌄';display:inline-block;font-size:1.2rem;line-height:1;transition:transform .15s;
+}
+.buy-variation-disclosure[open]>summary .buy-expand-caption::after{transform:rotate(180deg)}
+.buy-variation-disclosure[open]>summary{
+ background:#f4f7fb;border-bottom:1px solid #e8edf4;
+}
+.buy-variation-disclosure .buy-variants{padding:0 13px}
+.buy-variation-disclosure .buy-variant:first-child{border-top:0}
+.buy-variation-disclosure:not([open]) .buy-variants{display:none}
+.buy-group-actions{border-top:1px solid var(--buy-border)}
+.buy-page .buy-load-more{display:flex;justify-content:center;padding:0 14px 15px}
+.buy-page .buy-load-more .button{min-height:43px;padding:10px 22px}
+@media(max-width:760px){
+ .buy-page .buy-catalog-toolbar{padding:12px;gap:10px}
+ .buy-page .buy-catalog-toolbar .product-filter-row{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+ .buy-page .buy-catalog-toolbar .product-filter-chip{
+  min-width:0;width:100%;justify-content:space-between;padding:8px;
+  font-size:.72rem;text-align:left;
+ }
+ .buy-page .buy-catalog-toolbar .product-filter-chip span:first-child{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ }
+ .buy-page .buy-catalog-toolbar .catalog-sorting-row{
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+ }
+ .buy-page .buy-catalog-toolbar .catalog-filter-field:last-child{grid-column:1/-1}
+ .buy-variation-disclosure>summary{min-height:47px;padding:12px}
+ .buy-variation-disclosure>summary .buy-expand-caption{font-size:.7rem}
+}
+@media(prefers-reduced-motion:reduce){
+ .buy-variation-disclosure>summary .buy-expand-caption::after{transition:none}
+}
