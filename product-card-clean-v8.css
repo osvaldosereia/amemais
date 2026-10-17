@@ -305,6 +305,7 @@
 }
 
 
+.mobile-c-app .products-panel .product-card-v3 .product-gallery-indicators{display:none!important}
 /* CDSB | Proposta aprovada: card mobile de catálogo (out/2026).
    Sem botões sobre a foto. A imagem funciona como área de ampliação e gesto.
    As telas desktop conservam sua disposição operacional existente. */
