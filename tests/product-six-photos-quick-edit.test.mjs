@@ -28,8 +28,8 @@ test('novo upload pode atingir 6 imagens mas bloqueia a sétima antes de compact
  assert.equal(galleryHasChanges(form),false);
 });
 test('card oferece atalho de ícone acessível ao editor de fotos quando autorizado',()=>{
- assert.match(workflow,/data-action="product-gallery-quick"/);
- assert.match(workflow,/aria-label="Editar fotos/);
+ assert.match(workflow,/'product-gallery-quick','camera'/);
+ assert.match(workflow,/'Editar fotos de '\+group.title/);
  assert.match(workflow,/product-card-photo-quick/);
  assert.match(workflow,/canEdit\?/);
  assert.match(css,/\.product-card-photo-quick/);
