@@ -310,14 +310,15 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<small class="product-card-description">'+h(description)+'</small>'+
         '<strong class="product-card-name">'+h(group.title)+'</strong>'+
         (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':'')+
-        '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
-          '<small>'+stockLabel+'</small><span><b>'+fmt(isProducts?groupAvailable:count)+'</b> un.</span></div>'+
+        (!isProducts?'<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
+          '<small>'+stockLabel+'</small><span><b>'+fmt(count)+'</b> un.</span></div>':'')+
         '<div class="product-card-location'+(locationMissing?' is-unknown':'')+'" aria-label="Localização do produto">'+
            '<span class="product-location-icon" aria-hidden="true">⌖</span>'+
            '<strong>'+h(location)+'</strong></div>'+
         arrivalChip+
       '</div>'+
       (isProducts?'<div class="stock-total-breakdown">'+
+          '<div class="product-stock-total '+(groupAvailable===0?'product-stock-empty':'')+'"><small>Disponível</small><span><b>'+fmt(groupAvailable)+'</b> un.</span></div>'+
           '<div class="stock-total-metric reserved"><small>Físico</small><strong>'+fmt(count)+'</strong><span>un.</span></div>'+
           '<div class="stock-total-metric available"><small>Reservado</small><strong>'+fmt(groupReserved)+'</strong><span>un.</span></div>'+
         '</div>':'')+
