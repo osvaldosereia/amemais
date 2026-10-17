@@ -24,7 +24,8 @@ test('quatro abas separadas e catálogo só na reposição',()=>{
  const repos=view('reposicao');
  assert.match(repos,/data-action="buy-tab"/);
  assert.equal((repos.match(/class="buy-group-card buy-quick-card"/g)||[]).length,2);
- assert.match(repos,/data-action="buy-suggest-group"/);
+ assert.match(repos,/data-action="buy-open-group"/);
+ assert.doesNotMatch(repos,/data-action="buy-suggest-group"/);
  assert.match(repos,/7 variação\(ões\)|1 variação\(ões\)/);
  assert.match(repos,/data-buy-only-replenishment/);
  assert.doesNotMatch(repos,/Tarefas internas/);
