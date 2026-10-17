@@ -30,7 +30,7 @@ import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCar
  setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
  confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261016cart1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
-import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261016buycart1';
+import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261017directory1';
 import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSummary,purchaseCartBySupplier,purchaseCartReviewGroups,serializePurchaseCart,parsePurchaseCart} from './purchase-cart.js?v=20261016buycart1';
 import {supplierDirectoryPayload,staffDirectoryPayload,procurementTaskDraft,supplierInsights,procurementTasksHTML} from './directory-automation.js?v=20261017directory1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
