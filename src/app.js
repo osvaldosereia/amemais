@@ -35,6 +35,7 @@ import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSumma
 import {supplierDirectoryPayload,staffDirectoryPayload,procurementTaskDraft,supplierInsights,procurementTasksHTML} from './directory-automation.js?v=20261017directory1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
 import {renderOperationsDashboard} from './dashboard-home.js?v=20261016home1';
+import {accessCenterHTML} from './access-center.js?v=20261017ac1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
 import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261016label57';
 
@@ -91,7 +92,7 @@ const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],gondolas:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],orderOperationalRows:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
-  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseReceipts:[],purchaseReceiptItems:[],procurementTasks:[],staffContactDetails:[],purchaseSupplierFilter:'',purchaseTab:'reposicao',purchaseOrderFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'priority',onlyReplenishment:true,page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseReceipts:[],purchaseReceiptItems:[],procurementTasks:[],staffContactDetails:[],purchaseSupplierFilter:'',purchaseTab:'reposicao',purchaseOrderFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'priority',onlyReplenishment:true,page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],accessProfiles:[],accessProfilePermissions:[],profileAssignments:[],accessTab:'pessoas',staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -278,6 +279,9 @@ async function loadData(){
   if(isAdmin()){
     resources.push(['userPermissions',db.from('staff_permissions').select('*').limit(5000)]);
     resources.push(['staffContactDetails',db.from('staff_contact_details').select('*').limit(1000)]);
+    resources.push(['accessProfiles',db.from('access_profiles').select('*').order('name').limit(250)]);
+    resources.push(['accessProfilePermissions',db.from('access_profile_permissions').select('*').limit(5000)]);
+    resources.push(['profileAssignments',db.from('staff_profile_assignments').select('*').limit(1000)]);
   }
   if(hasPermission('movements.read') || hasPermission('users.manage')){
     resources.push(['audits',db.from('audit_log').select('id,entity,entity_id,action,actor_id,created_at').order('created_at',{ascending:false}).limit(100)]);
@@ -1469,40 +1473,15 @@ function orderEventModal(orderId){
 }
 function usersPage(){
  if(!isAdmin())return '<p class="help">Acesso restrito ao administrador CDSB.</p>';
- const archived=state.usersAdminArchived===true;
- const active=state.users.filter(u=>!u.archived_at),removed=state.users.filter(u=>Boolean(u.archived_at));
- const dataset=archived?removed:active;
- const counters=[['Ativos',active.filter(x=>x.active).length],['Bloqueados',active.filter(x=>!x.active).length],['Arquivados',removed.length]];
- const entry=u=>'<article class="um-user" data-user-row data-user-filter="'+h([u.full_name,u.username,profileLabel(u)].join(' ').toLowerCase())+'" data-user-role="'+h(u.role)+'">'+
-  '<div class="um-user-main"><span class="um-avatar" aria-hidden="true">'+h((u.full_name||'?').slice(0,1).toUpperCase())+'</span>'+
-   '<div class="um-user-names"><strong>'+h(u.full_name)+'</strong><small>@'+h(u.username)+'</small></div></div>'+
-  '<div class="um-user-details"><span class="um-role">'+h(profileLabel(u))+'</span>'+ 
-   (state.staffContactDetails.find(d=>d.user_id===u.id)?.job_title?'<small class="um-linked">'+h(state.staffContactDetails.find(d=>d.user_id===u.id).job_title)+'</small>':'')+
-   '<span class="pill '+(u.archived_at?'encerrado':u.active?'ativo':'encerrado')+'">'+(u.archived_at?'Excluído':u.active?'Ativo':'Bloqueado')+'</span>'+
-   (u.role==='franquia'?'<small class="um-linked">'+h(state.stores.filter(s=>state.staffStores.some(a=>a.user_id===u.id&&a.store_id===s.id)).map(x=>x.name).join(', ')||'Sem loja vinculada')+'</small>':'')+
-  '</div><div class="um-user-actions">'+
-   (u.archived_at?button('Restaurar','user-restore','data-id="'+h(u.id)+'"','small'):
-    button('Editar','user-edit','data-id="'+h(u.id)+'"','small')+
-    (u.id===state.user?.id?'':button('Perfil e acessos','user-role','data-id="'+h(u.id)+'"','small')+
-     button('Senha','set-user-password','data-id="'+h(u.id)+'"','small')+
-     button(u.active?'Bloquear':'Reativar','user-toggle','data-id="'+h(u.id)+'"','small')+
-     button('Excluir','user-delete','data-id="'+h(u.id)+'"','small danger'))+
-    (u.id===state.user?.id?button('Minha senha','my-password','','small'):''))+
-  '</div></article>';
- return tabHead('Usuários','Administre pessoas, perfis, vínculos e acessos em um só lugar.',
-   button('Preparar 6 contas CDSB','users-provision','','small')+button('+ Novo usuário','user-new','','primary'))+
-  '<div class="um-shell"><div class="um-totals">'+counters.map(([name,val])=>
-   '<div><strong>'+val+'</strong><small>'+name+'</small></div>').join('')+'</div>'+
-  '<div class="um-filters"><label class="um-search"><span>Buscar usuário</span><input type="search" data-users-search placeholder="Nome, usuário ou função..."></label>'+
-   '<label><span>Perfil</span><select data-users-filter-role><option value="">Todos os perfis</option>'+
-   Object.entries(roles).map(([role,title])=>'<option value="'+h(role)+'">'+h(title)+'</option>').join('')+'</select></label>'+
-   button(archived?'Ver equipe atual':'Ver arquivados','users-archived-toggle','','small')+'</div>'+
-  '<section class="um-list" data-users-list>'+ (dataset.length?dataset.map(entry).join(''):
-   '<p class="um-empty">'+(archived?'Nenhuma conta arquivada.':'Nenhum usuário cadastrado.')+'</p>')+'</section>'+
-  '<p class="um-footnote">Excluir retira a conta da equipe e bloqueia seu login, preservando movimentos, pedidos e auditoria. Contas arquivadas podem ser restauradas.</p></div>';
+ return accessCenterHTML({
+  users:state.users,profiles:state.accessProfiles,assignments:state.profileAssignments,
+  stores:state.stores,staffStores:state.staffStores,events:state.events,members:state.members,
+  audits:state.audits,contacts:state.staffContactDetails,tab:state.accessTab,
+  archived:state.usersAdminArchived===true,button,profileLabels:roles
+ });
 }
 function applyUserListFilter(){
- const root=document.querySelector('.um-shell');if(!root)return;
+ const root=document.querySelector('.ac-root');if(!root)return;
  const query=(root.querySelector('[data-users-search]')?.value||'').trim().toLowerCase();
  const role=root.querySelector('[data-users-filter-role]')?.value||'';
  for(const el of root.querySelectorAll('[data-user-row]'))
