@@ -126,6 +126,14 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const location=locations.length>1?'Gôndolas por variação'
     :locations[0]||'Gôndola não informada';
   const locationMissing=locations.length===0;
+  const categoryName=categories.find(item=>item.id===(group.model?.category_id||main.category_id))?.name||'';
+  const rawTags=group.model?.tags||main.tags||[];
+  const displayTags=[...new Set((Array.isArray(rawTags)?rawTags:[]).filter(t=>typeof t==='string'&&t.trim()).map(t=>t.trim()))].slice(0,2);
+  const contextChips=(categoryName||displayTags.length)?
+    '<div class="product-card-context-tags" aria-label="Categoria e tags">'+
+      (categoryName?'<span class="product-card-context-chip">'+h(categoryName)+'</span>':'')+
+      displayTags.map(t=>'<span class="product-card-context-chip">'+h(t)+'</span>').join('')+
+    '</div>':'';
   const groupEdit=group.modelId?'product-card-edit':'product-edit';
   const groupEditId=group.modelId?group.modelId:main.id;
   const sizeCount=group.products.length;
@@ -318,7 +326,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<div class="product-card-location'+(locationMissing?' is-unknown':'')+'" aria-label="Localização do produto">'+
            '<span class="product-location-icon" aria-hidden="true">⌖</span>'+
            '<strong>'+h(location)+'</strong></div>'+
-        arrivalChip+
+        contextChips+arrivalChip+
       '</div>'+
       (isProducts?'<div class="stock-total-breakdown">'+
           '<div class="product-stock-total '+(groupAvailable===0?'product-stock-empty':'')+'"><small>Disponível</small><span><b>'+fmt(groupAvailable)+'</b> un.</span></div>'+
