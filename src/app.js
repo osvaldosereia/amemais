@@ -3530,7 +3530,24 @@ async function handleClick(event){
    if(supplier)return supplierFormModal(supplier);
    return;
   }
-  if(action==='buy-new')return purchaseNewModal(target.dataset.supplier||null);
+  if(action==='buy-new'||action==='buy-review')return purchaseReviewModal(target.dataset.supplier||null);
+  if(action==='buy-review-supplier')return purchaseReviewModal(target.dataset.supplier||null);
+  if(action==='buy-cart-remove'||action==='buy-cart-remove-model'){
+   if(!hasPermission('purchases.manage'))return;
+   const supplier=target.dataset.supplier;
+   const keep=purchaseReviewFormValues();
+   if(action==='buy-cart-remove')state.purchaseCart.delete(id);
+   else {
+    const groups=purchaseCartReviewGroups(state.purchaseCart,state.items,state.apparelModels,supplier);
+    const group=groups.find(g=>g.key===target.dataset.group);
+    for(const row of group?.rows||[])state.purchaseCart.delete(row.id);
+   }
+   savePurchaseCart();
+   const remaining=purchaseCartBySupplier(state.purchaseCart,state.items);
+   if(remaining.has(supplier))return purchaseReviewModal(supplier,keep);
+   if(remaining.size)return purchaseReviewModal();
+   closeTopModal();render();return;
+  }
   if(action==='buy-print-alerts'){
    if(!hasPermission('purchases.manage'))return;
    const suggestions=purchaseSuggestions(state.items,state.balances,state.stockReservations,
@@ -4456,43 +4473,44 @@ async function handleSubmit(event){
     p_id:form.dataset.id,p_days:days
    })),'Previsão de chegada atualizada. O histórico foi preservado.');
   }
+  if(type==='buy-choose-supplier'){closeTopModal();return;}
   if(type==='buy-order-create'){
    if(!hasPermission('purchases.manage'))return;
    const days=Number(values.estimated_days);
    if(!Number.isInteger(days)||days<1||days>365)return toast('Informe o prazo em dias corridos (1 a 365).',true);
    const supplier=String(values.supplier_id||'');
-   const rows=[...form.querySelectorAll('[data-buy-product]')]
-    .filter(row=>row.dataset.supplier===supplier&&row.querySelector('[data-buy-select]')?.checked);
-   const lines=[];
-   for(const row of rows){
-    const input=row.querySelector('[data-buy-quantity]');
-    const qty=Number(input?.value);
-    if(!Number.isInteger(qty)||qty<1||qty>1000000){
-     return toast('Revise as quantidades de cada SKU selecionado (1 a 1.000.000).',true);
-    }
-    lines.push({product_id:input.dataset.product,quantity:qty});
+   const supplierRows=purchaseCartBySupplier(state.purchaseCart,state.items).get(supplier)||[];
+   if(!supplierRows.length)return toast('Este fornecedor não possui itens selecionados.',true);
+   for(const input of form.querySelectorAll('[data-buy-review-qty]')){
+    if(!validPurchaseQty(input.value))return toast('Informe de 1 a 1.000.000 unidades para cada tamanho.',true);
+    const found=supplierRows.find(line=>line.product.id===input.dataset.product);
+    if(!found)return toast('O carrinho mudou. Reabra a revisão antes de salvar.',true);
+    found.quantity=Number(input.value);
    }
+   const lines=supplierRows.map(line=>({product_id:line.product.id,quantity:line.quantity}));
    if(!lines.length)return toast('Selecione uma ou mais variações para comprar.',true);
-   if(!window.confirm('Salvar pedido com '+lines.length+' SKU(s) e previsão de '+days+
-    ' dias corridos? O estoque não será alterado.'))return;
+   if(!window.confirm('Salvar pedido com '+lines.length+' SKU(s), '+lines.reduce((n,x)=>n+x.quantity,0)+
+    ' unidades e previsão de '+days+' dias corridos? O estoque não será alterado.'))return;
    state.loading=true;
-   let id=null;
+   let savedId=null;
    try{
-    id=assertOk(await db.rpc('save_purchase_order_with_eta',{
+    savedId=assertOk(await db.rpc('save_purchase_order_with_eta',{
      p_supplier:supplier,p_items:lines,p_note:String(values.note||'').slice(0,1500),p_estimated_days:days
     }));
-    // Após a gravação, nunca reenviar o RPC se o download falhar.
-    const order=assertOk(await db.from('purchase_orders').select('*').eq('id',id).single());
-    const saved=assertOk(await db.from('purchase_order_items').select('*').eq('purchase_order_id',id));
-    await loadData();
+    // A criação é atômica. Falha no PDF NUNCA pode repetir a criação do pedido.
+    for(const line of lines)state.purchaseCart.delete(line.product_id);
+    savePurchaseCart();
+    const order=assertOk(await db.from('purchase_orders').select('*').eq('id',savedId).single());
+    const saved=assertOk(await db.from('purchase_order_items').select('*').eq('purchase_order_id',savedId));
     closeTopModal();
+    await loadData();
     await downloadBuyOrder(order,saved);
-    toast('Pedido salvo e PDF baixado. Confirme a encomenda depois de encaminhar o documento ao fornecedor.');
+    toast('Pedido salvo e PDF baixado. Confirme a encomenda após enviar o documento ao fornecedor.');
    }catch(error){
     fail(error);
-    if(id){
-     try{await loadData();closeTopModal();}catch(err){console.warn('Não foi possível atualizar a lista',err);}
-     toast('O pedido foi salvo, mas o PDF não foi baixado. Use Baixar PDF na lista de compras.',true);
+    if(savedId){
+     try{closeTopModal();await loadData();}catch(err){console.warn('Lista não atualizada',err);}
+     toast('Pedido salvo, porém o download do PDF falhou. Use Baixar PDF na lista, sem criar outro pedido.',true);
     }
    }finally{state.loading=false;}
    return;
