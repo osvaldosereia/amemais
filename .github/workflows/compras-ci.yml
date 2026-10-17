@@ -1,0 +1,35 @@
+name: Compras - regressao
+on:
+  pull_request:
+    paths:
+      - 'src/app.js'
+      - 'src/cdsb-purchases.js'
+      - 'src/purchase-cart.js'
+      - 'src/directory-automation.js'
+      - 'supabase/migrations/**'
+      - 'tests/**'
+      - '.github/workflows/compras-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/app.js'
+      - 'src/cdsb-purchases.js'
+      - 'supabase/migrations/**'
+      - 'tests/**'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regressões de compras, fornecedores e PDF
+        run: |
+          node --check src/cdsb-purchases.js
+          node --check src/purchase-cart.js
+          node --check src/app.js
+          node --test tests/cdsb-purchases.test.mjs tests/purchase-eta-pdf-tv.test.mjs tests/purchases-ux-receiving.test.mjs tests/directory-automation.test.mjs
