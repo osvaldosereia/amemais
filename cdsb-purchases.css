@@ -288,3 +288,30 @@
  .buy-review-variant input{width:77px}
  .buy-review-variant .button{font-size:.68rem}
 }
+
+/* Evolução de fornecedores e tarefas — outubro/2026 */
+.supplier-directory{gap:10px}
+.supplier-directory-card{align-items:flex-start;gap:12px;background:#fff;border-color:#dbe4ec;border-radius:13px;padding:14px}
+.supplier-directory-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:6px}
+.supplier-directory-card strong{color:#102d50;font-size:.97rem}
+.supplier-directory-card small{color:#586e83;line-height:1.4;overflow-wrap:anywhere}
+.supplier-directory-metrics{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.supplier-directory-metrics span{display:inline-flex;padding:5px 8px;border-radius:7px;background:#edf3f8;color:#244563;font-size:.71rem;font-weight:750}
+.supplier-directory-inactive{color:#a34d4d!important;font-weight:750}
+.directory-tasks{background:#fff;border:1px solid #dae3ec;border-radius:15px;padding:16px;margin-top:16px;min-width:0}
+.directory-tasks-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.directory-tasks-head h2{font-size:1.07rem;color:#102d50;margin:0 0 6px}
+.directory-tasks-head p{max-width:660px;margin:0;color:#65768b;font-size:.79rem;line-height:1.5}
+.directory-task-counts{display:flex;flex-wrap:wrap;gap:7px;margin:13px 0}
+.directory-task-counts span{background:#edf4f8;color:#224561;padding:6px 9px;border-radius:8px;font-size:.75rem;font-weight:750}
+.directory-task-list{display:flex;flex-direction:column;gap:8px}
+.directory-task{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fcfdff;border:1px solid #e1e8f0;border-radius:11px;padding:12px}
+.directory-task.is-overdue{border-left:4px solid #b65b3b}
+.directory-task-main{min-width:0;display:flex;flex-direction:column;gap:5px}
+.directory-task-main strong{color:#173a57;font-size:.89rem}
+.directory-task-main small{color:#62768a;font-size:.74rem}
+.directory-task-main p{margin:0;color:#5e7185;font-size:.74rem;overflow-wrap:anywhere}
+.directory-task-actions{flex-shrink:0;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.directory-task-status{font-size:.73rem;color:#587087;font-weight:700}
+.directory-task-actions button{font-size:.75rem;min-height:38px}
+@media(max-width:760px){.directory-tasks{padding:13px;margin-top:12px}.directory-tasks-head,.directory-task{flex-direction:column;align-items:stretch}.directory-task-actions{justify-content:flex-end}.supplier-directory-card{flex-direction:column}.supplier-directory-card>button{width:100%}}
