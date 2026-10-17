@@ -149,6 +149,37 @@ BEGIN
   jsonb_build_object('days',p_estimated_days,'stock_updated',false));
 END;$fn$;
 
+-- Proteção adicional: somente enviar rascunho previamente conferido, com prazo e SKU válidos.
+CREATE OR REPLACE FUNCTION public.set_purchase_order_status(p_id uuid,p_status text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
+DECLARE v_order public.purchase_orders%rowtype;
+BEGIN
+ IF auth.uid() IS NULL OR NOT app_private.has_permission('purchases.manage') THEN
+  RAISE EXCEPTION 'Sem permissão para gerenciar compras';END IF;
+ SELECT * INTO v_order FROM public.purchase_orders WHERE id=p_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Compra não encontrada';END IF;
+ IF NOT (
+   (v_order.status='rascunho' AND p_status IN ('enviado','cancelado')) OR
+   (v_order.status='enviado' AND p_status='cancelado')
+ ) THEN RAISE EXCEPTION 'Transição de compra inválida';END IF;
+ IF p_status='enviado' THEN
+  IF v_order.estimated_days IS NULL OR v_order.expected_arrival_date IS NULL THEN
+   RAISE EXCEPTION 'Confira o pedido e informe a previsão antes de enviar';END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.purchase_order_items WHERE purchase_order_id=p_id) THEN
+   RAISE EXCEPTION 'Não é possível enviar pedido sem produtos';END IF;
+  IF EXISTS(SELECT 1 FROM public.purchase_order_items i JOIN public.products p ON p.id=i.product_id
+     WHERE i.purchase_order_id=p_id AND
+      (i.quantity<p.minimum_order_quantity OR i.quantity>1000000 OR
+       p.supplier_id IS DISTINCT FROM v_order.supplier_id)) THEN
+   RAISE EXCEPTION 'Quantidade abaixo do mínimo ou item de outro fornecedor';END IF;
+ END IF;
+ UPDATE public.purchase_orders SET status=p_status,updated_at=now(),
+  sent_at=CASE WHEN p_status='enviado' THEN now() ELSE sent_at END WHERE id=p_id;
+ INSERT INTO public.audit_log(entity,entity_id,action,actor_id,details)
+ VALUES('purchase_orders',p_id::text,'PURCHASE_STATUS_CHANGED',auth.uid(),
+  jsonb_build_object('before',v_order.status,'after',p_status,'stock_updated',false));
+END;$fn$;
+
 REVOKE ALL ON FUNCTION public.create_supplier_purchase_draft(uuid),
  public.add_purchase_draft_items(uuid,jsonb),
  public.set_purchase_draft_quantity(uuid,uuid,integer),
