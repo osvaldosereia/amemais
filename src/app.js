@@ -2922,8 +2922,9 @@ async function forceDeletePreview(kind,id){
    ...(kind==='model'?['<strong>'+h(data.variant_count||0)+'</strong> variações/tamanhos']:[]),
    '<strong>'+h(data.stock_units||0)+'</strong> unidade(s) físicas em saldo',
    ...(kind==='model'?[
-    '<strong>'+h(data.cd_units||0)+'</strong> no CDSB; <strong>'+h(data.event_units||0)+'</strong> em temporárias',
-    '<strong>'+h(data.reserved_units||0)+'</strong> unidade(s) reservada(s)']:[]),
+    '<strong>'+h(data.cd_units||0)+'</strong> no CDSB; <strong>'+h(data.event_units||0)+'</strong> em temporárias; <strong>'+h(data.branch_units||0)+'</strong> em filiais',
+    '<strong>'+h(data.reserved_units||0)+'</strong> unidade(s) reservada(s)']:kind==='product'?[
+    '<strong>'+h(data.branch_units||0)+'</strong> unidade(s) em filiais']:[]),
    '<strong>'+h(data.pending_records||0)+'</strong> pedido(s) pendente(s)',
    '<strong>'+h(data.history_records||0)+'</strong> registro(s) históricos'
   ];
@@ -2935,9 +2936,9 @@ async function forceDeletePreview(kind,id){
      '</b> · SKU '+h(p.sku||'—')+' · Físico '+qtyStore(p.id)+
      ' · Reservado '+qtyReserved(p.id)+'</li>').join('')+'</ul></div>':'';
   const explanation=kind==='model'?
-   'TODOS os tamanhos e cores serão removidos do catálogo na mesma operação. Saldos físicos serão baixados com registro de auditoria; reservas serão liberadas e pedidos pendentes que contenham alguma dessas variações serão cancelados. Os pedidos e as movimentações já concluídos permanecem no histórico.':
+   'Todos os tamanhos e cores serão arquivados juntos, sem dar baixa no estoque nem cancelar pedidos. Se houver saldo físico, reserva ou pedido aberto em alguma variação, regularize esses vínculos antes de arquivar. O histórico será preservado.':
    kind==='product'?
-   'A variação deixa de aparecer no catálogo. Os saldos serão baixados com auditoria, as reservas serão liberadas e pedidos pendentes relacionados serão cancelados.':
+   'A variação será arquivada no catálogo, sem movimentar estoque nem cancelar pedidos. Para prosseguir, o saldo deve estar zerado em todos os locais, sem reservas ou pedidos abertos.':
    kind==='store'?
    'A loja sai da relação operacional. Pedidos pendentes são cancelados e reservas liberadas. O histórico permanece. Filiais com mercadorias ainda em estoque devem devolver antes.':
    'A loja temporária deixa de aparecer. Pedidos não enviados são cancelados e o estoque restante retorna ao CDSB. O histórico é preservado.';
@@ -2946,7 +2947,7 @@ async function forceDeletePreview(kind,id){
    '<div class="force-delete-summary">'+warnings.map(t=>'<div>'+t+'</div>').join('')+'</div>'+
    variantsList+
    '<p>'+h(explanation)+'</p>'+
-   '<p class="help">Essa ação não pode ser desfeita pela tela. Ela não exclui o histórico, mas pode baixar o estoque de produtos reais.</p>'+
+   '<p class="help">'+h(kind==='product'||kind==='model'?'Arquivamento de catálogo: nenhuma unidade física será baixada; regularize o estoque na área Estoque antes de confirmar.':'Esta ação altera vínculos e pode devolver saldo ao CDSB, conforme o tipo de unidade. O histórico será preservado.')+'</p>'+
    '<label class="field"><span>Digite exatamente <strong>'+h(data.name)+'</strong> para autorizar</span>'+
    '<input name="confirmation" type="text" required autocomplete="off" placeholder="'+h(data.name)+'"></label>',
    'force-delete-confirm','Confirmar exclusão avançada');
@@ -4831,7 +4832,10 @@ async function handleSubmit(event){
    const kind=form.dataset.kind,entityId=form.dataset.id,expected=form.dataset.name;
    if(String(values.confirmation||'').trim()!==expected)
     return toast('Digite exatamente o nome exibido para confirmar.',true);
-   if(!window.confirm('CONFIRMAR EXCLUSÃO AVANÇADA de '+expected+'? Pedidos pendentes e saldos poderão ser alterados; o histórico permanecerá.'))return;
+   const catalogOnly=kind==='product'||kind==='model';
+   if(!window.confirm(catalogOnly?
+     'ARQUIVAR '+expected+' no catálogo? Não haverá baixa física nem cancelamento automático de pedidos. É necessário saldo zerado e ausência de pendências.':
+     'CONFIRMAR EXCLUSÃO AVANÇADA de '+expected+'? Pedidos pendentes e saldos poderão ser alterados; o histórico permanecerá.'))return;
    return exec(async()=>{
     if(kind==='model'){
      assertOk(await db.rpc('force_archive_model',{p_model:entityId,p_confirm:expected}));
@@ -4842,7 +4846,7 @@ async function handleSubmit(event){
      }));
     }
     if(kind==='event'){state.activeEvent=null;state.eventWorkflow=null;state.view='lojas';}
-   },'Exclusão avançada concluída. Pedidos e movimentações históricos foram preservados.');
+   },(kind==='product'||kind==='model')?'Cadastro arquivado sem baixar estoque ou cancelar pedidos. Histórico preservado.':'Exclusão avançada concluída. Pedidos e movimentações históricos foram preservados.');
   }
   if(type==='event-delete-confirm'){
    const id=form.dataset.eventId,e=eventById(id);
