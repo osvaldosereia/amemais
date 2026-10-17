@@ -3533,6 +3533,7 @@ async function handleClick(event){
     state.purchaseCatalog={search:'',category:'',tag:'',gondola:'',sort:'priority',onlyReplenishment:true,page:0};
     render();return;
   }
+  if(action==='buy-orders-all'){state.purchaseOrderFilter='';render();return;}
   if(action==='buy-tab'){
     const tab=target.dataset.tab;
     if(['reposicao','pedidos','acompanhamento','fornecedores'].includes(tab)){
