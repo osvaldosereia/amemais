@@ -45,7 +45,7 @@ test('os 12 cards ficam visíveis na mesma tela, com mini botões abrir',()=>{
  state.lastSuccess=Date.now();state.snapshot=mock;state.management=management;
  shell(mock);
  const titles=['Fila prioritária','Ocorrências identificadas','Avarias',
-  '10 produtos com menor estoque','10 produtos com maior estoque','Sem pedidos há +90 dias',
+  'Produtos com menor estoque','Produtos com maior estoque','Sem pedidos há +90 dias',
   'Produtos mais pedidos','Franquias','Categorias','Próximos eventos','Eventos encerrados',
   'Compras e produtividade'];
  for(const name of titles)assert.ok(root.innerHTML.includes(name),name);
