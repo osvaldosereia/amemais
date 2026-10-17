@@ -250,13 +250,26 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
   (purchaseCards||'<p class="buy-empty">Nenhum pedido cadastrado.</p>')+'</section>'+
   '<p class="buy-note">Pedidos de compra não adicionam estoque físico. Apenas entradas confirmadas atualizam o saldo.</p></div>';
 }
-export function supplierListHTML(suppliers,button){
- return '<div class="supplier-list">'+suppliers.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(s=>
-  '<article class="supplier-row"><div><strong>'+h(s.name)+'</strong>'+
-   '<small>'+h([s.contact_name,s.phone,s.email].filter(Boolean).join(' · '))+'</small>'+
-   (!s.active?'<small>Inativo</small>':'')+'</div>'+
-   button('Editar','buy-supplier-edit','data-id="'+h(s.id)+'"','small')+'</article>'
- ).join('')+'</div>';
+export function supplierListHTML(suppliers,button,{products=[],orders=[],tasks=[]}={}){
+ return '<div class="supplier-list supplier-directory">'+suppliers.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(s=>{
+  const skus=products.filter(p=>p.supplier_id===s.id).length;
+  const purchases=orders.filter(o=>o.supplier_id===s.id).length;
+  const pendings=tasks.filter(t=>t.supplier_id===s.id&&['pendente','em_andamento'].includes(t.status)).length;
+  const details=[s.contact_name,s.contact_role,s.phone,s.whatsapp,s.email].filter(Boolean).join(' · ');
+  const terms=[s.delivery_days?'Entrega: '+s.delivery_days+' dias':'',
+   s.payment_terms?'Pagamento: '+s.payment_terms:'',
+   s.minimum_order_amount!=null?'Pedido mín.: R$ '+Number(s.minimum_order_amount).toLocaleString('pt-BR',{minimumFractionDigits:2}):'']
+   .filter(Boolean);
+  return '<article class="supplier-row supplier-directory-card"><div class="supplier-directory-info">'+
+   '<strong>'+h(s.name)+'</strong>'+
+   (s.legal_name&&s.legal_name!==s.name?'<small>'+h(s.legal_name)+'</small>':'')+
+   (details?'<small>'+h(details)+'</small>':'')+
+   '<div class="supplier-directory-metrics"><span>'+skus+' SKU(s)</span><span>'+purchases+' compra(s)</span>'+
+    '<span>'+pendings+' tarefa(s)</span></div>'+
+   (terms.length?'<small>'+h(terms.join(' · '))+'</small>':'')+
+   (!s.active?'<small class="supplier-directory-inactive">Inativo</small>':'')+'</div>'+
+   button('Editar','buy-supplier-edit','data-id="'+h(s.id)+'"','small')+'</article>';
+ }).join('')+'</div>';
 }
 export function purchaseOrderRows(products,suppliers,balances,reservations,orders,items,models=[]){
  const groups=purchasingGroups(products,models,balances,reservations,orders,items).filter(g=>g.supplier_id);
