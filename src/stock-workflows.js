@@ -95,7 +95,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     '<button type="button" class="product-card-photo-quick" data-action="product-gallery-quick" data-id="'+h(group.modelId||main.id)+'" data-is-model="'+String(Boolean(group.modelId))+'" '+
     'aria-label="Editar fotos de '+h(group.title)+'" title="Editar fotos do produto" >'+
     '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+
-    '<rect x="3" y="3" width="15" height="15" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 15 4-4 3 3 3-3 5 5"/><path d="M20 11v8M16 15h8"/></svg></button>':'';
+    '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/><path d="m14.5 5.5 4 4"/></svg></button>':'';
 
   const canMove=isProducts&&canMoveStock();
   const skuAccess=isProducts&&canManageSku();
