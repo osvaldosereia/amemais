@@ -79,3 +79,75 @@
   font-size:clamp(.89rem,3.4vw,1.07rem)!important;
  }
 }
+
+
+/* v9: overrides for the mobile-c-app shell, whose older rules had higher specificity. */
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top{
+ display:grid!important;grid-template-columns:minmax(0,42%) minmax(0,1fr)!important;
+ grid-template-rows:auto auto!important;align-items:start!important;
+ gap:10px!important;padding:12px!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top>.grouped-inventory-photo{
+ grid-column:1!important;grid-row:1!important;align-self:start!important;
+ width:100%!important;height:auto!important;aspect-ratio:1/1!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top>.grouped-inventory-info{
+ display:flex!important;grid-column:2!important;grid-row:1!important;
+ flex-direction:column!important;align-items:flex-start!important;gap:6px!important;
+ min-width:0!important;width:100%!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-description{
+ order:0!important;display:inline-flex!important;padding:4px 8px!important;
+ width:auto!important;max-width:100%!important;border-radius:7px!important;
+ background:#edf2f8!important;color:#355271!important;font-size:.72rem!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-name{order:1!important}
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-codes{order:2!important}
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-location{
+ order:3!important;align-self:flex-start!important;width:auto!important;max-width:100%!important;
+ min-height:0!important;max-height:none!important;margin:0!important;padding:5px 7px!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-stock-total{
+ order:4!important;width:auto!important;min-width:0!important;max-width:100%!important;
+ min-height:0!important;max-height:none!important;margin:0!important;padding:7px 10px!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top>.stock-total-breakdown{
+ grid-column:1/-1!important;grid-row:2!important;display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;
+ width:100%!important;margin:0!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .stock-total-breakdown>.stock-total-metric{
+ min-width:0!important;min-height:64px!important;max-height:none!important;
+ padding:9px 11px!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .grouped-inventory-actions.product-card-actions-v5{
+ display:grid!important;grid-template-columns:minmax(0,1.25fr) minmax(0,.8fr) minmax(0,1fr)!important;
+ gap:7px!important;padding:10px 12px!important;align-items:stretch!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-action-primary-row{
+ display:contents!important;grid-column:auto!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-utilities{
+ grid-column:auto!important;min-width:0!important;width:100%!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-utilities[open]{
+ grid-column:1/-1!important;display:grid!important;
+}
+.mobile-c-app .products-panel .product-card-v3 .product-card-actions-v5 .product-card-action-primary,
+.mobile-c-app .products-panel .product-card-v3 .product-card-utilities>summary{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ width:100%!important;min-height:44px!important;padding:8px 5px!important;
+ font-size:clamp(.67rem,2.65vw,.8rem)!important;line-height:1.2!important;
+ white-space:normal!important;text-align:center!important;
+}
+@media(min-width:761px){
+ .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top{
+  grid-template-columns:minmax(160px,26%) minmax(0,1fr)!important;
+ }
+ .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top>.grouped-inventory-photo{
+  grid-row:1/3!important;
+ }
+ .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top>.stock-total-breakdown{
+  grid-column:2!important;
+ }
+}
