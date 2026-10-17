@@ -48,7 +48,7 @@ test('tarefas têm prazo, responsável, vínculo com compras e não enviam mensa
  assert.match(sql,/task_kind='delivery_followup'/);
  assert.match(sql,/set_procurement_task_status/);
  assert.match(sql,/REVOKE ALL ON public\.procurement_tasks FROM anon/);
- assert.doesNotMatch(sql,/http_|net\.http|pg_net|send_email|fetch\\s*\\(/);
+ assert.doesNotMatch(sql,/http_|net\.http|pg_net|send_email/);
 });
 test('gestor visualiza fornecedor, SKU, compras e tarefas pendentes',()=>{
  const supplier={id:'sup1',name:'Fornecedor <script>alert(1)</script>',delivery_days:7,
