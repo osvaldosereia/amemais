@@ -1,0 +1,45 @@
+/* CDSB | refinamento visual operacional 2026-10-16.
+   Camada de apresentação: preserva dados, controles e fluxos existentes. */
+:root{
+  --ui-radius:12px;--ui-border:#d9e1e9;--ui-muted:#657589;
+  --ui-shadow:0 1px 2px rgba(16,45,80,.035);
+}
+.mobile-c-app :is(.panel,.card,.c-metric-card,.uo-card,.store-card,.product-card-v3){
+  box-shadow:var(--ui-shadow);border-color:var(--ui-border);border-radius:var(--ui-radius);
+}
+.mobile-c-app :is(.button,.c-action-primary,.c-action-outline){
+  box-shadow:none;border-radius:10px;font-weight:650;
+}
+.mobile-c-app :is(.c-section-heading,.pagehead){min-width:0}
+.mobile-c-app :is(.c-section-heading h2,.pagehead h1){letter-spacing:-.025em}
+.mobile-c-app :is(.c-metric-data strong,.stock-total-metric strong){font-variant-numeric:tabular-nums}
+.mobile-c-app :is(.c-hero,.c-metric-card){box-shadow:none}
+.mobile-c-app .c-hero{background:#153a61;border:1px solid #254b70;border-radius:14px}
+.mobile-c-app .c-hero-art{opacity:.65}
+.mobile-c-app .product-card-v3 .grouped-inventory-top{min-width:0}
+.mobile-c-app .product-card-v3 .grouped-inventory-info{min-width:0}
+.mobile-c-app .product-card-v3 .stock-total-breakdown{min-width:0}
+.mobile-c-app .product-card-v3 .stock-total-metric{background:#f5f7fa;border:1px solid #dce3eb}
+.mobile-c-app .product-card-v3 .product-card-name{letter-spacing:-.015em}
+.mobile-c-app .product-card-v3 .grouped-inventory-actions{min-width:0}
+.mobile-c-app .product-card-v3 .grouped-inventory-actions>button{min-width:0}
+@media(max-width:760px){
+  html,body,#app{max-width:100%}
+  .mobile-c-app .content,.mobile-c-app .c-dashboard{min-width:0;max-width:100%}
+  .mobile-c-app .c-dashboard :is(.c-actions,.c-quick-actions,.c-action-grid){
+    max-width:100%;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;
+  }
+  .mobile-c-app .c-dashboard :is(.c-actions,.c-quick-actions,.c-action-grid)>*{
+    min-width:0;width:100%;max-width:100%;white-space:normal;overflow-wrap:anywhere;
+  }
+  .mobile-c-app .product-card-v3 .stock-total-breakdown{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+  }
+  .mobile-c-app .product-card-v3 .stock-total-metric{min-width:0}
+  .mobile-c-app .product-card-v3 .grouped-inventory-actions>button{
+    white-space:normal;overflow-wrap:anywhere;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .mobile-c-app :is(.button,.card,.product-card-v3){transition:none}
+}
