@@ -100,12 +100,12 @@ export function filterPurchaseGroups(groups=[],filters={},categories=[]){
   if(category&&!g.variants.some(p=>buyCategoryBranch(p.category_id||g.category_id,category,byId)))return false;
   if(tag&&!g.variants.some(p=>(p.tags||[]).some(t=>buyNormalized(t)===tag)))return false;
   if(gondola&&!g.variants.some(p=>buyGondolaKey(p.gondola)===gondola))return false;
-  if(q.length){
-   const searchable=buyNormalized([g.title,...g.variants.flatMap(p=>[
-    p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira,...(p.tags||[])
-   ])].join(' '));
-   if(!q.every(term=>searchable.includes(term)))return false;
-  }
+  if(q.length&&!g.variants.some(p=>{
+   const searchable=buyNormalized([
+    g.title,p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira,...(p.tags||[])
+   ].join(' '));
+   return q.every(term=>searchable.includes(term));
+  }))return false;
   return true;
  });
  const byName=(a,b)=>buyCollator.compare(a.title,b.title)||buyCollator.compare(a.key,b.key);
@@ -143,7 +143,6 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    .replace(/^g[oô]ndola\s*[:#-]?\s*/i,''));
  }
  const optionsGondola=[...gondolaOptions].sort((a,b)=>buyCollator.compare(a[1],b[1]));
- const tagOptions=tags.map(t=>t.name).filter(Boolean);
  const buySelect=(key,label,options)=>'<label class="catalog-filter-field"><span>'+label+'</span><select data-buy-catalog="'+key+'">'+
   options.map(([v,name])=>'<option value="'+h(v)+'"'+(String(catalog[key]||'')===String(v)?' selected':'')+'>'+h(name)+'</option>').join('')+
   '</select></label>';
