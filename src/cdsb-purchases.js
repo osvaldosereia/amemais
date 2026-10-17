@@ -170,8 +170,6 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
   suppliers.filter(s=>s.active).map(s=>'<option value="'+h(s.id)+'"'+(filter===s.id?' selected':'')+'>'+h(s.name)+'</option>').join('');
  const productCards=visibleGroups.map(g=>{
   const supplier=suppliers.find(s=>s.id===g.supplier_id)?.name||'Sem fornecedor';
-  const groupShortage=g.variants.reduce((n,p)=>n+Math.max(0,Number(p.min_stock||0)-p.free-p.pending),0);
-  const lowVariants=g.variants.filter(p=>Math.max(0,Number(p.min_stock||0)-p.free-p.pending)>0).length;
   const gondolas=[...new Set(g.variants.map(p=>p.gondola).filter(Boolean))].slice(0,2).join(' · ');
   const categoryId=g.variants.find(p=>p.category_id)?.category_id;
   const categoryName=categories.find(c=>String(c.id)===String(categoryId))?.name||'—';
@@ -181,9 +179,6 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
   const picked=g.variants.filter(p=>cart.has(p.id));
   const pickedUnits=picked.reduce((sum,p)=>sum+Number(cart.get(p.id)||0),0);
   const cards=g.variants.map(p=>{
-   const need=p.min_stock>p.free?Math.max(0,p.min_stock-p.free-p.pending):0;
-   const warning=p.pending?'Encomendado: '+f(p.pending)+' un. · '+(p.pendingDate?'prev. '+fmtDate(p.pendingDate):'sem previsão'):
-    (p.min_stock>0&&p.free<p.min_stock?'Abaixo do mínimo — avaliar histórico':'Estoque em avaliação');
    const moq=Math.max(1,Number(p.minimum_order_quantity||1));
    const selected=cart.has(p.id),quantity=selected?Number(cart.get(p.id)):moq;
    return '<div class="buy-variant" data-buy-sku="'+h(p.id)+'" data-buy-group="'+h(g.key)+'">'+
@@ -191,11 +186,8 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
     '<input type="checkbox" data-buy-inline-select data-product="'+h(p.id)+'"'+(selected?' checked':'')+(g.supplier_id?'':' disabled')+
     ' aria-label="Selecionar tamanho '+h(p.apparel_size||'Único')+' do '+h(g.title)+'">'+
     '<span><strong>'+h(p.apparel_size||'Único')+'</strong>'+
-    '<small>'+h([p.apparel_color!=='Única'?p.apparel_color:'',p.sku?'SKU '+p.sku:''].filter(Boolean).join(' · '))+'</small>'+
-    '<small>'+h(warning)+'</small></span></label>'+
+    '<small>'+h([p.apparel_color!=='Única'?p.apparel_color:'',p.sku?'SKU '+p.sku:''].filter(Boolean).join(' · '))+'</small></span></label>'+
     '<div class="buy-variant-values"><span>Disponível <b>'+f(p.free)+'</b></span>'+
-    '<span>Estoque mín. <b>'+f(p.min_stock)+'</b></span>'+
-    '<span class="buy-need'+(need?' is-low':'')+'">Falta <b>'+f(need)+'</b></span>'+ 
     '<span class="buy-moq">Pedido mínimo <b>'+f(moq)+'</b></span></div></div>'+
     '<div class="buy-inline-order"><label>Quantidade a pedir <input type="number" min="'+String(moq)+'" max="1000000" step="1"'+
     ' inputmode="numeric" data-buy-inline-qty data-product="'+h(p.id)+'" value="'+String(quantity)+'"'+
@@ -219,7 +211,6 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
       '<small>'+h(supplier)+' · '+g.variants.length+' variação(ões)'+(gondolas?' · Gôndola '+h(gondolas):'')+'</small>'+
       '<div class="buy-group-metrics"><span>Livre: <b>'+f(g.available)+'</b></span>'+
        '<span>Encomendado: <b>'+f(g.pending)+'</b></span>'+
-       (groupShortage?'<span class="buy-shortage-chip">'+lowVariants+' variação(ões) · faltam '+f(groupShortage)+' un.</span>':'')+
       '</div></div>'+
     '<div class="buy-card-meta"><div><small>Fornecedor</small><strong>'+h(supplier)+'</strong></div>'+
      '<div><small>Categoria</small><strong>'+h(categoryName)+'</strong></div></div>'+
@@ -233,7 +224,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    '</div>'+
    '<details class="buy-variation-disclosure buy-one-panel" id="buy-panel-'+h(g.key)+'" data-buy-expand="'+h(g.key)+'"'+(isExpanded?' open':'')+'>'+
     '<summary class="buy-panel-accessible-summary">Variações, quantidades e histórico de saídas de '+h(g.title)+'</summary>'+
-    '<div class="buy-panel-column-head" aria-hidden="true"><span>Tamanho / SKU</span><span>Estoque / mínimo do fornecedor</span><span>Quantidade a pedir</span></div>'+
+    '<div class="buy-panel-column-head" aria-hidden="true"><span>Tamanho / SKU</span><span>Disponível / pedido mínimo</span><span>Quantidade a pedir</span></div>'+
     '<div class="buy-variants">'+cards+'</div>'+
     '<section class="buy-panel-history" data-buy-outflow="'+h(g.key)+'" aria-live="polite">'+
       '<div class="buy-panel-history-head"><strong>Saídas do CD · 30/90 dias</strong>'+
