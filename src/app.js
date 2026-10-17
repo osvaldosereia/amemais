@@ -35,7 +35,7 @@ import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSumma
 import {supplierDirectoryPayload,staffDirectoryPayload,procurementTaskDraft,supplierInsights,procurementTasksHTML} from './directory-automation.js?v=20261017directory1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
 import {renderOperationsDashboard} from './dashboard-home.js?v=20261016home1';
-import {accessCenterHTML} from './access-center.js?v=20261017ac1';
+import {accessCenterHTML} from './access-center.js?v=20261017access1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
 import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261016label57';
 
