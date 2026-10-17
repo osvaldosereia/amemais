@@ -137,7 +137,7 @@ function issueList(items,limit=7){
 function lowStockRows(items){
  if(!items?.length)return emptyReport('Nenhum produto ativo para avaliar.');
  return '<div class="tv-report-head"><span>Produto / SKU</span><span>Gôndola</span><span>Disponível</span><span>Mínimo</span></div>'+
- items.slice(0,10).map(x=>
+ items.slice(0,5).map(x=>
  '<div class="tv-report-row"><span><strong>'+esc(x.name||'Produto')+'</strong>'+
  '<small>'+esc(x.sku||'Sem SKU')+(x.apparel_size?' · '+esc(x.apparel_size):'')+'</small></span>'+
  '<span>'+esc(x.gondola||'—')+'</span>'+
