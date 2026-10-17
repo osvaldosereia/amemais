@@ -84,14 +84,16 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
        (galleryPaths.length>1?'<button type="button" class="product-gallery-arrow prev" data-action="product-gallery-prev" aria-label="Foto anterior de '+h(group.title)+'">‹</button>'+
         '<button type="button" class="product-gallery-arrow next" data-action="product-gallery-next" aria-label="Próxima foto de '+h(group.title)+'">›</button>'+
         '<span class="product-gallery-count" data-gallery-count aria-live="polite">1 / '+galleryPaths.length+'</span>':'')+
-     '</div>':photoButton(main);
+     '</div>'+
+     (galleryPaths.length>1?'<div class="product-gallery-indicators" aria-label="Galeria com '+galleryPaths.length+' fotos">'+
+       galleryPaths.map((_,i)=>'<span class="product-gallery-indicator'+(i===0?' is-active':'')+'" aria-hidden="true"></span>').join('')+'</div>':''):photoButton(main);
   const active=group.products.filter(p=>p.active);
   const isProducts=mode==='products';
   const canEdit=isProducts&&(canEditProduct?canEditProduct():canRegisterProducts());
   // Atalho contextual: o editor de fotos abre diretamente sem acessar as abas de cadastro.
   const photoQuickAction=canEdit?
     '<button type="button" class="product-card-photo-quick" data-action="product-gallery-quick" data-id="'+h(group.modelId||main.id)+'" data-is-model="'+String(Boolean(group.modelId))+'" '+
-    'aria-label="Editar fotos de '+h(group.title)+'" title="Editar fotos" >'+
+    'aria-label="Editar fotos de '+h(group.title)+'" title="Editar fotos do produto" >'+
     '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+
     '<rect x="3" y="3" width="15" height="15" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 15 4-4 3 3 3-3 5 5"/><path d="M20 11v8M16 15h8"/></svg></button>':'';
 
@@ -277,7 +279,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
    '</details>':'';
   const primaryStock=isProducts?
     '<button type="button" class="button product-card-action-primary product-card-action-stock" data-action="product-card-sizes" '+
-      'aria-expanded="'+String(Boolean(expanded))+'">Ver variações <span aria-hidden="true">⌄</span></button>':'';
+      'aria-expanded="'+String(Boolean(expanded))+'" data-variation-count="'+sizeCount+'">Ver variações ('+sizeCount+') <span aria-hidden="true">›</span></button>':'';
   const primaryEdit=canEdit?
     '<button type="button" class="button product-card-action-primary" data-action="product-card-edit-toggle" aria-expanded="false">'+
       'Editar produto <span aria-hidden="true">⌄</span></button>':'';
@@ -305,9 +307,10 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
 
   return '<article class="grouped-inventory-card product-card-v3" data-product-card="'+h(group.key)+'">'+
     '<div class="grouped-inventory-top">'+
-      '<div class="grouped-inventory-photo">'+photo+photoQuickAction+'</div>'+
+      '<div class="grouped-inventory-photo">'+photo+'</div>'+
       '<div class="grouped-inventory-info">'+
-        '<small class="product-card-description">'+h(description)+'</small>'+
+        '<small class="product-card-description">'+h(description)+'</small>'+ 
+        photoQuickAction+
         '<strong class="product-card-name">'+h(group.title)+'</strong>'+
         (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':'')+
         (!isProducts?'<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
