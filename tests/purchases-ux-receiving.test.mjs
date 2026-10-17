@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 const read=path=>readFile(new URL('../'+path,import.meta.url),'utf8');
 const source=await read('src/cdsb-purchases.js');
 const app=await read('src/app.js');
-const migration=await read('supabase/migrations/20261017170000_purchase_receipts_atomic.sql');
+const migration=await read('supabase/migrations/20261017160818_purchase_receipts_atomic_20261017.sql');
 const {purchasesPage,purchasePendingByProduct,purchaseSuggestions,filterPurchaseGroups,purchasingGroups}=
  await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const p=[
