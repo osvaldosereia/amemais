@@ -5,71 +5,77 @@ const read=p=>readFile(new URL('../'+p,import.meta.url),'utf8');
 const source=await read('src/cdsb-purchases.js');
 const app=await read('src/app.js');
 const css=await read('buy-one-panel.css');
-const index=await read('index.html');
-const {purchasesPage}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const migration=await read('supabase/migrations/20261017175111_purchase_drafts_supplier_minimum_20261017.sql');
+const {purchasesPage,purchasingGroups}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const products=['P','M','G'].map((name,i)=>({id:'p'+i,name:'CAMISETA',
  apparel_model_id:'model1',apparel_size:name,sku:'SKU-'+name,min_stock:5,
- category_id:'cat',supplier_id:'s1',active:true}));
-const args={
- products,models:[{id:'model1',name:'CAMISETA AVIVA',image_path:'foto.webp'}],
+ minimum_order_quantity:[12,3,6][i],category_id:'cat',supplier_id:'s1',active:true}));
+const args={products,models:[{id:'model1',name:'CAMISETA AVIVA',image_path:'foto.webp'}],
  suppliers:[{id:'s1',name:'Fornecedor',active:true}],categories:[{id:'cat',name:'Camisetas'}],
  balances:[{product_id:'p0',quantity:0},{product_id:'p1',quantity:9},{product_id:'p2',quantity:1}],
  catalog:{onlyReplenishment:true,sort:'priority'},
- button:(label,action,attrs='')=>'<button data-action="'+action+'" '+attrs+'>'+label+'</button>'
-};
-test('card compacto tem uma única barra de 3 ações padronizadas, sem antigo resumo de variações',()=>{
+ button:(label,action,attrs='')=>'<button data-action="'+action+'" '+attrs+'>'+label+'</button>'};
+test('card só tem Abrir compra, sem Usar sugestões ou Conferir/Revisar pedido',()=>{
  const page=purchasesPage(args);
- assert.match(page,/class="buy-group-card buy-quick-card"/);
- assert.match(page,/class="buy-card-toolbar"/);
  assert.equal((page.match(/data-action="buy-open-group"/g)||[]).length,1);
- assert.equal((page.match(/data-action="buy-suggest-group"/g)||[]).length,1);
- assert.equal((page.match(/data-action="buy-product-report"/g)||[]).length,1);
- assert.doesNotMatch(page,/class="buy-group-actions"/);
- assert.match(page,/aria-label="Abrir compra"/);
- assert.match(page,/aria-label="Usar sugestões · 9 un\."/);
- assert.match(page,/aria-label="Ver saídas 30\/90 dias"/);
- assert.match(page,/Categoria<\/small><strong>Camisetas/);
- assert.match(page,/data-buy-picked="model:model1"/);
+ assert.doesNotMatch(page,/data-action="buy-suggest-group"/);
+ assert.doesNotMatch(page,/data-action="buy-product-report"/);
+ assert.doesNotMatch(page,/Revisar seleção|Revisar pedido/);
+ assert.match(page,/data-action="buy-add-to-draft"/);
+ assert.match(page,/Adicionar ao pedido/);
+ assert.match(page,/data-buy-outflow=/);
 });
-test('abrir compra exibe no mesmo card todas as variações, quantidades, histórico e revisão',()=>{
- const page=purchasesPage({...args,expanded:new Set(['model:model1']),cart:new Map([['p0',5],['p2',4]])});
- assert.match(page,/<details class="buy-variation-disclosure buy-one-panel"[^>]* open>/);
- assert.match(page,/class="buy-panel-history"/);
- assert.match(page,/data-buy-outflow="model:model1"/);
- assert.equal((page.match(/data-buy-inline-select/g)||[]).length,3);
- assert.equal((page.match(/data-buy-inline-qty/g)||[]).length,3);
- assert.match(page,/data-buy-panel-review="model:model1"/);
- assert.match(page,/2 tamanho\(s\) · 9 un\./);
- assert.match(page,/data-buy-panel-total="model:model1">2 tamanho\(s\) · 9 unidades/);
+test('quantidades iniciais vêm do pedido mínimo do fornecedor, não do estoque mínimo',()=>{
+ const page=purchasesPage({...args,expanded:new Set(['model:model1'])});
+ assert.match(page,/data-buy-inline-qty data-product="p0" value="12"/);
+ assert.match(page,/data-buy-inline-qty data-product="p1" value="3"/);
+ assert.match(page,/data-buy-inline-qty data-product="p2" value="6"/);
+ assert.match(page,/Pedido mínimo <b>12/);
+ assert.match(page,/Pedido mínimo <b>3/);
+ assert.match(page,/Pedido mínimo <b>6/);
+ assert.match(app,/function prefillPurchaseMinimums/);
+ assert.match(app,/if\(!shortage\|\|!variant.supplier_id\|\|state.purchaseCart.has\(variant.id\)\)continue/);
+ assert.match(app,/minimum_order_quantity/);
 });
-test('compra sem seleção só mostra revisão quando existir seleção; SKU sem fornecedor não pode ser pedido',()=>{
- const empty=purchasesPage(args);
- assert.match(empty,/data-buy-panel-review="model:model1" hidden/);
- const noSupplier=purchasesPage({...args,products:products.map(p=>({...p,supplier_id:null}))});
- assert.match(noSupplier,/data-action="buy-suggest-group"[^>]*disabled/);
- assert.match(noSupplier,/data-buy-inline-select[^>]*disabled/);
+test('pedido recebe itens selecionados em rascunho do mesmo fornecedor, com autorização',()=>{
+ assert.match(app,/function purchaseDraftTargetModal/);
+ assert.match(app,/formModal\('Adicionar ao pedido/);
+ assert.match(app,/supplierIds.length!==1/);
+ assert.match(app,/create_supplier_purchase_draft/);
+ assert.match(app,/add_purchase_draft_items/);
+ assert.match(migration,/status<>'rascunho'/);
+ assert.match(migration,/p\.supplier_id|v_product\.supplier_id/);
+ assert.match(migration,/ON CONFLICT \(purchase_order_id,product_id\) DO UPDATE/);
+ assert.doesNotMatch(migration,/UPDATE public.store_orders|UPDATE public.stock_balances/);
 });
-test('histórico de saídas é carregado no painel, com limite e ressalva física; não abre modal',()=>{
- const handler=app.split("if(action==='buy-product-report')")[1].split("if(action==='buy-status')")[0];
- assert.match(handler,/setPurchasePanelOpen\(groupKey,true\)/);
- assert.match(handler,/loadPurchaseOutflow\(groupKey\)/);
- assert.doesNotMatch(handler,/formModal/);
- assert.match(app,/async function loadPurchaseOutflow/);
- assert.match(app,/delta_store.*0/);
- assert.match(app,/\.limit\(3000\)/);
- assert.match(app,/Saídas físicas não são necessariamente vendas/);
- assert.match(app,/function updatePurchaseCartDisplay/);
- assert.match(app,/data-buy-panel-total/);
- assert.match(app,/data-buy-panel-review/);
- assert.match(app,/data-buy-inline-qty/);
+test('revisão e PDF são feitos dentro do pedido, sem nova etapa e sem envio fictício',()=>{
+ assert.match(app,/function purchaseDraftDetails/);
+ assert.match(app,/data-draft-qty/);
+ assert.match(app,/buy-draft-confirm/);
+ assert.match(app,/confirm_supplier_purchase_draft/);
+ assert.match(app,/p_items:edited/);
+ assert.match(app,/downloadBuyOrder\(fresh,items\)/);
+ assert.match(app,/buy-draft-mark-sent/);
+ assert.match(app,/não transmite mensagens|não envia mensagens automaticamente/);
+ assert.match(migration,/PUBLIC,anon/);
 });
-test('desktop mantém 3 botões com a mesma altura, mobile em uma linha com ícones',()=>{
- assert.match(css,/grid-template-columns:minmax\(146px,1\.14fr\)/);
- assert.match(css,/min-height:43px!important;height:43px!important/);
+test('mesmo modelo com fornecedores diferentes não mistura pedidos',()=>{
+ const split=purchasingGroups(products.map((p,i)=>({...p,supplier_id:i===2?'s2':'s1'})),args.models,args.balances,[],[],[]);
+ assert.equal(split.length,2);
+ assert.equal(split.find(g=>g.supplier_id==='s1').variants.length,2);
+ assert.equal(split.find(g=>g.supplier_id==='s2').variants.length,1);
+});
+test('MOQ possui constraint própria diferente de min_stock',()=>{
+ assert.match(migration,/ADD COLUMN IF NOT EXISTS minimum_order_quantity integer NOT NULL DEFAULT 1/);
+ assert.match(migration,/minimum_order_quantity BETWEEN 1 AND 1000000/);
+ assert.match(migration,/PURCHASE_DRAFT_ITEMS_ADDED/);
+ assert.match(migration,/PURCHASE_DRAFT_READY_TO_SEND/);
+ assert.match(app,/Pedido mínimo do fornecedor por variação/);
+ assert.match(app,/minimum_order_quantity:minimumOrderQuantity/);
+});
+test('botão único mantém altura uniforme no desktop e mobile',()=>{
+ assert.match(css,/buy-quick-card \.buy-card-toolbar/);
+ assert.match(css,/grid-template-columns:minmax\(142px,212px\)/);
  assert.match(css,/@media\(max-width:760px\)/);
- assert.match(css,/grid-template-columns:minmax\(0,1fr\) 46px 46px!important/);
- assert.match(css,/\.buy-card-action:not\(\.is-primary\) \.buy-action-label\{display:none!important/);
- assert.match(css,/\.buy-one-panel/);
- const stylesheet=index.match(/<link rel="stylesheet"[^>]+>/g).at(-1);
- assert.match(stylesheet,/buy-one-panel\.css\?v=20261017compras-single1/);
+ assert.match(css,/grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
 });

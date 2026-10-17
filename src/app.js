@@ -30,7 +30,7 @@ import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCar
  setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
  confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261016cart1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
-import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261017comprasv2';
+import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261017drafts1';
 import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSummary,purchaseCartBySupplier,purchaseCartReviewGroups,serializePurchaseCart,parsePurchaseCart} from './purchase-cart.js?v=20261016buycart1';
 import {supplierDirectoryPayload,staffDirectoryPayload,procurementTaskDraft,supplierInsights,procurementTasksHTML} from './directory-automation.js?v=20261017directory1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
@@ -1571,8 +1571,10 @@ function photoChooser(item){return galleryMarkup(item);}
 function procurementFields(item=null){
  return '<section class="form-section wide"><div class="section-head"><strong>Reposição e compras</strong>'+
   '<small>Controle por SKU/variação; não altera o estoque atual</small></div>'+
-  '<div class="formgrid">'+field('Estoque mínimo (unidades)','min_stock','number',item?.min_stock??0,
-    'min="0" max="1000000" step="1"','Ao ficar abaixo desse limite, aparece na sugestão de compras.')+
+  '<div class="formgrid">'+field('Estoque mínimo para reposição','min_stock','number',item?.min_stock??0,
+    'min="0" max="1000000" step="1"','Define alerta de reposição, não o mínimo de compra.')+
+  field('Pedido mínimo do fornecedor por variação','minimum_order_quantity','number',item?.minimum_order_quantity??1,
+    'min="1" max="1000000" step="1" required','Quantidade mínima aceita pelo fornecedor ao comprar este SKU.')+
   selectField('Fornecedor padrão','supplier_id',[['','Sem fornecedor'],...state.suppliers.filter(s=>s.active||s.id===item?.supplier_id).map(s=>[s.id,s.name])],item?.supplier_id||'')+
   '</div><p class="help">Cadastre fornecedores na seção Compras. Para modelos com variações, o mínimo vale por tamanho/SKU.</p></section>';
 }
@@ -1581,11 +1583,15 @@ function procurementValues(form){
  if(raw===''||!Number.isInteger(min)||min<0||min>1000000)throw Error('Estoque mínimo deve ser de 0 a 1.000.000 unidades.');
  const supplier=form.elements.namedItem('supplier_id')?.value||null;
  if(supplier&&!state.suppliers.some(s=>s.id===supplier&&s.active))throw Error('Fornecedor inválido ou inativo.');
- return {supplier_id:supplier,min_stock:min};
+ const minimumRaw=form.elements.namedItem('minimum_order_quantity')?.value??'1',minimumOrderQuantity=Number(minimumRaw);
+ if(minimumRaw===''||!Number.isInteger(minimumOrderQuantity)||minimumOrderQuantity<1||minimumOrderQuantity>1000000)
+  throw Error('Pedido mínimo do fornecedor deve ser de 1 a 1.000.000 unidades.');
+ return {supplier_id:supplier,min_stock:min,minimum_order_quantity:minimumOrderQuantity};
 }
 async function saveModelProcurement(modelId,form){
  const v=procurementValues(form);
  assertOk(await db.rpc('set_apparel_procurement',{p_model:modelId,p_supplier:v.supplier_id,p_min_stock:v.min_stock}));
+ assertOk(await db.from('products').update({minimum_order_quantity:v.minimum_order_quantity}).eq('apparel_model_id',modelId));
 }
 function supplierManagerModal(){
  if(!hasPermission('purchases.manage'))return;
@@ -1713,6 +1719,98 @@ function setPurchasePanelOpen(groupKey,open){
  }
  if(open)state.purchaseExpanded.add(groupKey);
  else state.purchaseExpanded.delete(groupKey);
+}
+function prefillPurchaseMinimums(groupKey){
+ const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+  state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
+ const card=[...document.querySelectorAll('[data-buy-card]')].find(el=>el.dataset.buyCard===groupKey);
+ if(!group||!card)return;
+ for(const variant of group.variants){
+  const shortage=Math.max(0,Number(variant.min_stock||0)-Number(variant.free||0)-Number(variant.pending||0));
+  if(!shortage||!variant.supplier_id||state.purchaseCart.has(variant.id))continue;
+  const minimum=Math.max(1,Number(variant.minimum_order_quantity||1));
+  const line=[...card.querySelectorAll('[data-buy-sku]')].find(el=>el.dataset.buySku===variant.id);
+  if(!line)continue;
+  const checkbox=line.querySelector('[data-buy-inline-select]');
+  const qty=line.querySelector('[data-buy-inline-qty]');
+  if(!checkbox||!qty)continue;
+  checkbox.checked=true;qty.disabled=false;qty.value=String(minimum);qty.min=String(minimum);
+  state.purchaseCart=setPurchaseCartItem(state.purchaseCart,variant.id,minimum);
+ }
+ savePurchaseCart();updatePurchaseCartDisplay();
+}
+function purchaseDraftTargetModal(groupKey){
+ if(!hasPermission('purchases.manage'))return;
+ const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+   state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
+ if(!group)return toast('Produto não encontrado.',true);
+ const selected=group.variants.filter(p=>state.purchaseCart.has(p.id));
+ if(!selected.length)return toast('Selecione pelo menos uma variação.',true);
+ const supplierIds=[...new Set(selected.map(p=>p.supplier_id))];
+ if(supplierIds.length!==1||!supplierIds[0])return toast('Selecione variações de um único fornecedor cadastrado.',true);
+ const supplierId=supplierIds[0];
+ for(const p of selected){
+  const qty=state.purchaseCart.get(p.id),minimum=Number(p.minimum_order_quantity||1);
+  if(!validPurchaseQty(qty)||qty<minimum)
+   return toast('O tamanho '+(p.apparel_size||p.name)+' exige pedido mínimo de '+minimum+' unidades.',true);
+ }
+ const supplier=state.suppliers.find(x=>x.id===supplierId);
+ if(!supplier?.active)return toast('Fornecedor indisponível.',true);
+ const drafts=state.purchaseOrders.filter(o=>o.supplier_id===supplierId&&o.status==='rascunho');
+ const options=[['novo','+ Criar novo pedido para '+supplier.name],
+  ...drafts.map(o=>[o.id,'PC-'+o.number+' · '+state.purchaseItems.filter(i=>i.purchase_order_id===o.id).length+' SKU(s)'])];
+ formModal('Adicionar ao pedido · '+supplier.name,
+  '<p class="help">'+selected.length+' variação(ões) · '+selected.reduce((n,p)=>n+Number(state.purchaseCart.get(p.id)),0)+
+  ' unidades. Cada pedido pertence exclusivamente a um fornecedor. Escolha um rascunho ou crie um agora.</p>'+
+  '<div class="formgrid">'+selectField('Em qual pedido adicionar?','purchase_order_id',options,drafts.length===1?drafts[0].id:'novo')+'</div>',
+  'buy-add-draft','Adicionar ao pedido');
+ const form=document.querySelector('form[data-form="buy-add-draft"]');
+ if(form){form.dataset.group=groupKey;form.dataset.supplier=supplierId;}
+}
+function purchaseDraftDetails(order){
+ if(!order||!hasPermission('purchases.manage'))return;
+ const draft=order.status==='rascunho';
+ const supplier=state.suppliers.find(s=>s.id===order.supplier_id);
+ const items=state.purchaseItems.filter(i=>i.purchase_order_id===order.id);
+ const groups=new Map();
+ for(const item of items){
+  const product=state.items.find(p=>p.id===item.product_id);
+  const model=state.apparelModels.find(m=>m.id===product?.apparel_model_id);
+  const key=model?.id||item.product_id;
+  if(!groups.has(key))groups.set(key,{title:model?.name||item.product_name,photo:model?.image_path||product?.image_path,rows:[]});
+  groups.get(key).rows.push({item,product});
+ }
+ const content=[...groups.values()].map(g=>{
+  const photo=g.photo?'<img data-photo-path="'+h(g.photo)+'" alt="Foto: '+h(g.title)+'">':'<span>Sem foto</span>';
+  return '<article class="buy-review-card"><header class="buy-review-card-head">'+
+   '<div class="buy-review-photo">'+photo+'</div><div class="buy-review-card-title"><strong>'+h(g.title)+'</strong>'+
+   '<small>'+g.rows.length+' variação(ões)</small></div></header><div class="buy-review-variants">'+g.rows.map(({item,product})=>{
+    const minimum=Math.max(1,Number(product?.minimum_order_quantity||1));
+    return '<div class="buy-review-variant"><div><strong>'+h(product?.apparel_size||item.product_name)+'</strong>'+
+     '<small>SKU '+h(item.sku||'—')+' · Pedido mínimo: '+minimum+' un.</small></div>'+
+     (draft?'<label>Quantidade (0 remove)<input type="number" data-draft-qty="'+h(item.product_id)+
+      '" min="0" max="1000000" step="1" value="'+item.quantity+'" inputmode="numeric" aria-label="Quantidade de '+h(item.product_name)+'"></label>':
+      '<strong>'+item.quantity+' un.</strong>')+'</div>';
+   }).join('')+'</div></article>';
+ }).join('');
+ const total=items.reduce((sum,i)=>sum+Number(i.quantity||0),0);
+ formModal('Pedido PC-'+order.number+' · '+(supplier?.name||'Fornecedor'),
+  '<p class="help">'+(draft?'Confira os produtos e quantidades aqui mesmo. Não existe uma etapa separada de revisão.':
+   'Pedido já registrado; o histórico e a conferência do recebimento permanecem independentes.')+'</p>'+
+  '<div class="buy-review-cards">'+(content||'<p class="buy-empty">Nenhum produto adicionado. Volte à Reposição para incluir itens.</p>')+'</div>'+
+  '<div class="buy-review-summary">'+items.length+' SKU(s) · '+total+' unidades</div>'+
+  (draft?'<div class="formgrid">'+
+    field('Prazo estimado de chegada (dias)','estimated_days','number',order.estimated_days||supplier?.delivery_days||15,'required min="1" max="365"')+
+    textareaField('Observações para o fornecedor','note',order.note||'')+'</div>'+
+    '<p class="help">Conferir e preparar PDF não envia mensagens automaticamente. Compartilhe o PDF com o fornecedor e então registre o envio.</p>'+
+    (items.length&&order.expected_arrival_date?button('Baixar PDF','buy-print-order','data-id="'+h(order.id)+'"','small'):'')+
+    (items.length&&order.expected_arrival_date?button('Já enviei ao fornecedor','buy-draft-mark-sent','data-id="'+h(order.id)+'"','small'):''):
+   '') ,
+  draft?'buy-draft-confirm':'buy-draft-readonly',draft?'Conferir e preparar PDF':'Fechar');
+ const form=document.querySelector('form[data-form="'+(draft?'buy-draft-confirm':'buy-draft-readonly')+'"]');
+ if(form)form.dataset.order=order.id;
+ if(draft&&!items.length)form?.querySelector('button[type="submit"]')?.setAttribute('disabled','');
+ hydrateImages();
 }
 function purchaseReviewFormValues(){
  const form=document.querySelector('form[data-form="buy-order-create"]');
@@ -3641,31 +3739,33 @@ async function handleClick(event){
     if(['abertas','atrasadas'].includes(stat)){state.purchaseTab='pedidos';state.purchaseOrderFilter=stat;}
     state.purchaseCatalog.page=0;render();return;
   }
+  if(action==='buy-add-to-draft')return purchaseDraftTargetModal(target.dataset.group);
+  if(action==='buy-order-open')return purchaseDraftDetails(state.purchaseOrders.find(o=>o.id===id));
+  if(action==='buy-draft-mark-sent'){
+   const order=state.purchaseOrders.find(o=>o.id===id);
+   if(!order||order.status!=='rascunho')return;
+   if(!order.estimated_days||!order.expected_arrival_date)
+     return toast('Confira o pedido e prepare o PDF antes de registrar o envio.',true);
+   const form=document.querySelector('form[data-form="buy-draft-confirm"]');
+   const dirty=[...(form?.querySelectorAll('[data-draft-qty]')||[])].some(input=>
+     Number(input.value)!==Number(state.purchaseItems.find(i=>i.purchase_order_id===id&&i.product_id===input.dataset.draftQty)?.quantity));
+   if(dirty||String(form?.elements.namedItem('estimated_days')?.value||'')!==String(order.estimated_days)||
+      String(form?.elements.namedItem('note')?.value||'').trim()!==String(order.note||'').trim())
+     return toast('Existem mudanças não conferidas. Clique em Conferir e preparar PDF primeiro.',true);
+   if(!window.confirm('Confirma que este pedido já foi enviado efetivamente ao fornecedor? Esta ação apenas registra o envio, não transmite mensagens.'))return;
+   return exec(async()=>{
+    assertOk(await db.rpc('set_purchase_order_status',{p_id:id,p_status:'enviado'}));
+    closeTopModal();
+   },'Encomenda registrada como enviada ao fornecedor.');
+  }
   if(action==='buy-open-group'){
     const groupKey=target.dataset.group;
     const panel=target.closest('[data-buy-card]')?.querySelector('[data-buy-expand]');
     if(!panel)return;
     const open=!panel.open;
     setPurchasePanelOpen(groupKey,open);
-    if(open)await loadPurchaseOutflow(groupKey);
+    if(open){prefillPurchaseMinimums(groupKey);await loadPurchaseOutflow(groupKey);}
     return;
-  }
-  if(action==='buy-suggest-group'){
-    if(!hasPermission('purchases.manage'))return;
-    const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
-      state.purchaseOrders,state.purchaseItems).find(g=>g.key===target.dataset.group);
-    if(!group?.supplier_id)return toast('Cadastre um fornecedor antes de selecionar produtos.',true);
-    let count=0;
-    for(const p of group.variants){
-      const need=Math.max(0,Number(p.min_stock||0)-p.free-p.pending);
-      if(need>0&&!state.purchaseCart.has(p.id)){
-        state.purchaseCart=setPurchaseCartItem(state.purchaseCart,p.id,need);count++;
-      }
-    }
-    if(!count)return toast('Todas as sugestões deste modelo já estão selecionadas.');
-    savePurchaseCart();state.purchaseExpanded.add(group.key);render();
-    await loadPurchaseOutflow(group.key);
-    toast(count+' variação(ões) incluída(s). Revise as quantidades antes de salvar.');return;
   }
   if(action==='buy-load-more'){
     state.purchaseCatalog.page+=1;render();return;
@@ -4596,6 +4696,75 @@ async function handleSubmit(event){
     assertOk(await record);
    },'Gôndola salva e disponível no cadastro.');
   }
+  if(type==='buy-add-draft'){
+   if(!hasPermission('purchases.manage'))return;
+   const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+      state.purchaseOrders,state.purchaseItems).find(g=>g.key===form.dataset.group);
+   if(!group)return toast('Produto não encontrado. Atualize Compras.',true);
+   const chosen=group.variants.filter(p=>state.purchaseCart.has(p.id));
+   if(!chosen.length)return toast('Selecione os tamanhos antes de adicionar.',true);
+   const supplier=form.dataset.supplier;
+   if(chosen.some(p=>p.supplier_id!==supplier))return toast('Um pedido aceita produtos de um único fornecedor.',true);
+   const lines=chosen.map(p=>({product_id:p.id,quantity:Number(state.purchaseCart.get(p.id))}));
+   if(lines.some((l,i)=>!validPurchaseQty(l.quantity)||l.quantity<Number(chosen[i].minimum_order_quantity||1)))
+     return toast('Confira o pedido mínimo do fornecedor em cada tamanho.',true);
+   const selected=String(values.purchase_order_id||'novo');
+   const existing=selected==='novo'?null:state.purchaseOrders.find(o=>o.id===selected);
+   if(selected!=='novo'&&(!existing||existing.status!=='rascunho'||existing.supplier_id!==supplier))
+    return toast('Pedido selecionado não está disponível para esse fornecedor.',true);
+   state.loading=true;
+   try{
+    const orderId=existing?.id||assertOk(await db.rpc('create_supplier_purchase_draft',{p_supplier:supplier}));
+    assertOk(await db.rpc('add_purchase_draft_items',{p_order:orderId,p_items:lines}));
+    for(const line of lines)state.purchaseCart.delete(line.product_id);
+    savePurchaseCart();
+    closeTopModal();
+    await loadData();
+    toast(lines.length+' variação(ões) adicionada(s). Pode acrescentar outros produtos ao mesmo pedido.');
+   }catch(error){fail(error);}finally{state.loading=false;}
+   return;
+  }
+  if(type==='buy-draft-readonly'){closeTopModal();return;}
+  if(type==='buy-draft-confirm'){
+   if(!hasPermission('purchases.manage'))return;
+   const order=state.purchaseOrders.find(o=>o.id===form.dataset.order);
+   if(!order||order.status!=='rascunho')return toast('Reabra o pedido para conferir a versão atual.',true);
+   const lines=state.purchaseItems.filter(i=>i.purchase_order_id===order.id);
+   const edited=[];
+   for(const item of lines){
+    const field=[...form.querySelectorAll('[data-draft-qty]')].find(x=>x.dataset.draftQty===item.product_id);
+    if(!field)return toast('A lista mudou. Reabra o pedido antes de finalizar.',true);
+    const qty=Number(field.value),product=state.items.find(p=>p.id===item.product_id);
+    if(field.value.trim()===''||!Number.isInteger(qty)||qty<0||qty>1000000||
+       (qty>0&&qty<Number(product?.minimum_order_quantity||1)))
+     return toast('Confira o pedido mínimo do fornecedor em cada variação (zero remove).',true);
+    edited.push({product_id:item.product_id,quantity:qty});
+   }
+   if(!edited.some(x=>x.quantity>0))return toast('Mantenha ao menos um produto no pedido.',true);
+   const days=Number(values.estimated_days);
+   if(!Number.isInteger(days)||days<1||days>365)return toast('Informe previsão entre 1 e 365 dias.',true);
+   if(!window.confirm('Conferir '+edited.filter(x=>x.quantity>0).length+' SKU(s) e preparar PDF? O estoque não será alterado.'))return;
+   state.loading=true;let saved=false;
+   try{
+    assertOk(await db.rpc('confirm_supplier_purchase_draft',{
+      p_order:order.id,p_estimated_days:days,p_note:String(values.note||'').slice(0,1500),p_items:edited
+    }));
+    saved=true;
+    const fresh=assertOk(await db.from('purchase_orders').select('*').eq('id',order.id).single());
+    const items=assertOk(await db.from('purchase_order_items').select('*').eq('purchase_order_id',order.id));
+    await loadData();
+    purchaseDraftDetails(state.purchaseOrders.find(o=>o.id===order.id));
+    await downloadBuyOrder(fresh,items);
+    toast('Pedido conferido e PDF preparado. Envie ao fornecedor e clique em Já enviei nesta mesma tela.');
+   }catch(error){
+    fail(error);
+    if(saved){
+     try{closeTopModal();await loadData();}catch(e){console.warn('Falha ao atualizar',e);}
+     toast('Pedido atualizado, mas PDF falhou. Reabra e baixe novamente sem duplicar itens.',true);
+    }
+   }finally{state.loading=false;}
+   return;
+  }
   if(type==='buy-task-create'){
    if(!hasPermission('purchases.manage'))return;
    let draft;
@@ -4756,7 +4925,8 @@ async function handleSubmit(event){
       if(!editing){const procurement=procurementValues(form);
        assertOk(await db.rpc('set_product_procurement',{
         p_product:productId,p_supplier:procurement.supplier_id,p_min_stock:procurement.min_stock
-       }));}
+       }));
+       assertOk(await db.from('products').update({minimum_order_quantity:procurement.minimum_order_quantity}).eq('id',productId));}
       if(galleryHasChanges(form)){
         try{
           const existing=editing?product(id):null;
@@ -5445,7 +5615,7 @@ document.addEventListener('toggle',event=>{
  const details=event.target;
  if(!details.matches?.('[data-buy-expand]')||!details.isConnected)return;
  setPurchasePanelOpen(details.dataset.buyExpand,details.open);
- if(details.open)void loadPurchaseOutflow(details.dataset.buyExpand);
+ if(details.open){prefillPurchaseMinimums(details.dataset.buyExpand);void loadPurchaseOutflow(details.dataset.buyExpand);}
 },true);
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
@@ -5471,8 +5641,8 @@ document.addEventListener('input',event=>{
     const input=event.target,id=input.dataset.product;
     const selected=input.closest('[data-buy-sku]')?.querySelector('[data-buy-inline-select]')?.checked;
     if(!selected)return;
-    if(!validPurchaseQty(input.value)){
-      input.setCustomValidity('Informe 1 a 1.000.000 unidades inteiras.');
+    if(!validPurchaseQty(input.value)||Number(input.value)<Number(input.min||1)){
+      input.setCustomValidity('Mínimo do fornecedor: '+(input.min||1)+' unidades.');
       state.purchaseCart.delete(id);
     }else {
       input.setCustomValidity('');
@@ -5661,7 +5831,7 @@ document.addEventListener('change',event=>{
     if(!qty)return;
     qty.disabled=!input.checked;
     if(input.checked){
-      if(!validPurchaseQty(qty.value))qty.value='1';
+      if(!validPurchaseQty(qty.value)||Number(qty.value)<Number(qty.min||1))qty.value=qty.min||'1';
       state.purchaseCart=setPurchaseCartItem(state.purchaseCart,id,qty.value);
     }else state.purchaseCart.delete(id);
     savePurchaseCart();updatePurchaseCartDisplay();

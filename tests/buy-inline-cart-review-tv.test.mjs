@@ -29,9 +29,10 @@ test('seleção de SKUs com valores inteiros é independente de filtro e pagina�
  assert.match(page,/data-buy-inline-qty data-product="A-P" value="9"/);
  assert.match(page,/data-buy-inline-qty data-product="A-M" value="12"/);
  assert.match(page,/data-buy-expand="model:modelA" open/);
- assert.match(page,/3 SKU\(s\) · 26 unidades · 2 fornecedor\(es\)/);
+ assert.match(page,/2 tamanho\(s\) · 21 un\./);
+ assert.doesNotMatch(page,/class="buy-cart-dock"/);
  assert.ok(!page.includes('Selecionar para compra'));
- assert.match(page,/data-action="buy-review"/);
+ assert.match(page,/data-action="buy-add-to-draft"/);
 });
 test('revisão agrupa por modelo e mantém total e foto por fornecedor',()=>{
  const basket=new Map([['A-P',10],['A-M',8],['B-G',4]]);

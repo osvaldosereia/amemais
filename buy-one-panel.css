@@ -112,3 +112,36 @@
  .buy-page .buy-panel-footer .button{width:100%}
 }
 @media(prefers-reduced-motion:reduce){.buy-page .buy-card-toolbar .buy-card-action{transition:none!important}}
+
+
+/* Fluxo de compra por pedido: somente Abrir compra no card fechado. */
+.buy-page .buy-quick-card .buy-card-toolbar{
+ display:grid!important;grid-template-columns:minmax(142px,212px) minmax(0,1fr)!important;
+ gap:10px!important;align-items:center!important;justify-content:stretch!important;
+ padding:8px 12px!important;
+}
+.buy-page .buy-quick-card .buy-card-toolbar>.buy-card-action{width:100%!important;min-height:42px!important}
+.buy-page .buy-quick-card .buy-card-toolbar>.buy-card-selected{
+ justify-content:flex-end!important;min-height:42px!important;background:transparent!important;
+ border:0!important;text-align:right!important;
+}
+.buy-page .buy-one-panel .buy-variant-values .buy-moq{
+ background:#fff7e7!important;border-color:#ebd3a4!important;
+ color:#7d5621!important;font-weight:700!important;
+}
+.buy-page .buy-panel-footer{background:#f9fbfe}
+.buy-page .buy-panel-footer>.button.primary{padding:10px 18px}
+.buy-page .buy-review-card .buy-review-variant input[data-draft-qty]{width:92px;text-align:center}
+.buy-page .buy-order .buy-order-actions .button{white-space:nowrap}
+@media(max-width:760px){
+ .buy-page .buy-quick-card .buy-card-toolbar{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
+ .buy-page .buy-quick-card .buy-card-toolbar>.buy-card-selected{
+  grid-column:2!important;justify-content:flex-end!important;font-size:.66rem!important;
+  min-height:42px!important
+ }
+ .buy-page .buy-quick-card .buy-card-toolbar>.buy-card-action.is-primary{
+  grid-column:1!important;min-height:44px!important
+ }
+ .buy-page .buy-one-panel .buy-variant-values{gap:5px!important}
+ .buy-page .buy-panel-footer{padding:10px 12px}
+}
