@@ -105,8 +105,8 @@ BEGIN
  jsonb_build_object('product_id',p_product,'quantity',p_quantity));
 END;$fn$;
 
--- Finalização do rascunho; envio externo do PDF ao fornecedor é etapa humana.
--- A função não declara que uma mensagem foi entregue automaticamente.
+
+-- Conferência final transacional: quantidade/itens, prazo e observações no mesmo pedido.
 CREATE OR REPLACE FUNCTION public.confirm_supplier_purchase_draft(
  p_order uuid,p_estimated_days integer,p_note text DEFAULT NULL,p_items jsonb DEFAULT NULL
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
@@ -117,8 +117,7 @@ BEGIN
   RAISE EXCEPTION 'Sem permissão para gerenciar compras';END IF;
  IF p_estimated_days IS NULL OR p_estimated_days NOT BETWEEN 1 AND 365 THEN
   RAISE EXCEPTION 'Informe prazo de chegada de 1 a 365 dias'; END IF;
- IF length(coalesce(p_note,''))>1500 THEN
-  RAISE EXCEPTION 'Observação muito longa'; END IF;
+ IF length(coalesce(p_note,''))>1500 THEN RAISE EXCEPTION 'Observação muito longa'; END IF;
  SELECT * INTO v_order FROM public.purchase_orders WHERE id=p_order FOR UPDATE;
  IF NOT FOUND OR v_order.status<>'rascunho' THEN
   RAISE EXCEPTION 'Somente pedidos em rascunho podem ser confirmados'; END IF;
@@ -131,95 +130,13 @@ BEGIN
   IF (SELECT count(DISTINCT value->>'product_id') FROM jsonb_array_elements(p_items))<>v_existing THEN
    RAISE EXCEPTION 'SKU repetido na conferência';END IF;
   FOR v_line IN SELECT value FROM jsonb_array_elements(p_items) LOOP
-   IF jsonb_typeof(v_line)<>'object' OR coalesce(v_line->>'product_id','') !~* '^[0-9a-f-]{36}
- SELECT p.name INTO v_bad FROM public.purchase_order_items i
- JOIN public.products p ON p.id=i.product_id
- WHERE i.purchase_order_id=p_order AND
-  (i.quantity<p.minimum_order_quantity OR i.quantity>1000000 OR
-   p.supplier_id IS DISTINCT FROM v_order.supplier_id)
- LIMIT 1;
- IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'Revise o pedido mínimo ou fornecedor de %',v_bad; END IF;
- UPDATE public.purchase_orders SET estimated_days=p_estimated_days,
-  expected_arrival_date=(now() AT TIME ZONE 'America/Cuiaba')::date+p_estimated_days,
-  note=nullif(btrim(coalesce(p_note,'')),''),
-  updated_at=now()
- WHERE id=p_order;
- INSERT INTO public.audit_log(entity,entity_id,action,actor_id,details)
- VALUES('purchase_orders',p_order::text,'PURCHASE_DRAFT_READY_TO_SEND',auth.uid(),
-  jsonb_build_object('days',p_estimated_days,'stock_updated',false));
-END;$fn$;
-
--- Proteção adicional: somente enviar rascunho previamente conferido, com prazo e SKU válidos.
-CREATE OR REPLACE FUNCTION public.set_purchase_order_status(p_id uuid,p_status text)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
-DECLARE v_order public.purchase_orders%rowtype;
-BEGIN
- IF auth.uid() IS NULL OR NOT app_private.has_permission('purchases.manage') THEN
-  RAISE EXCEPTION 'Sem permissão para gerenciar compras';END IF;
- SELECT * INTO v_order FROM public.purchase_orders WHERE id=p_id FOR UPDATE;
- IF NOT FOUND THEN RAISE EXCEPTION 'Compra não encontrada';END IF;
- IF NOT (
-   (v_order.status='rascunho' AND p_status IN ('enviado','cancelado')) OR
-   (v_order.status='enviado' AND p_status='cancelado')
- ) THEN RAISE EXCEPTION 'Transição de compra inválida';END IF;
- IF p_status='enviado' THEN
-  IF v_order.estimated_days IS NULL OR v_order.expected_arrival_date IS NULL THEN
-   RAISE EXCEPTION 'Confira o pedido e informe a previsão antes de enviar';END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.purchase_order_items WHERE purchase_order_id=p_id) THEN
-   RAISE EXCEPTION 'Não é possível enviar pedido sem produtos';END IF;
-  IF EXISTS(SELECT 1 FROM public.purchase_order_items i JOIN public.products p ON p.id=i.product_id
-     WHERE i.purchase_order_id=p_id AND
-      (i.quantity<p.minimum_order_quantity OR i.quantity>1000000 OR
-       p.supplier_id IS DISTINCT FROM v_order.supplier_id)) THEN
-   RAISE EXCEPTION 'Quantidade abaixo do mínimo ou item de outro fornecedor';END IF;
- END IF;
- UPDATE public.purchase_orders SET status=p_status,updated_at=now(),
-  sent_at=CASE WHEN p_status='enviado' THEN now() ELSE sent_at END WHERE id=p_id;
- INSERT INTO public.audit_log(entity,entity_id,action,actor_id,details)
- VALUES('purchase_orders',p_id::text,'PURCHASE_STATUS_CHANGED',auth.uid(),
-  jsonb_build_object('before',v_order.status,'after',p_status,'stock_updated',false));
-END;$fn$;
-
-REVOKE ALL ON FUNCTION public.create_supplier_purchase_draft(uuid),
- public.add_purchase_draft_items(uuid,jsonb),
- public.set_purchase_draft_quantity(uuid,uuid,integer),
- public.confirm_supplier_purchase_draft(uuid,integer,text,jsonb) FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.create_supplier_purchase_draft(uuid),
- public.add_purchase_draft_items(uuid,jsonb),
- public.set_purchase_draft_quantity(uuid,uuid,integer),
- public.confirm_supplier_purchase_draft(uuid,integer,text,jsonb) TO authenticated;
-COMMIT;
-    OR coalesce(v_line->>'quantity','') !~ '^(0|[1-9][0-9]{0,6})
- SELECT p.name INTO v_bad FROM public.purchase_order_items i
- JOIN public.products p ON p.id=i.product_id
- WHERE i.purchase_order_id=p_order AND
-  (i.quantity<p.minimum_order_quantity OR i.quantity>1000000 OR
-   p.supplier_id IS DISTINCT FROM v_order.supplier_id)
- LIMIT 1;
- IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'Revise o pedido mínimo ou fornecedor de %',v_bad; END IF;
- UPDATE public.purchase_orders SET estimated_days=p_estimated_days,
-  expected_arrival_date=(now() AT TIME ZONE 'America/Cuiaba')::date+p_estimated_days,
-  note=nullif(btrim(coalesce(p_note,'')),''),
-  updated_at=now()
- WHERE id=p_order;
- INSERT INTO public.audit_log(entity,entity_id,action,actor_id,details)
- VALUES('purchase_orders',p_order::text,'PURCHASE_DRAFT_READY_TO_SEND',auth.uid(),
-  jsonb_build_object('days',p_estimated_days,'stock_updated',false));
-END;$fn$;
-
-REVOKE ALL ON FUNCTION public.create_supplier_purchase_draft(uuid),
- public.add_purchase_draft_items(uuid,jsonb),
- public.set_purchase_draft_quantity(uuid,uuid,integer),
- public.confirm_supplier_purchase_draft(uuid,integer,text) FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.create_supplier_purchase_draft(uuid),
- public.add_purchase_draft_items(uuid,jsonb),
- public.set_purchase_draft_quantity(uuid,uuid,integer),
- public.confirm_supplier_purchase_draft(uuid,integer,text) TO authenticated;
-COMMIT; THEN
+   IF jsonb_typeof(v_line)<>'object'
+     OR coalesce(v_line->>'product_id','') !~* '^[0-9a-f-]{36}$'
+     OR coalesce(v_line->>'quantity','') !~ '^(0|[1-9][0-9]{0,6})$' THEN
     RAISE EXCEPTION 'Quantidade ou SKU inválido'; END IF;
    v_pid:=(v_line->>'product_id')::uuid;v_qty:=(v_line->>'quantity')::integer;
    IF v_qty>1000000 OR NOT EXISTS (SELECT 1 FROM public.purchase_order_items
-    WHERE purchase_order_id=p_order AND product_id=v_pid) THEN
+      WHERE purchase_order_id=p_order AND product_id=v_pid) THEN
     RAISE EXCEPTION 'Item não pertence ao pedido ou quantidade muito grande'; END IF;
    IF v_qty>0 AND v_qty<(SELECT minimum_order_quantity FROM public.products WHERE id=v_pid) THEN
     RAISE EXCEPTION 'Quantidade inferior ao pedido mínimo do fornecedor';END IF;
@@ -250,12 +167,43 @@ COMMIT; THEN
   jsonb_build_object('days',p_estimated_days,'stock_updated',false));
 END;$fn$;
 
+-- Estado enviado somente depois da conferência e do envio humano.
+CREATE OR REPLACE FUNCTION public.set_purchase_order_status(p_id uuid,p_status text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $fn$
+DECLARE v_order public.purchase_orders%rowtype;
+BEGIN
+ IF auth.uid() IS NULL OR NOT app_private.has_permission('purchases.manage') THEN
+  RAISE EXCEPTION 'Sem permissão para gerenciar compras';END IF;
+ SELECT * INTO v_order FROM public.purchase_orders WHERE id=p_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Compra não encontrada';END IF;
+ IF NOT (
+  (v_order.status='rascunho' AND p_status IN ('enviado','cancelado')) OR
+  (v_order.status='enviado' AND p_status='cancelado')
+ ) THEN RAISE EXCEPTION 'Transição de compra inválida';END IF;
+ IF p_status='enviado' THEN
+  IF v_order.estimated_days IS NULL OR v_order.expected_arrival_date IS NULL THEN
+   RAISE EXCEPTION 'Confira o pedido e informe a previsão antes de enviar';END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.purchase_order_items WHERE purchase_order_id=p_id) THEN
+   RAISE EXCEPTION 'Não é possível enviar pedido sem produtos';END IF;
+  IF EXISTS(SELECT 1 FROM public.purchase_order_items i JOIN public.products p ON p.id=i.product_id
+    WHERE i.purchase_order_id=p_id AND
+    (i.quantity<p.minimum_order_quantity OR i.quantity>1000000 OR
+     p.supplier_id IS DISTINCT FROM v_order.supplier_id)) THEN
+   RAISE EXCEPTION 'Quantidade abaixo do mínimo ou item de outro fornecedor';END IF;
+ END IF;
+ UPDATE public.purchase_orders SET status=p_status,updated_at=now(),
+  sent_at=CASE WHEN p_status='enviado' THEN now() ELSE sent_at END WHERE id=p_id;
+ INSERT INTO public.audit_log(entity,entity_id,action,actor_id,details)
+ VALUES('purchase_orders',p_id::text,'PURCHASE_STATUS_CHANGED',auth.uid(),
+  jsonb_build_object('before',v_order.status,'after',p_status,'stock_updated',false));
+END;$fn$;
+
 REVOKE ALL ON FUNCTION public.create_supplier_purchase_draft(uuid),
  public.add_purchase_draft_items(uuid,jsonb),
  public.set_purchase_draft_quantity(uuid,uuid,integer),
- public.confirm_supplier_purchase_draft(uuid,integer,text) FROM PUBLIC,anon;
+ public.confirm_supplier_purchase_draft(uuid,integer,text,jsonb) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.create_supplier_purchase_draft(uuid),
  public.add_purchase_draft_items(uuid,jsonb),
  public.set_purchase_draft_quantity(uuid,uuid,integer),
- public.confirm_supplier_purchase_draft(uuid,integer,text) TO authenticated;
+ public.confirm_supplier_purchase_draft(uuid,integer,text,jsonb) TO authenticated;
 COMMIT;
