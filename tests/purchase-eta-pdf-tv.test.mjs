@@ -21,7 +21,7 @@ test('compras agrupadas por modelo e variações com fotos e controle explícito
  const suppliers=[{id:'s',name:'Fornecedor',active:true}];
  const models=[{id:'m',name:'CAMISETA',image_path:'apparel/m/1.jpg'}];
  const page=purchasesPage({products,models,suppliers,button:(label,action)=>'<button data-action="'+action+'">'+label+'</button>'});
- assert.equal((page.match(/class="buy-group-card"/g)||[]).length,1);
+ assert.equal((page.match(/class="buy-group-card buy-quick-card"/g)||[]).length,1);
  assert.match(page,/data-photo-path="apparel\/m\/1.jpg"/);
  assert.match(page,/Ver saídas 30\/90 dias/);
  const form=purchaseOrderRows(products,suppliers,[],[],[],[],models);

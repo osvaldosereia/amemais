@@ -66,12 +66,12 @@ test('ordenar por estoque, nome e data funciona sem dividir os modelos',()=>{
 test('os cards mantêm fotos e variações dentro de details inicialmente fechado',()=>{
  const page=purchasesPage({products,models,suppliers,balances,categories,
   tags:[{name:'Infantil'}],button,filter:'',catalog:{search:'abc100'}});
- assert.equal((page.match(/class="buy-group-card"/g)||[]).length,1);
+ assert.equal((page.match(/class="buy-group-card buy-quick-card"/g)||[]).length,1);
  assert.match(page,/data-photo-path="model-1.webp"/);
- assert.match(page,/<details class="buy-variation-disclosure" data-buy-expand=/);
- assert.doesNotMatch(page,/<details class="buy-variation-disclosure"[^>]* open/);
- assert.match(page,/Variações \(2\)/);
- assert.match(page,/Selecionar tamanhos e quantidades/);
+ assert.match(page,/<details class="buy-variation-disclosure buy-one-panel"[^>]*data-buy-expand=/);
+ assert.doesNotMatch(page,/<details class="buy-variation-disclosure buy-one-panel"[^>]* open/);
+ assert.match(page,/Abrir compra/);
+ assert.match(page,/data-action="buy-open-group"/);
  assert.match(page,/data-mode="buy-filter"/);
  assert.match(page,/data-mode="buy-tag"/);
  assert.match(page,/id="buy-catalog-search"/);
@@ -85,11 +85,11 @@ test('lista oferece carregamento progressivo sem perder filtro aplicado',()=>{
  }));
  const page0=purchasesPage({products:many,suppliers,categories,button,catalog:{page:0}});
  const page1=purchasesPage({products:many,suppliers,categories,button,catalog:{page:1}});
- assert.equal((page0.match(/class="buy-group-card"/g)||[]).length,8);
- assert.equal((page1.match(/class="buy-group-card"/g)||[]).length,16);
+ assert.equal((page0.match(/class="buy-group-card buy-quick-card"/g)||[]).length,8);
+ assert.equal((page1.match(/class="buy-group-card buy-quick-card"/g)||[]).length,16);
  assert.match(page0,/data-action="buy-load-more"/);
  const filtered=purchasesPage({products:many,suppliers,categories,button,catalog:{search:'Produto 17',page:0}});
- assert.equal((filtered.match(/class="buy-group-card"/g)||[]).length,1);
+ assert.equal((filtered.match(/class="buy-group-card buy-quick-card"/g)||[]).length,1);
  assert.doesNotMatch(filtered,/data-action="buy-load-more"/);
 });
 test('eventos de filtro e busca usam estado independente de Produtos',()=>{

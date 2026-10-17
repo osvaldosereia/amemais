@@ -167,6 +167,11 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
   const groupShortage=g.variants.reduce((n,p)=>n+Math.max(0,Number(p.min_stock||0)-p.free-p.pending),0);
   const lowVariants=g.variants.filter(p=>Math.max(0,Number(p.min_stock||0)-p.free-p.pending)>0).length;
   const gondolas=[...new Set(g.variants.map(p=>p.gondola).filter(Boolean))].slice(0,2).join(' · ');
+  const categoryId=g.variants.find(p=>p.category_id)?.category_id;
+  const categoryName=categories.find(c=>String(c.id)===String(categoryId))?.name||'—';
+  const isExpanded=expanded.has(g.key);
+  const canSuggest=Boolean(groupShortage&&g.supplier_id);
+  const commonAttrs='data-group="'+h(g.key)+'"';
   const image=g.photo?'<img data-photo-path="'+h(g.photo)+'" alt="Foto: '+h(g.title)+'" loading="lazy">':'<span class="buy-no-photo">Sem foto</span>';
   const picked=g.variants.filter(p=>cart.has(p.id));
   const pickedUnits=picked.reduce((sum,p)=>sum+Number(cart.get(p.id)||0),0);
@@ -189,19 +194,53 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
     ' inputmode="numeric" data-buy-inline-qty data-product="'+h(p.id)+'" value="'+String(quantity)+'"'+
     (selected&&g.supplier_id?'':' disabled')+' aria-label="Quantidade para tamanho '+h(p.apparel_size||'Único')+'"></label></div></div>';
   }).join('');
-  return '<article class="buy-group-card"><div class="buy-group-head"><div class="buy-group-photo">'+image+'</div>'+
-   '<div class="buy-group-title"><h3>'+h(g.title)+'</h3><small>'+h(supplier)+' · '+g.variants.length+' variação(ões)'+(gondolas?' · Gôndola '+h(gondolas):'')+'</small>'+
-   '<div class="buy-group-metrics"><span>Livre: <b>'+f(g.available)+'</b></span>'+
-   '<span>Encomendado: <b>'+f(g.pending)+'</b></span>'+(groupShortage?'<span class="buy-shortage-chip">'+lowVariants+' variação(ões) · faltam '+f(groupShortage)+' un.</span>':'')+'</div></div></div>'+
-   '<details class="buy-variation-disclosure" data-buy-expand="'+h(g.key)+'"'+(expanded.has(g.key)?' open':'')+'><summary><strong>Variações ('+g.variants.length+')</strong>'+
-   '<span class="buy-expand-caption">Selecionar tamanhos e quantidades</span>'+
-   '<span class="buy-picked-in-card" data-buy-picked="'+h(g.key)+'">'+
-    (pickedUnits?picked.length+' tamanho(s) · '+f(pickedUnits)+' un.':'')+'</span></summary>'+
-   '<div class="buy-variants">'+cards+'</div></details><div class="buy-group-actions">'+
-   (groupShortage&&g.supplier_id?button('Usar sugestões · '+f(groupShortage)+' un.','buy-suggest-group','data-group="'+h(g.key)+'"','small primary'):'')+
-   button('Ver saídas 30/90 dias','buy-product-report','data-group="'+h(g.key)+'"','small')+
-   (pickedUnits?button('Revisar seleção','buy-review','data-supplier="'+h(g.supplier_id)+'"','small primary'):'')+
-   '</div></article>';
+  const ico=(kind)=>{
+   const paths={
+    cart:'<circle cx="9" cy="20" r="1"/><circle cx="19" cy="20" r="1"/><path d="M2 3h2l2.6 12.5h12.9l2-9.5H5"/>',
+    magic:'<path d="m4 20 12-12 4 4L8 24M15 3l1.5-1.5L18 3l1.5-1.5M4 6h4M6 4v4"/>',
+    chart:'<path d="M3 21V9M8 21V13M13 21V5M18 21V10M22 21H2"/>'
+   };
+   return '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[kind]+'</svg>';
+  };
+  const action=(text,actionName,kind,extra='',primary=false,disabled=false)=>
+   '<button type="button" class="buy-card-action'+(primary?' is-primary':'')+'" data-action="'+actionName+'" '+
+   commonAttrs+' '+extra+' aria-label="'+h(text)+'" title="'+h(text)+'"'+(disabled?' disabled':'')+'>'+
+   ico(kind)+'<span class="buy-action-label">'+h(text)+'</span></button>';
+  const reportLabel='Ver saídas 30/90 dias';
+  const suggestionLabel='Usar sugestões · '+f(groupShortage)+' un.';
+  return '<article class="buy-group-card buy-quick-card" data-buy-card="'+h(g.key)+'">'+
+   '<div class="buy-group-head"><div class="buy-group-photo">'+image+'</div>'+
+    '<div class="buy-group-title"><h3>'+h(g.title)+'</h3>'+
+      '<small>'+h(supplier)+' · '+g.variants.length+' variação(ões)'+(gondolas?' · Gôndola '+h(gondolas):'')+'</small>'+
+      '<div class="buy-group-metrics"><span>Livre: <b>'+f(g.available)+'</b></span>'+
+       '<span>Encomendado: <b>'+f(g.pending)+'</b></span>'+
+       (groupShortage?'<span class="buy-shortage-chip">'+lowVariants+' variação(ões) · faltam '+f(groupShortage)+' un.</span>':'')+
+      '</div></div>'+
+    '<div class="buy-card-meta"><div><small>Fornecedor</small><strong>'+h(supplier)+'</strong></div>'+
+     '<div><small>Categoria</small><strong>'+h(categoryName)+'</strong></div></div>'+
+   '</div>'+
+   '<div class="buy-card-toolbar" role="group" aria-label="Operações para '+h(g.title)+'">'+
+     action(isExpanded?'Fechar compra':'Abrir compra','buy-open-group','cart',
+      'aria-expanded="'+String(isExpanded)+'" aria-controls="buy-panel-'+h(g.key)+'"',true)+
+     action(suggestionLabel,'buy-suggest-group','magic','',false,!canSuggest)+
+     action(reportLabel,'buy-product-report','chart')+
+     '<span class="buy-card-selected" data-buy-picked="'+h(g.key)+'" aria-live="polite">'+
+      (pickedUnits?picked.length+' tamanho(s) · '+f(pickedUnits)+' un.':'Nenhuma variação selecionada')+'</span>'+
+   '</div>'+
+   '<details class="buy-variation-disclosure buy-one-panel" id="buy-panel-'+h(g.key)+'" data-buy-expand="'+h(g.key)+'"'+(isExpanded?' open':'')+'>'+
+    '<summary class="buy-panel-accessible-summary">Variações, quantidades e histórico de saídas de '+h(g.title)+'</summary>'+
+    '<div class="buy-panel-column-head" aria-hidden="true"><span>Tamanho / SKU</span><span>Estoque e sugestão</span><span>Quantidade</span></div>'+
+    '<div class="buy-variants">'+cards+'</div>'+
+    '<section class="buy-panel-history" data-buy-outflow="'+h(g.key)+'" aria-live="polite">'+
+      '<div class="buy-panel-history-head"><strong>Saídas do CD · 30/90 dias</strong>'+
+      '<small>Não equivalem necessariamente a vendas.</small></div>'+
+      '<p class="buy-history-loading">Abra a compra para consultar o histórico.</p></section>'+
+    '<div class="buy-panel-footer"><strong data-buy-panel-total="'+h(g.key)+'">'+
+      (pickedUnits?picked.length+' tamanho(s) · '+f(pickedUnits)+' unidades':'Selecione as variações para montar o pedido')+
+     '</strong>'+
+     '<button type="button" class="button primary" data-action="buy-review" data-supplier="'+h(g.supplier_id||'')+'" data-buy-panel-review="'+h(g.key)+'"'+(pickedUnits?'':' hidden')+'>Revisar seleção</button>'+
+    '</div>'+
+   '</details></article>';
  }).join('');
  const purchaseCards=orders.filter(o=>orderFilter==='abertas'?['rascunho','enviado','recebido_parcial'].includes(o.status):orderFilter==='atrasadas'?['enviado','recebido_parcial'].includes(o.status)&&o.expected_arrival_date&&o.expected_arrival_date<today:true).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,40).map(o=>{
   const supplier=suppliers.find(s=>s.id===o.supplier_id)?.name||'Fornecedor';

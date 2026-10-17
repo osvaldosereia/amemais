@@ -23,7 +23,7 @@ test('seleção de SKUs com valores inteiros é independente de filtro e pagina�
  basket=cart.setPurchaseCartItem(basket,'B-G',5);
  assert.deepEqual(cart.purchaseCartSummary(basket,products),{skus:3,units:26,suppliers:2});
  const page=purchasesPage({products,models,suppliers,button:btn,cart:basket,catalog:{search:'7892'},expanded:new Set(['model:modelA'])});
- assert.equal((page.match(/class="buy-group-card"/g)||[]).length,1);
+ assert.equal((page.match(/class="buy-group-card buy-quick-card"/g)||[]).length,1);
  assert.match(page,/data-buy-inline-select data-product="A-P" checked/);
  assert.match(page,/data-buy-inline-select data-product="A-M" checked/);
  assert.match(page,/data-buy-inline-qty data-product="A-P" value="9"/);

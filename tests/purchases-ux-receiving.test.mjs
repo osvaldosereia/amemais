@@ -23,13 +23,13 @@ const view=(tab,catalog={onlyReplenishment:true,sort:'priority'},orders=[],items
 test('quatro abas separadas e catálogo só na reposição',()=>{
  const repos=view('reposicao');
  assert.match(repos,/data-action="buy-tab"/);
- assert.equal((repos.match(/class="buy-group-card"/g)||[]).length,2);
+ assert.equal((repos.match(/class="buy-group-card buy-quick-card"/g)||[]).length,2);
  assert.match(repos,/data-action="buy-suggest-group"/);
  assert.match(repos,/7 variação\(ões\)|1 variação\(ões\)/);
  assert.match(repos,/data-buy-only-replenishment/);
  assert.doesNotMatch(repos,/Tarefas internas/);
  assert.match(view('pedidos'),/Pedidos de compra · fornecedores/);
- assert.doesNotMatch(view('pedidos'),/class="buy-group-card"/);
+ assert.doesNotMatch(view('pedidos'),/class="buy-group-card buy-quick-card"/);
  assert.match(view('acompanhamento'),/Tarefas internas/);
  assert.match(view('fornecedores'),/Novo fornecedor/);
 });

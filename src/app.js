@@ -1649,8 +1649,70 @@ function updatePurchaseCartDisplay(){
   if(!group)continue;
   const selected=group.variants.filter(p=>state.purchaseCart.has(p.id));
   const units=selected.reduce((n,p)=>n+Number(state.purchaseCart.get(p.id)||0),0);
-  label.textContent=selected.length?selected.length+' tamanho(s) · '+units+' un.':'';
+  label.textContent=selected.length?selected.length+' tamanho(s) · '+units+' un.':'Nenhuma variação selecionada';
+  const card=label.closest('[data-buy-card]');
+  const total=card?.querySelector('[data-buy-panel-total]');
+  if(total)total.textContent=selected.length?selected.length+' tamanho(s) · '+units+' unidades':'Selecione as variações para montar o pedido';
+  const review=card?.querySelector('[data-buy-panel-review]');
+  if(review)review.hidden=!selected.length;
  }
+}
+async function loadPurchaseOutflow(groupKey){
+ const card=[...document.querySelectorAll('[data-buy-card]')].find(x=>x.dataset.buyCard===groupKey);
+ const view=card?.querySelector('[data-buy-outflow]');
+ if(!view||view.dataset.loaded==='true'||view.dataset.loaded==='loading')return;
+ const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+  state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
+ if(!group)return;
+ view.dataset.loaded='loading';
+ const message=view.querySelector('.buy-history-loading');
+ if(message)message.textContent='Consultando saídas dos últimos 90 dias…';
+ try{
+  const result=await db.from('stock_movements').select('product_id,action,quantity,delta_store,created_at')
+   .in('product_id',group.variants.map(p=>p.id))
+   .gte('created_at',new Date(Date.now()-90*86400000).toISOString())
+   .order('created_at',{ascending:false}).limit(3000);
+  const moves=assertOk(result)||[],cut=Date.now()-30*86400000;
+  const rows=group.variants.map(p=>{
+   const out=moves.filter(m=>m.product_id===p.id&&Number(m.delta_store)<0);
+   const month=out.filter(m=>new Date(m.created_at).getTime()>=cut);
+   const sum=a=>a.reduce((n,m)=>n+Math.abs(Number(m.delta_store)||0),0);
+   return '<div class="buy-history-row"><strong>'+h(p.apparel_size||'Único')+
+    '<small>SKU '+h(p.sku||'—')+'</small></strong><span>30 dias: <b>'+sum(month)+
+    '</b></span><span>90 dias: <b>'+sum(out)+'</b></span></div>';
+  }).join('');
+  if(!view.isConnected)return;
+  view.innerHTML='<div class="buy-panel-history-head"><strong>Saídas do CD · 30/90 dias</strong>'+
+   '<small>Saídas físicas não são necessariamente vendas.</small></div>'+
+   '<div class="buy-history-rows">'+rows+'</div>'+
+   (moves.length===3000?'<p class="buy-history-note">Limite de 3.000 movimentações atingido. Os totais podem estar incompletos.</p>':'')+
+   '<p class="buy-history-note">Considere transferências e sazonalidade antes de comprar.</p>';
+  view.dataset.loaded='true';
+ }catch(error){
+  if(view.isConnected){
+   view.dataset.loaded='error';
+   const loading=view.querySelector('.buy-history-loading');
+   if(loading)loading.textContent='Erro ao consultar as saídas. Clique em histórico para tentar novamente.';
+  }
+  console.warn('Erro ao consultar saídas de compra',error);
+ }
+}
+function setPurchasePanelOpen(groupKey,open){
+ const card=[...document.querySelectorAll('[data-buy-card]')].find(x=>x.dataset.buyCard===groupKey);
+ const panel=card?.querySelector('[data-buy-expand]');
+ if(!panel)return;
+ panel.open=open;
+ const trigger=card.querySelector('[data-action="buy-open-group"]');
+ if(trigger){
+  const label=open?'Fechar compra':'Abrir compra';
+  trigger.setAttribute('aria-expanded',String(open));
+  trigger.setAttribute('aria-label',label);
+  trigger.title=label;
+  const caption=trigger.querySelector('.buy-action-label');
+  if(caption)caption.textContent=label;
+ }
+ if(open)state.purchaseExpanded.add(groupKey);
+ else state.purchaseExpanded.delete(groupKey);
 }
 function purchaseReviewFormValues(){
  const form=document.querySelector('form[data-form="buy-order-create"]');
@@ -3579,6 +3641,15 @@ async function handleClick(event){
     if(['abertas','atrasadas'].includes(stat)){state.purchaseTab='pedidos';state.purchaseOrderFilter=stat;}
     state.purchaseCatalog.page=0;render();return;
   }
+  if(action==='buy-open-group'){
+    const groupKey=target.dataset.group;
+    const panel=target.closest('[data-buy-card]')?.querySelector('[data-buy-expand]');
+    if(!panel)return;
+    const open=!panel.open;
+    setPurchasePanelOpen(groupKey,open);
+    if(open)await loadPurchaseOutflow(groupKey);
+    return;
+  }
   if(action==='buy-suggest-group'){
     if(!hasPermission('purchases.manage'))return;
     const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
@@ -3593,6 +3664,7 @@ async function handleClick(event){
     }
     if(!count)return toast('Todas as sugestões deste modelo já estão selecionadas.');
     savePurchaseCart();state.purchaseExpanded.add(group.key);render();
+    await loadPurchaseOutflow(group.key);
     toast(count+' variação(ões) incluída(s). Revise as quantidades antes de salvar.');return;
   }
   if(action==='buy-load-more'){
@@ -3645,35 +3717,17 @@ async function handleClick(event){
    return purchaseEtaModal(state.purchaseOrders.find(x=>x.id===id));
   }
   if(action==='buy-product-report'){
-   if(!hasPermission('purchases.manage'))return;
-   const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
-     state.purchaseOrders,state.purchaseItems).find(g=>g.key===target.dataset.group);
-   if(!group)return toast('Produto não encontrado.',true);
-   const ids=group.variants.map(p=>p.id);
-   const since=new Date(Date.now()-90*86400000).toISOString();
-   try{
-    const result=await db.from('stock_movements').select('product_id,action,quantity,delta_store,created_at')
-     .in('product_id',ids).gte('created_at',since).order('created_at',{ascending:false}).limit(3000);
-    const moves=assertOk(result)||[];
-    const cut=Date.now()-30*86400000;
-    const rows=group.variants.map(p=>{
-     const all=moves.filter(m=>m.product_id===p.id&&Number(m.delta_store)<0);
-     const month=all.filter(m=>new Date(m.created_at).getTime()>=cut);
-     const qtd=arr=>arr.reduce((sum,m)=>sum+Math.abs(Number(m.delta_store)||0),0);
-     return '<div class="buy-outflow-line"><div><strong>'+h(p.apparel_size||'Único')+
-     '</strong><small> · SKU '+h(p.sku||'—')+'</small></div><div>30 dias: <b>'+qtd(month)+
-     '</b> · 90 dias: <b>'+qtd(all)+'</b> un.</div></div>';
-    }).join('');
-    formModal('Saídas registradas · '+group.title,
-     '<p class="help">Movimentações físicas de saída do CD, não vendas ao consumidor. Transferências e saídas excepcionais podem aparecer neste total.</p>'+
-     '<div class="buy-outflow-report">'+rows+'</div>'+
-     (moves.length===3000?'<p class="help">Consulta limitada a 3.000 movimentações; os totais podem estar incompletos.</p>':'')+
-     '<p class="help">Estoque baixo, por si só, não indica necessidade de reposição. Considere eventos e histórico de indisponibilidade.</p>',
-     'buy-report-close','Fechar');
-   }catch(error){fail(error);}
-   return;
-  }
-  if(action==='buy-status'){
+    if(!hasPermission('purchases.manage'))return;
+    const groupKey=target.dataset.group;
+    setPurchasePanelOpen(groupKey,true);
+    const current=[...document.querySelectorAll('[data-buy-card]')].find(x=>x.dataset.buyCard===groupKey);
+    const view=current?.querySelector('[data-buy-outflow]');
+    if(view?.dataset.loaded==='error')delete view.dataset.loaded;
+    await loadPurchaseOutflow(groupKey);
+    view?.scrollIntoView({block:'nearest',behavior:'smooth'});
+    return;
+   }
+   if(action==='buy-status'){
    if(!hasPermission('purchases.manage'))return;
    const order=state.purchaseOrders.find(o=>o.id===id),status=target.dataset.status;
    if(!order||!['enviado','cancelado'].includes(status))return;
@@ -5390,8 +5444,8 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('toggle',event=>{
  const details=event.target;
  if(!details.matches?.('[data-buy-expand]')||!details.isConnected)return;
- if(details.open)state.purchaseExpanded.add(details.dataset.buyExpand);
- else state.purchaseExpanded.delete(details.dataset.buyExpand);
+ setPurchasePanelOpen(details.dataset.buyExpand,details.open);
+ if(details.open)void loadPurchaseOutflow(details.dataset.buyExpand);
 },true);
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{

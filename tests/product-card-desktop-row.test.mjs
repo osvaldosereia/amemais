@@ -11,8 +11,8 @@ const card=await read('src/stock-workflows.js');
 
 test('layout compacto desktop é a última camada e mantém os estilos mobile precedentes',()=>{
  const links=[...index.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map(m=>m[1]);
- assert.match(links.at(-1),/product-card-actions-icons\.css\?v=20261017icons1/);
- assert.match(links.at(-2),/product-card-desktop-compact\.css\?v=20261017desktopcompact1/);
+ assert.ok(links.some(x=>/product-card-actions-icons\.css\?v=20261017icons1/.test(x)));
+ assert.ok(links.findIndex(x=>x.includes('product-card-desktop-compact.css'))<links.findIndex(x=>x.includes('product-card-actions-icons.css')));
  assert.ok(links.findIndex(x=>x.includes('product-card-clean-v8.css'))<links.length-1);
  assert.match(css,/@media \(min-width:761px\)/);
  assert.match(css,/@media \(min-width:761px\) and \(max-width:1180px\)/);
