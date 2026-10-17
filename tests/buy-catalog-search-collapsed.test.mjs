@@ -68,10 +68,10 @@ test('os cards mantêm fotos e variações dentro de details inicialmente fechad
   tags:[{name:'Infantil'}],button,filter:'',catalog:{search:'abc100'}});
  assert.equal((page.match(/class="buy-group-card"/g)||[]).length,1);
  assert.match(page,/data-photo-path="model-1.webp"/);
- assert.match(page,/<details class="buy-variation-disclosure">/);
- assert.doesNotMatch(page,/<details class="buy-variation-disclosure" open/);
+ assert.match(page,/<details class="buy-variation-disclosure" data-buy-expand=/);
+ assert.doesNotMatch(page,/<details class="buy-variation-disclosure"[^>]* open/);
  assert.match(page,/Variações \(2\)/);
- assert.match(page,/Ver tamanhos e quantidades/);
+ assert.match(page,/Selecionar tamanhos e quantidades/);
  assert.match(page,/data-mode="buy-filter"/);
  assert.match(page,/data-mode="buy-tag"/);
  assert.match(page,/id="buy-catalog-search"/);
@@ -103,6 +103,6 @@ test('eventos de filtro e busca usam estado independente de Produtos',()=>{
  assert.match(app,/data-buy-filter/);
  assert.match(css,/\.buy-variation-disclosure\[open\]/);
  assert.match(css,/@media\(max-width:760px\)/);
- assert.match(html,/cdsb-purchases\.css\?v=20261016buysearch1/);
- assert.match(app,/cdsb-purchases\.js\?v=20261016buysearch1/);
+ assert.match(html,/cdsb-purchases\.css\?v=20261016buycart1/);
+ assert.match(app,/cdsb-purchases\.js\?v=20261016buycart1/);
 });
