@@ -1720,6 +1720,97 @@ function setPurchasePanelOpen(groupKey,open){
  if(open)state.purchaseExpanded.add(groupKey);
  else state.purchaseExpanded.delete(groupKey);
 }
+function prefillPurchaseMinimums(groupKey){
+ const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+  state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
+ const card=[...document.querySelectorAll('[data-buy-card]')].find(el=>el.dataset.buyCard===groupKey);
+ if(!group||!card)return;
+ for(const variant of group.variants){
+  const shortage=Math.max(0,Number(variant.min_stock||0)-Number(variant.free||0)-Number(variant.pending||0));
+  if(!shortage||!variant.supplier_id||state.purchaseCart.has(variant.id))continue;
+  const minimum=Math.max(1,Number(variant.minimum_order_quantity||1));
+  const line=[...card.querySelectorAll('[data-buy-sku]')].find(el=>el.dataset.buySku===variant.id);
+  if(!line)continue;
+  const checkbox=line.querySelector('[data-buy-inline-select]');
+  const qty=line.querySelector('[data-buy-inline-qty]');
+  if(!checkbox||!qty)continue;
+  checkbox.checked=true;qty.disabled=false;qty.value=String(minimum);qty.min=String(minimum);
+  state.purchaseCart=setPurchaseCartItem(state.purchaseCart,variant.id,minimum);
+ }
+ savePurchaseCart();updatePurchaseCartDisplay();
+}
+function purchaseDraftTargetModal(groupKey){
+ if(!hasPermission('purchases.manage'))return;
+ const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+   state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
+ if(!group)return toast('Produto não encontrado.',true);
+ const selected=group.variants.filter(p=>state.purchaseCart.has(p.id));
+ if(!selected.length)return toast('Selecione pelo menos uma variação.',true);
+ const supplierIds=[...new Set(selected.map(p=>p.supplier_id))];
+ if(supplierIds.length!==1||!supplierIds[0])return toast('Selecione variações de um único fornecedor cadastrado.',true);
+ const supplierId=supplierIds[0];
+ for(const p of selected){
+  const qty=state.purchaseCart.get(p.id),minimum=Number(p.minimum_order_quantity||1);
+  if(!validPurchaseQty(qty)||qty<minimum)
+   return toast('O tamanho '+(p.apparel_size||p.name)+' exige pedido mínimo de '+minimum+' unidades.',true);
+ }
+ const supplier=state.suppliers.find(x=>x.id===supplierId);
+ if(!supplier?.active)return toast('Fornecedor indisponível.',true);
+ const drafts=state.purchaseOrders.filter(o=>o.supplier_id===supplierId&&o.status==='rascunho');
+ const options=[['novo','+ Criar novo pedido para '+supplier.name],
+  ...drafts.map(o=>[o.id,'PC-'+o.number+' · '+state.purchaseItems.filter(i=>i.purchase_order_id===o.id).length+' SKU(s)'])];
+ formModal('Adicionar ao pedido · '+supplier.name,
+  '<p class="help">'+selected.length+' variação(ões) · '+selected.reduce((n,p)=>n+Number(state.purchaseCart.get(p.id)),0)+
+  ' unidades. Cada pedido pertence exclusivamente a um fornecedor. Escolha um rascunho ou crie um agora.</p>'+
+  '<div class="formgrid">'+selectField('Em qual pedido adicionar?','purchase_order_id',options,drafts.length===1?drafts[0].id:'novo')+'</div>',
+  'buy-add-draft','Adicionar ao pedido');
+ const form=document.querySelector('form[data-form="buy-add-draft"]');
+ if(form){form.dataset.group=groupKey;form.dataset.supplier=supplierId;}
+}
+function purchaseDraftDetails(order){
+ if(!order||!hasPermission('purchases.manage'))return;
+ const draft=order.status==='rascunho';
+ const supplier=state.suppliers.find(s=>s.id===order.supplier_id);
+ const items=state.purchaseItems.filter(i=>i.purchase_order_id===order.id);
+ const groups=new Map();
+ for(const item of items){
+  const product=state.items.find(p=>p.id===item.product_id);
+  const model=state.apparelModels.find(m=>m.id===product?.apparel_model_id);
+  const key=model?.id||item.product_id;
+  if(!groups.has(key))groups.set(key,{title:model?.name||item.product_name,photo:model?.image_path||product?.image_path,rows:[]});
+  groups.get(key).rows.push({item,product});
+ }
+ const content=[...groups.values()].map(g=>{
+  const photo=g.photo?'<img data-photo-path="'+h(g.photo)+'" alt="Foto: '+h(g.title)+'">':'<span>Sem foto</span>';
+  return '<article class="buy-review-card"><header class="buy-review-card-head">'+
+   '<div class="buy-review-photo">'+photo+'</div><div class="buy-review-card-title"><strong>'+h(g.title)+'</strong>'+
+   '<small>'+g.rows.length+' variação(ões)</small></div></header><div class="buy-review-variants">'+g.rows.map(({item,product})=>{
+    const minimum=Math.max(1,Number(product?.minimum_order_quantity||1));
+    return '<div class="buy-review-variant"><div><strong>'+h(product?.apparel_size||item.product_name)+'</strong>'+
+     '<small>SKU '+h(item.sku||'—')+' · Pedido mínimo: '+minimum+' un.</small></div>'+
+     (draft?'<label>Quantidade (0 remove)<input type="number" data-draft-qty="'+h(item.product_id)+
+      '" min="0" max="1000000" step="1" value="'+item.quantity+'" inputmode="numeric" aria-label="Quantidade de '+h(item.product_name)+'"></label>':
+      '<strong>'+item.quantity+' un.</strong>')+'</div>';
+   }).join('')+'</div></article>';
+ }).join('');
+ const total=items.reduce((sum,i)=>sum+Number(i.quantity||0),0);
+ formModal('Pedido PC-'+order.number+' · '+(supplier?.name||'Fornecedor'),
+  '<p class="help">'+(draft?'Confira os produtos e quantidades aqui mesmo. Não existe uma etapa separada de revisão.':
+   'Pedido já registrado; o histórico e a conferência do recebimento permanecem independentes.')+'</p>'+
+  '<div class="buy-review-cards">'+(content||'<p class="buy-empty">Nenhum produto adicionado. Volte à Reposição para incluir itens.</p>')+'</div>'+
+  '<div class="buy-review-summary">'+items.length+' SKU(s) · '+total+' unidades</div>'+
+  (draft?'<div class="formgrid">'+
+    field('Prazo estimado de chegada (dias)','estimated_days','number',order.estimated_days||supplier?.delivery_days||15,'required min="1" max="365"')+
+    textareaField('Observações para o fornecedor','note',order.note||'')+'</div>'+
+    '<p class="help">Conferir e preparar PDF não envia mensagens automaticamente. Compartilhe o PDF com o fornecedor e então registre o envio.</p>'+
+    (items.length?button('Já enviei ao fornecedor','buy-draft-mark-sent','data-id="'+h(order.id)+'"','small'):''):
+   '') ,
+  draft?'buy-draft-confirm':'buy-draft-readonly',draft?'Conferir e preparar PDF':'Fechar');
+ const form=document.querySelector('form[data-form="'+(draft?'buy-draft-confirm':'buy-draft-readonly')+'"]');
+ if(form)form.dataset.order=order.id;
+ if(draft&&!items.length)form?.querySelector('button[type="submit"]')?.setAttribute('disabled','');
+ hydrateImages();
+}
 function purchaseReviewFormValues(){
  const form=document.querySelector('form[data-form="buy-order-create"]');
  return {days:form?.elements.namedItem('estimated_days')?.value||'15',
@@ -3647,31 +3738,25 @@ async function handleClick(event){
     if(['abertas','atrasadas'].includes(stat)){state.purchaseTab='pedidos';state.purchaseOrderFilter=stat;}
     state.purchaseCatalog.page=0;render();return;
   }
+  if(action==='buy-add-to-draft')return purchaseDraftTargetModal(target.dataset.group);
+  if(action==='buy-order-open')return purchaseDraftDetails(state.purchaseOrders.find(o=>o.id===id));
+  if(action==='buy-draft-mark-sent'){
+   const order=state.purchaseOrders.find(o=>o.id===id);
+   if(!order||order.status!=='rascunho')return;
+   if(!window.confirm('Confirma que este pedido já foi enviado efetivamente ao fornecedor? Esta ação apenas registra o envio, não transmite mensagens.'))return;
+   return exec(async()=>{
+    assertOk(await db.rpc('set_purchase_order_status',{p_id:id,p_status:'enviado'}));
+    closeTopModal();
+   },'Encomenda registrada como enviada ao fornecedor.');
+  }
   if(action==='buy-open-group'){
     const groupKey=target.dataset.group;
     const panel=target.closest('[data-buy-card]')?.querySelector('[data-buy-expand]');
     if(!panel)return;
     const open=!panel.open;
     setPurchasePanelOpen(groupKey,open);
-    if(open)await loadPurchaseOutflow(groupKey);
+    if(open){prefillPurchaseMinimums(groupKey);await loadPurchaseOutflow(groupKey);}
     return;
-  }
-  if(action==='buy-suggest-group'){
-    if(!hasPermission('purchases.manage'))return;
-    const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
-      state.purchaseOrders,state.purchaseItems).find(g=>g.key===target.dataset.group);
-    if(!group?.supplier_id)return toast('Cadastre um fornecedor antes de selecionar produtos.',true);
-    let count=0;
-    for(const p of group.variants){
-      const need=Math.max(0,Number(p.min_stock||0)-p.free-p.pending);
-      if(need>0&&!state.purchaseCart.has(p.id)){
-        state.purchaseCart=setPurchaseCartItem(state.purchaseCart,p.id,need);count++;
-      }
-    }
-    if(!count)return toast('Todas as sugestões deste modelo já estão selecionadas.');
-    savePurchaseCart();state.purchaseExpanded.add(group.key);render();
-    await loadPurchaseOutflow(group.key);
-    toast(count+' variação(ões) incluída(s). Revise as quantidades antes de salvar.');return;
   }
   if(action==='buy-load-more'){
     state.purchaseCatalog.page+=1;render();return;
@@ -5452,7 +5537,7 @@ document.addEventListener('toggle',event=>{
  const details=event.target;
  if(!details.matches?.('[data-buy-expand]')||!details.isConnected)return;
  setPurchasePanelOpen(details.dataset.buyExpand,details.open);
- if(details.open)void loadPurchaseOutflow(details.dataset.buyExpand);
+ if(details.open){prefillPurchaseMinimums(details.dataset.buyExpand);void loadPurchaseOutflow(details.dataset.buyExpand);}
 },true);
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
