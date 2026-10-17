@@ -1769,7 +1769,7 @@ function purchaseReceiptModal(order){
  if(form){form.dataset.id=order.id;form.dataset.requestId=crypto.randomUUID();}
 }
 function purchaseEtaModal(order){
- if(!order||!hasPermission('purchases.manage')||!['rascunho','enviado','recebido_parcial'].includes(order.status))return;
+ if(!order||!hasPermission('purchases.manage')||!['rascunho','enviado'].includes(order.status))return;
  formModal('Atualizar previsão · Compra PC-'+order.number,
   '<p class="help">O novo prazo é contado em dias corridos a partir de hoje. A previsão anterior ficará registrada no histórico de auditoria.</p>'+
   '<div class="formgrid">'+field('Novo prazo de chegada (dias corridos)','estimated_days','number',String(order.estimated_days||15),
