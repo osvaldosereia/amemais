@@ -51,15 +51,107 @@ export function purchasingGroups(products=[],models=[],balances=[],reservations=
  }
  return [...groups.values()].sort((x,y)=>x.title.localeCompare(y.title,'pt-BR',{numeric:true}));
 }
-export function purchasesPage({products=[],models=[],suppliers=[],balances=[],reservations=[],orders=[],items=[],button,filter=''}) {
+
+// Espelha a pesquisa e segmentação do catálogo de Produtos, preservando o modelo inteiro.
+const buyNormalized=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+ .toLocaleLowerCase('pt-BR').trim();
+const buyGondolaKey=value=>buyNormalized(value).replace(/^gondola\s*[:#-]?\s*/,'')
+ .replace(/^0+(?=[0-9])/,'').trim();
+const buyCollator=new Intl.Collator('pt-BR',{numeric:true,sensitivity:'base'});
+const buySortOptions=[
+ ['name-asc','Nome: A a Z'],['name-desc','Nome: Z a A'],
+ ['available-desc','Maior estoque disponível'],['available-asc','Menor estoque disponível'],
+ ['physical-desc','Maior estoque físico'],['physical-asc','Menor estoque físico'],
+ ['gondola','Ordem das gôndolas'],['recent','Cadastrados recentemente']
+];
+function buyCategoryBranch(id,selected,byId){
+ if(!selected)return true;
+ let current=id;
+ const seen=new Set();
+ while(current&&!seen.has(String(current))){
+  if(String(current)===String(selected))return true;
+  seen.add(String(current));
+  current=byId.get(String(current))?.parent_id;
+ }
+ return false;
+}
+function buyCategoryName(id,categories){
+ if(!id)return 'Todas as categorias';
+ const byId=new Map(categories.map(cat=>[String(cat.id),cat]));
+ const names=[];const seen=new Set();
+ let current=String(id);
+ while(current&&!seen.has(current)){
+  seen.add(current);
+  const cat=byId.get(current);
+  if(!cat)break;
+  names.unshift(cat.name);
+  current=cat.parent_id?String(cat.parent_id):'';
+ }
+ return names.join(' / ')||'Todas as categorias';
+}
+export function filterPurchaseGroups(groups=[],filters={},categories=[]){
+ const q=buyNormalized(filters.search||'').split(/\s+/).filter(Boolean);
+ const category=String(filters.category||''),tag=buyNormalized(filters.tag||'');
+ const gondola=buyGondolaKey(filters.gondola||''),supplier=String(filters.supplier||'');
+ const byId=new Map(categories.map(c=>[String(c.id),c]));
+ const result=groups.filter(g=>{
+  if(supplier&&String(g.supplier_id||'')!==supplier)return false;
+  // Só a relevância é filtrada; todas as variações permanecem no card correspondente.
+  if(category&&!g.variants.some(p=>buyCategoryBranch(p.category_id||g.category_id,category,byId)))return false;
+  if(tag&&!g.variants.some(p=>(p.tags||[]).some(t=>buyNormalized(t)===tag)))return false;
+  if(gondola&&!g.variants.some(p=>buyGondolaKey(p.gondola)===gondola))return false;
+  if(q.length&&!g.variants.some(p=>{
+   const searchable=buyNormalized([
+    g.title,p.name,p.sku,p.ean,p.apparel_color,p.apparel_size,p.gondola,p.prateleira,...(p.tags||[])
+   ].join(' '));
+   return q.every(term=>searchable.includes(term));
+  }))return false;
+  return true;
+ });
+ const byName=(a,b)=>buyCollator.compare(a.title,b.title)||buyCollator.compare(a.key,b.key);
+ const location=g=>g.variants.map(p=>buyGondolaKey(p.gondola)).filter(Boolean).sort(buyCollator.compare.bind(buyCollator))[0]||'';
+ const physical=g=>g.variants.reduce((sum,p)=>sum+Number(p.physical||0),0);
+ const recent=g=>g.variants.reduce((latest,p)=>String(p.created_at||'')>latest?String(p.created_at||''):latest,'');
+ return result.sort((a,b)=>{
+  switch(filters.sort){
+   case 'name-desc':return -byName(a,b);
+   case 'available-desc':return b.available-a.available||byName(a,b);
+   case 'available-asc':return a.available-b.available||byName(a,b);
+   case 'physical-desc':return physical(b)-physical(a)||byName(a,b);
+   case 'physical-asc':return physical(a)-physical(b)||byName(a,b);
+   case 'recent':return recent(b).localeCompare(recent(a))||byName(a,b);
+   case 'gondola':{
+    const ga=location(a),gb=location(b);
+    return (!ga&&gb)?1:(!gb&&ga)?-1:buyCollator.compare(ga,gb)||byName(a,b);
+   }
+   default:return byName(a,b);
+  }
+ });
+}
+
+export function purchasesPage({products=[],models=[],suppliers=[],categories=[],tags=[],balances=[],reservations=[],orders=[],items=[],button,filter='',catalog={}}) {
  const groups=purchasingGroups(products,models,balances,reservations,orders,items);
- const relevant=groups.filter(g=>!filter||g.supplier_id===filter);
+ const relevant=filterPurchaseGroups(groups,{...catalog,supplier:filter},categories);
+ const filtersApplied=Boolean(catalog.search||catalog.category||catalog.tag||catalog.gondola||filter);
+ const shownCount=(Math.max(0,Number(catalog.page)||0)+1)*8;
+ const visibleGroups=relevant.slice(0,shownCount);
+ const more=relevant.length>visibleGroups.length;
+ const gondolaOptions=new Map();
+ for(const g of groups)for(const p of g.variants){
+  const key=buyGondolaKey(p.gondola);
+  if(key&&!gondolaOptions.has(key))gondolaOptions.set(key,'Gôndola '+String(p.gondola).trim()
+   .replace(/^g[oô]ndola\s*[:#-]?\s*/i,''));
+ }
+ const optionsGondola=[...gondolaOptions].sort((a,b)=>buyCollator.compare(a[1],b[1]));
+ const buySelect=(key,label,options)=>'<label class="catalog-filter-field"><span>'+label+'</span><select data-buy-catalog="'+key+'">'+
+  options.map(([v,name])=>'<option value="'+h(v)+'"'+(String(catalog[key]||'')===String(v)?' selected':'')+'>'+h(name)+'</option>').join('')+
+  '</select></label>';
  const below=groups.filter(g=>g.variants.some(p=>p.min_stock>0&&p.free<p.min_stock&&p.pending===0));
  const open=orders.filter(o=>['rascunho','enviado'].includes(o.status)).length;
  const noSupplier=groups.filter(g=>!g.supplier_id).length;
  const options='<option value="">Todos os fornecedores</option>'+
   suppliers.filter(s=>s.active).map(s=>'<option value="'+h(s.id)+'"'+(filter===s.id?' selected':'')+'>'+h(s.name)+'</option>').join('');
- const productCards=relevant.slice(0,150).map(g=>{
+ const productCards=visibleGroups.map(g=>{
   const supplier=suppliers.find(s=>s.id===g.supplier_id)?.name||'Sem fornecedor';
   const image=g.photo?'<img data-photo-path="'+h(g.photo)+'" alt="Foto: '+h(g.title)+'" loading="lazy">':'<span class="buy-no-photo">Sem foto</span>';
   const cards=g.variants.map(p=>{
@@ -76,7 +168,9 @@ export function purchasesPage({products=[],models=[],suppliers=[],balances=[],re
    '<div class="buy-group-title"><h3>'+h(g.title)+'</h3><small>'+h(supplier)+' · '+g.variants.length+' variação(ões)</small>'+
    '<div class="buy-group-metrics"><span>Livre: <b>'+f(g.available)+'</b></span>'+
    '<span>Encomendado: <b>'+f(g.pending)+'</b></span></div></div></div>'+
-   '<div class="buy-variants">'+cards+'</div><div class="buy-group-actions">'+
+   '<details class="buy-variation-disclosure"><summary><strong>Variações ('+g.variants.length+')</strong>'+
+   '<span class="buy-expand-caption">Ver tamanhos e quantidades</span></summary>'+
+   '<div class="buy-variants">'+cards+'</div></details><div class="buy-group-actions">'+
    button('Relatório de saídas','buy-product-report','data-group="'+h(g.key)+'"','small')+
    (g.supplier_id?button('Selecionar para compra','buy-new','data-supplier="'+h(g.supplier_id)+'"','small primary'):'')+
    '</div></article>';
@@ -109,8 +203,29 @@ export function purchasesPage({products=[],models=[],suppliers=[],balances=[],re
   '<section class="panel"><header class="buy-section-head"><div><h2>Catálogo para reposição</h2>'+
   '<small>Estoque baixo não comprova demanda. Consulte as saídas antes de comprar.</small></div>'+
   button('Imprimir relatório','buy-print-alerts','','small')+'</header>'+
-  '<div class="buy-filters"><label>Fornecedor <select data-buy-filter>'+options+'</select></label></div>'+
-  '<div class="buy-group-grid">'+(productCards||'<p class="buy-empty">Nenhum produto neste filtro.</p>')+'</div></section>'+
+  '<div class="product-toolbar-v3 buy-catalog-toolbar">'+
+    '<div class="product-search-row">'+
+      '<input id="buy-catalog-search" class="search" type="search" autocomplete="off"'+
+      ' value="'+h(catalog.search||'')+'" placeholder="Buscar nome, EAN, SKU, cor ou gôndola…"'+
+      ' aria-label="Buscar produtos para comprar"></div>'+
+    '<div class="product-filter-row">'+
+      '<button type="button" class="taxonomy-filter-button product-filter-chip" data-action="taxonomy-open" data-mode="buy-filter" aria-haspopup="dialog">'+
+        '<span>'+h(buyCategoryName(catalog.category,categories))+'</span><span aria-hidden="true">⌄</span></button>'+
+      '<button type="button" class="taxonomy-filter-button product-filter-chip" data-action="taxonomy-open" data-mode="buy-tag" aria-haspopup="dialog">'+
+        '<span>'+h(catalog.tag||'Tags')+'</span><span aria-hidden="true">⌄</span></button></div>'+
+    '<div class="catalog-sorting-row">'+
+      buySelect('sort','Ordenar por',buySortOptions)+
+      buySelect('gondola','Gôndola',[['','Todas as gôndolas'],...optionsGondola])+
+      '<label class="catalog-filter-field"><span>Fornecedor</span><select data-buy-filter>'+options+'</select></label>'+
+    '</div>'+
+    '<div class="buy-filter-tools">'+
+      '<span class="buy-result-count" aria-live="polite">'+relevant.length+' modelo(s) encontrado(s)</span>'+
+      (filtersApplied?button('Limpar filtros','buy-clear-filters','','small'):'')+
+    '</div>'+
+   '</div>'+
+  '<div class="buy-group-grid">'+(productCards||'<p class="buy-empty">Nenhum modelo corresponde à busca e aos filtros escolhidos.</p>')+'</div>'+
+  (more?'<div class="buy-load-more">'+button('Mostrar mais produtos ('+visibleGroups.length+' de '+relevant.length+')','buy-load-more','','small')+'</div>':'')+
+  '</section>'+
   '<section class="panel"><header class="buy-section-head"><h2>Pedidos de compra</h2></header>'+
   (purchaseCards||'<p class="buy-empty">Nenhum pedido cadastrado.</p>')+'</section>'+
   '<p class="buy-note">Pedidos de compra não adicionam estoque físico. Apenas entradas confirmadas atualizam o saldo.</p></div>';
