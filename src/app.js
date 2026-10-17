@@ -1585,7 +1585,7 @@ async function saveModelProcurement(modelId,form){
 }
 function supplierManagerModal(){
  if(!hasPermission('purchases.manage'))return;
- formModal('Fornecedores',supplierListHTML(state.suppliers,button)+
+ formModal('Fornecedores',supplierListHTML(state.suppliers,button,{products:state.items,orders:state.purchaseOrders,tasks:state.procurementTasks})+
   '<div class="actions">'+button('+ Novo fornecedor','buy-supplier-new','','primary')+'</div>',
   'buy-supplier-list','Fechar');
 }
@@ -1597,6 +1597,15 @@ function supplierFormModal(supplier=null){
   field('Telefone / WhatsApp','phone','text',supplier?.phone||'','maxlength="60"')+
   field('Email','email','email',supplier?.email||'','maxlength="180"')+
   field('CNPJ / documento','document','text',supplier?.document||'','maxlength="35"')+
+  field('Razão social','legal_name','text',supplier?.legal_name||'','maxlength="180"')+
+  field('Função do contato','contact_role','text',supplier?.contact_role||'','maxlength="100"')+
+  field('WhatsApp comercial','whatsapp','tel',supplier?.whatsapp||'','maxlength="60"')+
+  field('Site','website','url',supplier?.website||'','maxlength="250" placeholder="https://"')+
+  field('Endereço','address','text',supplier?.address||'','maxlength="500"')+
+  selectField('Canal preferido','preferred_channel',[['','Não informado'],['whatsapp','WhatsApp'],['telefone','Telefone'],['email','E-mail'],['outro','Outro']],supplier?.preferred_channel||'')+
+  field('Prazo habitual de entrega (dias)','delivery_days','number',supplier?.delivery_days??'','min="1" max="365" step="1"')+
+  field('Pedido mínimo (R$)','minimum_order_amount','text',supplier?.minimum_order_amount??'','inputmode="decimal" placeholder="0,00"')+
+  textareaField('Condições de pagamento','payment_terms',supplier?.payment_terms||'')+
   textareaField('Observações','notes',supplier?.notes||'')+
   (supplier?selectField('Situação','active',[['true','Ativo'],['false','Inativo']],String(supplier.active)):'')+
   '</div>','buy-supplier-save','Salvar fornecedor');
@@ -4436,15 +4445,8 @@ async function handleSubmit(event){
   if(type==='buy-suppliers-list'){closeTopModal();return;}
   if(type==='buy-supplier-save'){
    if(!hasPermission('purchases.manage'))return;
-   const name=String(values.name||'').trim();
-   if(name.length<2||name.length>150)return toast('Informe o nome do fornecedor.',true);
-   const payload={
-    name,contact_name:String(values.contact_name||'').trim().slice(0,140)||null,
-    phone:String(values.phone||'').trim().slice(0,60)||null,
-    email:String(values.email||'').trim().slice(0,180)||null,
-    document:String(values.document||'').trim().slice(0,35)||null,
-    notes:String(values.notes||'').trim().slice(0,1500)||null
-   };
+   let payload;
+   try{payload=supplierDirectoryPayload(values);}catch(error){return toast(error.message,true);}
    if(form.dataset.id)payload.active=values.active==='true';
    return exec(async()=>{
     const response=form.dataset.id?
