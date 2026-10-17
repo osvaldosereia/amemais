@@ -282,9 +282,10 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     '<div class="grouped-inventory-top">'+
       '<div class="grouped-inventory-photo">'+photo+photoQuickAction+'</div>'+
       '<div class="grouped-inventory-info">'+
-        '<strong class="product-card-name">'+h(group.title)+'</strong>'+
         '<small class="product-card-description">'+h(description)+'</small>'+
-        (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':'')+
+        '<strong class="product-card-name">'+h(group.title)+'</strong>'+
+        (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':
+          '<small class="product-card-codes product-card-codes-multiple">EAN por variação · consulte os códigos ao expandir</small>')+
         '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
           '<small>'+stockLabel+'</small><span><b>'+fmt(isProducts?groupAvailable:count)+'</b> un.</span></div>'+
         '<div class="product-card-location'+(locationMissing?' is-unknown':'')+'" aria-label="Localização do produto">'+
