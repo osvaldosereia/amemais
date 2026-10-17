@@ -129,8 +129,11 @@ export function filterPurchaseGroups(groups=[],filters={},categories=[]){
  });
 }
 
-export function purchasesPage({products=[],models=[],suppliers=[],categories=[],tags=[],balances=[],reservations=[],orders=[],items=[],button,filter='',catalog={}}) {
+export function purchasesPage({products=[],models=[],suppliers=[],categories=[],tags=[],balances=[],reservations=[],orders=[],items=[],button,filter='',catalog={},cart=new Map(),expanded=new Set()}) {
  const groups=purchasingGroups(products,models,balances,reservations,orders,items);
+ const cartCount=[...cart.values()].reduce((n,q)=>n+(Number(q)||0),0);
+ const cartSkus=cart.size;
+ const cartSuppliers=new Set(products.filter(p=>cart.has(p.id)).map(p=>p.supplier_id).filter(Boolean)).size;
  const relevant=filterPurchaseGroups(groups,{...catalog,supplier:filter},categories);
  const filtersApplied=Boolean(catalog.search||catalog.category||catalog.tag||catalog.gondola||filter);
  const shownCount=(Math.max(0,Number(catalog.page)||0)+1)*8;
@@ -154,25 +157,38 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
  const productCards=visibleGroups.map(g=>{
   const supplier=suppliers.find(s=>s.id===g.supplier_id)?.name||'Sem fornecedor';
   const image=g.photo?'<img data-photo-path="'+h(g.photo)+'" alt="Foto: '+h(g.title)+'" loading="lazy">':'<span class="buy-no-photo">Sem foto</span>';
+  const picked=g.variants.filter(p=>cart.has(p.id));
+  const pickedUnits=picked.reduce((sum,p)=>sum+Number(cart.get(p.id)||0),0);
   const cards=g.variants.map(p=>{
    const need=p.min_stock>p.free?Math.max(0,p.min_stock-p.free-p.pending):0;
    const warning=p.pending?'Encomendado: '+f(p.pending)+' un. · '+(p.pendingDate?'prev. '+fmtDate(p.pendingDate):'sem previsão'):
     (p.min_stock>0&&p.free<p.min_stock?'Abaixo do mínimo — avaliar histórico':'Estoque em avaliação');
-   return '<div class="buy-variant"><div class="buy-variant-name"><strong>'+h(p.apparel_size||'Único')+'</strong>'+
+   const selected=cart.has(p.id),quantity=selected?Number(cart.get(p.id)):1;
+   return '<div class="buy-variant" data-buy-sku="'+h(p.id)+'" data-buy-group="'+h(g.key)+'">'+
+    '<div class="buy-variant-pick"><label class="buy-variant-name">'+
+    '<input type="checkbox" data-buy-inline-select data-product="'+h(p.id)+'"'+(selected?' checked':'')+
+    ' aria-label="Selecionar tamanho '+h(p.apparel_size||'Único')+' do '+h(g.title)+'">'+
+    '<span><strong>'+h(p.apparel_size||'Único')+'</strong>'+
     '<small>'+h([p.apparel_color!=='Única'?p.apparel_color:'',p.sku?'SKU '+p.sku:''].filter(Boolean).join(' · '))+'</small>'+
-    '<small>'+h(warning)+'</small></div><div class="buy-variant-values"><span>Disponível <b>'+f(p.free)+'</b></span>'+
+    '<small>'+h(warning)+'</small></span></label>'+
+    '<div class="buy-variant-values"><span>Disponível <b>'+f(p.free)+'</b></span>'+
     '<span>Mínimo <b>'+f(p.min_stock)+'</b></span>'+
-    '<span>Sugestão <b>'+f(need)+'</b></span></div></div>';
+    '<span>Sugestão <b>'+f(need)+'</b></span></div></div>'+
+    '<div class="buy-inline-order"><label>Quantidade a pedir <input type="number" min="1" max="1000000" step="1"'+
+    ' inputmode="numeric" data-buy-inline-qty data-product="'+h(p.id)+'" value="'+String(quantity)+'"'+
+    (selected?'':' disabled')+' aria-label="Quantidade para tamanho '+h(p.apparel_size||'Único')+'"></label></div></div>';
   }).join('');
   return '<article class="buy-group-card"><div class="buy-group-head"><div class="buy-group-photo">'+image+'</div>'+
    '<div class="buy-group-title"><h3>'+h(g.title)+'</h3><small>'+h(supplier)+' · '+g.variants.length+' variação(ões)</small>'+
    '<div class="buy-group-metrics"><span>Livre: <b>'+f(g.available)+'</b></span>'+
    '<span>Encomendado: <b>'+f(g.pending)+'</b></span></div></div></div>'+
-   '<details class="buy-variation-disclosure"><summary><strong>Variações ('+g.variants.length+')</strong>'+
-   '<span class="buy-expand-caption">Ver tamanhos e quantidades</span></summary>'+
+   '<details class="buy-variation-disclosure" data-buy-expand="'+h(g.key)+'"'+(expanded.has(g.key)?' open':'')+'><summary><strong>Variações ('+g.variants.length+')</strong>'+
+   '<span class="buy-expand-caption">Selecionar tamanhos e quantidades</span>'+
+   '<span class="buy-picked-in-card" data-buy-picked="'+h(g.key)+'">'+
+    (pickedUnits?picked.length+' tamanho(s) · '+f(pickedUnits)+' un.':'')+'</span></summary>'+
    '<div class="buy-variants">'+cards+'</div></details><div class="buy-group-actions">'+
    button('Relatório de saídas','buy-product-report','data-group="'+h(g.key)+'"','small')+
-   (g.supplier_id?button('Selecionar para compra','buy-new','data-supplier="'+h(g.supplier_id)+'"','small primary'):'')+
+   (pickedUnits?button('Revisar seleção','buy-review','data-supplier="'+h(g.supplier_id)+'"','small primary'):'')+
    '</div></article>';
  }).join('');
  const purchaseCards=orders.slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,40).map(o=>{
@@ -195,7 +211,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
  }).join('');
  return '<div class="buy-page"><header class="pagehead"><div><h1>Compras</h1>'+
   '<p>Selecione variações, compare estoques e histórico logístico e acompanhe encomendas.</p></div>'+
-  '<div class="actions">'+button('+ Pedido de compra','buy-new','','primary')+
+  '<div class="actions">'+button('Revisar pedido','buy-review','','primary')+
   button('Fornecedores','buy-suppliers','','small')+'</div></header>'+
   '<div class="buy-stat-grid"><div><strong>'+f(below.length)+'</strong><span>Modelos abaixo do mínimo sem encomenda</span></div>'+
   '<div><strong>'+f(open)+'</strong><span>Compras em aberto</span></div>'+
@@ -226,6 +242,10 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
   '<div class="buy-group-grid">'+(productCards||'<p class="buy-empty">Nenhum modelo corresponde à busca e aos filtros escolhidos.</p>')+'</div>'+
   (more?'<div class="buy-load-more">'+button('Mostrar mais produtos ('+visibleGroups.length+' de '+relevant.length+')','buy-load-more','','small')+'</div>':'')+
   '</section>'+
+  '<aside class="buy-cart-dock" data-buy-cart-dock'+(cartSkus?'':' hidden')+' aria-live="polite">'+
+  '<div class="buy-dock-heading"><strong>Meu pedido de compra</strong>'+
+  '<small data-buy-cart-summary>'+f(cartSkus)+' SKU(s) · '+f(cartCount)+' unidades · '+f(cartSuppliers)+' fornecedor(es)</small></div>'+
+  button('Revisar pedido','buy-review','','primary')+'</aside>'+
   '<section class="panel"><header class="buy-section-head"><h2>Pedidos de compra</h2></header>'+
   (purchaseCards||'<p class="buy-empty">Nenhum pedido cadastrado.</p>')+'</section>'+
   '<p class="buy-note">Pedidos de compra não adicionam estoque físico. Apenas entradas confirmadas atualizam o saldo.</p></div>';
