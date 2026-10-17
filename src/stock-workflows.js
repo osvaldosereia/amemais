@@ -116,8 +116,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
 
   const colors=[...new Set(active.map(p=>(p.apparel_color||'').trim()).filter(c=>c&&c!=='Única'))];
   const description=group.modelId
-    ?(colors.length===1?colors[0]+' · ':colors.length>1?colors.length+' cores · ':'')+
-      active.length+' '+(active.length===1?'variação':'variações')
+    ?active.length+' '+(active.length===1?'variação':'variações')
     :'Produto único';
   const locations=[...new Set(active.map(p=>
     [p.gondola?'Gôndola '+p.gondola:'',p.prateleira?'Prateleira '+p.prateleira:'']
@@ -184,13 +183,39 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         (canEdit?'<button type="button" class="button small card-balance-edit-variant" data-action="'+(group.modelId?'apparel-variant-edit':'product-edit')+'" data-id="'+h(p.id)+'">Editar EAN / gôndola</button>':'')+'</div>';
   }).join('');
   const history=historyForGroup(group)||[];
+  // Consulta rápida: uma linha por tamanho, sem miniaturas, sem alteração de saldo.
+  const variantOverview='<div class="product-variant-overview" role="region" aria-label="Saldos por variação de '+h(group.title)+'">'+
+    '<div class="product-variant-head" aria-hidden="true">'+
+      '<span>Tamanho</span><span>SKU / EAN</span><span>Físico</span>'+
+      '<span>Reservado</span><span>Disponível</span><span>Ação</span></div>'+
+    '<div class="product-variant-overview-list">'+group.products.map(p=>{
+      const physical=p.active?quantity(p):0;
+      const reserved=p.active?qtyReserved(p.id):0;
+      const available=p.active?qtyAvailable(p.id):0;
+      const size=group.modelId?(p.apparel_size||'Único'):'Único';
+      const editAction=group.modelId?'apparel-variant-edit':'product-edit';
+      return '<div class="product-variant-overview-row'+(p.active?'':' is-inactive')+'" data-variant-overview-id="'+h(p.id)+'">'+
+        '<div class="product-variant-size"><strong>'+h(size)+'</strong>'+
+          (!p.active?'<small>Inativo</small>':'')+'</div>'+
+        '<div class="product-variant-identifiers"><small>SKU: '+h(p.sku||'—')+'</small>'+
+          '<small>EAN: '+h(p.ean||'—')+'</small></div>'+
+        '<div class="product-variant-figure" data-label="Físico"><span class="product-variant-metric-label">Físico</span><strong>'+fmt(physical)+'</strong></div>'+
+        '<div class="product-variant-figure" data-label="Reservado"><span class="product-variant-metric-label">Reservado</span><strong>'+fmt(reserved)+'</strong></div>'+
+        '<div class="product-variant-figure is-available" data-label="Disponível"><span class="product-variant-metric-label">Disponível</span><strong>'+fmt(available)+'</strong></div>'+
+        '<div class="product-variant-row-action">'+
+          (canEdit?'<button type="button" class="product-variant-edit" data-action="'+editAction+'" data-id="'+h(p.id)+'" aria-label="Editar variação '+h(size)+'">Editar</button>':'')+
+        '</div></div>';
+    }).join('')+'</div>'+
+    (group.modelId&&canEdit?'<button type="button" class="product-variant-add" data-action="add-variants" data-id="'+h(group.modelId)+'">+ Adicionar variação</button>':'')+
+    '</div>';
   const stockTabs='<div class="card-workspace-tabs" role="tablist" aria-label="Estoque do produto">'+
    '<button type="button" data-action="product-stock-tab" data-tab="balanco" role="tab" aria-selected="true">Balanço rápido</button>'+
    '<button type="button" data-action="product-stock-tab" data-tab="movimentar" role="tab" aria-selected="false">Movimentar</button>'+
    '<button type="button" data-action="product-stock-tab" data-tab="historico" role="tab" aria-selected="false">Histórico</button></div>';
   const stockWorkspace=isProducts?
-   '<details class="grouped-variants-mobile card-workspace" data-product-details'+(expanded?' open':'')+'>'+
-     '<summary>Estoque e balanço por variação</summary>'+stockTabs+
+   '<details class="grouped-variants-mobile card-workspace product-variants-details" data-product-details'+(expanded?' open':'')+'>'+
+     '<summary>Variações ('+active.length+')</summary>'+variantOverview+
+     '<details class="product-advanced-stock"><summary>Operações de estoque: balanço, movimentação e histórico</summary>'+stockTabs+
      '<section data-stock-panel="balanco"><p class="card-workspace-help">Conte as quantidades físicas de todas as variações. As reservas não podem ser reduzidas.</p>'+
         '<div class="card-balance-search"><input type="search" data-balance-scan-input placeholder="Bipe ou digite EAN/SKU e pressione Enter" aria-label="Localizar variação pelo código" autocomplete="off">'+
         '<button type="button" class="button" data-action="product-balance-scan">Ler pela câmera</button></div>'+
@@ -213,7 +238,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
          '</strong><span>'+h(m.action||'')+' · '+h(String(m.quantity??0))+' un.</span>'+
          '<small>'+h(m.created_at?new Date(m.created_at).toLocaleDateString('pt-BR'):'')+'</small></li>').join('')+'</ul>':
          '<p class="card-workspace-help">Nenhuma movimentação recente na lista carregada.</p>')+'</section>'+
-   '</details>':'<details class="grouped-variants-mobile" data-product-details'+(expanded?' open':'')+'>'+
+     '</details></details>':'<details class="grouped-variants-mobile" data-product-details'+(expanded?' open':'')+'>'+
       '<summary>Estoque por variação</summary>'+modelRows()+'</details>';
   const model=group.model;
   const basicName=model?.name||main.name;
@@ -284,8 +309,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       '<div class="grouped-inventory-info">'+
         '<small class="product-card-description">'+h(description)+'</small>'+
         '<strong class="product-card-name">'+h(group.title)+'</strong>'+
-        (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':
-         '<small class="product-card-codes">EAN individual por variação</small>')+
+        (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':'')+
         '<div class="product-stock-total '+(count===0?'product-stock-empty':'')+'">'+
           '<small>'+stockLabel+'</small><span><b>'+fmt(isProducts?groupAvailable:count)+'</b> un.</span></div>'+
         '<div class="product-card-location'+(locationMissing?' is-unknown':'')+'" aria-label="Localização do produto">'+
