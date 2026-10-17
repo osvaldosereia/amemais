@@ -30,7 +30,7 @@ import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCar
  setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
  confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261016cart1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
-import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261016buyeta1';
+import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261016buysearch1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
 import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261016label57';
@@ -88,7 +88,7 @@ const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],gondolas:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],orderOperationalRows:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
-  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0},userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -539,7 +539,8 @@ function pageContent(){
   if(state.view==='avarias')return damageStockPage();
   if(state.view==='produtos')return productsPage();
   if(state.view==='compras')return purchasesPage({products:state.items,suppliers:state.suppliers,balances:state.balances,
-   reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,models:state.apparelModels,button,filter:state.purchaseSupplierFilter});
+   reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,models:state.apparelModels,categories:state.categories,tags:state.tags,
+   button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog});
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):storesPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
@@ -3274,13 +3275,18 @@ async function handleClick(event){
   if(action==='logout'){closeMobileNavigation(false);await db.auth.signOut();state.user=null;state.profile=null;state.imageCache.clear();render();return;}
   if(action==='taxonomy-open'){
     const mode=target.dataset.mode,form=target.closest('form');
-    const selected=mode==='product'?chosenCategory(form):
+    const isBuyCategory=mode==='buy-filter',isBuyTag=mode==='buy-tag';
+    const selected=isBuyCategory?state.purchaseCatalog.category:isBuyTag?state.purchaseCatalog.tag:
+      mode==='product'?chosenCategory(form):
       mode==='parent'?form?.querySelector('input[name="parent_id"]')?.value:
       mode==='tag'?state.tagFilter:state.categoryFilter;
     openTaxonomyPicker({
-      trigger:target,categories:mode==='tag'?state.tags:state.categories,selected: selected||'',mode,
+      trigger:target,categories:(mode==='tag'||isBuyTag)?state.tags:state.categories,
+      selected:selected||'',mode:isBuyTag?'tag':isBuyCategory?'filter':mode,
       excludeId:mode==='parent'?form?.dataset.id:null,
       onSelect:value=>{
+        if(isBuyCategory){state.purchaseCatalog.category=value;state.purchaseCatalog.page=0;render();return;}
+        if(isBuyTag){state.purchaseCatalog.tag=value;state.purchaseCatalog.page=0;render();return;}
         if(mode==='filter'){state.categoryFilter=value;state.page=0;render();return;}
         if(mode==='tag'){state.tagFilter=value;state.page=0;render();return;}
         const input=form?.querySelector('input[name="'+(mode==='parent'?'parent_id':'category_id')+'"]');
@@ -3435,6 +3441,14 @@ async function handleClick(event){
     const input=document.querySelector('.modalback form input[name="ean"]');
     if(input)input.value=ean;
     return;
+  }
+  if(action==='buy-clear-filters'){
+    state.purchaseSupplierFilter='';
+    state.purchaseCatalog={search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0};
+    render();return;
+  }
+  if(action==='buy-load-more'){
+    state.purchaseCatalog.page+=1;render();return;
   }
   if(action==='buy-suppliers')return supplierManagerModal();
   if(action==='buy-supplier-new')return supplierFormModal();
@@ -5073,6 +5087,15 @@ async function handleSubmit(event){
   }
 
 }
+function updatePurchaseSearch(value){
+ const input=document.getElementById('buy-catalog-search');
+ const cursor=input?.selectionStart??null;
+ state.purchaseCatalog.search=value;
+ state.purchaseCatalog.page=0;
+ render();
+ const next=document.getElementById('buy-catalog-search');
+ if(next){next.focus({preventScroll:true});if(cursor!==null)next.setSelectionRange(cursor,cursor);}
+}
 function updateFiltered(id,value){
   const active=document.activeElement;
   const selection=active?.selectionStart??null;
@@ -5163,6 +5186,10 @@ document.addEventListener('input',event=>{
      state.storeHubFilter.type,state.storeHubFilter.status);
   }
   if(event.target.matches('[data-users-search]'))applyUserListFilter();
+  if(event.target.id==='buy-catalog-search'){
+   updatePurchaseSearch(event.target.value);
+   return;
+  }
   if(event.target.matches('[data-buy-search]'))syncPurchaseForm(event.target.closest('form'));
   if(event.target.matches('[data-buy-quantity]')){
    const input=event.target;
@@ -5328,7 +5355,14 @@ document.addEventListener('change',event=>{
    const row=event.target.closest('[data-buy-product]'),qty=row?.querySelector('[data-buy-quantity]');
    if(qty){qty.disabled=!event.target.checked;if(event.target.checked)qty.focus();}
   }
-  if(event.target.matches('[data-buy-filter]')){state.purchaseSupplierFilter=event.target.value;render();return;}
+  if(event.target.matches('[data-buy-catalog]')){
+    const field=event.target.dataset.buyCatalog;
+    if(!['sort','gondola'].includes(field))return;
+    state.purchaseCatalog[field]=event.target.value;state.purchaseCatalog.page=0;render();return;
+  }
+  if(event.target.matches('[data-buy-filter]')){
+    state.purchaseSupplierFilter=event.target.value;state.purchaseCatalog.page=0;render();return;
+  }
   if(event.target.matches('[data-unified-status], [data-unified-destination], [data-unified-sort]')){
     const container=event.target.closest('.uo-page');
     filterUnifiedOrders(container,container?.querySelector('[data-unified-search]')?.value||'',
