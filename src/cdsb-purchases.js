@@ -216,7 +216,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    ' · Previsão: '+fmtDate(o.expected_arrival_date)+(overdue?' · ATRASADO':'')+'</small></div>'+
    '<span class="buy-status">'+h(status)+'</span><div class="buy-order-actions">'+
    button('Baixar PDF','buy-print-order','data-id="'+h(o.id)+'"','small')+
-   (['rascunho','enviado','recebido_parcial'].includes(o.status)?button('Alterar previsão','buy-eta-edit','data-id="'+h(o.id)+'"','small'):'')+
+   (['rascunho','enviado'].includes(o.status)?button('Alterar previsão','buy-eta-edit','data-id="'+h(o.id)+'"','small'):'')+
    (o.status==='rascunho'?button('Confirmar encomenda','buy-status','data-id="'+h(o.id)+'" data-status="enviado"','small primary'):'')+
    (['enviado','recebido_parcial'].includes(o.status)?button('Conferir recebimento','buy-receive','data-id="'+h(o.id)+'"','small primary'):'')+
    (['rascunho','enviado'].includes(o.status)?button('Cancelar','buy-status','data-id="'+h(o.id)+'" data-status="cancelado"','small danger'):'')+
