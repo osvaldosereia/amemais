@@ -32,6 +32,7 @@ import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCar
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261016buycart1';
 import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSummary,purchaseCartBySupplier,purchaseCartReviewGroups,serializePurchaseCart,parsePurchaseCart} from './purchase-cart.js?v=20261016buycart1';
+import {supplierDirectoryPayload,staffDirectoryPayload,procurementTaskDraft,supplierInsights,procurementTasksHTML} from './directory-automation.js?v=20261017directory1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
 import {renderOperationsDashboard} from './dashboard-home.js?v=20261016home1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
@@ -90,7 +91,7 @@ const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],gondolas:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],orderOperationalRows:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
-  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseSupplierFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],procurementTasks:[],staffContactDetails:[],purchaseSupplierFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -235,6 +236,7 @@ async function loadData(){
   if(hasPermission('purchases.manage')){
    resources.push(['purchaseOrders',db.from('purchase_orders').select('*').order('created_at',{ascending:false}).limit(600)]);
    resources.push(['purchaseItems',db.from('purchase_order_items').select('*').limit(12000)]);
+    resources.push(['procurementTasks',db.from('procurement_tasks').select('*').order('due_date',{ascending:true}).limit(1000)]);
   }
   if(!isFranchisePortal()&&(hasPermission('orders.separate')||hasPermission('events.separate')||hasPermission('events.read')||hasPermission('events.manage'))){
     resources.push(['eventPickBatches',db.from('event_pick_batches').select('*').order('created_at',{ascending:false}).limit(2000)]);
@@ -272,6 +274,7 @@ async function loadData(){
   resources.push(['staffStores',db.from('staff_stores').select('*').limit(5000)]);
   if(isAdmin()){
     resources.push(['userPermissions',db.from('staff_permissions').select('*').limit(5000)]);
+    resources.push(['staffContactDetails',db.from('staff_contact_details').select('*').limit(1000)]);
   }
   if(hasPermission('movements.read') || hasPermission('users.manage')){
     resources.push(['audits',db.from('audit_log').select('id,entity,entity_id,action,actor_id,created_at').order('created_at',{ascending:false}).limit(100)]);
