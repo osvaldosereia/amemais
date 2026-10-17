@@ -29,7 +29,7 @@ test('não arquiva SKU com reserva ou pedido aberto, em qualquer fluxo',()=>{
 });
 test('bloqueia entrada de estoque em produto arquivado, inclusive filial',()=>{
   assert.match(sql,/CREATE OR REPLACE FUNCTION app_private\.reject_archived_product_stock_growth/);
-  assert.match(sql,/force_archived_at IS NULL FOR KEY SHARE/i);
+  assert.match(sql,/force_archived_at IS NULL FOR SHARE/i);
   assert.match(sql,/BEFORE INSERT OR UPDATE ON public\.stock_balances/i);
   assert.match(sql,/BEFORE INSERT OR UPDATE ON public\.store_stock/i);
 });
