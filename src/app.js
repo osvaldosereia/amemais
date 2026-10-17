@@ -3729,12 +3729,21 @@ async function handleClick(event){
     const stockButton=card.querySelector('[data-action="product-card-sizes"]');
     const editButton=card.querySelector('[data-action="product-card-edit-toggle"]');
     if(stockButton){
-      stockButton.setAttribute('aria-expanded',String(Boolean(card.querySelector('[data-product-details]')?.open)));
-      stockButton.innerHTML=(card.querySelector('[data-product-details]')?.open?'Ocultar variações':'Ver variações')+' <span aria-hidden="true">⌄</span>';
+      const isOpen=Boolean(card.querySelector('[data-product-details]')?.open);
+      const count=stockButton.dataset.variationCount||'';
+      const label=(isOpen?'Ocultar variações':'Ver variações')+(count?' ('+count+')':'');
+      stockButton.setAttribute('aria-expanded',String(isOpen));
+      stockButton.setAttribute('aria-label',label);
+      stockButton.title=label;
+      stockButton.classList.toggle('is-active',isOpen);
     }
     if(editButton){
-      editButton.setAttribute('aria-expanded',String(Boolean(card.querySelector('[data-product-editor]')?.open)));
-      editButton.innerHTML=(card.querySelector('[data-product-editor]')?.open?'Fechar edição':'Editar produto')+' <span aria-hidden="true">⌄</span>';
+      const isOpen=Boolean(card.querySelector('[data-product-editor]')?.open);
+      const label=isOpen?'Fechar edição':'Editar produto';
+      editButton.setAttribute('aria-expanded',String(isOpen));
+      editButton.setAttribute('aria-label',label);
+      editButton.title=label;
+      editButton.classList.toggle('is-active',isOpen);
     }
     const key=card.getAttribute('data-product-card');
     if(openingStock&&willOpen)state.expandedProductGroups.add(key);
