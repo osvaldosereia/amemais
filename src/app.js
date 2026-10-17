@@ -2926,6 +2926,7 @@ async function forceDeletePreview(kind,id){
     '<strong>'+h(data.reserved_units||0)+'</strong> unidade(s) reservada(s)']:kind==='product'?[
     '<strong>'+h(data.branch_units||0)+'</strong> unidade(s) em filiais']:[]),
    '<strong>'+h(data.pending_records||0)+'</strong> pedido(s) pendente(s)',
+   ...((kind==='product'||kind==='model')?['<strong>'+h(data.active_reservations||0)+'</strong> reserva(s) ativa(s)']:[]),
    '<strong>'+h(data.history_records||0)+'</strong> registro(s) históricos'
   ];
   const modelVariants=kind==='model'?
