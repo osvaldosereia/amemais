@@ -26,7 +26,7 @@ test('sete ações diretas, sem menu oculto ou texto visual; cada controle com t
   'shelf-label-open','share-product','add-variants','product-model-delete'
  ]);
  assert.equal((toolbar.match(/<svg /g)||[]).length,7);
- assert.equal((toolbar.match(/aria-label="/g)||[]).length,7);
+ assert.equal((toolbar.match(/<button[^>]+aria-label="/g)||[]).length,7);
  assert.equal((toolbar.match(/ title="/g)||[]).length,7);
  assert.doesNotMatch(card,/product-card-utilities|Mais opções/);
  assert.match(toolbar,/aria-label="Ver variações \(4\)"/);
