@@ -56,5 +56,5 @@ test('logo escalável preserva o brasão e mantém tipografia e subtítulo legí
  assert.match(logo,/textLength="646"/);
  assert.match(tvTheme,/width:185px/);
  assert.match(entry,/20261016logo3/);
- assert.match(tvPage,/20261016logo3/);
+ assert.match(tvPage,/20261016buycarttv1/);
 });

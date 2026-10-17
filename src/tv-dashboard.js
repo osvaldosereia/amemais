@@ -137,7 +137,7 @@ function issueList(items,limit=7){
 function lowStockRows(items){
  if(!items?.length)return emptyReport('Nenhum produto ativo para avaliar.');
  return '<div class="tv-report-head"><span>Produto / SKU</span><span>Gôndola</span><span>Disponível</span><span>Mínimo</span></div>'+
- items.slice(0,10).map(x=>
+ items.slice(0,5).map(x=>
  '<div class="tv-report-row"><span><strong>'+esc(x.name||'Produto')+'</strong>'+
  '<small>'+esc(x.sku||'Sem SKU')+(x.apparel_size?' · '+esc(x.apparel_size):'')+'</small></span>'+
  '<span>'+esc(x.gondola||'—')+'</span>'+
@@ -233,7 +233,7 @@ function currentScreen(operational,manage){
   panel('Últimas movimentações',recent(operational?.recent))+'</div>';
  if(!manage)return panel('Relatórios indisponíveis',emptyReport('Aguardando atualização da consulta gerencial.'),'tv-screen-wide');
  if(s===1)return '<div class="tv-screen-grid tv-stock-screen">'+
-  panel('10 produtos com menor estoque disponível',lowStockRows(manage.low_stock),'tv-screen-wide')+
+  panel('Produtos com menor estoque',lowStockRows(manage.low_stock),'tv-screen-wide')+
   panel('Panorama do estoque','<div class="tv-summary-grid">'+
     metric('SKUs ativos',manage.stock_summary?.products)+
     metric('Estoque zerado',manage.stock_summary?.zero)+
@@ -377,7 +377,7 @@ function oneKpis(operational,manage){
 }
 const oneTitles={
  queue:'Fila prioritária',issues:'Ocorrências identificadas',damages:'Avarias · últimos 30 dias',
- low:'10 produtos com menor estoque',high:'10 produtos com maior estoque',dormant:'Sem pedidos há +90 dias',
+ low:'Produtos com menor estoque',high:'Produtos com maior estoque',dormant:'Sem pedidos há +90 dias',
  popular:'Produtos mais pedidos · 30 dias',franchises:'Franquias · últimos 30 dias',
  categories:'Categorias · comparação 30 dias',upcoming:'Próximos eventos',
  closed:'Eventos encerrados',purchases:'Compras e produtividade'
@@ -387,8 +387,8 @@ function oneGrid(operational,manage,rankings){
  oneCard(oneTitles.queue,'queue',oneQueue(operational?.priority))+
  oneCard(oneTitles.issues,'issues',oneIssues(manage?.issues))+
  oneCard(oneTitles.damages,'damages',oneDamages(manage?.damages))+
- oneCard(oneTitles.low,'low',oneRows(manage?.low_stock,'low'))+
- oneCard(oneTitles.high,'high',oneRows(rankings?.top_stock,'high'))+
+ oneCard(oneTitles.low,'low',oneRows(manage?.low_stock,'low',5))+
+ oneCard(oneTitles.high,'high',oneRows(rankings?.top_stock,'high',5))+
  oneCard(oneTitles.dormant,'dormant',oneRows(rankings?.dormant,'dormant',5))+
  oneCard(oneTitles.popular,'popular',oneRows(rankings?.most_ordered,'popular'))+
  oneCard(oneTitles.franchises,'franchises',oneFranchises(manage?.franchises))+
