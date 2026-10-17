@@ -283,7 +283,6 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
       '<div class="grouped-inventory-photo">'+photo+photoQuickAction+'</div>'+
       '<div class="grouped-inventory-info">'+
         '<small class="product-card-description">'+h(description)+'</small>'+
-        '<small class="product-card-description">'+h(description)+'</small>'+
         '<strong class="product-card-name">'+h(group.title)+'</strong>'+
         (sizeCount===1?'<small class="product-card-codes">SKU: '+h(main.sku||'—')+' · EAN: '+h(main.ean||'—')+'</small>':
          '<small class="product-card-codes">EAN individual por variação</small>')+
