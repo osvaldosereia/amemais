@@ -292,7 +292,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<summary>Mais opções <span aria-hidden="true">⌄</span></summary>'+
         '<div class="product-card-utilities-content">'+
           '<div class="product-card-action-secondary-row">'+
-            (canLabel?direct('Etiqueta 57 mm','shelf-label-open',main.id,'product-card-action-secondary'):'')+
+            (canLabel?direct('Etiqueta 80 mm','shelf-label-open',main.id,'product-card-action-secondary'):'')+
             (canShare?direct('Compartilhar','share-product',main.id,'product-card-action-secondary'):'')+
             (group.modelId&&canEdit?direct('+ Variação','add-variants',group.modelId,'product-card-action-secondary'):'')+
           '</div>'+
