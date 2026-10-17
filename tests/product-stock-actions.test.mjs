@@ -57,7 +57,7 @@ test('perfil somente de consulta não pode editar estoque ou cadastro',()=>{
   canMoveStock:()=>false,canManageSku:()=>false,canBalance:()=>false,
   canEditProduct:()=>false
  });
- assert.match(html,/Ver estoque/);
+ assert.match(html,/Ver variações/);
  assert.doesNotMatch(html,/data-action="product-card-edit-toggle"/);
  assert.doesNotMatch(html,/data-action="product-balance-save"/);
  assert.doesNotMatch(html,/data-action="product-stock-mode"/);
@@ -100,7 +100,7 @@ test('produto único usa as mesmas abas sem excluir o conjunto indevidamente',()
   canBalance:()=>true,canManageSku:()=>true,canDeleteProduct:()=>true,
   canShare:true,canLabel:true
  });
- assert.match(html,/Ver estoque/);
+ assert.match(html,/Ver variações/);
  assert.match(html,/data-action="product-card-edit-toggle"/);
  for(const action of ['product-edit','product-balance-save','shelf-label-open','share-product','product-delete'])
   assert.match(html,new RegExp('data-action="'+action+'"'));
