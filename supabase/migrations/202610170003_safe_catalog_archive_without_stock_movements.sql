@@ -42,7 +42,7 @@ BEGIN
  END CASE;
  IF v_name IS NULL THEN RAISE EXCEPTION 'Cadastro não encontrado ou já excluído'; END IF;
  RETURN jsonb_build_object('name',v_name,'kind',p_kind,'stock_units',v_balance,
-   'pending_records',v_requests+v_orders,'branch_units',v_branch,'history_records',v_history,'preserves_history',true);
+   'pending_records',v_orders,'active_reservations',v_requests,'branch_units',v_branch,'history_records',v_history,'preserves_history',true);
 END;$function$;
 
 CREATE OR REPLACE FUNCTION public.force_archive_model_preview(p_model uuid)
@@ -85,7 +85,7 @@ BEGIN
    JOIN public.avulso_order_items it ON it.order_id=o.id
    JOIN public.products p ON p.id=it.product_id
    WHERE p.apparel_model_id=p_model AND p.force_archived_at IS NULL
-   AND o.fulfillment_status IN ('legado','pendente_estoque','reservado','separado')
+   AND o.fulfillment_status IN ('legado','solicitado','pendente_estoque','reservado','separado')
   UNION
   SELECT ('evento:'||b.id::text) FROM public.event_pick_batches b
    JOIN public.event_pick_batch_items it ON it.batch_id=b.id
