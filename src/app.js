@@ -4687,6 +4687,74 @@ async function handleSubmit(event){
     assertOk(await record);
    },'Gôndola salva e disponível no cadastro.');
   }
+  if(type==='buy-add-draft'){
+   if(!hasPermission('purchases.manage'))return;
+   const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+      state.purchaseOrders,state.purchaseItems).find(g=>g.key===form.dataset.group);
+   if(!group)return toast('Produto não encontrado. Atualize Compras.',true);
+   const chosen=group.variants.filter(p=>state.purchaseCart.has(p.id));
+   if(!chosen.length)return toast('Selecione os tamanhos antes de adicionar.',true);
+   const supplier=form.dataset.supplier;
+   if(chosen.some(p=>p.supplier_id!==supplier))return toast('Um pedido aceita produtos de um único fornecedor.',true);
+   const lines=chosen.map(p=>({product_id:p.id,quantity:Number(state.purchaseCart.get(p.id))}));
+   if(lines.some((l,i)=>!validPurchaseQty(l.quantity)||l.quantity<Number(chosen[i].minimum_order_quantity||1)))
+     return toast('Confira o pedido mínimo do fornecedor em cada tamanho.',true);
+   const selected=String(values.purchase_order_id||'novo');
+   const existing=selected==='novo'?null:state.purchaseOrders.find(o=>o.id===selected);
+   if(selected!=='novo'&&(!existing||existing.status!=='rascunho'||existing.supplier_id!==supplier))
+    return toast('Pedido selecionado não está disponível para esse fornecedor.',true);
+   state.loading=true;
+   try{
+    const orderId=existing?.id||assertOk(await db.rpc('create_supplier_purchase_draft',{p_supplier:supplier}));
+    assertOk(await db.rpc('add_purchase_draft_items',{p_order:orderId,p_items:lines}));
+    for(const line of lines)state.purchaseCart.delete(line.product_id);
+    savePurchaseCart();
+    closeTopModal();state.purchaseTab='pedidos';
+    await loadData();
+    toast(lines.length+' variação(ões) adicionada(s). Pode acrescentar outros produtos ao mesmo pedido.');
+   }catch(error){fail(error);}finally{state.loading=false;}
+   return;
+  }
+  if(type==='buy-draft-readonly'){closeTopModal();return;}
+  if(type==='buy-draft-confirm'){
+   if(!hasPermission('purchases.manage'))return;
+   const order=state.purchaseOrders.find(o=>o.id===form.dataset.order);
+   if(!order||order.status!=='rascunho')return toast('Reabra o pedido para conferir a versão atual.',true);
+   const lines=state.purchaseItems.filter(i=>i.purchase_order_id===order.id);
+   const edited=[];
+   for(const item of lines){
+    const field=[...form.querySelectorAll('[data-draft-qty]')].find(x=>x.dataset.draftQty===item.product_id);
+    if(!field)return toast('A lista mudou. Reabra o pedido antes de finalizar.',true);
+    const qty=Number(field.value),product=state.items.find(p=>p.id===item.product_id);
+    if(field.value.trim()===''||!Number.isInteger(qty)||qty<0||qty>1000000||
+       (qty>0&&qty<Number(product?.minimum_order_quantity||1)))
+     return toast('Confira o pedido mínimo do fornecedor em cada variação (zero remove).',true);
+    edited.push({product_id:item.product_id,quantity:qty});
+   }
+   if(!edited.some(x=>x.quantity>0))return toast('Mantenha ao menos um produto no pedido.',true);
+   const days=Number(values.estimated_days);
+   if(!Number.isInteger(days)||days<1||days>365)return toast('Informe previsão entre 1 e 365 dias.',true);
+   if(!window.confirm('Conferir '+edited.filter(x=>x.quantity>0).length+' SKU(s) e preparar PDF? O estoque não será alterado.'))return;
+   state.loading=true;let saved=false;
+   try{
+    assertOk(await db.rpc('confirm_supplier_purchase_draft',{
+      p_order:order.id,p_estimated_days:days,p_note:String(values.note||'').slice(0,1500),p_items:edited
+    }));
+    saved=true;
+    const fresh=assertOk(await db.from('purchase_orders').select('*').eq('id',order.id).single());
+    const items=assertOk(await db.from('purchase_order_items').select('*').eq('purchase_order_id',order.id));
+    closeTopModal();
+    await loadData();await downloadBuyOrder(fresh,items);
+    toast('Pedido conferido e PDF preparado. Envie ao fornecedor e registre o envio no pedido.');
+   }catch(error){
+    fail(error);
+    if(saved){
+     try{closeTopModal();await loadData();}catch(e){console.warn('Falha ao atualizar',e);}
+     toast('Pedido atualizado, mas PDF falhou. Reabra e baixe novamente sem duplicar itens.',true);
+    }
+   }finally{state.loading=false;}
+   return;
+  }
   if(type==='buy-task-create'){
    if(!hasPermission('purchases.manage'))return;
    let draft;
@@ -5563,8 +5631,8 @@ document.addEventListener('input',event=>{
     const input=event.target,id=input.dataset.product;
     const selected=input.closest('[data-buy-sku]')?.querySelector('[data-buy-inline-select]')?.checked;
     if(!selected)return;
-    if(!validPurchaseQty(input.value)){
-      input.setCustomValidity('Informe 1 a 1.000.000 unidades inteiras.');
+    if(!validPurchaseQty(input.value)||Number(input.value)<Number(input.min||1)){
+      input.setCustomValidity('Mínimo do fornecedor: '+(input.min||1)+' unidades.');
       state.purchaseCart.delete(id);
     }else {
       input.setCustomValidity('');
@@ -5753,7 +5821,7 @@ document.addEventListener('change',event=>{
     if(!qty)return;
     qty.disabled=!input.checked;
     if(input.checked){
-      if(!validPurchaseQty(qty.value))qty.value='1';
+      if(!validPurchaseQty(qty.value)||Number(qty.value)<Number(qty.min||1))qty.value=qty.min||'1';
       state.purchaseCart=setPurchaseCartItem(state.purchaseCart,id,qty.value);
     }else state.purchaseCart.delete(id);
     savePurchaseCart();updatePurchaseCartDisplay();
