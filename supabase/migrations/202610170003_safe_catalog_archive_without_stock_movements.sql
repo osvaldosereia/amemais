@@ -175,13 +175,13 @@ BEGIN
 END;$function$;
 
 -- Prevent stock being added to an archived SKU after its balance reached zero.
--- Lock the parent product during stock growth so it serializes with catalog archiving.
+-- FOR SHARE conflicts with archive's UPDATE (FOR KEY SHARE does not), serializing stock growth and archiving.
 CREATE OR REPLACE FUNCTION app_private.reject_archived_product_stock_growth()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $guard$
 BEGIN
  IF (TG_OP='INSERT' AND NEW.quantity>0)
     OR (TG_OP='UPDATE' AND NEW.quantity>OLD.quantity) THEN
-   PERFORM 1 FROM public.products WHERE id=NEW.product_id AND force_archived_at IS NULL FOR KEY SHARE;
+   PERFORM 1 FROM public.products WHERE id=NEW.product_id AND force_archived_at IS NULL FOR SHARE;
    IF NOT FOUND THEN
      RAISE EXCEPTION 'Produto arquivado: não é permitido adicionar estoque';
    END IF;
