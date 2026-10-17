@@ -1710,6 +1710,8 @@ function purchaseReviewModal(supplierId=null,keep={}){
    textareaField('Observações para o fornecedor','note',keep.note||'')+'</div>'+
   '<p class="help">O sistema salvará um pedido exclusivo para este fornecedor e baixará um PDF A4 com foto, tamanhos e quantidades.</p>',
   'buy-order-create','Salvar pedido e baixar PDF');
+ // O pedido pode conter dezenas de modelos: dê largura e rolagem próprias à revisão.
+ document.querySelector('.modalback form[data-form="buy-order-create"]')?.closest('.modal')?.classList.add('buy-review-modal');
  hydrateImages();
 }
 function updatePurchaseReviewTotals(supplierId){
