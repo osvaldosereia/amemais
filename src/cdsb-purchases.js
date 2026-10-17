@@ -135,7 +135,7 @@ export function filterPurchaseGroups(groups=[],filters={},categories=[]){
  });
 }
 
-export function purchasesPage({products=[],models=[],suppliers=[],categories=[],tags=[],balances=[],reservations=[],orders=[],items=[],button,filter='',catalog={},cart=new Map(),expanded=new Set(),tab='reposicao',tasksHTML='',orderFilter=''}) {
+export function purchasesPage({products=[],models=[],suppliers=[],categories=[],tags=[],balances=[],reservations=[],orders=[],items=[],button,filter='',catalog={},cart=new Map(),expanded=new Set(),tab='reposicao',tasksHTML='',orderFilter='',tasks=[]}) {
  const groups=purchasingGroups(products,models,balances,reservations,orders,items);
  const cartCount=[...cart.values()].reduce((n,q)=>n+(Number(q)||0),0);
  const cartSkus=cart.size;
@@ -224,7 +224,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
  }).join('');
  return '<div class="buy-page"><header class="pagehead"><div><h1>Compras</h1>'+
   '<p>Selecione variações, compare estoques e histórico logístico e acompanhe encomendas.</p></div>'+
-  '<div class="actions">'+button('Revisar pedido','buy-review','','primary')+
+  '<div class="actions">'+(cartSkus?button('Revisar pedido','buy-review','','primary'):'')+
   button('Gerenciar fornecedores','buy-suppliers','','small')+'</div></header>'+
   '<nav class="buy-tabs" aria-label="Áreas de Compras">'+
   [['reposicao','Reposição'],['pedidos','Pedidos de compra'],['acompanhamento','Acompanhamento'],['fornecedores','Fornecedores']].map(([id,label])=>
@@ -267,7 +267,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
   (tab==='pedidos'?'<section class="panel"><header class="buy-section-head"><div><h2>Pedidos de compra · fornecedores</h2><small>Pedidos feitos aos fornecedores, não às lojas ou franquias.</small></div>'+ (orderFilter?button('Ver todos','buy-orders-all','','small'):'')+'</header>'+
   (purchaseCards||'<p class="buy-empty">Nenhum pedido corresponde ao filtro selecionado.</p>')+'</section>':'')+
   (tab==='acompanhamento'?tasksHTML:'')+
-  (tab==='fornecedores'?'<section class="panel"><header class="buy-section-head"><h2>Fornecedores</h2>'+button('Novo fornecedor','buy-supplier-new','','small primary')+'</header>'+supplierListHTML(suppliers,button,{products,orders})+'</section>':'')+
+  (tab==='fornecedores'?'<section class="panel"><header class="buy-section-head"><h2>Fornecedores</h2>'+button('Novo fornecedor','buy-supplier-new','','small primary')+'</header>'+supplierListHTML(suppliers,button,{products,orders,tasks})+'</section>':'')+
   '<p class="buy-note">Pedidos de compra de fornecedores são independentes dos pedidos das lojas. Somente recebimentos conferidos atualizam o estoque físico.</p></div>';
 }
 export function supplierListHTML(suppliers,button,{products=[],orders=[],tasks=[]}={}){
