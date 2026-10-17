@@ -656,7 +656,7 @@ function productModelManager(modelId){
       '<p>Escolha o tamanho que deseja editar. Cada variação tem EAN, SKU e estoque independentes.</p>'+
       '<div class="product-model-manage-actions">'+
         button('Alterar foto','apparel-photo','data-id="'+h(modelId)+'"','small')+
-        button('Etiquetas 57 mm','shelf-label-open','data-id="'+h(variants[0].id)+'"','small')+
+        button('Etiquetas 80 mm','shelf-label-open','data-id="'+h(variants[0].id)+'"','small')+
         button('+ Adicionar tamanhos','add-variants','data-id="'+h(modelId)+'"','small primary')+
         (isAdmin()&&hasPermission('system.force_delete')?
          button('Excluir produto completo','product-model-delete','data-id="'+h(modelId)+'"','small danger'):'')+
@@ -1825,7 +1825,7 @@ function productModal(item=null){
     button('📷 Ler','form-scan','data-target="ean"','small')+'</div></div></div>';
   const locations='<section class="form-section wide location-section">'+
     '<div class="section-head"><strong>Localização na loja</strong>'+(
-      item?button('Imprimir etiqueta 57 mm','shelf-label-one','data-id="'+h(item.id)+'"','small'):
+      item?button('Imprimir etiqueta 80 mm','shelf-label-one','data-id="'+h(item.id)+'"','small'):
       '<small>Opcional</small>')+'</div>'+
     '<div class="location-fields">'+
     gondolaSelectHTML('gondola',state.gondolas,item?.gondola||'')+
@@ -1858,7 +1858,7 @@ function shelfLabelsModal(id){
  const group=item.apparel_model_id?
    state.items.filter(p=>p.apparel_model_id===item.apparel_model_id&&!p.force_archived_at):[item];
  if(!group.length)return toast('Não há variações para imprimir.',true);
- formModal('Etiquetas de gôndola · 57 mm',shelfLabelPicker(group,model?.name||''),'shelf-label-print',
+ formModal('Etiquetas de gôndola · 80 mm',shelfLabelPicker(group,model?.name||''),'shelf-label-print',
   'Imprimir etiquetas');
  const form=document.querySelector('.modalback form[data-form="shelf-label-print"]');
  if(form)form.dataset.productId=id;

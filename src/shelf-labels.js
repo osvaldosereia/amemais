@@ -1,4 +1,4 @@
-// Etiquetas de gôndola AME+ Store: 57 mm, SKU por variação, Code 128 local/offline.
+// Etiquetas de gôndola AME+ Store: 80 mm, SKU por variação, Code 128 local/offline.
 const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,ch=>({
  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
 }[ch]));
@@ -41,7 +41,7 @@ export function code128SVG(value){
   }
  }
  const total=x+quiet;
- return '<svg class="shelf-barcode" xmlns="http://www.w3.org/2000/svg" width="49mm" height="18mm" viewBox="0 0 '+
+ return '<svg class="shelf-barcode" xmlns="http://www.w3.org/2000/svg" width="72mm" height="18mm" viewBox="0 0 '+
   total+' 48" preserveAspectRatio="none" fill="#000" shape-rendering="crispEdges" role="img" aria-label="Código de barras Code 128: '+
   escapeHtml(code)+'">'+bars.join('')+'</svg>';
 }
@@ -81,7 +81,7 @@ export function shelfLabelPicker(products,modelName=''){
  const items=products.map(p=>shelfLabelData(p,modelName));
  return '<div class="shelf-label-picker">'+
  '<p>Escolha os tamanhos e a quantidade de etiquetas para cada variação. Cada etiqueta terá seu próprio código de barras e a gôndola cadastrada.</p>'+
- '<div class="shelf-label-preview-title">Prévia da etiqueta (bobina de 57 mm)</div>'+
+ '<div class="shelf-label-preview-title">Prévia da etiqueta (bobina de 80 mm)</div>'+
  '<div class="shelf-label-preview">'+(items.length?shelfLabelArticle(items.find(x=>x.valid)||items[0]):'Nenhum produto cadastrado.')+'</div>'+
  '<div class="shelf-label-variant-head"><strong>Etiquetas a imprimir</strong><small>1 por variação, por padrão</small></div>'+
  '<div class="shelf-label-variants">'+items.map((x,i)=>{
@@ -101,7 +101,7 @@ export function shelfLabelPicker(products,modelName=''){
       '" min="1" max="20" step="1" inputmode="numeric" value="1" '+(!eligible?'disabled':'')+'></label>'+
   '</div>';
  }).join('')+'</div>'+
- '<p class="shelf-label-help">Formato de impressão: <b>57 mm de largura × 70 mm por etiqueta</b> (até 40 por impressão), sem fotos, preço ou quantidade em estoque. Não confundir o código impresso com o código do pedido.</p>'+
+ '<p class="shelf-label-help">Formato de impressão: <b>80 mm de largura × 70 mm por etiqueta</b> (até 40 por impressão), sem fotos, preço ou quantidade em estoque. Não confundir o código impresso com o código do pedido.</p>'+
  '</div>';
 }
 export function collectShelfLabels(products,form,modelName=''){
@@ -130,8 +130,8 @@ export function shelfLabelsHTML(items){
  '*{box-sizing:border-box}',
  'html,body{padding:0;margin:0;background:white;color:black}',
  'body{font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
- '.label-sheet{width:57mm;max-width:57mm;margin:0 auto}',
- '.shelf-label{height:70mm;width:57mm;max-width:57mm;padding:2mm 4mm 1.5mm;',
+ '.label-sheet{width:80mm;max-width:80mm;margin:0 auto}',
+ '.shelf-label{height:70mm;width:80mm;max-width:80mm;padding:2mm 4mm 1.5mm;',
  'display:flex;flex-direction:column;gap:.75mm;border-bottom:1px dashed #888;',
  'page-break-inside:avoid;break-inside:avoid;overflow:hidden}',
  '.shelf-label-heading{display:flex;justify-content:space-between;align-items:center}',
@@ -155,7 +155,7 @@ export function shelfLabelsHTML(items){
  '.shelf-label-identifiers strong{font-size:10pt;font-weight:850;overflow-wrap:anywhere}',
  '.shelf-label-code{display:flex;align-items:center;justify-content:center;flex-direction:column;',
  'margin-top:auto;gap:.4mm}',
- '.shelf-barcode{width:49mm;height:18mm;max-width:100%;display:block}',
+ '.shelf-barcode{width:72mm;height:18mm;max-width:100%;display:block}',
  '.shelf-label-code>strong{font-family:monospace;font-size:9pt;font-weight:800;letter-spacing:.1px;overflow-wrap:anywhere}',
  '.shelf-label-no-code{text-align:center;font-size:8pt}',
  '.shelf-label-footer{border-top:1px solid #000;display:flex;align-items:center;',
@@ -164,28 +164,28 @@ export function shelfLabelsHTML(items){
  'font-size:14px}.label-screen-actions button{padding:10px;border:1px solid #555;background:#fff;cursor:pointer}',
  '@media screen{html{background:#dadada}body{background:transparent}',
  ' .shelf-label{background:white;box-shadow:0 2px 8px #0002;margin-bottom:5px}}',
- '@media print{html,body{width:57mm!important;max-width:57mm!important;overflow:visible!important}',
+ '@media print{html,body{width:80mm!important;max-width:80mm!important;overflow:visible!important}',
  ' .label-screen-actions{display:none!important}.label-sheet{margin:0!important}',
  ' .shelf-label{border-bottom:1px dashed #888;box-shadow:none!important;margin:0!important}}',
  '</style>'
  ].join('');
  const script=[
  '<script>',
- 'window.printLabels57=()=>{',
+ 'window.printLabels80=()=>{',
  'const sheet=document.querySelector(".label-sheet");if(!sheet)return;',
  'const mm=sheet.querySelectorAll(".shelf-label").length*70+2;',
  'let tag=document.getElementById("shelf-page-size");',
  'if(!tag){tag=document.createElement("style");tag.id="shelf-page-size";document.head.append(tag);}',
- 'tag.textContent="@page{size:57mm "+Math.max(70,Math.min(3000,mm))+"mm;margin:0}";',
+ 'tag.textContent="@page{size:80mm "+Math.max(70,Math.min(3000,mm))+"mm;margin:0}";',
  'window.focus();window.print();',
  '};',
- 'window.addEventListener("load",()=>window.printLabels57());',
+ 'window.addEventListener("load",()=>window.printLabels80());',
  '</script>'
  ].join('');
  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'+
  '<title>Etiquetas de gôndola · '+items.length+' un.</title>'+
  '<meta name="viewport" content="width=device-width, initial-scale=1">'+css+'</head><body>'+
- '<div class="label-screen-actions"><button onclick="window.printLabels57()">Imprimir etiquetas 57 mm</button>'+
+ '<div class="label-screen-actions"><button onclick="window.printLabels80()">Imprimir etiquetas 80 mm</button>'+
  '<button onclick="window.close()">Fechar</button></div>'+
  '<main class="label-sheet">'+items.map(shelfLabelArticle).join('')+'</main>'+script+'</body></html>';
 }

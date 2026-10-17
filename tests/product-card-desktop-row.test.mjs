@@ -31,7 +31,7 @@ test('operações principais continuam visíveis e ações auxiliares são agrup
  assert.match(cards,/<summary>Mais opções/);
  assert.match(cards,/Ver variações/);
  assert.match(cards,/Editar produto/);
- assert.match(cards,/Etiqueta 57 mm/);
+ assert.match(cards,/Etiqueta 80 mm/);
  assert.match(cards,/Compartilhar/);
  assert.match(cards,/\+ Variação/);
  assert.match(finalTheme,/\.product-card-action-primary-row/);

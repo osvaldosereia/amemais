@@ -1,4 +1,4 @@
-// Cupom contínuo de separação para bobina térmica de 57 mm.
+// Cupom contínuo de separação para bobina térmica de 80 mm.
 // Ordenação por gôndola, prateleira, modelo e variação.
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=value=>Number(value||0).toLocaleString('pt-BR');
@@ -56,7 +56,7 @@ export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE'}={}){
  '*{box-sizing:border-box}',
  'html,body{padding:0;margin:0;background:#fff;color:#000}',
  'body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
- '.slip{width:49mm;max-width:49mm;margin:0 auto;padding:1.5mm 0 3mm;overflow-wrap:anywhere}',
+ '.slip{width:72mm;max-width:72mm;margin:0 auto;padding:1.5mm 0 3mm;overflow-wrap:anywhere}',
  '.brand{text-align:center;font-size:12pt;font-weight:900;letter-spacing:.2px}',
  'h1{text-align:center;font-size:10.5pt;line-height:1.25;margin:1.5mm 0}',
  '.meta{font-size:8pt;line-height:1.4;border-block:1px dashed #000;padding:1.5mm 0;overflow-wrap:anywhere}',
@@ -79,32 +79,32 @@ export function pickingThermalHTML(order,{printedAt='',brand='AME+ STORE'}={}){
  '.pick-quantity i{display:inline-block;width:4mm;height:4mm;border:1.3px solid #000;vertical-align:middle}',
  'footer{border-top:2px solid #000;margin-top:2mm;padding-top:1.5mm;font-size:8pt;line-height:1.5;overflow-wrap:anywhere}',
  '.signature{margin:6mm 0 2mm;border-top:1px solid #000;text-align:center;padding-top:1mm}',
- '.screen-actions{width:49mm;max-width:49mm;margin:0 auto 3mm;padding:2mm;display:flex;flex-wrap:wrap;gap:2mm;justify-content:center}',
+ '.screen-actions{width:72mm;max-width:72mm;margin:0 auto 3mm;padding:2mm;display:flex;flex-wrap:wrap;gap:2mm;justify-content:center}',
  '.screen-actions button{border:1px solid #222;background:white;padding:3mm;font-size:10pt;cursor:pointer}',
- '@media screen{html{background:#ddd}body{width:57mm;margin:10px auto;box-shadow:0 1px 12px #888}}',
- '@media print{html,body{width:57mm!important;max-width:57mm!important;margin:0!important;box-shadow:none!important}',
- ' .slip{width:49mm!important;max-width:49mm!important;margin:0 auto!important}',
+ '@media screen{html{background:#ddd}body{width:80mm;margin:10px auto;box-shadow:0 1px 12px #888}}',
+ '@media print{html,body{width:80mm!important;max-width:80mm!important;margin:0!important;box-shadow:none!important}',
+ ' .slip{width:72mm!important;max-width:72mm!important;margin:0 auto!important}',
  ' .screen-actions{display:none!important}h2,.pick-item{break-inside:avoid;page-break-inside:avoid}}',
  '</style>'
  ].join('');
  const autoPrint=[
  '<script>',
- 'window.printSlip57=()=>{',
+ 'window.printSlip80=()=>{',
  'const slip=document.querySelector(".slip");',
  'if(!slip)return;',
  'const heightMM=Math.ceil(slip.getBoundingClientRect().height*25.4/96+5);',
  'let page=document.getElementById("thermal-page-size");',
  'if(!page){page=document.createElement("style");page.id="thermal-page-size";document.head.append(page);}',
- 'page.textContent="@page{size:57mm "+Math.min(3000,Math.max(40,heightMM))+"mm;margin:0}";',
+ 'page.textContent="@page{size:80mm "+Math.min(3000,Math.max(40,heightMM))+"mm;margin:0}";',
  'window.focus();window.print();',
  '};',
- 'window.addEventListener("load",()=>window.printSlip57());',
+ 'window.addEventListener("load",()=>window.printSlip80());',
  '</script>'
  ].join('');
  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'+
  '<meta name="viewport" content="width=device-width, initial-scale=1">'+
  '<title>Separação térmica '+esc(title)+' #'+esc(code)+'</title>'+css+'</head><body>'+
- '<div class="screen-actions"><button onclick="window.printSlip57()">Imprimir bobina 57 mm</button>'+
+ '<div class="screen-actions"><button onclick="window.printSlip80()">Imprimir bobina 80 mm</button>'+
  '<button onclick="window.close()">Fechar</button></div>'+
  '<main class="slip"><header><div class="brand">'+esc(brand)+'</div>'+
   '<h1>LISTA DE SEPARAÇÃO</h1></header>'+
