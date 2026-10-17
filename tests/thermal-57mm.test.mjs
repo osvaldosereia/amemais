@@ -48,7 +48,7 @@ test('pedido de separação usa largura física 80 mm, área útil 72 mm e altur
  assert.match(html,/@page\{size:80mm /);
  assert.match(html,/printSlip80/);
  assert.match(html,/\.pick-quantity\{display:flex;flex-wrap:wrap/);
- assert.doesNotMatch(html,/80mm|72mm|printSlip80/);
+ assert.doesNotMatch(html,/57mm|49mm|printSlip57/);
  assert.match(html,/SEPARAR <b>12<\/b> UN\./);
  assert.match(html,/PRATELEIRA B/);
  assert.match(html,/GÔNDOLA 1/);
