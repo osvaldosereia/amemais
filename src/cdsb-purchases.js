@@ -37,9 +37,15 @@ export function purchasingGroups(products=[],models=[],balances=[],reservations=
  for(const x of balances||[])if(!x.event_id)stock.set(x.product_id,(stock.get(x.product_id)||0)+Number(x.quantity||0));
  for(const r of reservations||[])if(r.status==='ativa')reserved.set(r.product_id,(reserved.get(r.product_id)||0)+Number(r.quantity||0));
  const byModel=new Map(models.map(m=>[m.id,m]));
+ const suppliersByModel=new Map();
+ for(const p of products.filter(p=>p.active&&!p.force_archived_at&&p.apparel_model_id)){
+  const set=suppliersByModel.get(p.apparel_model_id)||new Set();
+  set.add(String(p.supplier_id||'sem-fornecedor'));suppliersByModel.set(p.apparel_model_id,set);
+ }
  for(const p of products.filter(p=>p.active&&!p.force_archived_at)){
   const m=byModel.get(p.apparel_model_id);
-  const key=m?'model:'+m.id:'product:'+p.id;
+  const splitSupplier=m&&suppliersByModel.get(m.id)?.size>1;
+  const key=m?'model:'+m.id+(splitSupplier?':supplier:'+String(p.supplier_id||'sem-fornecedor'):''):'product:'+p.id;
   if(!groups.has(key))groups.set(key,{key,title:m?.name||p.name,photo:m?.image_path||p.image_path,
    supplier_id:p.supplier_id,variants:[],available:0,pending:0,minimum:0});
   const group=groups.get(key);
