@@ -91,7 +91,7 @@ const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],gondolas:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],orderOperationalRows:[],
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
-  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],procurementTasks:[],staffContactDetails:[],purchaseSupplierFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
+  stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],procurementTasks:[],staffContactDetails:[],purchaseSupplierFilter:'',purchaseTab:'reposicao',purchaseOrderFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'priority',onlyReplenishment:true,page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
@@ -553,8 +553,8 @@ function pageContent(){
   if(state.view==='produtos')return productsPage();
   if(state.view==='compras')return purchasesPage({products:state.items,suppliers:state.suppliers,balances:state.balances,
    reservations:state.stockReservations,orders:state.purchaseOrders,items:state.purchaseItems,models:state.apparelModels,categories:state.categories,tags:state.tags,
-   button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog,cart:state.purchaseCart,expanded:state.purchaseExpanded})+
-   procurementTasksHTML(state.procurementTasks,state.suppliers,state.users,button,hasPermission('purchases.manage'));
+   button,filter:state.purchaseSupplierFilter,catalog:state.purchaseCatalog,cart:state.purchaseCart,expanded:state.purchaseExpanded,
+   orderFilter:state.purchaseOrderFilter,tab:state.purchaseTab,tasksHTML:procurementTasksHTML(state.procurementTasks,state.suppliers,state.users,button,true)});
   if(state.view==='eventos')return state.activeEvent?(state.eventWorkflow==='return'?returnWorkflowPage():eventDetails()):storesPage();
   if(state.view==='movimentacoes')return movementsPage();
   if(state.view==='pedidos')return ordersPage();
@@ -3530,8 +3530,38 @@ async function handleClick(event){
   }
   if(action==='buy-clear-filters'){
     state.purchaseSupplierFilter='';
-    state.purchaseCatalog={search:'',category:'',tag:'',gondola:'',sort:'name-asc',page:0};
+    state.purchaseCatalog={search:'',category:'',tag:'',gondola:'',sort:'priority',onlyReplenishment:true,page:0};
     render();return;
+  }
+  if(action==='buy-tab'){
+    const tab=target.dataset.tab;
+    if(['reposicao','pedidos','acompanhamento','fornecedores'].includes(tab)){
+      state.purchaseTab=tab;state.purchaseOrderFilter='';render();
+    }
+    return;
+  }
+  if(action==='buy-stat'){
+    const stat=target.dataset.stat;
+    if(stat==='repor'){state.purchaseTab='reposicao';state.purchaseCatalog.onlyReplenishment=true;state.purchaseCatalog.missingSupplier=false;}
+    if(stat==='sem-fornecedor'){state.purchaseTab='reposicao';state.purchaseSupplierFilter='';state.purchaseCatalog.onlyReplenishment=false;state.purchaseCatalog.missingSupplier=true;}
+    if(['abertas','atrasadas'].includes(stat)){state.purchaseTab='pedidos';state.purchaseOrderFilter=stat;}
+    state.purchaseCatalog.page=0;render();return;
+  }
+  if(action==='buy-suggest-group'){
+    if(!hasPermission('purchases.manage'))return;
+    const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+      state.purchaseOrders,state.purchaseItems).find(g=>g.key===target.dataset.group);
+    if(!group?.supplier_id)return toast('Cadastre um fornecedor antes de selecionar produtos.',true);
+    let count=0;
+    for(const p of group.variants){
+      const need=Math.max(0,Number(p.min_stock||0)-p.free-p.pending);
+      if(need>0&&!state.purchaseCart.has(p.id)){
+        state.purchaseCart=setPurchaseCartItem(state.purchaseCart,p.id,need);count++;
+      }
+    }
+    if(!count)return toast('Todas as sugestões deste modelo já estão selecionadas.');
+    savePurchaseCart();state.purchaseExpanded.add(group.key);render();
+    toast(count+' variação(ões) incluída(s). Revise as quantidades antes de salvar.');return;
   }
   if(action==='buy-load-more'){
     state.purchaseCatalog.page+=1;render();return;
@@ -3610,8 +3640,8 @@ async function handleClick(event){
   if(action==='buy-status'){
    if(!hasPermission('purchases.manage'))return;
    const order=state.purchaseOrders.find(o=>o.id===id),status=target.dataset.status;
-   if(!order||!['enviado','finalizado','cancelado'].includes(status))return;
-   if(!window.confirm('Alterar compra #'+order.number+' para '+status+'? Compras não movimentam estoque. Para recebimento, confirme a entrada em Produtos antes de concluir.'))return;
+   if(!order||!['enviado','cancelado'].includes(status))return;
+   if(!window.confirm('Alterar compra #'+order.number+' para '+status+'? Esta ação não movimenta estoque.'))return;
    return exec(async()=>assertOk(await db.rpc('set_purchase_order_status',{p_id:id,p_status:status})),
     'Situação da compra atualizada. O saldo físico não foi alterado.');
   }
@@ -5519,7 +5549,12 @@ document.addEventListener('change',event=>{
     if(input.checked)qty.focus({preventScroll:true});
     return;
   }
-  if(event.target.matches('[data-buy-catalog]')){
+  if(event.target.matches('[data-buy-only-replenishment]')){
+     state.purchaseCatalog.onlyReplenishment=event.target.checked;
+     state.purchaseCatalog.missingSupplier=false;
+     state.purchaseCatalog.page=0;render();return;
+   }
+   if(event.target.matches('[data-buy-catalog]')){
     const field=event.target.dataset.buyCatalog;
     if(!['sort','gondola'].includes(field))return;
     state.purchaseCatalog[field]=event.target.value;state.purchaseCatalog.page=0;render();return;
