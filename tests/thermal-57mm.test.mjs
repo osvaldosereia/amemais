@@ -15,22 +15,22 @@ const order={code:'AA003',origin:'CDSB',target:'RETIRO ENCHEIVOS - NOBRES',
  lines:[{modelTitle:'CAMISETA AVIVA 2026',color:'Azul',size:'G',sku:'1003831',
  ean:'000100033267',gondola:'01',prateleira:'B',quantity:12}]};
 
-test('prévia da etiqueta e documento de impressão respeitam bobina 57 mm',()=>{
+test('prévia da etiqueta e documento de impressão respeitam bobina 80 mm',()=>{
  const label=labels.shelfLabelData(product);
  const modal=labels.shelfLabelPicker([product],product.name);
  const html=labels.shelfLabelsHTML([label]);
- assert.match(modal,/bobina de 57 mm/);
- assert.match(modal,/57 mm de largura/);
- assert.match(html,/\.label-sheet\{width:57mm/);
- assert.match(html,/\.shelf-label\{height:70mm;width:57mm;max-width:57mm/);
- assert.match(html,/\.shelf-barcode\{width:49mm;height:18mm/);
- assert.match(html,/@page\{size:57mm /);
+ assert.match(modal,/bobina de 80 mm/);
+ assert.match(modal,/80 mm de largura/);
+ assert.match(html,/\.label-sheet\{width:80mm/);
+ assert.match(html,/\.shelf-label\{height:70mm;width:80mm;max-width:80mm/);
+ assert.match(html,/\.shelf-barcode\{width:72mm;height:18mm/);
+ assert.match(html,/@page\{size:80mm /);
  assert.match(html,/length\*70\+2/);
- assert.doesNotMatch(html,/80mm|85mm|72mm|printLabels80/);
- assert.match(css,/width:57mm/);
- assert.match(css,/\.shelf-barcode\{width:49mm/);
- assert.doesNotMatch(css,/80mm|85mm|72mm/);
- assert.match(labels.code128SVG(product.ean),/width="49mm"/);
+ assert.doesNotMatch(html,/57mm|85mm|49mm|printLabels57/);
+ assert.match(css,/width:80mm/);
+ assert.match(css,/\.shelf-barcode\{width:72mm/);
+ assert.doesNotMatch(css,/57mm|85mm|49mm/);
+ assert.match(labels.code128SVG(product.ean),/width="72mm"/);
 });
 test('lote de 40 etiquetas cabe no formato contínuo e mantém os dados sem foto',()=>{
  const label=labels.shelfLabelData(product);
@@ -41,12 +41,12 @@ test('lote de 40 etiquetas cabe no formato contínuo e mantém os dados sem foto
  assert.match(html,/000100033267/);
  assert.doesNotMatch(html,/<img\b/);
 });
-test('pedido de separação usa largura física 57 mm, área útil 49 mm e altura dinâmica',()=>{
+test('pedido de separação usa largura física 80 mm, área útil 72 mm e altura dinâmica',()=>{
  const html=picking.pickingThermalHTML(order,{printedAt:'16/10/2026 15:00'});
- assert.match(html,/\.slip\{width:49mm;max-width:49mm/);
- assert.match(html,/html,body\{width:57mm!important;max-width:57mm!important/);
- assert.match(html,/@page\{size:57mm /);
- assert.match(html,/printSlip57/);
+ assert.match(html,/\.slip\{width:72mm;max-width:72mm/);
+ assert.match(html,/html,body\{width:80mm!important;max-width:80mm!important/);
+ assert.match(html,/@page\{size:80mm /);
+ assert.match(html,/printSlip80/);
  assert.match(html,/\.pick-quantity\{display:flex;flex-wrap:wrap/);
  assert.doesNotMatch(html,/80mm|72mm|printSlip80/);
  assert.match(html,/SEPARAR <b>12<\/b> UN\./);
@@ -54,10 +54,10 @@ test('pedido de separação usa largura física 57 mm, área útil 49 mm e altur
  assert.match(html,/GÔNDOLA 1/);
  assert.match(html,/TOTAL: 12 UNIDADES/);
 });
-test('o sistema identifica os dois formatos de impressão como 57 mm',()=>{
- assert.match(app,/Etiquetas de gôndola · 57 mm/);
- assert.match(app,/Imprimir etiqueta 57 mm/);
- assert.match(stock,/Etiqueta 57 mm/);
+test('o sistema identifica os dois formatos de impressão como 80 mm',()=>{
+ assert.match(app,/Etiquetas de gôndola · 80 mm/);
+ assert.match(app,/Imprimir etiqueta 80 mm/);
+ assert.match(stock,/Etiqueta 80 mm/);
  assert.match(app,/shelf-label-print/);
  assert.match(app,/pickingThermalHTML/);
 });
