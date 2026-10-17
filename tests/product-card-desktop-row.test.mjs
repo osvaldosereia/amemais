@@ -1,38 +1,58 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-const css=await readFile(new URL('../product-card-cdsb-square.css',import.meta.url),'utf8');
-const index=await readFile(new URL('../index.html',import.meta.url),'utf8');
-const cards=await readFile(new URL('../src/stock-workflows.js',import.meta.url),'utf8');
-const changed=css.split('/* Desktop: cinco ações e quatro indicadores na mesma linha. */')[1];
-test('regra nova opera somente no desktop e CSS recebe cache atualizado',()=>{
- assert.ok(changed,'Faltou bloco de layout desktop');
- assert.match(changed.trimStart(),/^@media\s*\(min-width:\s*761px\)/);
- assert.doesNotMatch(changed,/@media\s*\(max-width:/);
- assert.match(index,/product-card-cdsb-square\.css\?v=20261016square2/);
- assert.equal(index.match(/product-card-cdsb-square\.css\?/g)?.length,1);
+
+const read=path=>readFile(new URL('../'+path,import.meta.url),'utf8');
+const css=await read('product-card-desktop-compact.css');
+const legacy=await read('product-card-cdsb-square.css');
+const mobile=await read('product-card-clean-v8.css');
+const index=await read('index.html');
+const card=await read('src/stock-workflows.js');
+
+test('layout compacto desktop é a última camada e mantém os estilos mobile precedentes',()=>{
+ const links=[...index.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map(m=>m[1]);
+ assert.match(links.at(-1),/product-card-desktop-compact\.css\?v=20261017desktopcompact1/);
+ assert.ok(links.findIndex(x=>x.includes('product-card-clean-v8.css'))<links.length-1);
+ assert.match(css,/@media \(min-width:761px\)/);
+ assert.match(css,/@media \(min-width:761px\) and \(max-width:1180px\)/);
+ assert.doesNotMatch(css,/@media\s*\(max-width:760px\)/);
+ assert.match(mobile,/grid-template-areas:"photo info" "totals totals"/);
 });
-test('Disponível, Gôndola, Físico e Reservado aparecem lado a lado e à direita da foto',()=>{
- assert.match(changed,/grid-template-columns:\s*clamp\([^)]+\)\s+repeat\(4,minmax\(0,1fr\)\)!important/);
- assert.match(changed,/\.grouped-inventory-info[\s\S]*?display:contents!important/);
- assert.match(changed,/\.product-stock-total[\s\S]*?grid-column:2!important;grid-row:4!important/);
- assert.match(changed,/\.product-card-location[\s\S]*?grid-column:3!important;grid-row:4!important/);
- assert.match(changed,/\.stock-total-breakdown[\s\S]*?display:contents!important/);
- assert.match(changed,/\.stock-total-metric\.reserved[\s\S]*?grid-column:4!important;grid-row:4!important/);
- assert.match(changed,/\.stock-total-metric\.available[\s\S]*?grid-column:5!important;grid-row:4!important/);
- assert.match(changed,/\.grouped-inventory-photo[\s\S]*?aspect-ratio:1\/1!important/);
+
+test('neutraliza grid legado de cinco colunas e preserva blocos foto, informações e saldos',()=>{
+ assert.match(legacy,/repeat\(4,minmax\(0,1fr\)\)/);
+ assert.match(css,/grid-template-areas:"photo info totals"!important/);
+ assert.match(css,/grid-template-areas:"photo info" "photo totals"!important/);
+ assert.match(css,/grid-template-columns:clamp\(130px,10\.6vw,154px\)/);
+ assert.match(css,/\.grouped-inventory-top>\.grouped-inventory-info\{[\s\S]*?display:flex!important/);
+ assert.match(css,/\.grouped-inventory-top>\.stock-total-breakdown\{[\s\S]*?display:grid!important/);
+ assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
+ assert.match(css,/grid-column:auto!important;grid-row:auto!important/);
+ assert.match(css,/min-height:0!important;height:auto!important/);
 });
-test('operações principais continuam visíveis e ações auxiliares são agrupadas',()=>{
- const finalTheme=css+'\n'+String('');
- assert.match(cards,/product-card-action-primary-row/);
- assert.match(cards,/product-card-action-secondary-row/);
- assert.match(cards,/product-card-action-danger-row/);
- assert.match(cards,/product-card-utilities/);
- assert.match(cards,/<summary>Mais opções/);
- assert.match(cards,/Ver variações/);
- assert.match(cards,/Editar produto/);
- assert.match(cards,/Etiqueta 80 mm/);
- assert.match(cards,/Compartilhar/);
- assert.match(cards,/\+ Variação/);
- assert.match(finalTheme,/\.product-card-action-primary-row/);
+
+test('ações, edição de foto fora da imagem, saldos e variações continuam no card',()=>{
+ assert.match(card,/grouped-inventory-top/);
+ assert.match(card,/grouped-inventory-photo/);
+ assert.match(card,/grouped-inventory-info/);
+ assert.match(card,/stock-total-breakdown/);
+ assert.match(card,/product-card-photo-quick/);
+ assert.match(card,/product-card-action-primary-row/);
+ assert.match(card,/product-card-utilities/);
+ assert.match(card,/data-action="product-card-sizes"/);
+ assert.match(card,/Ver variações/);
+ assert.match(card,/Editar produto/);
+ assert.match(card,/data-product-details/);
+ assert.match(css,/\.grouped-inventory-info>\.product-card-photo-quick\{[\s\S]*?position:absolute!important;right:0!important;top:0!important/);
+ assert.match(css,/\.grouped-inventory-photo :is\(\.product-gallery-arrow,\.product-gallery-count\)\{[\s\S]*?display:none!important/);
+});
+
+test('identidade CDSB e dimensão compacta não atingem compras nem pedidos das lojas',()=>{
+ assert.match(css,/#102d50/);
+ assert.match(css,/#dce5ef/);
+ assert.match(css,/\.mobile-c-app \.products-panel \.product-card-v3/);
+ assert.doesNotMatch(css,/\.buy-page/);
+ assert.doesNotMatch(css,/\.uo-page/);
+ assert.match(css,/min-height:39px!important/);
+ assert.match(css,/max-height:154px!important/);
 });

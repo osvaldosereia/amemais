@@ -1,0 +1,168 @@
+/* CDSB | Cards compactos de Produtos no desktop - 2026-10-17.
+ * Um único grid para foto, informações e os três saldos. Esta camada final
+ * neutraliza regras legadas display:contents/5 colunas sem tocar no mobile.
+ * Escopo restrito ao catálogo Produtos; painel TV, Pedidos e Compras intactos. */
+@media (min-width:761px) {
+  .mobile-c-app .products-panel .product-card-v3{
+    display:flex!important;flex-direction:column!important;align-items:stretch!important;
+    min-height:0!important;height:auto!important;gap:0!important;
+    width:100%!important;overflow:hidden!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3>.grouped-inventory-top{
+    display:grid!important;
+    grid-template-columns:clamp(130px,10.6vw,154px) minmax(0,1fr) minmax(246px,294px)!important;
+    grid-template-rows:auto!important;
+    grid-template-areas:"photo info totals"!important;
+    align-items:center!important;gap:16px!important;
+    width:100%!important;min-width:0!important;
+    padding:12px 14px!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top>.grouped-inventory-photo{
+    display:block!important;grid-area:photo!important;
+    grid-column:auto!important;grid-row:auto!important;
+    position:relative!important;align-self:center!important;
+    width:100%!important;height:auto!important;min-height:0!important;
+    max-height:154px!important;aspect-ratio:1/1!important;
+    border-radius:10px!important;overflow:hidden!important;
+    border:1px solid #dae3ed!important;margin:0!important;padding:0!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-photo :is(.product-photo-gallery,.product-photo){
+    width:100%!important;height:100%!important;min-height:0!important;
+    aspect-ratio:1/1!important;margin:0!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-photo img.thumb{
+    width:100%!important;height:100%!important;object-fit:cover!important;
+    object-position:center 30%!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top>.grouped-inventory-info{
+    display:flex!important;flex-direction:column!important;align-items:flex-start!important;
+    position:relative!important;grid-area:info!important;
+    grid-column:auto!important;grid-row:auto!important;
+    justify-content:center!important;align-self:center!important;
+    width:100%!important;min-width:0!important;
+    height:auto!important;min-height:0!important;
+    padding:0 45px 0 0!important;margin:0!important;gap:7px!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-description,
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-name,
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-codes,
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-location,
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-purchase-arrival{
+    display:block;position:static!important;grid-column:auto!important;grid-row:auto!important;
+    justify-self:auto!important;align-self:flex-start!important;
+    width:auto!important;max-width:100%!important;min-width:0!important;
+    min-height:0!important;max-height:none!important;
+    margin:0!important;text-align:left!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-description{
+    order:0!important;font-size:.72rem!important;line-height:1.25!important;
+    color:#64778d!important;white-space:normal!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-name{
+    order:1!important;font-size:clamp(.98rem,1.32vw,1.13rem)!important;
+    line-height:1.27!important;letter-spacing:-.012em!important;
+    font-weight:820!important;color:#102d50!important;
+    overflow-wrap:anywhere!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-codes{
+    order:2!important;font-size:.69rem!important;line-height:1.22!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-location{
+    order:3!important;display:inline-flex!important;align-items:center!important;
+    padding:5px 8px!important;border-radius:7px!important;gap:5px!important;
+    background:#fff8ea!important;border:1px solid #ecdcc0!important;
+    color:#694b1c!important;font-size:.71rem!important;line-height:1.25!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-purchase-arrival{
+    order:4!important;display:flex!important;flex-wrap:wrap!important;
+    padding:5px 7px!important;font-size:.69rem!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-info>.product-card-photo-quick{
+    position:absolute!important;right:0!important;top:0!important;
+    grid-column:auto!important;grid-row:auto!important;
+    order:0!important;align-self:auto!important;justify-self:auto!important;
+    margin:0!important;width:35px!important;height:35px!important;
+    min-width:35px!important;min-height:35px!important;
+    border-radius:9px!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-top>.stock-total-breakdown{
+    display:grid!important;grid-area:totals!important;
+    grid-column:auto!important;grid-row:auto!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    grid-template-rows:auto!important;gap:0!important;
+    align-items:stretch!important;align-self:center!important;
+    width:100%!important;min-width:0!important;
+    margin:0!important;padding:0!important;
+    background:#fff!important;border:1px solid #dce5ef!important;
+    border-radius:10px!important;overflow:hidden!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .stock-total-breakdown>.product-stock-total,
+  .mobile-c-app .products-panel .product-card-v3 .stock-total-breakdown>.stock-total-metric{
+    display:flex!important;flex-direction:column!important;align-items:flex-start!important;
+    justify-content:center!important;flex:initial!important;
+    grid-column:auto!important;grid-row:auto!important;
+    width:100%!important;min-width:0!important;max-width:none!important;
+    min-height:86px!important;max-height:none!important;
+    margin:0!important;padding:9px 10px!important;gap:4px!important;
+    border:0!important;border-radius:0!important;box-shadow:none!important;
+    background:#fff!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .stock-total-breakdown>:not(:last-child){
+    border-right:1px solid #e0e8f1!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .stock-total-breakdown :is(small,span){
+    font-size:.68rem!important;line-height:1.2!important;color:#667b92!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .stock-total-breakdown :is(b,strong){
+    font-size:1.42rem!important;line-height:1.03!important;font-weight:810!important;
+    color:#102d50!important;font-variant-numeric:tabular-nums!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-actions.product-card-actions-v5{
+    display:grid!important;grid-template-columns:1.28fr .95fr .95fr!important;
+    grid-template-rows:auto!important;gap:8px!important;
+    align-items:stretch!important;align-self:stretch!important;
+    width:100%!important;min-width:0!important;
+    padding:0 14px 12px!important;margin:0!important;
+    background:#fff!important;border:0!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .product-card-action-primary-row{
+    display:contents!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-actions .product-card-action-primary,
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-actions .product-card-utilities>summary{
+    display:flex!important;align-items:center!important;justify-content:center!important;
+    width:100%!important;height:auto!important;min-height:39px!important;
+    padding:7px 11px!important;margin:0!important;
+    font-size:.78rem!important;line-height:1.2!important;
+    border-radius:8px!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .product-card-utilities{
+    grid-column:auto!important;width:100%!important;min-width:0!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .product-card-utilities[open]{
+    grid-column:1/-1!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-photo :is(.product-gallery-arrow,.product-gallery-count){
+    display:none!important;
+  }
+}
+@media (min-width:761px) and (max-width:1180px){
+  .mobile-c-app .products-panel .product-card-v3>.grouped-inventory-top{
+    grid-template-columns:clamp(116px,15vw,140px) minmax(0,1fr)!important;
+    grid-template-rows:auto auto!important;
+    grid-template-areas:"photo info" "photo totals"!important;
+    gap:8px 12px!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .stock-total-breakdown>.product-stock-total,
+  .mobile-c-app .products-panel .product-card-v3 .stock-total-breakdown>.stock-total-metric{
+    min-height:65px!important;padding:7px 10px!important;
+  }
+  .mobile-c-app .products-panel .product-card-v3 .stock-total-breakdown :is(b,strong){
+    font-size:1.2rem!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .mobile-c-app .products-panel .product-card-v3 .grouped-inventory-photo *{
+    animation:none!important;
+  }
+}

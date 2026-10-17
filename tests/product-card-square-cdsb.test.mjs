@@ -12,7 +12,8 @@ const finalTheme=await readFile(new URL('../operational-clean-ui.css',import.met
 test('nova camada visual é a última folha CSS e usa a identidade CDSB',()=>{
  assert.match(index,/product-card-cdsb-square\.css\?v=20261016square2/);
  const lastCss=index.match(/<link\s+rel="stylesheet"[^>]+>/g).at(-1);
- assert.match(lastCss,/product-card-clean-v8\.css/);
+ assert.match(lastCss,/product-card-desktop-compact\.css/);
+ assert.ok(index.indexOf('product-card-desktop-compact.css')>index.indexOf('product-card-clean-v8.css'));
  assert.match(baseTheme,/--cdsb-blue:#102d50/);
  assert.match(baseTheme,/--cdsb-gold:#c7a35f/);
  assert.match(css,/--card-blue:\s*var\(--cdsb-blue/);
