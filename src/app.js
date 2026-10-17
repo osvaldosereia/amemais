@@ -33,6 +33,7 @@ import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=202610
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261016buycart1';
 import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSummary,purchaseCartBySupplier,purchaseCartReviewGroups,serializePurchaseCart,parsePurchaseCart} from './purchase-cart.js?v=20261016buycart1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
+import {renderOperationsDashboard} from './dashboard-home.js?v=20261016home1';
 import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
 import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261016label57';
 
@@ -600,68 +601,9 @@ function productGroupCard(group){
   });
 }
 function dashboard(){
-  const all=state.items.filter(p=>p.active);
-  const total=state.balances.filter(b=>!b.event_id&&state.items.some(p=>p.id===b.product_id&&!p.force_archived_at)).reduce((sum,b)=>sum+b.quantity,0);
-  const eventTotal=state.balances.filter(b=>b.event_id&&state.items.some(p=>p.id===b.product_id&&!p.force_archived_at)).reduce((sum,b)=>sum+b.quantity,0);
-  const zero=all.filter(p=>qtyAvailable(p.id)===0).length;
-  const reserved=state.stockReservations.reduce((sum,x)=>sum+Number(x.quantity||0),0);
-  const available=Math.max(0,total-reserved);
-  const activeEvents=state.events.filter(e=>e.status==='ativo').length;
-  const movementsToday=state.movements.filter(m=>m.created_at&&new Intl.DateTimeFormat('en-CA',{
-    timeZone:'America/Cuiaba',year:'numeric',month:'2-digit',day:'2-digit'
-  }).format(new Date(m.created_at))===dateToday()).length;
-  const firstName=(state.profile.full_name||'').trim().split(/\s+/)[0]||'Olá';
-  const recentGroups=recentInventoryGroups(all,state.apparelModels,6);
-  const roots=state.categories.filter(c=>!c.parent_id).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
-  const categoryCards=roots.slice(0,8).map(c=>{
-    const count=all.filter(p=>categoryChain(p.category_id).some(path=>path.id===c.id)).length;
-    return '<button type="button" class="c-category-card" data-action="home-category" data-id="'+h(c.id)+'">'+
-      '<span class="c-category-icon">'+uiIcon('layers',21)+'</span>'+
-      '<strong>'+h(c.name)+'</strong><small>'+count+' produto(s)</small></button>';
-  }).join('');
-  const productCards=recentGroups.map(productGroupCard).join('');
-  const cards=[
-    {label:'Produtos ativos',value:all.length,icon:'package',tone:'green',hint:'Cadastrados'},
-    {label:'Sem disponibilidade',value:zero,icon:'alert',tone:'red',hint:'Livre na central'},
-    {label:'Movimentações',value:movementsToday,icon:'arrows',tone:'blue',hint:'Hoje'},
-    {label:'Eventos ativos',value:activeEvents,icon:'calendar',tone:'orange',hint:'Em andamento'}
-  ];
-  return '<div class="c-dashboard">'+
-    '<div class="c-welcome"><span class="c-eyebrow">PAINEL DO ESTOQUE</span>'+
-    '<h1>Olá, '+h(firstName)+'!</h1><p>Acompanhe seu estoque em um só lugar.</p></div>'+
-    '<section class="c-hero" aria-label="Resumo das unidades na loja"><div class="c-hero-main">'+
-    '<span class="c-hero-label">'+uiIcon('package',19)+' Físico na central</span>'+
-    '<strong class="c-hero-number">'+total.toLocaleString('pt-BR')+'</strong>'+
-    '<span class="c-hero-sub">'+available.toLocaleString('pt-BR')+' disponíveis · '+reserved.toLocaleString('pt-BR')+' reservadas · '+eventTotal.toLocaleString('pt-BR')+' em lojas temporárias</span></div>'+
-    '<div class="c-hero-art" aria-hidden="true"><span></span><span></span><span></span><span></span></div></section>'+
-    '<div class="c-metric-grid">'+cards.map(c=>'<div class="c-metric c-metric-'+c.tone+'">'+
-      '<div class="c-metric-icon">'+uiIcon(c.icon,21)+'</div>'+
-      '<div class="c-metric-data"><span>'+h(c.label)+'</span><strong>'+c.value.toLocaleString('pt-BR')+'</strong>'+
-      '<small>'+h(c.hint)+'</small></div></div>').join('')+'</div>'+
-    '<div class="c-dashboard-actions">'+
-      (canRegisterProducts()?'<button type="button" class="c-action-primary" data-action="product-new">'+
-        uiIcon('plus',20)+' Novo produto</button>':'')+
-      (hasPermission('stock.entry')?'<button type="button" class="c-action-outline" data-action="stock-receive-shipment">'+
-        uiIcon('arrow-down-to-line',20)+' Receber remessa</button>':'')+
-      '<button type="button" class="c-action-outline" data-action="global-scan">'+uiIcon('scan',20)+' Ler EAN</button>'+
-      (['admin','gerente'].includes(state.profile?.role)?
-        '<button type="button" class="c-action-outline" data-action="open-tv">'+uiIcon('trend',20)+
-        ' Abrir Painel TV</button>':'')+'</div>'+
-    '<section class="c-dashboard-section"><div class="c-section-heading"><h2>Categorias</h2>'+
-    '<button type="button" data-action="view" data-view="produtos">Ver produtos '+uiIcon('chevron',17)+'</button></div>'+
-    (categoryCards?'<div class="c-category-grid">'+categoryCards+'</div>':
-      '<p class="c-dash-empty">Cadastre categorias para organizar os produtos.</p>')+'</section>'+
-    '<section class="c-dashboard-section"><div class="c-section-heading"><h2>Produtos recentes</h2>'+
-    '<button type="button" data-action="view" data-view="produtos">Ver todos '+uiIcon('chevron',17)+'</button></div>'+
-    (productCards?'<div class="products-panel c-dashboard-recent-products"><div class="grouped-inventory-grid">'+productCards+'</div></div>':
-      '<div class="c-dash-empty">'+uiIcon('package',28)+'<span>Nenhum produto cadastrado ainda.</span>'+
-      (canRegisterProducts()?button('Cadastrar primeiro produto','product-new','','primary'):'')+'</div>')+'</section>'+
-    (activeEvents?'<section class="c-dashboard-section c-event-shortcut"><div>'+
-      uiIcon('calendar',21)+' <strong>'+activeEvents+' evento(s) em andamento</strong></div>'+
-      '<button type="button" data-action="view" data-view="eventos">Ver eventos '+uiIcon('arrow',16)+'</button></section>':'')+
-    '</div>';
+  return renderOperationsDashboard({state,h,uiIcon,qtyAvailable,categoryChain,purchaseSuggestions,
+    hasPermission,canRegisterProducts,permittedView,unifiedOrderRecords,dateToday});
 }
-
 function imgMarkup(p){
   return p.image_path?'<img class="thumb" data-photo-id="'+h(p.id)+'" alt="Foto: '+h(p.name)+'" loading="lazy" />':
     '<div class="thumb placeholder" aria-hidden="true">▧</div>';
@@ -3228,6 +3170,39 @@ async function handleClick(event){
       searchAndManageSku(code,true);
     });}catch(error){fail(error);return;}
   }
+  if(action==='dashboard-product-search'){
+    if(!permittedView('produtos'))return toast('Seu perfil não tem acesso ao catálogo.',true);
+    const input=document.querySelector('[data-dashboard-product-query]');
+    const query=String(input?.value||'').trim();
+    if(!query)return input?.focus();
+    state.categoryFilter='';state.tagFilter='';state.gondolaFilter='';
+    switchView('produtos');state.search=query;state.page=0;render();return;
+  }
+  if(action==='dashboard-stock-shortage'){
+    if(!permittedView('produtos'))return;
+    state.categoryFilter='';state.tagFilter='';switchView('produtos');
+    state.catalogSort='available-asc';render();return;
+  }
+  if(action==='dashboard-orders'){
+    if(!permittedView('pedidos'))return;
+    const status=target.dataset.status||'todos';
+    if(!['todos','a_separar','em_separacao','a_conferir','pronto_saida','pendente_estoque'].includes(status))return;
+    switchView('pedidos');
+    const page=document.querySelector('.uo-page'),field=page?.querySelector('[data-unified-status]');
+    if(!page||!field)return;
+    field.value=status;
+    const sort=page.querySelector('[data-unified-sort]');
+    if(sort)sort.value='prioridade';
+    filterUnifiedOrders(page,'',status,'todos','prioridade');
+    page.scrollIntoView({block:'start',behavior:'smooth'});
+    return;
+  }
+  if(action==='dashboard-order-open'){
+    if(!permittedView('pedidos'))return;
+    const kind=target.dataset.kind;
+    if(!unifiedOrderRecords().some(o=>o.kind===kind&&o.id===id))return;
+    state.pendingOrderFocus={kind,id};switchView('pedidos');return;
+  }
   if(action==='home-category'){
     state.categoryFilter=id;state.tagFilter='';switchView('produtos');return;
   }
@@ -5442,6 +5417,9 @@ document.addEventListener('input',event=>{
   }
 });
 document.addEventListener('keydown',event=>{
+  if(event.target.matches('[data-dashboard-product-query]')&&event.key==='Enter'){
+    event.preventDefault();document.querySelector('[data-action="dashboard-product-search"]')?.click();return;
+  }
   if(event.target.id==='stock-op-search'&&event.key==='Enter'){
     event.preventDefault();
     const q=event.target.value.trim();
