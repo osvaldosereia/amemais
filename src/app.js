@@ -577,6 +577,8 @@ function button(label,action,extra='',kind=''){
 }
 function pill(status){return '<span class="pill '+h(status)+'">'+h({ativo:'Ativo',encerrado:'Encerrado',rascunho:'Rascunho'}[status]||status)+'</span>';}
 function render(){
+  closePurchaseDrawer(false);
+  purchaseInfiniteObserver?.disconnect();
   const previousCard=state.view==='produtos'?
     [...root.querySelectorAll('[data-product-card]')].find(card=>
       card.querySelector('[data-product-editor][open],[data-product-details][open]')):null;
@@ -612,6 +614,7 @@ function render(){
     '<button type="button" class="mobile-top-menu only-mobile" aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-expanded="false" data-action="mobile-more">'+uiIcon('menu',23)+'</button></div></header>'+
     '<main class="content">'+pageContent()+'</main></div></div>';
   hydrateImages();
+  mountPurchaseInfinite();
   if(previousKey&&state.view==='produtos'){
     const next=[...root.querySelectorAll('[data-product-card]')].find(card=>card.dataset.productCard===previousKey);
     if(next&&Number.isFinite(previousTop)){
@@ -4093,18 +4096,47 @@ async function handleClick(event){
     closeTopModal();
    },'Encomenda registrada como enviada ao fornecedor.');
   }
-  if(action==='buy-open-group'){
-    const groupKey=target.dataset.group;
-    const panel=target.closest('[data-buy-card]')?.querySelector('[data-buy-expand]');
-    if(!panel)return;
-    const open=!panel.open;
-    setPurchasePanelOpen(groupKey,open);
-    if(open){prefillPurchaseMinimums(groupKey);await loadPurchaseOutflow(groupKey);}
+  if(action==='buy-drawer-close'){closePurchaseDrawer();return;}
+  if(action==='buy-assign-supplier'){
+    if(!hasPermission('purchases.manage'))return;
+    const key=target.dataset.group;
+    const drawer=purchaseDrawer;
+    const supplierId=drawer?.overlay.querySelector('[data-buy-supplier-choice]')?.value;
+    const supplier=state.suppliers.find(x=>x.id===supplierId&&x.active);
+    if(!drawer||drawer.groupKey!==key||!supplier)return toast('Escolha um fornecedor cadastrado.',true);
+    const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+      state.purchaseOrders,state.purchaseItems).find(g=>g.key===key);
+    if(!group||!group.variants.length)return;
+    const ids=group.variants.map(x=>x.id);
+    if(!window.confirm('Vincular '+supplier.name+' às '+ids.length+' variação(ões) deste produto?'))return;
+    try{
+      const updated=assertOk(await db.from('products').update({supplier_id:supplierId})
+        .in('id',ids).select('id'));
+      if(updated.length!==ids.length)throw new Error('A atualização do fornecedor ficou incompleta. Verifique suas permissões.');
+      for(const p of state.items)if(ids.includes(p.id))p.supplier_id=supplierId;
+      closePurchaseDrawer(false);
+      const next=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+        state.purchaseOrders,state.purchaseItems).find(g=>g.variants.some(p=>ids.includes(p.id)));
+      // Atualiza o catálogo e mantém os SKUs selecionados no carrinho.
+      render();
+      if(next){
+        openPurchaseDrawer(next.key);
+        updatePurchaseCartDisplay();
+        await loadPurchaseOutflow(next.key);
+      }
+      toast('Fornecedor vinculado. Agora você pode adicionar ao pedido.');
+    }catch(error){fail(error);}
     return;
   }
-  if(action==='buy-load-more'){
-    state.purchaseCatalog.page+=1;render();return;
+  if(action==='buy-open-group'){
+    const key=target.dataset.group;
+    if(purchaseDrawer?.groupKey===key){closePurchaseDrawer();return;}
+    setPurchasePanelOpen(key,true);
+    prefillPurchaseMinimums(key);
+    await loadPurchaseOutflow(key);
+    return;
   }
+  if(action==='buy-load-more'){await appendNextPurchaseBatch();return;}
   if(action==='buy-suppliers')return supplierManagerModal();
   if(action==='buy-supplier-new')return supplierFormModal();
   if(action==='buy-supplier-edit'){
@@ -4155,8 +4187,7 @@ async function handleClick(event){
     if(!hasPermission('purchases.manage'))return;
     const groupKey=target.dataset.group;
     setPurchasePanelOpen(groupKey,true);
-    const current=[...document.querySelectorAll('[data-buy-card]')].find(x=>x.dataset.buyCard===groupKey);
-    const view=current?.querySelector('[data-buy-outflow]');
+    const view=findPurchasePanel(groupKey)?.querySelector('[data-buy-outflow]');
     if(view?.dataset.loaded==='error')delete view.dataset.loaded;
     await loadPurchaseOutflow(groupKey);
     view?.scrollIntoView({block:'nearest',behavior:'smooth'});
@@ -6052,6 +6083,7 @@ function updateFiltered(id,value){
   if(field&&selection!==null){field.focus();field.setSelectionRange(selection,selection);}
 }
 document.addEventListener('click',event=>{
+  if(event.target.classList?.contains('buy-drawer-backdrop')){closePurchaseDrawer();return;}
   if(event.target.classList?.contains('photo-lightbox')){document.querySelector('.photo-lightbox')?.remove();return;}
   if(event.target.classList?.contains('mobile-more-overlay')){closeMobileNavigation();return;}
   handleClick(event).catch(fail);
@@ -6110,6 +6142,7 @@ document.addEventListener('keydown',event=>{
     return;
   }
   if(event.key==='Escape'){
+    if(purchaseDrawer){closePurchaseDrawer();return;}
     if(document.querySelector('.share-product-modal'))document.querySelector('.share-product-modal').remove();
     else if(document.querySelector('.tax-backdrop'))closeTaxonomyPicker();
     else if(document.querySelector('.photo-lightbox'))document.querySelector('.photo-lightbox').remove();
@@ -6125,9 +6158,7 @@ document.addEventListener('toggle',event=>{
    if(ui)ui.stockExpanded=details.open;
    return;
  }
- if(!details.matches?.('[data-buy-expand]')||!details.isConnected)return;
- setPurchasePanelOpen(details.dataset.buyExpand,details.open);
- if(details.open){prefillPurchaseMinimums(details.dataset.buyExpand);void loadPurchaseOutflow(details.dataset.buyExpand);}
+ // O painel de compra agora é controlado pela aba lateral, não por <details> no card.
 },true);
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
