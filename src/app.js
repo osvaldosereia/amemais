@@ -2045,7 +2045,12 @@ function productModal(item=null){
     (!item?'<p class="help wide">SKU e EAN de produtos excluídos podem ser reutilizados. O sistema impede duplicações somente com produtos ativos.</p>':'')+
     categorySelector(item)+
     (!item?sizesSection():'')+
-    single+photoChooser(item)+productTagChooser(item)+locations+procurementFields(item)+
+    single+
+    '<section class="form-section wide"><div class="section-head"><strong>Informações comerciais</strong></div><div class="formgrid">'+
+    field('Preço de venda (R$)','sale_price','number',item?.sale_price??'','min="0" max="99999999.99" step="0.01"')+
+    selectField('Unidade de venda','sales_unit',[['UN','Unidade'],['PC','Peça'],['CX','Caixa']],item?.sales_unit||'UN')+
+    '</div></section>'+
+    photoChooser(item)+productTagChooser(item)+locations+procurementFields(item)+
     (!item?'<div class="wide" data-single-stock>'+
       (state.view==='entrada'?'<p class="help">Ao cadastrar um produto para esta remessa, deixe o estoque inicial em zero e adicione-o à lista abaixo para não contabilizar duas vezes.</p>':'')+
       field('Quantidade inicial na loja','initial_quantity','number','0','min="0" max="1000000" step="1"','Entrada registrada no histórico.')+'</div>':'')+
@@ -5065,8 +5070,15 @@ async function handleSubmit(event){
     const editing=type==='product-edit',id=form.dataset.id;
     const ean=String(values.ean||'').replace(/[\s-]/g,'');
     if(ean && !/^\d{8,14}$/.test(ean)){toast('O EAN deve conter de 8 a 14 dígitos.',true);return;}
+    const rawPrice=String(values.sale_price??'').trim().replace(',','.');
+    const salePrice=rawPrice===''?null:Number(rawPrice);
+    if(rawPrice!==''&&(!/^\\d+(\\.\\d{1,2})?$/.test(rawPrice)||!Number.isFinite(salePrice)||salePrice>99999999.99)){
+      toast('Preço de venda inválido. Use até duas casas decimais.',true);return;
+    }
+    const salesUnit=String(values.sales_unit||'UN');
+    if(!['UN','PC','CX'].includes(salesUnit)){toast('Unidade de venda inválida.',true);return;}
     const payload={
-      ...procurementValues(form),
+      ...procurementValues(form),sale_price:salePrice,sales_unit:salesUnit,
       name:String(values.name).trim(),sku:String(values.sku||'').trim()||null,ean:ean||null,
       tags:productTagValues(form),
       category_id:chosenCategory(form),
@@ -5092,7 +5104,9 @@ async function handleSubmit(event){
           p_initial_quantity:initial
         }));
       }
-      if(!editing){const procurement=procurementValues(form);
+      if(!editing){
+       assertOk(await db.from('products').update({sale_price:payload.sale_price,sales_unit:payload.sales_unit}).eq('id',productId));
+       const procurement=procurementValues(form);
        assertOk(await db.rpc('set_product_procurement',{
         p_product:productId,p_supplier:procurement.supplier_id,p_min_stock:procurement.min_stock
        }));
