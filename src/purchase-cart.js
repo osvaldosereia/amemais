@@ -9,7 +9,7 @@ export function setPurchaseCartItem(cart,id,value){
  next.set(id,Number(value));return next;
 }
 export function cleanPurchaseCart(cart,products=[]){
- const byId=new Map(products.filter(p=>p.active&&!p.force_archived_at&&p.supplier_id)
+ const byId=new Map(products.filter(p=>p.active&&!p.force_archived_at)
   .map(p=>[p.id,p]));
  return new Map([...cart].filter(([id,q])=>byId.has(id)&&validPurchaseQty(q)));
 }
