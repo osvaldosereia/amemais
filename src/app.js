@@ -1,4 +1,4 @@
-import {productCardWorkspace} from './product-card-workspace.js?v=20261017workspace1';
+import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018categories1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261016sixphotos1';
@@ -5936,6 +5936,31 @@ function updatePurchaseSearch(value){
  const next=document.getElementById('buy-catalog-search');
  if(next){next.focus({preventScroll:true});if(cursor!==null)next.setSelectionRange(cursor,cursor);}
 }
+function filterCardCategoryChoices(searchInput){
+ const chooser=searchInput?.closest('[data-product-category-chooser]');
+ const select=chooser?.querySelector('[data-product-category-select]');
+ if(!select)return;
+ // Conservar uma cópia de todas as opções: ao digitar, nenhuma categoria é
+ // removida dos dados, apenas da visualização temporária do seletor.
+ const all=select.__cdsbCategoryOptions||[...select.options].map(opt=>({
+   id:opt.value,label:opt.textContent||''
+ }));
+ select.__cdsbCategoryOptions=all;
+ const chosen=select.value;
+ const results=filterProductCategories(all,searchInput.value);
+ const displayed=results.slice();
+ const current=all.find(opt=>opt.id===chosen);
+ // Filtrar nunca pode trocar o valor de category_id implicitamente.
+ if(current&&!displayed.some(opt=>opt.id===chosen))displayed.unshift(current);
+ select.replaceChildren(...displayed.map(opt=>new Option(opt.label,opt.id,false,opt.id===chosen)));
+ if(chosen&&displayed.some(opt=>opt.id===chosen))select.value=chosen;
+ select.disabled=!displayed.length;
+ const count=chooser.querySelector('[data-product-category-count]');
+ if(count)count.textContent=searchInput.value.trim()
+   ?(results.length?results.length+' categoria(s) encontrada(s). Selecione uma opção abaixo.'
+     :'Nenhuma categoria encontrada. A seleção atual foi mantida.')
+   :all.length+' categorias finais disponíveis. Apenas o último nível de cada ramo aparece.';
+}
 function updateFiltered(id,value){
   if(state.view==='produtos'&&![...root.querySelectorAll('[data-product-card]')].every(abandonCardDraft))return;
   const active=document.activeElement;
@@ -5951,6 +5976,11 @@ document.addEventListener('click',event=>{
   handleClick(event).catch(fail);
 });
 document.addEventListener('keydown',event=>{
+  if(event.target.matches?.('[data-product-category-search]')&&event.key==='Enter'){
+    event.preventDefault();
+    event.target.closest('[data-product-category-chooser]')?.querySelector('[data-product-category-select]')?.focus();
+    return;
+  }
   if(preventScannerSubmit(event))return;
   if(event.key==='Enter'&&event.target.matches('[data-order-cart-search]')){
    event.preventDefault();
@@ -6020,16 +6050,22 @@ document.addEventListener('toggle',event=>{
 },true);
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches?.('[data-product-category-search]'))return;
   const form=event.target.closest?.('form[data-form]');
   if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes'].includes(form?.dataset.form))
     form.dataset.unsaved='true';
 },true);
 document.addEventListener('change',event=>{
+  if(event.target.matches?.('[data-product-category-search]'))return;
   const form=event.target.closest?.('form[data-form]');
   if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes'].includes(form?.dataset.form))
     form.dataset.unsaved='true';
 },true);
 document.addEventListener('input',event=>{
+  if(event.target.matches('[data-product-category-search]')){
+    filterCardCategoryChoices(event.target);
+    return;
+  }
   if(event.target.matches('[data-order-cart-search]')){
    const form=event.target.closest('form[data-form="store-order-create"]');
    renderOrderCart(form,{resetPage:true});
@@ -6225,6 +6261,13 @@ document.addEventListener('change',event=>{
    state.storeHubFilter.status=event.target.value;
    filterStoreHub(event.target.closest('.sh-hub'),state.storeHubFilter.search,
      state.storeHubFilter.type,state.storeHubFilter.status);
+  }
+  if(event.target.matches('[data-product-category-select]')){
+    const chooser=event.target.closest('[data-product-category-chooser]');
+    const current=chooser?.querySelector('[data-product-category-current]');
+    if(current)current.textContent='Caminho selecionado: '+
+      String(event.target.selectedOptions[0]?.textContent||'Não informado');
+    return;
   }
   if(event.target.matches('[name="sku-selector"]')&&event.target.closest('[data-product-editor]')){
     const select=event.target,card=select.closest('[data-product-card]');
