@@ -44,7 +44,7 @@ test('painel reutiliza padrão visual direito e folha inferior do CDSB',()=>{
  assert.match(css,/\.buy-drawer-backdrop \.buy-drawer \.buy-drawer-product-info\{/);
 });
 test('CSS e JS novos têm cache atualizado',()=>{
- assert.match(index,/buy-purchase-drawer\.css\?v=20261018singlepanel1/);
- assert.match(index,/secure-entry\.js\?v=20261018productgrid1/);
- assert.match(entry,/app\.js\?v=20261018productgrid1/);
+ assert.match(index,/buy-purchase-drawer\.css\?v=20261018sheetformat1/);
+ assert.match(index,/secure-entry\.js\?v=20261018sheetformat1/);
+ assert.match(entry,/app\.js\?v=20261018sheetformat1/);
 });
