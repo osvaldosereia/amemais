@@ -148,7 +148,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
  const cartSuppliers=new Set(products.filter(p=>cart.has(p.id)).map(p=>p.supplier_id).filter(Boolean)).size;
  const relevant=filterPurchaseGroups(groups,{...catalog,supplier:filter},categories);
  const filtersApplied=Boolean(catalog.search||catalog.category||catalog.tag||catalog.gondola||filter||catalog.missingSupplier);
- const shownCount=(Math.max(0,Number(catalog.page)||0)+1)*8;
+ const shownCount=(Math.max(0,Number(catalog.page)||0)+1)*30;
  const visibleGroups=relevant.slice(0,shownCount);
  const more=relevant.length>visibleGroups.length;
  const gondolaOptions=new Map();
@@ -183,7 +183,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
    const selected=cart.has(p.id),quantity=selected?Number(cart.get(p.id)):moq;
    return '<div class="buy-variant" data-buy-sku="'+h(p.id)+'" data-buy-group="'+h(g.key)+'">'+
     '<div class="buy-variant-pick"><label class="buy-variant-name">'+
-    '<input type="checkbox" data-buy-inline-select data-product="'+h(p.id)+'"'+(selected?' checked':'')+(g.supplier_id?'':' disabled')+
+    '<input type="checkbox" data-buy-inline-select data-product="'+h(p.id)+'"'+(selected?' checked':'')+''+
     ' aria-label="Selecionar tamanho '+h(p.apparel_size||'Único')+' do '+h(g.title)+'">'+
     '<span><strong>'+h(p.apparel_size||'Único')+'</strong>'+
     '<small>'+h([p.apparel_color!=='Única'?p.apparel_color:'',p.sku?'SKU '+p.sku:''].filter(Boolean).join(' · '))+'</small></span></label>'+
@@ -191,7 +191,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
     '<span class="buy-moq">Pedido mínimo <b>'+f(moq)+'</b></span></div></div>'+
     '<div class="buy-inline-order"><label>Quantidade a pedir <input type="number" min="'+String(moq)+'" max="1000000" step="1"'+
     ' inputmode="numeric" data-buy-inline-qty data-product="'+h(p.id)+'" value="'+String(quantity)+'"'+
-    (selected&&g.supplier_id?'':' disabled')+' aria-label="Quantidade para tamanho '+h(p.apparel_size||'Único')+'"></label></div></div>';
+    (selected?'':' disabled')+' aria-label="Quantidade para tamanho '+h(p.apparel_size||'Único')+'"></label></div></div>';
   }).join('');
   const ico=(kind)=>{
    const paths={
@@ -227,7 +227,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
     '<div class="buy-panel-column-head" aria-hidden="true"><span>Tamanho / SKU</span><span>Disponível / pedido mínimo</span><span>Quantidade a pedir</span></div>'+
     '<div class="buy-variants">'+cards+'</div>'+
     '<section class="buy-panel-history" data-buy-outflow="'+h(g.key)+'" aria-live="polite">'+
-      '<div class="buy-panel-history-head"><strong>Saídas do CD · 30/90 dias</strong>'+
+      '<div class="buy-panel-history-head"><strong>Saídas do CD · últimos 90 dias</strong>'+
       '<small>Não equivalem necessariamente a vendas.</small></div>'+
       '<p class="buy-history-loading">Abra a compra para consultar o histórico.</p></section>'+
     '<div class="buy-panel-footer"><strong data-buy-panel-total="'+h(g.key)+'">'+
@@ -290,7 +290,10 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
     '</div>'+
    '</div>'+
   '<div class="buy-group-grid">'+(productCards||'<p class="buy-empty">Nenhum modelo corresponde à busca e aos filtros escolhidos.</p>')+'</div>'+
-  (more?'<div class="buy-load-more">'+button('Mostrar mais produtos ('+visibleGroups.length+' de '+relevant.length+')','buy-load-more','','small')+'</div>':'')+
+  (more?'<div class="buy-scroll-sentinel" data-buy-scroll-sentinel>'+
+    '<span>Role para carregar mais produtos · '+visibleGroups.length+' de '+relevant.length+'</span>'+
+    '<button type="button" data-action="buy-load-more" class="button small buy-scroll-fallback" hidden>Carregar mais 30</button>'+
+   '</div>':'')+
   '</section>'+
   '' : '')+
   (tab==='pedidos'?'<section class="panel"><header class="buy-section-head"><div><h2>Pedidos de compra · fornecedores</h2><small>Pedidos feitos aos fornecedores, não às lojas ou franquias.</small></div>'+ (orderFilter?button('Ver todos','buy-orders-all','','small'):'')+'</header>'+
