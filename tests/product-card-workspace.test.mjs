@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {categoryPath,productCardWorkspace} from '../src/product-card-workspace.js';
+import {categoryPath,productCardWorkspace,selectableProductCategories,filterProductCategories} from '../src/product-card-workspace.js';
 
 const categories=[
  {id:'root',parent_id:null,name:'Roupas e Acessórios'},
@@ -64,4 +64,54 @@ test('código da lista preserva estado de edição e atualiza apenas itens edita
  assert.match(app,/update_product_model_basic/);
  assert.match(app,/if\(type==='product-card-variant'\)/);
  assert.match(app,/cardUiFor\(card\)/);
+});
+
+test('seletor mostra somente folhas e usa o caminho completo',()=>{
+ const categoriesExtended=[...categories,
+  {id:'images',parent_id:null,name:'Imagens'},
+  {id:'images-sacred',parent_id:'images',name:'Imagens sacras'},
+  {id:'leaf-root',parent_id:null,name:'Produtos avulsos'}
+ ];
+ const result=selectableProductCategories(categoriesExtended);
+ assert.deepEqual(result.map(c=>c.id).sort(),['deep','female-shirt','images-sacred','leaf-root'].sort());
+ assert.ok(result.some(c=>c.label==='Imagens › Imagens sacras'));
+ assert.ok(result.some(c=>c.label==='Roupas e Acessórios › Masculina › Camiseta › Manga Curta'));
+ assert.ok(!result.some(c=>c.id==='images'));
+ assert.ok(!result.some(c=>c.id==='male-shirt'));
+});
+test('categoria intermediária atual permanece selecionável, sem liberar outras intermediárias',()=>{
+ const current=selectableProductCategories(categories,'male-shirt');
+ assert.ok(current.some(c=>c.id==='male-shirt'&&c.currentParent&&c.label.includes('categoria geral atual')));
+ assert.ok(current.some(c=>c.id==='female-shirt'&&!c.currentParent));
+ assert.ok(!current.some(c=>c.id==='root'));
+ const html=productCardWorkspace({...grouped,model:{...base,category_id:'male-shirt'}},props);
+ assert.match(html,/<option value="male-shirt" selected>/);
+ assert.doesNotMatch(html,/<option value="root"/);
+ assert.doesNotMatch(html,/<option value="male"/);
+});
+test('pesquisa por subcategoria, caminho e palavras sem diferenciação de acentos',()=>{
+ const opts=selectableProductCategories([
+  ...categories,
+  {id:'images',parent_id:null,name:'Imagens'},
+  {id:'sacred',parent_id:'images',name:'Imagens sacras'}
+ ]);
+ assert.deepEqual(filterProductCategories(opts,'sacrás').map(c=>c.id),['sacred']);
+ assert.deepEqual(filterProductCategories(opts,'imagens sacras').map(c=>c.id),['sacred']);
+ assert.deepEqual(filterProductCategories(opts,'masculina curta').map(c=>c.id),['deep']);
+ assert.deepEqual(filterProductCategories(opts,'não cadastrada'),[]);
+ assert.equal(filterProductCategories(opts,'').length,opts.length);
+});
+test('pesquisa mantém valor da categoria, evitando descarte do cadastro',async()=>{
+ const html=productCardWorkspace(grouped,props);
+ assert.match(html,/data-product-category-search/);
+ assert.match(html,/data-product-category-select required/);
+ assert.match(html,/data-product-category-count/);
+ assert.doesNotMatch(html,/<option value="root"/);
+ assert.doesNotMatch(html,/<option value="male-shirt"/);
+ const app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
+ assert.match(app,/function filterCardCategoryChoices\(/);
+ assert.match(app,/filterProductCategories\(all,searchInput\.value\)/);
+ assert.match(app,/if\(current&&!displayed\.some\(opt=>opt\.id===chosen\)\)displayed\.unshift\(current\)/);
+ assert.match(app,/if\(event\.target\.matches\?\.\('\[data-product-category-search\]'\)\)return/);
+ assert.match(app,/if\(event\.target\.matches\('\[data-product-category-search\]'\)\)/);
 });
