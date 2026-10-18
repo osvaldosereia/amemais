@@ -1,4 +1,3 @@
-import {productCardWorkspace} from './product-card-workspace.js?v=20261017workspace1';
 // Espelho local do seletor: módulos de catálogo devem permanecer independentes de DOM/imports.
 const gondolaSelectHTML=(name,locations=[],current='',opts={})=>{
  const esc=v=>String(v??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[x]));
@@ -72,7 +71,7 @@ export function productGalleryPaths(group){
  }
  return selected;
 }
-export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canEditProduct=null,canBalance=()=>false,canStockEntry=()=>false,canStockExit=()=>false,canShare=false,canLabel=false,expanded=false,historyForGroup=()=>[],categories=[],suppliers=[],gondolas=[],editorUi=null,purchases=new Map(),mode='products',eventId=null}){
+export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=()=>0,qtyAvailable=qtyStore,button,isManager,canRegisterProducts,canMoveStock=()=>false,canManageSku=()=>false,canQuickCount=()=>false,canDeleteWholeModel=()=>false,canDeleteProduct=()=>false,canEditProduct=null,canBalance=()=>false,canStockEntry=()=>false,canStockExit=()=>false,canShare=false,canLabel=false,expanded=false,historyForGroup=()=>[],categories=[],suppliers=[],gondolas=[],editorUi=null,renderEditor=null,purchases=new Map(),mode='products',eventId=null}){
   // A listagem tem um card por modelo, nunca um card por tamanho.
   const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
   const galleryPaths=productGalleryPaths(group);
@@ -235,13 +234,13 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
     '</div>';
   const stockTab=['balanco','movimentar','historico'].includes(editorUi?.stockTab)?editorUi.stockTab:'balanco';
   const stockTabs='<div class="card-workspace-tabs" role="tablist" aria-label="Estoque do produto">'+
-   [['balanco','Balanço rápido'],['movimentar','Movimentar'],['historico','Histórico']].map(([key,label])=>
-    '<button type="button" data-action="product-stock-tab" data-tab="'+key+'" role="tab" aria-selected="'+String(stockTab===key)+'">'+label+'</button>').join('')+'</div>';
+    [['balanco','Balanço rápido'],['movimentar','Movimentar'],['historico','Histórico']].map(([key,label])=>
+     '<button type="button" data-action="product-stock-tab" data-tab="'+key+'" role="tab" aria-selected="'+String(stockTab===key)+'">'+label+'</button>').join('')+'</div>';
   const stockWorkspace=isProducts?
    '<details class="grouped-variants-mobile card-workspace product-variants-details" data-product-details'+(expanded?' open':'')+'>'+
      '<summary>Variações ('+active.length+')</summary>'+variantOverview+
      '<details class="product-advanced-stock"><summary>Operações de estoque: balanço, movimentação e histórico</summary>'+stockTabs+
-     '<section data-stock-panel="balanco"'+(stockTab==='balanco'?'':' hidden')+' ><p class="card-workspace-help">Conte as quantidades físicas de todas as variações. As reservas não podem ser reduzidas.</p>'+
+     '<section data-stock-panel="balanco"'+(stockTab==='balanco'?'':' hidden')+'><p class="card-workspace-help">Conte as quantidades físicas de todas as variações. As reservas não podem ser reduzidas.</p>'+
         '<div class="card-balance-search"><input type="search" data-balance-scan-input placeholder="Bipe ou digite EAN/SKU e pressione Enter" aria-label="Localizar variação pelo código" autocomplete="off">'+
         '<button type="button" class="button" data-action="product-balance-scan">Ler pela câmera</button></div>'+
         '<div class="card-balance-list">'+(stockRows||'<p>Nenhuma variação ativa.</p>')+'</div>'+
@@ -250,7 +249,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<button type="button" class="button primary" data-action="product-balance-save">Salvar balanço</button></div>':
         '<p class="card-workspace-help">Seu perfil permite somente consultar os saldos.</p>')+
      '</section>'+
-     '<section data-stock-panel="movimentar"'+(stockTab==='movimentar'?'':' hidden')+' ><p class="card-workspace-help">Selecione a variação e o tipo de movimentação.</p>'+
+     '<section data-stock-panel="movimentar"'+(stockTab==='movimentar'?'':' hidden')+'><p class="card-workspace-help">Selecione a variação e o tipo de movimentação.</p>'+
      '<div class="card-stock-move-list">'+active.map(p=>'<div class="card-stock-move-row"><strong>'+h(p.apparel_size||p.name)+
        ' · '+h(p.apparel_color||'')+'</strong><span>'+fmt(quantity(p))+' un. físicas</span>'+
        (skuAccess?'<div class="card-stock-move-buttons">'+
@@ -258,18 +257,54 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
          (canStockExit()?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="saida">Saída excepcional</button>':'')+
          (canBalance()?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="contagem">Conferir SKU</button>':'')+
          '</div>':'')+'</div>').join('')+'</div></section>'+
-     '<section data-stock-panel="historico"'+(stockTab==='historico'?'':' hidden')+' ><p class="card-workspace-help">Últimos movimentos registrados das variações.</p>'+
+     '<section data-stock-panel="historico"'+(stockTab==='historico'?'':' hidden')+'><p class="card-workspace-help">Últimos movimentos registrados das variações.</p>'+
         (history.length?'<ul class="card-stock-history">'+history.slice(0,10).map(m=>'<li><strong>'+h(m.label||m.action||'Movimento')+
          '</strong><span>'+h(m.action||'')+' · '+h(String(m.quantity??0))+' un.</span>'+
          '<small>'+h(m.created_at?new Date(m.created_at).toLocaleDateString('pt-BR'):'')+'</small></li>').join('')+'</ul>':
          '<p class="card-workspace-help">Nenhuma movimentação recente na lista carregada.</p>')+'</section>'+
      '</details></details>':'<details class="grouped-variants-mobile" data-product-details'+(expanded?' open':'')+'>'+
       '<summary>Estoque por variação</summary>'+modelRows()+'</details>';
-  const edition=isProducts&&canEdit?productCardWorkspace(group,{
-    categories,suppliers,gondolas,ui:editorUi,
-    canDeleteWholeModel:canRemoveEntireModel,
-    canDeleteProduct:canDeleteProduct()
-  }):'';
+  const model=group.model;
+  const basicName=model?.name||main.name;
+  const basicTags=model?.tags||main.tags||[];
+  let edition=isProducts&&canEdit?
+   '<details class="product-card-editor card-workspace" data-product-editor>'+
+    '<summary>Editar cadastro do produto</summary>'+
+    '<div class="card-workspace-tabs" role="tablist" aria-label="Editar produto">'+
+      '<button type="button" data-action="product-editor-tab" data-tab="geral" role="tab" aria-selected="true">Geral</button>'+
+      '<button type="button" data-action="product-editor-tab" data-tab="variacoes" role="tab" aria-selected="false">Variações</button></div>'+
+    '<section data-editor-panel="geral"><form data-form="product-card-basic" data-id="'+h(model?.id||main.id)+'" data-is-model="'+Boolean(group.modelId)+'">'+
+      '<details class="card-editor-accordion" open><summary>Dados gerais</summary>'+
+        '<label>Nome do produto<input name="name" maxlength="180" required value="'+h(basicName)+'"></label>'+
+        '<label>Tags (separadas por vírgula)<input name="tags" maxlength="500" value="'+h(basicTags.join(', '))+'"></label>'+
+        '<label>Categoria<select name="category_id">'+(categories.length?categories.map(cat=>'<option value="'+h(cat.id)+'"'+(cat.id===(model?.category_id||main.category_id)?' selected':'')+'>'+h(cat.name)+'</option>').join(''):'<option value="'+h(model?.category_id||main.category_id||'')+'">Categoria atual</option>')+'</select></label>'+
+        '</details>'+
+      '<details class="card-editor-accordion"><summary>Localização e códigos</summary>'+
+         '<p>SKU, EAN, gôndola e prateleira são individuais para cada variação. Use a aba Variações para editá-los.</p></details>'+
+      '<div class="card-editor-actions"><button type="submit" class="button primary">Salvar dados gerais</button></div></form></section>'+
+    '<section data-editor-panel="variacoes" hidden><div class="card-editor-variation-list">'+group.products.map(p=>
+      '<div class="card-editor-variation"><div><strong>'+h(p.apparel_size||'Único')+' · '+h(p.apparel_color||'')+'</strong>'+
+      '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small>'+
+      '<small>'+h([p.gondola?'Gôndola '+p.gondola:'',p.prateleira?'Prateleira '+p.prateleira:''].filter(Boolean).join(' · ')||'Localização não informada')+'</small></div>'+
+      direct('Editar variação',group.modelId?'apparel-variant-edit':'product-edit',p.id)+'</div>').join('')+'</div>'+
+      (group.modelId?direct('+ Adicionar variação','add-variants',group.modelId):'')+
+      (canRemoveEntireModel?direct('Excluir produto completo','product-model-delete',group.modelId,'danger'):'')+
+      (!group.modelId&&canDeleteProduct()?direct('Excluir produto','product-delete',main.id,'danger'):'')+
+      '<details class="card-editor-accordion card-admin-tools"><summary>Administração avançada</summary>'+
+        '<p>Excluir pode afetar reservas e pedidos pendentes. O histórico concluído é preservado.</p>'+
+        '<p>Exclusão integral disponível acima para perfis autorizados.</p>'+
+      '</details></section>'+
+
+   '</details>':'';
+  // O editor novo é injetado pela tela de Produtos. O card mantém fallback
+  // compatível com outras telas e testes que o utilizam isoladamente.
+  if(isProducts&&canEdit&&typeof renderEditor==='function'){
+    edition=renderEditor(group,{
+      categories,suppliers,gondolas,ui:editorUi,
+      canDeleteWholeModel:canRemoveEntireModel,
+      canDeleteProduct:canDeleteProduct()
+    });
+  }
   const primaryStock=isProducts?cardAction('Ver variações ('+sizeCount+')',
     'product-card-sizes','layers',{css:'product-card-action-primary product-card-action-stock',
     attrs:' aria-expanded="'+String(Boolean(expanded))+'" data-variation-count="'+sizeCount+'"'}):'';
