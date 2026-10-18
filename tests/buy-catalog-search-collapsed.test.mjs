@@ -80,13 +80,14 @@ test('os cards mantêm fotos e variações dentro de details inicialmente fechad
  assert.match(page,/data-buy-filter/);
 });
 test('lista oferece carregamento progressivo sem perder filtro aplicado',()=>{
- const many=Array.from({length:19},(_,i)=>({
+ const many=Array.from({length:65},(_,i)=>({
   ...products[3],id:'u'+i,name:'Produto '+i,sku:'UNI'+i
  }));
  const page0=purchasesPage({products:many,suppliers,categories,button,catalog:{page:0}});
  const page1=purchasesPage({products:many,suppliers,categories,button,catalog:{page:1}});
- assert.equal((page0.match(/class="buy-group-card buy-quick-card"/g)||[]).length,8);
- assert.equal((page1.match(/class="buy-group-card buy-quick-card"/g)||[]).length,16);
+ assert.equal((page0.match(/class="buy-group-card buy-quick-card"/g)||[]).length,30);
+ assert.equal((page1.match(/class="buy-group-card buy-quick-card"/g)||[]).length,60);
+ assert.match(page0,/data-buy-scroll-sentinel/);
  assert.match(page0,/data-action="buy-load-more"/);
  const filtered=purchasesPage({products:many,suppliers,categories,button,catalog:{search:'Produto 17',page:0}});
  assert.equal((filtered.match(/class="buy-group-card buy-quick-card"/g)||[]).length,1);
@@ -104,5 +105,5 @@ test('eventos de filtro e busca usam estado independente de Produtos',()=>{
  assert.match(css,/\.buy-variation-disclosure\[open\]/);
  assert.match(css,/@media\(max-width:760px\)/);
  assert.match(html,/cdsb-purchases\.css\?v=20261017reviewfix1/);
- assert.match(app,/cdsb-purchases\.js\?v=20261017clean1/);
+ assert.match(app,/cdsb-purchases\.js\?v=20261018buygrid1/);
 });
