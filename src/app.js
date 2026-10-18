@@ -1753,7 +1753,7 @@ function openPurchaseDrawer(groupKey){
    state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
  if(!group)return;
  const trigger=card.querySelector('[data-action="buy-open-group"]');
- const overlay=document.createElement('div');overlay.className='modalback buy-drawer-backdrop';
+ const overlay=document.createElement('div');overlay.className='modalback buy-drawer-backdrop buy-page';
  const assign=!group.supplier_id?'<section class="buy-drawer-supplier" data-buy-supplier-missing>'+
   '<strong>Fornecedor não cadastrado para este produto</strong>'+
   '<p>Selecione as variações normalmente. Antes de adicionar ao pedido, vincule um fornecedor.</p>'+
@@ -1783,7 +1783,7 @@ function mountPurchaseInfinite(){
  if(typeof IntersectionObserver==='undefined'){if(fallback)fallback.hidden=false;return;}
  purchaseInfiniteObserver=new IntersectionObserver(entries=>{
   if(entries.some(e=>e.isIntersecting))void appendNextPurchaseBatch();
- },{rootMargin:'420px 0px',threshold:0});
+ },{rootMargin:'120px 0px',threshold:0});
  purchaseInfiniteObserver.observe(marker);
 }
 async function appendNextPurchaseBatch(){
@@ -1969,6 +1969,8 @@ function purchaseReviewFormValues(){
 }
 function purchaseReviewModal(supplierId=null,keep={}){
  if(!hasPermission('purchases.manage'))return;
+ const unlinked=[...state.purchaseCart.keys()].filter(id=>!state.items.find(p=>p.id===id)?.supplier_id);
+ if(unlinked.length)return toast('Há '+unlinked.length+' variação(ões) sem fornecedor. Abra a compra e vincule o fornecedor antes de revisar.',true);
  const batches=purchaseCartBySupplier(state.purchaseCart,state.items);
  if(!batches.size)return toast('Selecione pelo menos uma variação e informe a quantidade no card.',true);
  if(!supplierId&&batches.size>1){
