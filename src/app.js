@@ -206,6 +206,7 @@ async function refreshEditedProduct(productId=null,modelId=null){
     state.items=state.items.map(record=>record.id===productId?item:record);
   }
   render();
+  refreshOpenProductDrawer();
 }
 async function saveProductCard(work,{productId=null,modelId=null,success='Cadastro atualizado.'}={}){
   if(state.loading)return;
@@ -4217,6 +4218,10 @@ async function handleClick(event){
   }
   if(action==='add-variants'){
     if(!canRegisterProducts())return;
+    if(target.closest('.cdsb-product-drawer')){
+      const button=productDrawer?.overlay.querySelector('[data-action="product-drawer-show-add"]');
+      button?.click();return;
+    }
     const model=state.apparelModels.find(m=>m.id===id);if(!model)return toast('Modelo não encontrado.',true);
     const variants=state.items.filter(p=>p.apparel_model_id===id);
     const options=resolveCategoryVariations(state.categories,model.category_id).options;
@@ -5550,6 +5555,13 @@ async function handleSubmit(event){
    }finally{state.loading=false;}
    return;
   }
+  if(type==='product-drawer-photo'){
+    if(!hasPermission('products.edit')||!productDrawer)return;
+    if(!galleryHasChanges(form))return toast('Nenhuma alteração nas fotos.');
+    const modelId=form.dataset.modelId||null,productId=modelId?null:form.dataset.id;
+    return saveProductCard(async()=>savePhotoGallery(form,{db,assertOk,modelId,productId}),
+      {modelId,productId,success:'Fotos atualizadas. O painel permanece aberto.'});
+  }
   if(type==='product-card-variant'){
     if(!hasPermission('products.edit')||isFranchisePortal())return;
     const item=product(form.dataset.id);if(!item?.apparel_model_id)return;
@@ -5718,10 +5730,16 @@ async function handleSubmit(event){
   }
   if(type==='extra-sizes'){
     if(!canRegisterProducts())return;
+    const inDrawer=Boolean(form.closest('.cdsb-product-drawer'));
     const modelId=form.dataset.modelId;
     const existing=state.items.filter(p=>p.apparel_model_id===modelId);
     let payload;
     try{payload=collectExtraSizes(form,existing);}catch(error){fail(error);return;}
+    if(inDrawer){
+      return saveProductCard(async()=>assertOk(await db.rpc('add_apparel_variants_with_location',{
+        p_model_id:modelId,p_variants:payload
+      })),{modelId,success:'Variações cadastradas; continue no mesmo painel.'});
+    }
     await exec(async()=>assertOk(await db.rpc('add_apparel_variants_with_location',{
       p_model_id:modelId,p_variants:payload
     })),'Novos tamanhos adicionados ao mesmo produto.');
