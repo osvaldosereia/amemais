@@ -220,7 +220,7 @@ function cardUiFor(card){
   const key=card?.dataset.productCard;
   if(!key)return null;
   let ui=state.productCardUi.get(key);
-  if(!ui){ui={panel:null,editorTab:'cadastro',stockTab:'balanco',skuId:null,variantId:null};
+  if(!ui){ui={panel:null,editorTab:'cadastro',stockTab:'balanco',stockExpanded:false,skuId:null,variantId:null};
     state.productCardUi.set(key,ui);}
   return ui;
 }
@@ -3576,6 +3576,8 @@ function searchAndManageSku(code){
  }else toast('Código não localizado. Confira o EAN ou SKU.',true);
 }
 function switchView(view) {
+  if(state.view==='produtos'&&view!=='produtos'&&
+      ![...root.querySelectorAll('[data-product-card]')].every(abandonCardDraft))return;
   if(view==='pedidos-lojas'||view==='separacao')view='pedidos';
   if(view==='eventos'&&state.profile?.role!=='evento')view='lojas';
   state.activeStore=null;state.activeStoreTab='resumo';
@@ -5991,6 +5993,11 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('toggle',event=>{
  const details=event.target;
+ if(details.matches?.('details.product-advanced-stock')&&details.isConnected){
+   const ui=cardUiFor(details.closest('[data-product-card]'));
+   if(ui)ui.stockExpanded=details.open;
+   return;
+ }
  if(!details.matches?.('[data-buy-expand]')||!details.isConnected)return;
  setPurchasePanelOpen(details.dataset.buyExpand,details.open);
  if(details.open){prefillPurchaseMinimums(details.dataset.buyExpand);void loadPurchaseOutflow(details.dataset.buyExpand);}
