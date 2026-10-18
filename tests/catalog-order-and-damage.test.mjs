@@ -48,7 +48,8 @@ test('menu de Produtos usa ordenação e gôndola independentes dos filtros e do
  assert.match(app,/orderCatalogGroups\(/);
  assert.match(app,/data-product-sort/);
  assert.match(app,/data-product-gondola/);
- assert.match(app,/searchAndManageSku\(event\.target\.value\)/);
+ assert.match(app,/submitProductSearch\(event\.target\.value\)/);
+ assert.match(app,/scanEAN\(code=>searchAndManageSku\(code\)\)/);
  assert.doesNotMatch(app,/if\(event\.key==='Enter'&&event\.target\.id==='product-search'&&canOpenSkuManager\(\)\)/);
 });
 test('desktop mantém os cinco botões alinhados e mobile conserva duas faixas',()=>{

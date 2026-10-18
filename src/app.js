@@ -95,7 +95,7 @@ const state = {
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseReceipts:[],purchaseReceiptItems:[],procurementTasks:[],staffContactDetails:[],purchaseSupplierFilter:'',purchaseTab:'reposicao',purchaseOrderFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'priority',onlyReplenishment:true,page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],accessProfiles:[],accessProfilePermissions:[],profileAssignments:[],accessTab:'pessoas',staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
-  search:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
+  search:'',productSearchDraft:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
@@ -794,9 +794,11 @@ function productsPage(){
   return '<header class="pagehead products-pagehead"><div><h1>Produtos</h1>'+
     '<p>Catálogo e estoque</p></div><div class="actions">'+add+'</div></header>'+
     '<section class="panel products-panel"><div class="product-toolbar-v3">'+
-      '<div class="product-search-row">'+
-        '<input id="product-search" type="search" class="search" autocomplete="off"'+
-        ' placeholder="Buscar nome, EAN, SKU, cor ou gôndola…" aria-label="Buscar produtos" value="'+h(state.search)+'">'+
+      '<div class="product-search-row" role="search" aria-label="Buscar no catálogo de produtos">'+
+        '<input id="product-search" type="search" class="search" autocomplete="off" enterkeyhint="search"'+
+        ' placeholder="Buscar nome, EAN, SKU, cor ou gôndola…" aria-label="Buscar produtos" value="'+h(state.productSearchDraft)+'">'+
+        '<button type="button" class="product-search-submit-btn" data-action="product-search-submit" aria-label="Buscar produtos" title="Buscar produtos">'+
+          uiIcon('search',21)+'</button>'+
         '<button type="button" class="product-scan-btn" data-action="search-scan" aria-label="Ler EAN pela câmera" title="Ler EAN">'+
           uiIcon('scan',23)+'</button></div>'+
       '<div class="product-filter-row">'+
@@ -3559,12 +3561,23 @@ function closeMobileNavigation(restoreFocus=true){
   trigger?.setAttribute('aria-expanded','false');
   if(restoreFocus)trigger?.focus({preventScroll:true});
 }
+function submitProductSearch(value){
+ if(state.view!=='produtos')return;
+ const query=String(value??'').trim();
+ if(![...root.querySelectorAll('[data-product-card]')].every(abandonCardDraft))return;
+ state.productSearchDraft=query;
+ state.search=query;
+ state.page=0;
+ render();
+ const input=document.getElementById('product-search');
+ if(input)input.focus({preventScroll:true});
+}
 function searchAndManageSku(code){
  const value=String(code||'').trim();
  if(!value)return;
  const match=state.items.find(p=>p.active&&!p.force_archived_at&&
   (String(p.ean||'')===value||String(p.sku||'').toLocaleLowerCase('pt-BR')===value.toLocaleLowerCase('pt-BR')));
- state.view='produtos';state.search=value;state.page=0;
+ state.view='produtos';state.search=value;state.productSearchDraft=value;state.page=0;
  state.categoryFilter='';state.tagFilter='';state.gondolaFilter='';
  if(match)state.expandedProductGroups.add(match.apparel_model_id?
   'model:'+match.apparel_model_id:'product:'+match.id);
@@ -3583,7 +3596,7 @@ function switchView(view) {
   state.activeStore=null;state.activeStoreTab='resumo';
   if(['roupas','saida','balanco','inventario'].includes(view))view='produtos';
   if(!permittedView(view))return;
-  state.view=view;state.search='';state.page=0;state.ordersContext=null;
+  state.view=view;state.search='';state.productSearchDraft='';state.page=0;state.ordersContext=null;
   if(view!=='eventos'){state.activeEvent=null;state.eventWorkflow=null;state.eventReturnQuery='';}
   render();window.scrollTo(0,0);
 }
@@ -4085,7 +4098,7 @@ async function handleClick(event){
   if(action==='product-new')return productModal();
   if(action==='products-toggle-inactive'){state.showInactiveProducts=!state.showInactiveProducts;state.page=0;render();return;}
   if(action==='products-clear-filters'){
-    state.search='';state.categoryFilter='';state.tagFilter='';state.gondolaFilter='';state.page=0;
+    state.search='';state.productSearchDraft='';state.categoryFilter='';state.tagFilter='';state.gondolaFilter='';state.page=0;
     state.showInactiveProducts=false;render();return;
   }
   if(action==='size-toggle'||action==='size-remove'){
@@ -4873,6 +4886,9 @@ async function handleClick(event){
   }
   if(action==='user-new')return userModal();
   if(action==='user-role')return userRoleModal(id);
+  if(action==='product-search-submit'){
+    return submitProductSearch(document.getElementById('product-search')?.value||'');
+  }
   if(action==='search-scan'){
     try{return scanEAN(code=>searchAndManageSku(code));}
     catch(error){fail(error);return;}
@@ -5979,7 +5995,7 @@ document.addEventListener('keydown',event=>{
   }
   if(event.key==='Enter'&&event.target.id==='product-search'){
     event.preventDefault();
-    searchAndManageSku(event.target.value);
+    submitProductSearch(event.target.value);
     return;
   }
   if(event.key==='Escape'){
@@ -6148,7 +6164,8 @@ document.addEventListener('input',event=>{
       updateStockOperationBasket(false);
     }
   }
-  if(['product-search','movement-search','quick-search'].includes(event.target.id))updateFiltered(event.target.id,event.target.value);
+  if(event.target.id==='product-search')state.productSearchDraft=event.target.value;
+  if(['movement-search','quick-search'].includes(event.target.id))updateFiltered(event.target.id,event.target.value);
   if(event.target.id==='catalog-category-search'){
     state.catalogSearch=event.target.value;
     const list=document.querySelector('.catalog-tree-list');if(list)list.innerHTML=renderCatalogTree();
