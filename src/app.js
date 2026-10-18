@@ -1,3 +1,4 @@
+import {productCatalogCard} from './products-grid.js?v=20261018productgrid1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
@@ -578,6 +579,7 @@ function button(label,action,extra='',kind=''){
 function pill(status){return '<span class="pill '+h(status)+'">'+h({ativo:'Ativo',encerrado:'Encerrado',rascunho:'Rascunho'}[status]||status)+'</span>';}
 function render(){
   closePurchaseDrawer(false);
+  productInfiniteObserver?.disconnect();
   purchaseInfiniteObserver?.disconnect();
   const previousCard=state.view==='produtos'?
     [...root.querySelectorAll('[data-product-card]')].find(card=>
@@ -615,6 +617,7 @@ function render(){
     '<main class="content">'+pageContent()+'</main></div></div>';
   hydrateImages();
   mountPurchaseInfinite();
+  mountProductsInfinite();
   if(previousKey&&state.view==='produtos'){
     const next=[...root.querySelectorAll('[data-product-card]')].find(card=>card.dataset.productCard===previousKey);
     if(next&&Number.isFinite(previousTop)){
@@ -788,7 +791,7 @@ function productsPage(){
   );
   const filtersApplied=Boolean(q||state.categoryFilter||state.tagFilter||state.gondolaFilter||state.showInactiveProducts);
   const available=state.items.filter(p=>p.active).length;
-  const pageSize=5,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
+  const pageSize=30,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.max(0,Math.min(state.page,totalPages-1));
   const list=groups.slice(0,(state.page+1)*pageSize);
   const add=(hasPermission('stock.entry')?button('↓ Receber remessa','stock-receive-shipment','',''):'')+
@@ -825,7 +828,9 @@ function productsPage(){
         (filtersApplied?button('Limpar filtros','products-clear-filters','','small'):'')+
       '</div>'+
     '</div>'+
-    '<div class="grouped-inventory-grid">'+(list.length?list.map(productGroupCard).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
+    '<div class="grouped-inventory-grid products-card-grid">'+(list.length?list.map(group=>productCatalogCard(group,{
+      h,qtyStore,qtyReserved,qtyAvailable,categories:state.categories
+    })).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
       (filtersApplied?'<p>Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.</p>'+
       (hasPermission('products.create')&&/^\\d{8,14}$/.test(state.search.trim())?button('Cadastrar produto com este EAN','product-new-ean','','primary'):'')+
       button('Mostrar todos os produtos','products-clear-filters','','primary'):
@@ -833,8 +838,9 @@ function productsPage(){
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+
     'Exibindo '+list.length+' de '+groups.length+' modelo(s) · '+matched.length+' variação(ões)'+
     '</small><div class="actions">'+
-    (state.page+1<totalPages?button('Ver mais 5 produtos','product-load-more','','primary'):'')+
-    (state.page>0?button('Mostrar menos','product-show-less','','small'):'')+'</div></div></section>';
+    (state.page+1<totalPages?'<div class="product-grid-sentinel" data-products-scroll-sentinel>'+
+      '<span>Role para carregar mais produtos · '+list.length+' de '+groups.length+'</span>'+
+      '<button type="button" class="button small" data-action="product-load-more" hidden>Carregar mais 30</button></div>':'')+'</div></div></section>';
 }
 
 function franchiseCatalogPage(){
@@ -3702,8 +3708,10 @@ function searchAndManageSku(code){
  }else toast('Código não localizado. Confira o EAN ou SKU.',true);
 }
 function switchView(view) {
-  if(state.view==='produtos'&&view!=='produtos'&&
-      ![...root.querySelectorAll('[data-product-card]')].every(abandonCardDraft))return;
+  if(state.view==='produtos'&&view!=='produtos'){
+    if(productDrawer&&!closeProductDrawer(false))return;
+    if(![...root.querySelectorAll('[data-product-card]')].every(abandonCardDraft))return;
+  }
   if(view==='pedidos-lojas'||view==='separacao')view='pedidos';
   if(view==='eventos'&&state.profile?.role!=='evento')view='lojas';
   state.activeStore=null;state.activeStoreTab='resumo';
@@ -4275,6 +4283,18 @@ async function handleClick(event){
       const status=assertOk(await db.rpc('remove_product_safely',{p_product_id:id}));
       if(status==='archived')state.showInactiveProducts=false;
     },'Produto excluído ou desativado para preservar o histórico.');
+  }
+  if(action==='product-drawer-open'){openProductDrawer(target.dataset.group);return;}
+  if(action==='product-drawer-close'){closeProductDrawer();return;}
+  if(action==='product-drawer-tab'){switchProductDrawerTab(target.dataset.tab);return;}
+  if(action==='product-drawer-show-add'){
+    const drawer=productDrawer;
+    if(!drawer||!canRegisterProducts()||!drawer.group.modelId)return;
+    const area=drawer.overlay.querySelector('[data-product-drawer-add]');
+    if(!area)return;
+    area.hidden=!area.hidden;
+    if(!area.hidden)area.querySelector('input,select,button')?.focus({preventScroll:true});
+    return;
   }
   if(action==='product-card-sizes'||action==='product-card-edit-toggle'){
     const card=target.closest('[data-product-card]');
@@ -5044,7 +5064,7 @@ async function handleClick(event){
     catch(error){fail(error);return;}
   }
   if(action==='form-scan')return scanInto('input[name="'+scanTarget+'"]',target.closest('form'));
-  if(action==='product-load-more'){state.page++;render();return;}
+  if(action==='product-load-more'){await appendMoreProducts();return;}
   if(action==='product-show-less'){state.page=0;render();return;}
   if(action==='export-csv')return exportCsv();
   if(action==='event-activate'){
@@ -6153,6 +6173,7 @@ function updateFiltered(id,value){
   if(field&&selection!==null){field.focus();field.setSelectionRange(selection,selection);}
 }
 document.addEventListener('click',event=>{
+  if(event.target.classList?.contains('cdsb-product-backdrop')){closeProductDrawer();return;}
   if(event.target.classList?.contains('buy-drawer-backdrop')){closePurchaseDrawer();return;}
   if(event.target.classList?.contains('photo-lightbox')){document.querySelector('.photo-lightbox')?.remove();return;}
   if(event.target.classList?.contains('mobile-more-overlay')){closeMobileNavigation();return;}
@@ -6212,6 +6233,7 @@ document.addEventListener('keydown',event=>{
     return;
   }
   if(event.key==='Escape'){
+    if(productDrawer){closeProductDrawer();return;}
     if(purchaseDrawer){closePurchaseDrawer();return;}
     if(document.querySelector('.share-product-modal'))document.querySelector('.share-product-modal').remove();
     else if(document.querySelector('.tax-backdrop'))closeTaxonomyPicker();
