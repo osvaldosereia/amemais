@@ -23,7 +23,7 @@ test('compras agrupadas por modelo e variações com fotos e controle explícito
  const page=purchasesPage({products,models,suppliers,button:(label,action)=>'<button data-action="'+action+'">'+label+'</button>'});
  assert.equal((page.match(/class="buy-group-card buy-quick-card"/g)||[]).length,1);
  assert.match(page,/data-photo-path="apparel\/m\/1.jpg"/);
- assert.match(page,/Saídas do CD · 30\/90 dias/);
+ assert.match(page,/Saídas do CD · últimos 90 dias/);
  const form=purchaseOrderRows(products,suppliers,[],[],[],[],models);
  assert.equal((form.match(/class="buy-cart-group"/g)||[]).length,1);
  assert.equal((form.match(/data-buy-select/g)||[]).length,2);
