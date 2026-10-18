@@ -4079,7 +4079,11 @@ async function handleClick(event){
     if(['abertas','atrasadas'].includes(stat)){state.purchaseTab='pedidos';state.purchaseOrderFilter=stat;}
     state.purchaseCatalog.page=0;render();return;
   }
-  if(action==='buy-add-to-draft')return purchaseDraftTargetModal(target.dataset.group);
+  if(action==='buy-add-to-draft'){
+    const groupKey=target.dataset.group;
+    closePurchaseDrawer(false);
+    return purchaseDraftTargetModal(groupKey);
+  }
   if(action==='buy-order-open')return purchaseDraftDetails(state.purchaseOrders.find(o=>o.id===id));
   if(action==='buy-draft-mark-sent'){
    const order=state.purchaseOrders.find(o=>o.id===id);
