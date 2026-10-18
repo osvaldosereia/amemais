@@ -250,7 +250,7 @@ function readPurchaseForm(form){
   return {
     supplier_id,min_stock:numeric('min_stock',0,1000000),
     minimum_order_quantity:numeric('minimum_order_quantity',1,1000000),
-    sale_price:rawPrice===''?null:Number(rawPrice),sales_unit
+    sale_price:rawPrice===''?null:Number(rawPrice),cost_price:optionalCostPrice(form),sales_unit
   };
 }
 async function exec(work,success='Operação registrada.'){
@@ -1643,8 +1643,18 @@ function procurementFields(item=null){
     'min="0" max="1000000" step="1"','Define alerta de reposição, não o mínimo de compra.')+
   field('Pedido mínimo do fornecedor por variação','minimum_order_quantity','number',item?.minimum_order_quantity??1,
     'min="1" max="1000000" step="1" required','Quantidade mínima aceita pelo fornecedor ao comprar este SKU.')+
+  field('Preço de custo (R$)','cost_price','number',item?.cost_price??'',
+    'min="0" max="99999999.99" step="0.01" placeholder="Não informado"',
+    'Opcional. Deixe em branco enquanto não souber o custo deste SKU.')+
   selectField('Fornecedor padrão','supplier_id',[['','Sem fornecedor'],...state.suppliers.filter(s=>s.active||s.id===item?.supplier_id).map(s=>[s.id,s.name])],item?.supplier_id||'')+
   '</div><p class="help">Cadastre fornecedores na seção Compras. Para modelos com variações, o mínimo vale por tamanho/SKU.</p></section>';
+}
+function optionalCostPrice(form){
+ const raw=String(form.elements.namedItem('cost_price')?.value??'').trim().replace(',','.');
+ if(raw==='')return null;
+ if(!/^\d+(?:\.\d{1,2})?$/.test(raw)||!Number.isFinite(Number(raw))||Number(raw)>99999999.99)
+  throw Error('Preço de custo inválido. Informe um valor positivo com até duas casas decimais ou deixe vazio.');
+ return Number(raw);
 }
 function procurementValues(form){
  const raw=form.elements.namedItem('min_stock')?.value??'0',min=Number(raw);
@@ -1654,12 +1664,15 @@ function procurementValues(form){
  const minimumRaw=form.elements.namedItem('minimum_order_quantity')?.value??'1',minimumOrderQuantity=Number(minimumRaw);
  if(minimumRaw===''||!Number.isInteger(minimumOrderQuantity)||minimumOrderQuantity<1||minimumOrderQuantity>1000000)
   throw Error('Pedido mínimo do fornecedor deve ser de 1 a 1.000.000 unidades.');
- return {supplier_id:supplier,min_stock:min,minimum_order_quantity:minimumOrderQuantity};
+ return {supplier_id:supplier,min_stock:min,minimum_order_quantity:minimumOrderQuantity,
+  cost_price:optionalCostPrice(form)};
 }
 async function saveModelProcurement(modelId,form){
  const v=procurementValues(form);
  assertOk(await db.rpc('set_apparel_procurement',{p_model:modelId,p_supplier:v.supplier_id,p_min_stock:v.min_stock}));
- assertOk(await db.from('products').update({minimum_order_quantity:v.minimum_order_quantity}).eq('apparel_model_id',modelId));
+ assertOk(await db.from('products').update({
+  minimum_order_quantity:v.minimum_order_quantity,cost_price:v.cost_price
+ }).eq('apparel_model_id',modelId));
 }
 function supplierManagerModal(){
  if(!hasPermission('purchases.manage'))return;
@@ -5280,7 +5293,9 @@ async function handleSubmit(event){
         }));
       }
       if(!editing){
-       assertOk(await db.from('products').update({sale_price:payload.sale_price,sales_unit:payload.sales_unit}).eq('id',productId));
+       assertOk(await db.from('products').update({
+         sale_price:payload.sale_price,sales_unit:payload.sales_unit,cost_price:payload.cost_price
+       }).eq('id',productId));
        const procurement=procurementValues(form);
        assertOk(await db.rpc('set_product_procurement',{
         p_product:productId,p_supplier:procurement.supplier_id,p_min_stock:procurement.min_stock
