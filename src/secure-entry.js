@@ -15,4 +15,5 @@ if (insecure) {
   </main>`;
 } else {
   await import('./app.js?v=20261017access1');
+  await import('./catalog-transfer.js?v=20261017catalog1');
 }
