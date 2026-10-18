@@ -1806,6 +1806,8 @@ function closeTopModal(){
   if(focus?.isConnected)focus.focus({preventScroll:true});
 }
 function formModal(title,contents,formName,submitLabel='Salvar',stack=false){
+  // Operações especializadas permanecem sobre a ficha principal; não a destroem.
+  if(productDrawer&&state.view==='produtos')stack=true;
   if(!stack){
     while(document.querySelector('.modalback'))closeTopModal();
   }else{
