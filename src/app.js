@@ -31,8 +31,8 @@ import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCar
  setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
  confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261016cart1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
-import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261017clean1';
-import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSummary,purchaseCartBySupplier,purchaseCartReviewGroups,serializePurchaseCart,parsePurchaseCart} from './purchase-cart.js?v=20261016buycart1';
+import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261018buygrid1';
+import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSummary,purchaseCartBySupplier,purchaseCartReviewGroups,serializePurchaseCart,parsePurchaseCart} from './purchase-cart.js?v=20261018buygrid1';
 import {supplierDirectoryPayload,staffDirectoryPayload,procurementTaskDraft,supplierInsights,procurementTasksHTML} from './directory-automation.js?v=20261017directory1';
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
 import {renderOperationsDashboard} from './dashboard-home.js?v=20261016home1';
@@ -1722,6 +1722,87 @@ function savePurchaseCart(){
  try{sessionStorage.setItem('cdsb-purchase-cart:'+state.user.id,serializePurchaseCart(state.purchaseCart));}
  catch(error){console.warn('Carrinho mantido somente nesta sessão',error);}
 }
+let purchaseDrawer=null;
+let purchaseInfiniteObserver=null;
+let purchaseInfiniteBusy=false;
+function findPurchasePanel(key){
+ return [...document.querySelectorAll('[data-buy-expand]')].find(el=>el.dataset.buyExpand===key)||null;
+}
+function closePurchaseDrawer(restoreFocus=true){
+ if(!purchaseDrawer)return;
+ const {overlay,card,panel,trigger,groupKey}=purchaseDrawer;
+ purchaseDrawer=null;
+ if(card.isConnected){card.append(panel);panel.open=false;}else panel.remove();
+ overlay.remove();state.purchaseExpanded.delete(groupKey);
+ if(trigger?.isConnected){
+  trigger.setAttribute('aria-expanded','false');
+  const text=trigger.querySelector('.buy-action-label');if(text)text.textContent='Abrir compra';
+ }
+ if(restoreFocus&&trigger?.isConnected)trigger.focus({preventScroll:true});
+}
+function openPurchaseDrawer(groupKey){
+ if(purchaseDrawer?.groupKey===groupKey)return;
+ closePurchaseDrawer(false);
+ const card=[...document.querySelectorAll('[data-buy-card]')].find(el=>el.dataset.buyCard===groupKey);
+ const panel=card?.querySelector('[data-buy-expand]');
+ if(!card||!panel)return;
+ const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
+   state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
+ if(!group)return;
+ const trigger=card.querySelector('[data-action="buy-open-group"]');
+ const overlay=document.createElement('div');overlay.className='modalback buy-drawer-backdrop';
+ const assign=!group.supplier_id?'<section class="buy-drawer-supplier" data-buy-supplier-missing>'+
+  '<strong>Fornecedor não cadastrado para este produto</strong>'+
+  '<p>Selecione as variações normalmente. Antes de adicionar ao pedido, vincule um fornecedor.</p>'+
+  '<div class="buy-drawer-supplier-fields"><select data-buy-supplier-choice aria-label="Fornecedor do produto">'+
+  '<option value="">Selecionar fornecedor...</option>'+
+  state.suppliers.filter(x=>x.active).map(x=>'<option value="'+h(x.id)+'">'+h(x.name)+'</option>').join('')+
+  '</select><button type="button" class="button" data-action="buy-assign-supplier" data-group="'+h(groupKey)+
+  '">Vincular fornecedor</button></div></section>':'';
+ overlay.innerHTML='<section class="modal buy-drawer" role="dialog" aria-modal="true" aria-labelledby="buy-drawer-title">'+
+  '<header class="modalhead buy-drawer-head"><div><small>Compras · Produto</small><h2 id="buy-drawer-title">'+h(group.title)+
+  '</h2></div><button type="button" class="button buy-drawer-close" data-action="buy-drawer-close" aria-label="Fechar compra">✕</button></header>'+
+  '<div class="buy-drawer-scroll"><div class="buy-drawer-product"></div>'+assign+
+  '<div class="buy-drawer-slot"></div></div></section>';
+ const head=card.querySelector('.buy-group-head')?.cloneNode(true);
+ if(head)overlay.querySelector('.buy-drawer-product').append(head);
+ overlay.querySelector('.buy-drawer-slot').append(panel);
+ document.body.append(overlay);panel.open=true;state.purchaseExpanded.add(groupKey);
+ trigger?.setAttribute('aria-expanded','true');
+ purchaseDrawer={overlay,card,panel,trigger,groupKey};
+ overlay.querySelector('[data-action="buy-drawer-close"]')?.focus({preventScroll:true});
+}
+function mountPurchaseInfinite(){
+ purchaseInfiniteObserver?.disconnect();purchaseInfiniteObserver=null;
+ if(state.view!=='compras'||state.purchaseTab!=='reposicao')return;
+ const marker=root.querySelector('[data-buy-scroll-sentinel]');if(!marker)return;
+ const fallback=marker.querySelector('.buy-scroll-fallback');
+ if(typeof IntersectionObserver==='undefined'){if(fallback)fallback.hidden=false;return;}
+ purchaseInfiniteObserver=new IntersectionObserver(entries=>{
+  if(entries.some(e=>e.isIntersecting))void appendNextPurchaseBatch();
+ },{rootMargin:'420px 0px',threshold:0});
+ purchaseInfiniteObserver.observe(marker);
+}
+async function appendNextPurchaseBatch(){
+ if(purchaseInfiniteBusy||state.view!=='compras'||state.purchaseTab!=='reposicao')return;
+ const grid=root.querySelector('.buy-group-grid'),marker=root.querySelector('[data-buy-scroll-sentinel]');
+ if(!grid||!marker)return;
+ purchaseInfiniteBusy=true;purchaseInfiniteObserver?.disconnect();
+ try{
+  const count=grid.querySelectorAll('[data-buy-card]').length;
+  state.purchaseCatalog.page++;
+  const template=document.createElement('template');
+  template.innerHTML=pageContent();
+  for(const el of [...template.content.querySelectorAll('[data-buy-card]')].slice(count))grid.append(el);
+  const next=template.content.querySelector('[data-buy-scroll-sentinel]');
+  if(next)marker.replaceWith(next);else marker.remove();
+  hydrateImages();updatePurchaseCartDisplay();
+ }catch(error){
+  state.purchaseCatalog.page=Math.max(0,state.purchaseCatalog.page-1);
+  console.warn('Falha ao carregar mais produtos',error);
+  const fallback=marker.querySelector('.buy-scroll-fallback');if(fallback)fallback.hidden=false;
+ }finally{purchaseInfiniteBusy=false;mountPurchaseInfinite();}
+}
 function updatePurchaseCartDisplay(){
  const summary=purchaseCartSummary(state.purchaseCart,state.items);
  const dock=document.querySelector('[data-buy-cart-dock]');
@@ -1738,15 +1819,15 @@ function updatePurchaseCartDisplay(){
   const units=selected.reduce((n,p)=>n+Number(state.purchaseCart.get(p.id)||0),0);
   label.textContent=selected.length?selected.length+' tamanho(s) · '+units+' un.':'Nenhuma variação selecionada';
   const card=label.closest('[data-buy-card]');
-  const total=card?.querySelector('[data-buy-panel-total]');
+  const panel=findPurchasePanel(group.key);
+  const total=panel?.querySelector('[data-buy-panel-total]');
   if(total)total.textContent=selected.length?selected.length+' tamanho(s) · '+units+' unidades':'Selecione as variações para montar o pedido';
-  const review=card?.querySelector('[data-buy-panel-review]');
+  const review=panel?.querySelector('[data-buy-panel-review]');
   if(review)review.hidden=!selected.length;
  }
 }
 async function loadPurchaseOutflow(groupKey){
- const card=[...document.querySelectorAll('[data-buy-card]')].find(x=>x.dataset.buyCard===groupKey);
- const view=card?.querySelector('[data-buy-outflow]');
+ const view=findPurchasePanel(groupKey)?.querySelector('[data-buy-outflow]');
  if(!view||view.dataset.loaded==='true'||view.dataset.loaded==='loading')return;
  const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
   state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
@@ -1759,17 +1840,15 @@ async function loadPurchaseOutflow(groupKey){
    .in('product_id',group.variants.map(p=>p.id))
    .gte('created_at',new Date(Date.now()-90*86400000).toISOString())
    .order('created_at',{ascending:false}).limit(3000);
-  const moves=assertOk(result)||[],cut=Date.now()-30*86400000;
+  const moves=assertOk(result)||[];
   const rows=group.variants.map(p=>{
    const out=moves.filter(m=>m.product_id===p.id&&Number(m.delta_store)<0);
-   const month=out.filter(m=>new Date(m.created_at).getTime()>=cut);
-   const sum=a=>a.reduce((n,m)=>n+Math.abs(Number(m.delta_store)||0),0);
+   const sum=out.reduce((n,m)=>n+Math.abs(Number(m.delta_store)||0),0);
    return '<div class="buy-history-row"><strong>'+h(p.apparel_size||'Único')+
-    '<small>SKU '+h(p.sku||'—')+'</small></strong><span>30 dias: <b>'+sum(month)+
-    '</b></span><span>90 dias: <b>'+sum(out)+'</b></span></div>';
+    '<small>SKU '+h(p.sku||'—')+'</small></strong><span>90 dias: <b>'+sum+'</b></span></div>';
   }).join('');
   if(!view.isConnected)return;
-  view.innerHTML='<div class="buy-panel-history-head"><strong>Saídas do CD · 30/90 dias</strong>'+
+  view.innerHTML='<div class="buy-panel-history-head"><strong>Saídas do CD · últimos 90 dias</strong>'+
    '<small>Saídas físicas não são necessariamente vendas.</small></div>'+
    '<div class="buy-history-rows">'+rows+'</div>'+
    (moves.length===3000?'<p class="buy-history-note">Limite de 3.000 movimentações atingido. Os totais podem estar incompletos.</p>':'')+
@@ -1785,32 +1864,19 @@ async function loadPurchaseOutflow(groupKey){
  }
 }
 function setPurchasePanelOpen(groupKey,open){
- const card=[...document.querySelectorAll('[data-buy-card]')].find(x=>x.dataset.buyCard===groupKey);
- const panel=card?.querySelector('[data-buy-expand]');
- if(!panel)return;
- panel.open=open;
- const trigger=card.querySelector('[data-action="buy-open-group"]');
- if(trigger){
-  const label=open?'Fechar compra':'Abrir compra';
-  trigger.setAttribute('aria-expanded',String(open));
-  trigger.setAttribute('aria-label',label);
-  trigger.title=label;
-  const caption=trigger.querySelector('.buy-action-label');
-  if(caption)caption.textContent=label;
- }
- if(open)state.purchaseExpanded.add(groupKey);
- else state.purchaseExpanded.delete(groupKey);
+ if(open)openPurchaseDrawer(groupKey);
+ else if(purchaseDrawer?.groupKey===groupKey)closePurchaseDrawer();
 }
 function prefillPurchaseMinimums(groupKey){
  const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
   state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
- const card=[...document.querySelectorAll('[data-buy-card]')].find(el=>el.dataset.buyCard===groupKey);
- if(!group||!card)return;
+ const panel=findPurchasePanel(groupKey);
+ if(!group||!panel)return;
  for(const variant of group.variants){
   const shortage=Math.max(0,Number(variant.min_stock||0)-Number(variant.free||0)-Number(variant.pending||0));
-  if(!shortage||!variant.supplier_id||state.purchaseCart.has(variant.id))continue;
+  if(!shortage||state.purchaseCart.has(variant.id))continue;
   const minimum=Math.max(1,Number(variant.minimum_order_quantity||1));
-  const line=[...card.querySelectorAll('[data-buy-sku]')].find(el=>el.dataset.buySku===variant.id);
+  const line=[...panel.querySelectorAll('[data-buy-sku]')].find(el=>el.dataset.buySku===variant.id);
   if(!line)continue;
   const checkbox=line.querySelector('[data-buy-inline-select]');
   const qty=line.querySelector('[data-buy-inline-qty]');
