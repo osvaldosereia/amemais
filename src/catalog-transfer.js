@@ -5,7 +5,7 @@ const cfg=window.AME_CONFIG||{};
 const db=createClient(cfg.supabaseUrl,cfg.supabasePublishableKey,{
   auth:{autoRefreshToken:false,persistSession:true,detectSessionInUrl:false}
 });
-const HEADERS=['Importar','SKU','Nome','Codigo de barras','Tipo codigo','Unidade','Preco venda','Ativo',
+const HEADERS=['Importar','SKU','Nome','Codigo de barras','Tipo codigo','Unidade','Preco venda','Preco custo','Ativo',
 'Categoria','Subcategoria','Subsubcategoria','Tags','Familia','Tamanho','Cor','Tipo roupa',
 'Publico','Faixa etaria','Fornecedor','Estoque minimo','Pedido minimo','Estoque inicial',
 'Gondola','Prateleira','Foto URL','Codigo SAP','Codigo original','Observacoes','Confianca','Revisao'];
@@ -170,7 +170,7 @@ async function exportCatalog(){
       return {
         'Importar':p.active?'SIM':'NAO','SKU':p.sku||'', 'Nome':p.name||'',
         'Codigo de barras':p.ean||'', 'Tipo codigo':p.ean?.length===9?'Código interno':'',
-        'Unidade':p.sales_unit||'UN','Preco venda':p.sale_price??'','Ativo':p.active?'SIM':'NAO',
+        'Unidade':p.sales_unit||'UN','Preco venda':p.sale_price??'','Preco custo':p.cost_price??'','Ativo':p.active?'SIM':'NAO',
         'Categoria':categories[0]||'','Subcategoria':categories[1]||'',
         'Subsubcategoria':categories.slice(2).join(' > '),'Tags':(p.tags||[]).join(', '),
         'Familia':model?.name||'','Tamanho':p.apparel_size||'','Cor':p.apparel_color||'',
@@ -226,8 +226,13 @@ async function preview(){
       const value=r[f];if(value&&value.length>90)problems.push(tag+f+' excede 90 caracteres');
     }
     if(r.Categoria&&!categories.some(x=>!x.parent_id&&norm(x.name)===norm(r.Categoria)))maybeNewCategory.add(r.Categoria);
-    const price=r['Preco venda'];
-    if(price!==''&&!Number.isFinite(Number(String(price).replace(',','.'))))problems.push(tag+'preço inválido');
+    for(const label of ['Preco venda','Preco custo']){
+      const raw=String(r[label]??'').trim().replace(',','.');
+      if(raw!==''&&(!/^\d+(?:\.\d{1,2})?$/.test(raw)||!Number.isFinite(Number(raw))||
+          Number(raw)>99999999.99)){
+        problems.push(tag+label+': valor inválido. Use número positivo com até duas casas decimais.');
+      }
+    }
   }
   const shown=problems.slice(0,16).map(p=>'<li>'+escapeHtml(p)+'</li>').join('');
   target.innerHTML=`<div class="ame-transfer-metrics">
@@ -261,7 +266,8 @@ async function importCatalog(){
     for(let pos=0;pos<selected.length;pos+=60){
       status('Importando '+Math.min(pos+60,selected.length)+' de '+selected.length+'…');
       const payload=selected.slice(pos,pos+60).map(r=>({
-        ...Object.fromEntries(HEADERS.map(k=>[k,k==='Preco venda'?String(r[k]).replace(',','.'):r[k]]))
+        ...Object.fromEntries(HEADERS.map(k=>[k,['Preco venda','Preco custo'].includes(k)?
+          String(r[k]).replace(',','.'):r[k]]))
       }));
       const {data,error}=await db.rpc('import_products_batch',{
         p_rows:payload,p_create_categories:create,p_update_existing:update,p_import_initial_stock:stock
