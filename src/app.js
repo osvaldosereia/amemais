@@ -787,6 +787,20 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
  const quantity=(fn)=>active.reduce((n,p)=>n+Math.max(0,Number(fn(p.id)||0)),0).toLocaleString('pt-BR');
  const category=categoryFull(group.model?.category_id||main?.category_id)||'Sem categoria';
  const gondolas=[...new Set(group.products.map(p=>p.gondola).filter(Boolean))];
+ const vendors=[...new Set(group.products.map(p=>p.supplier_id||'').filter(Boolean))];
+ const supplierName=vendors.length>1?'Diferentes por variação':
+  vendors.length?state.suppliers.find(v=>v.id===vendors[0])?.name||'Não encontrado':'Não informado';
+ const perSku=(field,formatter=value=>String(value))=>{
+  const values=[...new Set(group.products.map(p=>p[field]).filter(v=>v!==null&&v!==undefined&&v!==''))];
+  return values.length===1&&group.products.every(p=>p[field]!==null&&p[field]!==undefined&&p[field]!=='')
+   ?formatter(values[0]):values.length?'Por variação':'Não informado';
+ };
+ const money=value=>Number(value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+ const extras=[
+  ['Fornecedor',supplierName],['Pedido mínimo',perSku('minimum_order_quantity',v=>v+' un.')],
+  ['Estoque mínimo',perSku('min_stock',v=>v+' un.')],['Preço de custo',perSku('cost_price',money)],
+  ['Preço de venda',perSku('sale_price',money)],['Situação',active.length===group.products.length?'Ativo':active.length?'Misto':'Inativo']
+ ];
  preview.innerHTML='<div class="product-drawer-identity"><div class="product-drawer-image">'+photo+'</div>'+
   '<div class="product-drawer-identity-text"><strong>'+h(group.title)+'</strong>'+
    '<small>'+h(category)+'</small>'+
@@ -796,7 +810,13 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
    '<div><small>Disponível</small><strong>'+quantity(qtyAvailable)+'</strong></div>'+
    '<div><small>Físico</small><strong>'+quantity(qtyStore)+'</strong></div>'+
    '<div><small>Reservado</small><strong>'+quantity(qtyReserved)+'</strong></div></div>'+
-  '<p class="product-drawer-hint">Selecione uma subseção acima para consultar e editar os dados deste produto, sem sair do painel.</p>';
+  '<div class="product-drawer-facts">'+extras.map(([label,value])=>
+    '<div><small>'+h(label)+'</small><strong>'+h(value)+'</strong></div>').join('')+'</div>'+
+  '<p class="product-drawer-hint">Selecione uma subseção acima para consultar e editar os dados deste produto, sem sair do painel.</p>'+
+  '<div class="product-drawer-tools">'+
+    (!isFranchisePortal()?button('Etiqueta de gôndola · 80 mm','shelf-label-open','data-id="'+h(main.id)+'"','small'):'')+
+    (canRegisterProducts()?button('Compartilhar produto','share-product','data-id="'+h(main.id)+'"','small'):'')+
+  '</div>';
  const template=document.createElement('template');
  template.innerHTML=productGroupCard(group);
  const article=template.content.firstElementChild;
