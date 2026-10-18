@@ -46,7 +46,7 @@ test('quantidades iniciais vêm do pedido mínimo do fornecedor, não do estoque
  assert.match(page,/Pedido mínimo <b>3/);
  assert.match(page,/Pedido mínimo <b>6/);
  assert.match(app,/function prefillPurchaseMinimums/);
- assert.match(app,/if\(!shortage\|\|!variant.supplier_id\|\|state.purchaseCart.has\(variant.id\)\)continue/);
+ assert.match(app,/if\(!shortage\|\|state.purchaseCart.has\(variant.id\)\)continue/);
  assert.match(app,/minimum_order_quantity/);
 });
 test('pedido recebe itens selecionados em rascunho do mesmo fornecedor, com autorização',()=>{
