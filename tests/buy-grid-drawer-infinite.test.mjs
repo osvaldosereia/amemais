@@ -32,7 +32,7 @@ test('produto sem fornecedor pode ser selecionado; só criação de pedido exige
  assert.equal(selection.get('sku0'),2);
  assert.equal(cart.purchaseCartBySupplier(selection,products).size,0);
  assert.match(app,/if\(action==='buy-assign-supplier'\)/);
- assert.match(app,/Vincule um fornecedor cadastrado/);
+ assert.match(app,/Fornecedor não cadastrado para este produto/);
 });
 test('painel lateral conserva grupos SKU e exige confirmação para vínculo do fornecedor',()=>{
  assert.match(app,/function openPurchaseDrawer\(groupKey\)/);
