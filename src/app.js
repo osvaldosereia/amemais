@@ -1988,7 +1988,7 @@ function openPurchaseDrawer(groupKey){
   '<header class="modalhead buy-drawer-head"><div><small>Compras · Produto</small><h2 id="buy-drawer-title">'+h(group.title)+
   '</h2></div><button type="button" class="button buy-drawer-close" data-action="buy-drawer-close" aria-label="Fechar compra">✕</button></header>'+
   '<div class="buy-drawer-scroll"><div class="buy-drawer-product"></div>'+assign+
-  '<div class="buy-drawer-slot"></div><div class="buy-drawer-checkout" data-buy-draft-target hidden></div></div></section>';
+  '<div class="buy-drawer-slot buy-page" data-buy-drawer-content></div><div class="buy-drawer-checkout" data-buy-draft-target hidden></div></div></section>';
  const source=card.querySelector('.buy-group-head');
  const product=overlay.querySelector('.buy-drawer-product');
  const photo=source?.querySelector('.buy-group-photo')?.cloneNode(true);
