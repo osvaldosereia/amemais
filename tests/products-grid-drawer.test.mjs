@@ -57,15 +57,15 @@ test('uma ficha contém resumo, cadastro, variações, compras, códigos, estoqu
  for(const tab of ["resumo","cadastro","variacoes","compras","codigos","estoque","midia","admin"])
   assert.match(app,new RegExp("'"+tab+"'"));
  assert.match(app,/role="dialog" aria-modal="true" aria-labelledby="cdsb-product-drawer-title"/);
- assert.match(app,/class="modalback cdsb-product-backdrop"/);
+ assert.match(app,/overlay\.className='modalback cdsb-product-backdrop'/);
  assert.match(app,/productGroupCard\(group\)/);
  assert.match(app,/data-product-drawer-overview/);
  assert.match(app,/data-product-drawer-photo/);
  assert.match(app,/photoChooser\(group\.model\|\|main\)/);
  assert.match(app,/data-product-drawer-editor-slot/);
  assert.match(workspace,/data-product-category-search/);
- assert.match(workspace,/data-form="product-card-purchase"/);
- assert.match(workspace,/data-form="product-card-codes"/);
+ assert.match(workspace,/subpanel\(group,p,'purchase'/);
+ assert.match(workspace,/subpanel\(group,p,'codes'/);
  assert.match(stock,/data-product-details/);
 });
 test('salvamentos mantêm painel e alterações não salvas exigem confirmação',()=>{
