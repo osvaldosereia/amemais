@@ -343,3 +343,17 @@
   padding:14px 12px!important;
  }
 }
+
+.buy-drawer-backdrop .buy-drawer .buy-drawer-section-title{
+ display:grid;gap:5px;min-width:0;padding:17px 18px 10px!important;
+ background:#fff;border-top:1px solid #e5ece9;
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-section-title>strong{
+ font-size:.86rem;font-weight:750;color:#102d50;line-height:1.4;
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-section-title>small{
+ font-size:.72rem;color:#657f8c;line-height:1.5;
+}
+@media(max-width:600px){
+ .buy-drawer-backdrop .buy-drawer .buy-drawer-section-title{padding:14px 12px 8px!important}
+}
