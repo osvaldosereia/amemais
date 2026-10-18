@@ -241,7 +241,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
    '<details class="grouped-variants-mobile card-workspace product-variants-details" data-product-details'+(expanded?' open':'')+'>'+
      '<summary>Variações ('+active.length+')</summary>'+variantOverview+
      '<details class="product-advanced-stock"><summary>Operações de estoque: balanço, movimentação e histórico</summary>'+stockTabs+
-     '<section data-stock-panel="balanco"'+(stockTab==='balanco'?'':' hidden')+'>\<p class="card-workspace-help">Conte as quantidades físicas de todas as variações. As reservas não podem ser reduzidas.</p>'+
+     '<section data-stock-panel="balanco"'+(stockTab==='balanco'?'':' hidden')+' ><p class="card-workspace-help">Conte as quantidades físicas de todas as variações. As reservas não podem ser reduzidas.</p>'+
         '<div class="card-balance-search"><input type="search" data-balance-scan-input placeholder="Bipe ou digite EAN/SKU e pressione Enter" aria-label="Localizar variação pelo código" autocomplete="off">'+
         '<button type="button" class="button" data-action="product-balance-scan">Ler pela câmera</button></div>'+
         '<div class="card-balance-list">'+(stockRows||'<p>Nenhuma variação ativa.</p>')+'</div>'+
@@ -250,7 +250,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
         '<button type="button" class="button primary" data-action="product-balance-save">Salvar balanço</button></div>':
         '<p class="card-workspace-help">Seu perfil permite somente consultar os saldos.</p>')+
      '</section>'+
-     '<section data-stock-panel="movimentar"'+(stockTab==='movimentar'?'':' hidden')+'>\<p class="card-workspace-help">Selecione a variação e o tipo de movimentação.</p>'+
+     '<section data-stock-panel="movimentar"'+(stockTab==='movimentar'?'':' hidden')+' ><p class="card-workspace-help">Selecione a variação e o tipo de movimentação.</p>'+
      '<div class="card-stock-move-list">'+active.map(p=>'<div class="card-stock-move-row"><strong>'+h(p.apparel_size||p.name)+
        ' · '+h(p.apparel_color||'')+'</strong><span>'+fmt(quantity(p))+' un. físicas</span>'+
        (skuAccess?'<div class="card-stock-move-buttons">'+
@@ -258,7 +258,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
          (canStockExit()?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="saida">Saída excepcional</button>':'')+
          (canBalance()?'<button type="button" data-action="product-stock-mode" data-id="'+h(p.id)+'" data-mode="contagem">Conferir SKU</button>':'')+
          '</div>':'')+'</div>').join('')+'</div></section>'+
-     '<section data-stock-panel="historico"'+(stockTab==='historico'?'':' hidden')+'>\<p class="card-workspace-help">Últimos movimentos registrados das variações.</p>'+
+     '<section data-stock-panel="historico"'+(stockTab==='historico'?'':' hidden')+' ><p class="card-workspace-help">Últimos movimentos registrados das variações.</p>'+
         (history.length?'<ul class="card-stock-history">'+history.slice(0,10).map(m=>'<li><strong>'+h(m.label||m.action||'Movimento')+
          '</strong><span>'+h(m.action||'')+' · '+h(String(m.quantity??0))+' un.</span>'+
          '<small>'+h(m.created_at?new Date(m.created_at).toLocaleDateString('pt-BR'):'')+'</small></li>').join('')+'</ul>':
