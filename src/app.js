@@ -1,3 +1,4 @@
+import {productCatalogCard} from './products-grid.js?v=20261018productgrid1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
@@ -205,6 +206,7 @@ async function refreshEditedProduct(productId=null,modelId=null){
     state.items=state.items.map(record=>record.id===productId?item:record);
   }
   render();
+  refreshOpenProductDrawer();
 }
 async function saveProductCard(work,{productId=null,modelId=null,success='Cadastro atualizado.'}={}){
   if(state.loading)return;
@@ -256,7 +258,14 @@ function readPurchaseForm(form){
 async function exec(work,success='Operação registrada.'){
   if(state.loading)return;
   state.loading=true;
-  try { await work(); await loadData(); document.querySelector('.modalback')?.remove(); toast(typeof success==='function'?success():success); }
+  try {
+    await work();
+    await loadData();
+    const legacy=[...document.querySelectorAll('.modalback')].reverse().find(el=>
+      !el.classList.contains('cdsb-product-backdrop')&&!el.classList.contains('buy-drawer-backdrop'));
+    legacy?.remove();
+    toast(typeof success==='function'?success():success);
+  }
   catch(error){fail(error);}
   finally {state.loading=false;}
 }
@@ -390,6 +399,8 @@ async function loadData(){
   if(updated)state.profile=updated;
   if(!state.profile?.active)throw new Error('Seu usuário está desativado.');
   render();
+  if(productDrawer&&!productDrawer.article.querySelector('[data-unsaved="true"]'))
+    refreshOpenProductDrawer();
 }
 async function loadProfile(){
   const {data:{user},error}=await db.auth.getUser();
@@ -578,6 +589,7 @@ function button(label,action,extra='',kind=''){
 function pill(status){return '<span class="pill '+h(status)+'">'+h({ativo:'Ativo',encerrado:'Encerrado',rascunho:'Rascunho'}[status]||status)+'</span>';}
 function render(){
   closePurchaseDrawer(false);
+  productInfiniteObserver?.disconnect();
   purchaseInfiniteObserver?.disconnect();
   const previousCard=state.view==='produtos'?
     [...root.querySelectorAll('[data-product-card]')].find(card=>
@@ -615,6 +627,7 @@ function render(){
     '<main class="content">'+pageContent()+'</main></div></div>';
   hydrateImages();
   mountPurchaseInfinite();
+  mountProductsInfinite();
   if(previousKey&&state.view==='produtos'){
     const next=[...root.querySelectorAll('[data-product-card]')].find(card=>card.dataset.productCard===previousKey);
     if(next&&Number.isFinite(previousTop)){
@@ -683,6 +696,210 @@ function panel(title,content,buttonMarkup=''){
   return '<section class="panel"><div class="panelhead"><h2>'+h(title)+'</h2>'+buttonMarkup+'</div>'+content+'</section>';
 }
 // Reutilizado na lista completa e na home: mesmas informações, botões e retrátil.
+
+let productDrawer=null;
+let productInfiniteObserver=null;
+let productInfiniteBusy=false;
+const productDrawerTabs=[
+ ['resumo','Visão geral'],['cadastro','Cadastro'],['variacoes','Variações'],
+ ['compras','Compras e reposição'],['codigos','Códigos e localização'],
+ ['estoque','Estoque'],['midia','Fotos'],['admin','Administração']
+];
+function findProductGroup(key){
+ const all=state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active));
+ return groupInventory(all,state.apparelModels).find(g=>g.key===key)||null;
+}
+function closeProductDrawer(restoreFocus=true,force=false){
+ if(!productDrawer)return true;
+ if(!force){
+  const photoForm=productDrawer.overlay.querySelector('[data-form="product-drawer-photo"]');
+  const pendingPhotos=photoForm&&galleryHasChanges(photoForm);
+  const draftVariants=Boolean(productDrawer.overlay.querySelector('[data-extra-size]:not([hidden])'));
+  if((pendingPhotos||draftVariants)&&!window.confirm('Há fotos ou variações não salvas. Descartar essas alterações?'))return false;
+  if(!abandonCardDraft(productDrawer.article))return false;
+ }
+ const {overlay,trigger}=productDrawer;
+ productDrawer=null;overlay.remove();
+ if(restoreFocus&&trigger?.isConnected)trigger.focus({preventScroll:true});
+ return true;
+}
+function switchProductDrawerTab(tab){
+ const sheet=productDrawer;if(!sheet)return;
+ if(!productDrawerTabs.some(x=>x[0]===tab))return;
+ if(tab==='variacoes'&&!sheet.group.modelId)return;
+ if(['cadastro','variacoes','compras','codigos','admin','midia'].includes(tab)&&
+    !hasPermission('products.edit'))return;
+ if(!abandonCardDraft(sheet.article))return;
+ const ui=cardUiFor(sheet.article);
+ if(ui){ui.drawerTab=tab;ui.panel=tab==='estoque'?'stock':'editor';
+  if(['cadastro','variacoes','compras','codigos'].includes(tab))ui.editorTab=tab;}
+ sheet.tab=tab;
+ sheet.overlay.querySelectorAll('[data-product-drawer-tab]').forEach(button=>{
+  const active=button.dataset.tab===tab;
+  button.classList.toggle('is-active',active);
+  button.setAttribute('aria-selected',String(active));
+ });
+ sheet.overlay.querySelector('[data-product-drawer-overview]').hidden=tab!=='resumo';
+ sheet.overlay.querySelector('[data-product-drawer-photo]')?.toggleAttribute('hidden',tab!=='midia');
+ const article=sheet.article;
+ const editor=article.querySelector('[data-product-editor]');
+ const stock=article.querySelector('[data-product-details]');
+ if(editor){
+  const show=['cadastro','variacoes','compras','codigos','admin'].includes(tab);
+  editor.hidden=!show;editor.open=show;
+  editor.querySelectorAll('[data-editor-panel]').forEach(section=>{
+   section.hidden=tab==='admin'||section.dataset.editorPanel!==tab;
+  });
+  const advanced=editor.querySelector('.card-admin-tools');
+  if(advanced){advanced.hidden=tab!=='admin';advanced.open=tab==='admin';}
+  for(const button of editor.querySelectorAll('[data-action="product-editor-tab"]'))
+   button.setAttribute('aria-selected',String(button.dataset.tab===tab));
+ }
+ if(stock){stock.hidden=tab!=='estoque';stock.open=tab==='estoque';}
+ const panel=sheet.overlay.querySelector('[data-product-drawer-main]');
+ if(panel)panel.scrollTop=0;
+}
+function openProductDrawer(key,{tab=null,scrollTop=0}={}){
+ const group=findProductGroup(key);
+ if(!group)return toast('Produto não encontrado no catálogo.',true);
+ if(productDrawer&&!closeProductDrawer(false))return;
+ const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
+ const models=Boolean(group.modelId);
+ const canEdit=hasPermission('products.edit');
+ const ui=state.productCardUi.get(key)||{};
+ const selected=tab||ui.drawerTab||'resumo';
+ const choices=productDrawerTabs.filter(([name])=>
+  models||name!=='variacoes').filter(([name])=>
+  canEdit||!['cadastro','variacoes','compras','codigos','midia','admin'].includes(name));
+ const overlay=document.createElement('div');
+ overlay.className='modalback cdsb-product-backdrop';
+ overlay.style.zIndex='41000';
+ overlay.innerHTML='<section class="modal cdsb-product-drawer" role="dialog" aria-modal="true" aria-labelledby="cdsb-product-drawer-title">'+
+  '<header class="modalhead"><div><small>PRODUTOS · CADASTRO E ESTOQUE</small>'+
+   '<h2 id="cdsb-product-drawer-title">'+h(group.title)+'</h2></div>'+
+   '<button type="button" class="button" data-action="product-drawer-close" aria-label="Fechar produto">✕</button></header>'+
+  '<nav class="product-drawer-tabs" role="tablist" aria-label="Subseções do produto">'+
+  choices.map(([name,label])=>'<button type="button" role="tab" data-action="product-drawer-tab" data-product-drawer-tab data-tab="'+name+'">'+label+'</button>').join('')+'</nav>'+
+  '<div class="product-drawer-main" data-product-drawer-main>'+
+   '<section data-product-drawer-overview></section>'+
+   '<div data-product-drawer-photo hidden></div>'+
+   '<div data-product-drawer-editor-slot></div>'+
+   '</div></section>';
+ const preview=overlay.querySelector('[data-product-drawer-overview]');
+ const mainPhoto=main?.image_path||main?.image_paths?.[0]||group.model?.image_path||group.model?.image_paths?.[0];
+ const photo=mainPhoto?'<img data-photo-path="'+h(mainPhoto)+'" loading="lazy" alt="Foto de '+h(group.title)+'">':
+  '<div class="product-drawer-placeholder">▧</div>';
+ const active=group.products.filter(p=>p.active);
+ const quantity=(fn)=>active.reduce((n,p)=>n+Math.max(0,Number(fn(p.id)||0)),0).toLocaleString('pt-BR');
+ const category=categoryFull(group.model?.category_id||main?.category_id)||'Sem categoria';
+ const gondolas=[...new Set(group.products.map(p=>p.gondola).filter(Boolean))];
+ const vendors=[...new Set(group.products.map(p=>p.supplier_id||'').filter(Boolean))];
+ const supplierName=vendors.length>1?'Diferentes por variação':
+  vendors.length?state.suppliers.find(v=>v.id===vendors[0])?.name||'Não encontrado':'Não informado';
+ const perSku=(field,formatter=value=>String(value))=>{
+  const values=[...new Set(group.products.map(p=>p[field]).filter(v=>v!==null&&v!==undefined&&v!==''))];
+  return values.length===1&&group.products.every(p=>p[field]!==null&&p[field]!==undefined&&p[field]!=='')
+   ?formatter(values[0]):values.length?'Por variação':'Não informado';
+ };
+ const money=value=>Number(value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+ const extras=[
+  ['Fornecedor',supplierName],['Pedido mínimo',perSku('minimum_order_quantity',v=>v+' un.')],
+  ['Estoque mínimo',perSku('min_stock',v=>v+' un.')],['Preço de custo',perSku('cost_price',money)],
+  ['Preço de venda',perSku('sale_price',money)],['Situação',active.length===group.products.length?'Ativo':active.length?'Misto':'Inativo']
+ ];
+ preview.innerHTML='<div class="product-drawer-identity"><div class="product-drawer-image">'+photo+'</div>'+
+  '<div class="product-drawer-identity-text"><strong>'+h(group.title)+'</strong>'+
+   '<small>'+h(category)+'</small>'+
+   '<small>'+h(group.modelId?group.products.length+' variação(ões)':'SKU '+(main?.sku||'—')+' · EAN '+(main?.ean||'—'))+'</small>'+
+   '<small>'+(gondolas.length?h('Gôndola '+gondolas.join(', ')):'Gôndola não informada')+'</small></div></div>'+
+  '<div class="product-drawer-metrics">'+
+   '<div><small>Disponível</small><strong>'+quantity(qtyAvailable)+'</strong></div>'+
+   '<div><small>Físico</small><strong>'+quantity(qtyStore)+'</strong></div>'+
+   '<div><small>Reservado</small><strong>'+quantity(qtyReserved)+'</strong></div></div>'+
+  '<div class="product-drawer-facts">'+extras.map(([label,value])=>
+    '<div><small>'+h(label)+'</small><strong>'+h(value)+'</strong></div>').join('')+'</div>'+
+  '<p class="product-drawer-hint">Selecione uma subseção acima para consultar e editar os dados deste produto, sem sair do painel.</p>'+
+  '<div class="product-drawer-tools">'+
+    (!isFranchisePortal()?button('Etiqueta de gôndola · 80 mm','shelf-label-open','data-id="'+h(main.id)+'"','small'):'')+
+    (canRegisterProducts()?button('Compartilhar produto','share-product','data-id="'+h(main.id)+'"','small'):'')+
+  '</div>';
+ const template=document.createElement('template');
+ template.innerHTML=productGroupCard(group);
+ const article=template.content.firstElementChild;
+ if(!article)return;
+ overlay.querySelector('[data-product-drawer-editor-slot]').append(article);
+ if(canEdit){
+  const form=document.createElement('form');
+  form.dataset.form='product-drawer-photo';
+  form.dataset.modelId=group.modelId||'';
+  form.dataset.id=main.id;
+  form.innerHTML=photoChooser(group.model||main)+
+   '<div class="cdsb-edit-footer"><button type="submit" class="button primary">Salvar fotos</button></div>';
+  overlay.querySelector('[data-product-drawer-photo]').append(form);
+  if(models){
+   const entry=article.querySelector('[data-editor-panel="variacoes"]');
+   const add=document.createElement('div');
+   add.className='product-drawer-add';
+   add.innerHTML='<button type="button" class="button" data-action="product-drawer-show-add">+ Adicionar variações</button>'+
+    '<div data-product-drawer-add hidden><form data-form="extra-sizes" data-model-id="'+h(group.modelId)+'">'+
+     addSizesContent(group.model,group.products,resolveCategoryVariations(state.categories,group.model?.category_id).options,state.gondolas)+
+     '<div class="cdsb-edit-footer"><button type="submit" class="button primary">Salvar novas variações</button></div></form></div>';
+   entry?.append(add);
+  }
+ }
+ document.body.append(overlay);
+ const trigger=[...root.querySelectorAll('[data-action="product-drawer-open"]')].find(b=>b.dataset.group===key)||null;
+ productDrawer={overlay,group,article,key,trigger,tab:selected};
+ switchProductDrawerTab(selected);
+ overlay.querySelector('[data-product-drawer-main]').scrollTop=scrollTop;
+ overlay.querySelector('[data-action="product-drawer-close"]')?.focus({preventScroll:true});
+ hydrateImages();
+}
+function refreshOpenProductDrawer(){
+ if(!productDrawer||state.view!=='produtos')return;
+ const {key,tab,overlay}=productDrawer;
+ if(!findProductGroup(key)){closeProductDrawer(false,true);return;}
+ const scroll=overlay.querySelector('[data-product-drawer-main]')?.scrollTop||0;
+ closeProductDrawer(false,true);
+ openProductDrawer(key,{tab,scrollTop:scroll});
+}
+function mountProductsInfinite(){
+ productInfiniteObserver?.disconnect();productInfiniteObserver=null;
+ if(state.view!=='produtos')return;
+ const marker=root.querySelector('[data-products-scroll-sentinel]');
+ if(!marker)return;
+ const fallback=marker.querySelector('[data-action="product-load-more"]');
+ if(typeof IntersectionObserver==='undefined'){if(fallback)fallback.hidden=false;return;}
+ productInfiniteObserver=new IntersectionObserver(entries=>{
+  if(entries.some(entry=>entry.isIntersecting))void appendMoreProducts();
+ },{rootMargin:'140px 0px',threshold:0});
+ productInfiniteObserver.observe(marker);
+}
+async function appendMoreProducts(){
+ if(productInfiniteBusy||state.view!=='produtos')return;
+ const grid=root.querySelector('.products-card-grid'),marker=root.querySelector('[data-products-scroll-sentinel]');
+ if(!grid||!marker)return;
+ productInfiniteBusy=true;productInfiniteObserver?.disconnect();
+ try{
+  const count=grid.querySelectorAll('.product-grid-card').length;
+  state.page++;
+  const template=document.createElement('template');
+  template.innerHTML=productsPage();
+  for(const card of [...template.content.querySelectorAll('.product-grid-card')].slice(count))grid.append(card);
+  const next=template.content.querySelector('[data-products-scroll-sentinel]');
+  if(next)marker.replaceWith(next);else marker.remove();
+  const summary=root.querySelector('.products-panel>.panelbody small');
+  const nextSummary=template.content.querySelector('.products-panel>.panelbody small');
+  if(summary&&nextSummary)summary.textContent=nextSummary.textContent;
+  hydrateImages();
+ }catch(error){
+  state.page=Math.max(0,state.page-1);
+  console.warn('Falha ao carregar produtos',error);
+  const fallback=marker.querySelector('[data-action="product-load-more"]');
+  if(fallback)fallback.hidden=false;
+ }finally{productInfiniteBusy=false;mountProductsInfinite();}
+}
+
 function productGroupCard(group){
   return groupedCard(group,{
     h,photoButton,qtyStore,qtyEvent,qtyReserved,qtyAvailable,button,isManager,canRegisterProducts,
@@ -788,7 +1005,7 @@ function productsPage(){
   );
   const filtersApplied=Boolean(q||state.categoryFilter||state.tagFilter||state.gondolaFilter||state.showInactiveProducts);
   const available=state.items.filter(p=>p.active).length;
-  const pageSize=5,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
+  const pageSize=30,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.max(0,Math.min(state.page,totalPages-1));
   const list=groups.slice(0,(state.page+1)*pageSize);
   const add=(hasPermission('stock.entry')?button('↓ Receber remessa','stock-receive-shipment','',''):'')+
@@ -825,7 +1042,9 @@ function productsPage(){
         (filtersApplied?button('Limpar filtros','products-clear-filters','','small'):'')+
       '</div>'+
     '</div>'+
-    '<div class="grouped-inventory-grid">'+(list.length?list.map(productGroupCard).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
+    '<div class="grouped-inventory-grid products-card-grid">'+(list.length?list.map(group=>productCatalogCard(group,{
+      h,qtyStore,qtyReserved,qtyAvailable,categories:state.categories
+    })).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
       (filtersApplied?'<p>Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.</p>'+
       (hasPermission('products.create')&&/^\\d{8,14}$/.test(state.search.trim())?button('Cadastrar produto com este EAN','product-new-ean','','primary'):'')+
       button('Mostrar todos os produtos','products-clear-filters','','primary'):
@@ -833,8 +1052,9 @@ function productsPage(){
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+
     'Exibindo '+list.length+' de '+groups.length+' modelo(s) · '+matched.length+' variação(ões)'+
     '</small><div class="actions">'+
-    (state.page+1<totalPages?button('Ver mais 5 produtos','product-load-more','','primary'):'')+
-    (state.page>0?button('Mostrar menos','product-show-less','','small'):'')+'</div></div></section>';
+    (state.page+1<totalPages?'<div class="product-grid-sentinel" data-products-scroll-sentinel>'+
+      '<span>Role para carregar mais produtos · '+list.length+' de '+groups.length+'</span>'+
+      '<button type="button" class="button small" data-action="product-load-more" hidden>Carregar mais 30</button></div>':'')+'</div></div></section>';
 }
 
 function franchiseCatalogPage(){
@@ -1592,6 +1812,8 @@ function closeTopModal(){
   if(focus?.isConnected)focus.focus({preventScroll:true});
 }
 function formModal(title,contents,formName,submitLabel='Salvar',stack=false){
+  // Operações especializadas permanecem sobre a ficha principal; não a destroem.
+  if(productDrawer&&state.view==='produtos')stack=true;
   if(!stack){
     while(document.querySelector('.modalback'))closeTopModal();
   }else{
@@ -3702,8 +3924,10 @@ function searchAndManageSku(code){
  }else toast('Código não localizado. Confira o EAN ou SKU.',true);
 }
 function switchView(view) {
-  if(state.view==='produtos'&&view!=='produtos'&&
-      ![...root.querySelectorAll('[data-product-card]')].every(abandonCardDraft))return;
+  if(state.view==='produtos'&&view!=='produtos'){
+    if(productDrawer&&!closeProductDrawer(false))return;
+    if(![...root.querySelectorAll('[data-product-card]')].every(abandonCardDraft))return;
+  }
   if(view==='pedidos-lojas'||view==='separacao')view='pedidos';
   if(view==='eventos'&&state.profile?.role!=='evento')view='lojas';
   state.activeStore=null;state.activeStoreTab='resumo';
@@ -4032,6 +4256,10 @@ async function handleClick(event){
   }
   if(action==='add-variants'){
     if(!canRegisterProducts())return;
+    if(target.closest('.cdsb-product-drawer')){
+      const button=productDrawer?.overlay.querySelector('[data-action="product-drawer-show-add"]');
+      button?.click();return;
+    }
     const model=state.apparelModels.find(m=>m.id===id);if(!model)return toast('Modelo não encontrado.',true);
     const variants=state.items.filter(p=>p.apparel_model_id===id);
     const options=resolveCategoryVariations(state.categories,model.category_id).options;
@@ -4275,6 +4503,18 @@ async function handleClick(event){
       const status=assertOk(await db.rpc('remove_product_safely',{p_product_id:id}));
       if(status==='archived')state.showInactiveProducts=false;
     },'Produto excluído ou desativado para preservar o histórico.');
+  }
+  if(action==='product-drawer-open'){openProductDrawer(target.dataset.group);return;}
+  if(action==='product-drawer-close'){closeProductDrawer();return;}
+  if(action==='product-drawer-tab'){switchProductDrawerTab(target.dataset.tab);return;}
+  if(action==='product-drawer-show-add'){
+    const drawer=productDrawer;
+    if(!drawer||!canRegisterProducts()||!drawer.group.modelId)return;
+    const area=drawer.overlay.querySelector('[data-product-drawer-add]');
+    if(!area)return;
+    area.hidden=!area.hidden;
+    if(!area.hidden)area.querySelector('input,select,button')?.focus({preventScroll:true});
+    return;
   }
   if(action==='product-card-sizes'||action==='product-card-edit-toggle'){
     const card=target.closest('[data-product-card]');
@@ -5044,7 +5284,7 @@ async function handleClick(event){
     catch(error){fail(error);return;}
   }
   if(action==='form-scan')return scanInto('input[name="'+scanTarget+'"]',target.closest('form'));
-  if(action==='product-load-more'){state.page++;render();return;}
+  if(action==='product-load-more'){await appendMoreProducts();return;}
   if(action==='product-show-less'){state.page=0;render();return;}
   if(action==='export-csv')return exportCsv();
   if(action==='event-activate'){
@@ -5353,6 +5593,13 @@ async function handleSubmit(event){
    }finally{state.loading=false;}
    return;
   }
+  if(type==='product-drawer-photo'){
+    if(!hasPermission('products.edit')||!productDrawer)return;
+    if(!galleryHasChanges(form))return toast('Nenhuma alteração nas fotos.');
+    const modelId=form.dataset.modelId||null,productId=modelId?null:form.dataset.id;
+    return saveProductCard(async()=>savePhotoGallery(form,{db,assertOk,modelId,productId}),
+      {modelId,productId,success:'Fotos atualizadas. O painel permanece aberto.'});
+  }
   if(type==='product-card-variant'){
     if(!hasPermission('products.edit')||isFranchisePortal())return;
     const item=product(form.dataset.id);if(!item?.apparel_model_id)return;
@@ -5521,10 +5768,16 @@ async function handleSubmit(event){
   }
   if(type==='extra-sizes'){
     if(!canRegisterProducts())return;
+    const inDrawer=Boolean(form.closest('.cdsb-product-drawer'));
     const modelId=form.dataset.modelId;
     const existing=state.items.filter(p=>p.apparel_model_id===modelId);
     let payload;
     try{payload=collectExtraSizes(form,existing);}catch(error){fail(error);return;}
+    if(inDrawer){
+      return saveProductCard(async()=>assertOk(await db.rpc('add_apparel_variants_with_location',{
+        p_model_id:modelId,p_variants:payload
+      })),{modelId,success:'Variações cadastradas; continue no mesmo painel.'});
+    }
     await exec(async()=>assertOk(await db.rpc('add_apparel_variants_with_location',{
       p_model_id:modelId,p_variants:payload
     })),'Novos tamanhos adicionados ao mesmo produto.');
@@ -6153,6 +6406,7 @@ function updateFiltered(id,value){
   if(field&&selection!==null){field.focus();field.setSelectionRange(selection,selection);}
 }
 document.addEventListener('click',event=>{
+  if(event.target.classList?.contains('cdsb-product-backdrop')){closeProductDrawer();return;}
   if(event.target.classList?.contains('buy-drawer-backdrop')){closePurchaseDrawer();return;}
   if(event.target.classList?.contains('photo-lightbox')){document.querySelector('.photo-lightbox')?.remove();return;}
   if(event.target.classList?.contains('mobile-more-overlay')){closeMobileNavigation();return;}
@@ -6212,6 +6466,7 @@ document.addEventListener('keydown',event=>{
     return;
   }
   if(event.key==='Escape'){
+    if(productDrawer){closeProductDrawer();return;}
     if(purchaseDrawer){closePurchaseDrawer();return;}
     if(document.querySelector('.share-product-modal'))document.querySelector('.share-product-modal').remove();
     else if(document.querySelector('.tax-backdrop'))closeTaxonomyPicker();
