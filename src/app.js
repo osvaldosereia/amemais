@@ -207,10 +207,20 @@ async function fetchAllCategories(){
   }
   return {data:all,error:null};
 }
+async function fetchAllProducts(){
+  const limit=750,all=[];
+  for(let offset=0;;offset+=limit){
+    const response=await db.from('products').select('*').order('id').range(offset,offset+limit-1);
+    const items=assertOk(response)||[];
+    all.push(...items);
+    if(items.length<limit)break;
+  }
+  return {data:all,error:null};
+}
 async function loadData(){
   if(!state.user)return;
   const resources=[
-    ['items',db.from('products').select('*').order('name').limit(2500)],
+    ['items',fetchAllProducts()],
     ['apparelModels',db.from('apparel_models').select('*').order('created_at',{ascending:false}).limit(1000)],
     ['categories',fetchAllCategories()],
     ['tags',db.from('tags').select('*').order('name').limit(1000)],
