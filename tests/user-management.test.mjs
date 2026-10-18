@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 const code=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
+const accessCenter=await readFile(new URL('../src/access-center.js',import.meta.url),'utf8');
 const access=code.slice(code.indexOf('const accessPresets='),code.indexOf('function assertFranchiseProfile('));
 const view=code.slice(code.indexOf('function usersPage(){'),code.indexOf('function closeTopModal(){'));
 const factories=new Function('state','permissionCatalog','h',access+'return {permissionFields,accessPresets};');
@@ -36,13 +37,14 @@ test('lojas têm checkboxes compactos e acesso avançado recolhido',()=>{
  assert.match(html,/value="s1" checked/);
  assert.match(html,/<details class="um-advanced"/);
 });
-test('usuários possuem editar, excluir, restaurar e filtros',()=>{
- assert.match(view,/data-users-search/);
- assert.match(view,/data-users-filter-role/);
- assert.match(view,/user-edit/);
- assert.match(view,/user-delete/);
- assert.match(view,/user-restore/);
- assert.match(view,/u\.id===state\.user\?\.id/);
+test('centro de acesso mantém filtros, edição, desativação e restauração',()=>{
+ assert.match(view,/accessCenterHTML/);
+ assert.match(accessCenter,/data-users-search/);
+ assert.match(accessCenter,/data-users-filter-role/);
+ assert.match(accessCenter,/user-workspace/);
+ assert.match(accessCenter,/user-restore/);
+ assert.match(code,/user-edit/);
+ assert.match(code,/user-delete/);
 });
 test('editor mantém papel escolhido e usa rotina transacional',()=>{
  assert.match(code,/set_staff_access_v2/);

@@ -17,6 +17,7 @@ jobs:
       - name: Verificar sintaxe dos módulos críticos
         run: |
           node --check src/app.js
+          node --check src/catalog-transfer.js
           node --check src/stock-workflows.js
           node --check src/shelf-labels.js
           node --check src/sku-panel.js

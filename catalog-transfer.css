@@ -1,0 +1,28 @@
+/* Catálogo: transferências em planilha; sobreposição acessível desktop/mobile */
+.ame-transfer-launch{white-space:nowrap;border:1px solid #b5cdc2;background:#f8fcfa;color:#164c3b}
+.ame-transfer-backdrop{position:fixed;inset:0;z-index:110000;background:rgba(12,24,26,.72);display:flex;align-items:center;justify-content:center;padding:14px}
+.ame-transfer-window{width:min(850px,100%);max-height:min(95dvh,920px);overflow:auto;border-radius:18px;background:#fff;color:#17372d;box-shadow:0 22px 60px #0b221f5c}
+.ame-transfer-window>header{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding:22px 24px;border-bottom:1px solid #dce7e0}
+.ame-transfer-window h2{font-size:22px;margin:0 0 7px}
+.ame-transfer-window>header p{font-size:13px;color:#60786e;margin:0}
+.ame-transfer-window>header button{font-size:29px;border:0;background:transparent;cursor:pointer;color:#355c50;line-height:1}
+.ame-transfer-window>main{padding:22px 24px 28px;display:grid;gap:17px}
+.ame-transfer-actions{display:flex;flex-wrap:wrap;gap:9px}
+.ame-transfer-file{display:flex;flex-direction:column;gap:10px;padding:18px;border:1px dashed #91b5a5;border-radius:12px;background:#f5faf7;font-weight:700}
+.ame-transfer-file input{font-weight:400;max-width:100%}
+.ame-transfer-help{font-size:13px;color:#61766c;margin:0}
+.ame-transfer-preview{max-height:330px;overflow:auto;border:1px solid #d7e3dc;background:#fcfefd;border-radius:11px;padding:15px;font-size:14px}
+.ame-transfer-preview p{margin:9px 0}
+.ame-transfer-preview ul{padding-left:20px}
+.ame-transfer-preview li{margin-bottom:6px;overflow-wrap:anywhere}
+.ame-transfer-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ame-transfer-metrics strong{font-size:13px;padding:9px;border-radius:8px;background:#eaf3ee;text-align:center}
+.ame-transfer-options{display:grid;gap:12px;padding:15px 18px;border:1px solid #d0ddd4;border-radius:12px}
+.ame-transfer-options[hidden]{display:none}
+.ame-transfer-options label{display:flex;align-items:flex-start;gap:9px;line-height:1.5;font-size:14px}
+.ame-transfer-options label input{margin-top:4px}
+.ame-transfer-options button{justify-self:start}
+.ame-transfer-status{font-size:14px;line-height:1.5;color:#1f6249;overflow-wrap:anywhere}
+.ame-transfer-status.error,.ame-transfer-metrics .error{color:#a82e32}
+.ame-transfer-status.error{font-weight:700}
+@media(max-width:640px){.ame-transfer-window{max-height:96dvh}.ame-transfer-window>header,.ame-transfer-window>main{padding:16px}.ame-transfer-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.ame-transfer-actions{display:grid}.ame-transfer-options button{width:100%}}
