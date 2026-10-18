@@ -210,7 +210,7 @@ async function fetchAllCategories(){
 async function fetchAllProducts(){
   const limit=750,all=[];
   for(let offset=0;;offset+=limit){
-    const response=await db.from('products').select('*').order('id').range(offset,offset+limit-1);
+    const response=await db.from('products') .select('*').order('name').order('id').range(offset,offset+limit-1);
     const items=assertOk(response)||[];
     all.push(...items);
     if(items.length<limit)break;
