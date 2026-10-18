@@ -64,7 +64,7 @@ async function parseFile(file){
     const lib=await xlsx();
     const book=lib.read(await file.arrayBuffer(),{type:'array',cellDates:false});
     const sheet=book.Sheets.Produtos||book.Sheets[book.SheetNames[0]];
-    rows=lib.utils.sheet_to_json(sheet,{defval:'',raw:false});
+    rows=lib.utils.sheet_to_json(sheet,{defval:'',raw:true});
   }else throw new Error('Escolha Excel (.xlsx/.xls) ou CSV.');
   if(!rows.length)throw new Error('Planilha vazia.');
   const missing=['SKU','Nome','Categoria','Importar'].filter(k=>!Object.hasOwn(rows[0],k));
