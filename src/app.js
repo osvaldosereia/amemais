@@ -711,7 +711,13 @@ function findProductGroup(key){
 }
 function closeProductDrawer(restoreFocus=true,force=false){
  if(!productDrawer)return true;
- if(!force&&!abandonCardDraft(productDrawer.article))return false;
+ if(!force){
+  const photoForm=productDrawer.overlay.querySelector('[data-form="product-drawer-photo"]');
+  const pendingPhotos=photoForm&&galleryHasChanges(photoForm);
+  const draftVariants=Boolean(productDrawer.overlay.querySelector('[data-extra-size]:not([hidden])'));
+  if((pendingPhotos||draftVariants)&&!window.confirm('Há fotos ou variações não salvas. Descartar essas alterações?'))return false;
+  if(!abandonCardDraft(productDrawer.article))return false;
+ }
  const {overlay,trigger}=productDrawer;
  productDrawer=null;overlay.remove();
  if(restoreFocus&&trigger?.isConnected)trigger.focus({preventScroll:true});
@@ -763,7 +769,7 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
  const ui=state.productCardUi.get(key)||{};
  const selected=tab||ui.drawerTab||'resumo';
  const choices=productDrawerTabs.filter(([name])=>
-  (models||name!=='variacoes')||(false)).filter(([name])=>
+  models||name!=='variacoes').filter(([name])=>
   canEdit||!['cadastro','variacoes','compras','codigos','midia','admin'].includes(name));
  const overlay=document.createElement('div');
  overlay.className='modalback cdsb-product-backdrop';
