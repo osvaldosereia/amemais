@@ -1936,20 +1936,12 @@ function purchaseDraftTargetModal(groupKey){
   '<div class="buy-draft-inline-heading"><strong>Adicionar ao pedido</strong>'+
   '<p>'+h(supplier.name)+' · '+chosen.length+' variação(ões) · '+quantity+' unidades</p></div>'+
   '<div class="buy-draft-inline-lines">'+lines+'</div>'+
-  '<label class="field"><span>Em qual pedido adicionar?</span>'+
-   selectField('Em qual pedido adicionar?','purchase_order_id',options,drafts.length===1?drafts[0].id:'novo')+
-  '</label>'+
+  selectField('Em qual pedido adicionar?','purchase_order_id',options,drafts.length===1?drafts[0].id:'novo')+
   '<p class="help">O pedido pertence somente a este fornecedor. Os saldos de estoque não serão movimentados.</p>'+
   '<div class="buy-draft-inline-actions">'+
   '<button type="button" class="button" data-action="buy-draft-target-back">Voltar às variações</button>'+
   '<button type="submit" class="button primary">Confirmar inclusão</button></div></form>';
- const extraLabel=target.querySelector('label.field>select')?.closest('label.field');
- if(extraLabel){
-  // O helper selectField já fornece seu próprio rótulo.
-  const inner=extraLabel.querySelector('.field');
-  if(inner)extraLabel.replaceWith(inner);
- }
- const action=drawer.panel.querySelector('[data-buy-panel-review]');
+const action=drawer.panel.querySelector('[data-buy-panel-review]');
  if(action)action.hidden=true;
  target.scrollIntoView({block:'nearest',behavior:'smooth'});
  target.querySelector('[name="purchase_order_id"]')?.focus({preventScroll:true});
