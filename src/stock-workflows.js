@@ -239,7 +239,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const stockWorkspace=isProducts?
    '<details class="grouped-variants-mobile card-workspace product-variants-details" data-product-details'+(expanded?' open':'')+'>'+
      '<summary>Variações ('+active.length+')</summary>'+variantOverview+
-     '<details class="product-advanced-stock"><summary>Operações de estoque: balanço, movimentação e histórico</summary>'+stockTabs+
+     '<details class="product-advanced-stock"'+(editorUi?.stockExpanded?' open':'')+'><summary>Operações de estoque: balanço, movimentação e histórico</summary>'+stockTabs+
      '<section data-stock-panel="balanco"'+(stockTab==='balanco'?'':' hidden')+'><p class="card-workspace-help">Conte as quantidades físicas de todas as variações. As reservas não podem ser reduzidas.</p>'+
         '<div class="card-balance-search"><input type="search" data-balance-scan-input placeholder="Bipe ou digite EAN/SKU e pressione Enter" aria-label="Localizar variação pelo código" autocomplete="off">'+
         '<button type="button" class="button" data-action="product-balance-scan">Ler pela câmera</button></div>'+
