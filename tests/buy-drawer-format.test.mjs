@@ -25,9 +25,10 @@ test('no drawer a largura governa o layout, sem comprimir tamanhos, chips e quan
   '.buy-variant-values','.buy-inline-order','.buy-inline-order input',
   '.buy-panel-history','.buy-history-rows','.buy-history-row','.buy-panel-footer'
  ]){
-  assert.ok(drawerStyles.includes(' .buy-drawer-slot '+selector)||
-    drawerStyles.includes(' .buy-drawer-slot'+selector),
-    'Sem regra de layout para '+selector);
+  const needle=selector==='.buy-drawer-slot.buy-page'
+    ?' .buy-drawer-slot.buy-page'
+    :' .buy-drawer-slot '+selector;
+  assert.ok(drawerStyles.includes(needle),'Sem regra de layout para '+selector);
  }
  assert.match(drawerStyles,/\.buy-drawer-slot \.buy-variant\{\s*display:flex!important;flex-direction:column!important/);
  assert.match(drawerStyles,/\.buy-drawer-slot \.buy-variant-pick\{\s*display:grid!important;grid-template-columns:minmax\(0,1fr\) auto!important/);
