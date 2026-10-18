@@ -1753,7 +1753,7 @@ function openPurchaseDrawer(groupKey){
    state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
  if(!group)return;
  const trigger=card.querySelector('[data-action="buy-open-group"]');
- const overlay=document.createElement('div');overlay.className='modalback buy-drawer-backdrop buy-page';
+ const overlay=document.createElement('div');overlay.className='modalback buy-drawer-backdrop';
  const assign=!group.supplier_id?'<section class="buy-drawer-supplier" data-buy-supplier-missing>'+
   '<strong>Fornecedor não cadastrado para este produto</strong>'+
   '<p>Selecione as variações normalmente. Antes de adicionar ao pedido, vincule um fornecedor.</p>'+
@@ -1766,9 +1766,19 @@ function openPurchaseDrawer(groupKey){
   '<header class="modalhead buy-drawer-head"><div><small>Compras · Produto</small><h2 id="buy-drawer-title">'+h(group.title)+
   '</h2></div><button type="button" class="button buy-drawer-close" data-action="buy-drawer-close" aria-label="Fechar compra">✕</button></header>'+
   '<div class="buy-drawer-scroll"><div class="buy-drawer-product"></div>'+assign+
-  '<div class="buy-drawer-slot"></div></div></section>';
- const head=card.querySelector('.buy-group-head')?.cloneNode(true);
- if(head)overlay.querySelector('.buy-drawer-product').append(head);
+  '<div class="buy-drawer-slot"></div><div class="buy-drawer-checkout" data-buy-draft-target hidden></div></div></section>';
+ const source=card.querySelector('.buy-group-head');
+ const product=overlay.querySelector('.buy-drawer-product');
+ const photo=source?.querySelector('.buy-group-photo')?.cloneNode(true);
+ if(photo)product.append(photo);
+ const details=document.createElement('div');details.className='buy-drawer-product-info';
+ const supplierText=source?.querySelector('.buy-card-meta>div:first-child strong')?.textContent||'Sem fornecedor';
+ const categoryText=source?.querySelector('.buy-card-meta>div:nth-child(2) strong')?.textContent||'Não informada';
+ details.innerHTML='<strong>'+h(group.title)+'</strong>'+
+  '<small>Fornecedor: '+h(supplierText)+' · Categoria: '+h(categoryText)+'</small>'+
+  '<small>'+group.variants.length+' variação(ões) · Livre: '+Number(group.available||0).toLocaleString('pt-BR')+
+  ' · Encomendado: '+Number(group.pending||0).toLocaleString('pt-BR')+'</small>';
+ product.append(details);
  overlay.querySelector('.buy-drawer-slot').append(panel);
  document.body.append(overlay);panel.open=true;state.purchaseExpanded.add(groupKey);
  trigger?.setAttribute('aria-expanded','true');
@@ -1891,31 +1901,50 @@ function prefillPurchaseMinimums(groupKey){
 }
 function purchaseDraftTargetModal(groupKey){
  if(!hasPermission('purchases.manage'))return;
+ const drawer=purchaseDrawer;
+ if(!drawer||drawer.groupKey!==groupKey)return toast('Abra o produto antes de adicionar ao pedido.',true);
  const group=purchasingGroups(state.items,state.apparelModels,state.balances,state.stockReservations,
    state.purchaseOrders,state.purchaseItems).find(g=>g.key===groupKey);
  if(!group)return toast('Produto não encontrado.',true);
- const selected=group.variants.filter(p=>state.purchaseCart.has(p.id));
- if(!selected.length)return toast('Selecione pelo menos uma variação.',true);
- const supplierIds=[...new Set(selected.map(p=>p.supplier_id))];
- if(supplierIds.length!==1||!supplierIds[0])return toast('Selecione variações de um único fornecedor cadastrado.',true);
+ const chosen=group.variants.filter(p=>state.purchaseCart.has(p.id));
+ if(!chosen.length)return toast('Selecione pelo menos uma variação.',true);
+ const supplierIds=[...new Set(chosen.map(p=>p.supplier_id))];
+ if(supplierIds.length!==1||!supplierIds[0])
+  return toast('Vincule um único fornecedor às variações selecionadas antes de adicionar ao pedido.',true);
  const supplierId=supplierIds[0];
- for(const p of selected){
-  const qty=state.purchaseCart.get(p.id),minimum=Number(p.minimum_order_quantity||1);
+ for(const p of chosen){
+  const qty=Number(state.purchaseCart.get(p.id)),minimum=Math.max(1,Number(p.minimum_order_quantity||1));
   if(!validPurchaseQty(qty)||qty<minimum)
-   return toast('O tamanho '+(p.apparel_size||p.name)+' exige pedido mínimo de '+minimum+' unidades.',true);
+   return toast('A variação '+(p.apparel_size||p.name)+' exige no mínimo '+minimum+' unidades.',true);
  }
  const supplier=state.suppliers.find(x=>x.id===supplierId);
  if(!supplier?.active)return toast('Fornecedor indisponível.',true);
  const drafts=state.purchaseOrders.filter(o=>o.supplier_id===supplierId&&o.status==='rascunho');
  const options=[['novo','+ Criar novo pedido para '+supplier.name],
-  ...drafts.map(o=>[o.id,'PC-'+o.number+' · '+state.purchaseItems.filter(i=>i.purchase_order_id===o.id).length+' SKU(s)'])];
- formModal('Adicionar ao pedido · '+supplier.name,
-  '<p class="help">'+selected.length+' variação(ões) · '+selected.reduce((n,p)=>n+Number(state.purchaseCart.get(p.id)),0)+
-  ' unidades. Cada pedido pertence exclusivamente a um fornecedor. Escolha um rascunho ou crie um agora.</p>'+
-  '<div class="formgrid">'+selectField('Em qual pedido adicionar?','purchase_order_id',options,drafts.length===1?drafts[0].id:'novo')+'</div>',
-  'buy-add-draft','Adicionar ao pedido');
- const form=document.querySelector('form[data-form="buy-add-draft"]');
- if(form){form.dataset.group=groupKey;form.dataset.supplier=supplierId;}
+   ...drafts.map(o=>[o.id,'PC-'+o.number+' · '+state.purchaseItems.filter(i=>i.purchase_order_id===o.id).length+' SKU(s)'])];
+ const target=drawer.overlay.querySelector('[data-buy-draft-target]');
+ if(!target)return;
+ const lines=chosen.map(p=>{
+  const minimum=Math.max(1,Number(p.minimum_order_quantity||1));
+  return '<div class="buy-draft-inline-row"><span><strong>'+h(p.apparel_size||'Único')+'</strong>'+
+   '<small>SKU '+h(p.sku||'—')+' · Mínimo '+minimum+'</small></span>'+
+   '<strong>'+Number(state.purchaseCart.get(p.id)).toLocaleString('pt-BR')+' un.</strong></div>';
+ }).join('');
+ const quantity=chosen.reduce((n,p)=>n+Number(state.purchaseCart.get(p.id)||0),0);
+ target.hidden=false;
+ target.innerHTML='<form data-form="buy-add-draft" data-group="'+h(groupKey)+'" data-supplier="'+h(supplierId)+'">'+
+  '<div class="buy-draft-inline-heading"><strong>Adicionar ao pedido</strong>'+
+  '<p>'+h(supplier.name)+' · '+chosen.length+' variação(ões) · '+quantity+' unidades</p></div>'+
+  '<div class="buy-draft-inline-lines">'+lines+'</div>'+
+  selectField('Em qual pedido adicionar?','purchase_order_id',options,drafts.length===1?drafts[0].id:'novo')+
+  '<p class="help">O pedido pertence somente a este fornecedor. Os saldos de estoque não serão movimentados.</p>'+
+  '<div class="buy-draft-inline-actions">'+
+  '<button type="button" class="button" data-action="buy-draft-target-back">Voltar às variações</button>'+
+  '<button type="submit" class="button primary">Confirmar inclusão</button></div></form>';
+const action=drawer.panel.querySelector('[data-buy-panel-review]');
+ if(action)action.hidden=true;
+ target.scrollIntoView({block:'nearest',behavior:'smooth'});
+ target.querySelector('[name="purchase_order_id"]')?.focus({preventScroll:true});
 }
 function purchaseDraftDetails(order){
  if(!order||!hasPermission('purchases.manage'))return;
@@ -4079,10 +4108,15 @@ async function handleClick(event){
     if(['abertas','atrasadas'].includes(stat)){state.purchaseTab='pedidos';state.purchaseOrderFilter=stat;}
     state.purchaseCatalog.page=0;render();return;
   }
-  if(action==='buy-add-to-draft'){
-    const groupKey=target.dataset.group;
-    closePurchaseDrawer(false);
-    return purchaseDraftTargetModal(groupKey);
+  if(action==='buy-add-to-draft')return purchaseDraftTargetModal(target.dataset.group);
+  if(action==='buy-draft-target-back'){
+    const drawer=purchaseDrawer;
+    const targetBox=drawer?.overlay.querySelector('[data-buy-draft-target]');
+    if(!drawer||!targetBox)return;
+    targetBox.hidden=true;targetBox.replaceChildren();
+    updatePurchaseCartDisplay();
+    drawer.panel.querySelector('[data-buy-panel-review]')?.focus({preventScroll:true});
+    return;
   }
   if(action==='buy-order-open')return purchaseDraftDetails(state.purchaseOrders.find(o=>o.id===id));
   if(action==='buy-draft-mark-sent'){
@@ -5143,11 +5177,41 @@ async function handleSubmit(event){
    try{
     const orderId=existing?.id||assertOk(await db.rpc('create_supplier_purchase_draft',{p_supplier:supplier}));
     assertOk(await db.rpc('add_purchase_draft_items',{p_order:orderId,p_items:lines}));
+    // Atualizar a memória de pedidos sem destruir o painel lateral nem abrir outro modal.
+    const [orderResponse,itemResponse]=await Promise.all([
+      db.from('purchase_orders').select('*').eq('id',orderId).single(),
+      db.from('purchase_order_items').select('*').eq('purchase_order_id',orderId)
+    ]);
+    if(!orderResponse.error&&orderResponse.data)
+      state.purchaseOrders=state.purchaseOrders.filter(o=>o.id!==orderId).concat(orderResponse.data);
+    if(!itemResponse.error&&Array.isArray(itemResponse.data))
+      state.purchaseItems=state.purchaseItems.filter(i=>i.purchase_order_id!==orderId).concat(itemResponse.data);
+    if(orderResponse.error||itemResponse.error)
+      console.warn('Inclusão confirmada; listagem de pedidos será atualizada no próximo acesso.');
     for(const line of lines)state.purchaseCart.delete(line.product_id);
     savePurchaseCart();
-    closeTopModal();
-    await loadData();
-    toast(lines.length+' variação(ões) adicionada(s). Pode acrescentar outros produtos ao mesmo pedido.');
+    const drawer=purchaseDrawer;
+    if(drawer?.groupKey===form.dataset.group){
+      for(const row of drawer.panel.querySelectorAll('[data-buy-sku]')){
+        if(!lines.some(line=>line.product_id===row.dataset.buySku))continue;
+        const checked=row.querySelector('[data-buy-inline-select]');
+        const qty=row.querySelector('[data-buy-inline-qty]');
+        if(checked)checked.checked=false;
+        if(qty){qty.disabled=true;qty.value=String(Math.max(1,Number(product(row.dataset.buySku)?.minimum_order_quantity||1)));}
+      }
+      const target=drawer.overlay.querySelector('[data-buy-draft-target]');
+      if(target){
+        const order=state.purchaseOrders.find(o=>o.id===orderId);
+        target.innerHTML='<div class="buy-draft-inline-success" role="status">'+
+         '<strong>Produto adicionado ao pedido '+h(order?.number?'PC-'+order.number:'selecionado')+'.</strong>'+
+         '<p>'+lines.length+' variação(ões) incluída(s). Você pode continuar escolhendo outros produtos.</p>'+
+         '<button type="button" class="button primary" data-action="buy-draft-target-back">Continuar comprando</button>'+
+         '</div>';
+        target.hidden=false;
+      }
+      updatePurchaseCartDisplay();
+    }
+    toast(lines.length+' variação(ões) adicionada(s) ao pedido.');
    }catch(error){fail(error);}finally{state.loading=false;}
    return;
   }

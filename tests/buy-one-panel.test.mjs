@@ -51,7 +51,8 @@ test('quantidades iniciais vêm do pedido mínimo do fornecedor, não do estoque
 });
 test('pedido recebe itens selecionados em rascunho do mesmo fornecedor, com autorização',()=>{
  assert.match(app,/function purchaseDraftTargetModal/);
- assert.match(app,/formModal\('Adicionar ao pedido/);
+ assert.match(app,/data-form="buy-add-draft"/);
+ assert.doesNotMatch(app,/formModal\('Adicionar ao pedido/);
  assert.match(app,/supplierIds.length!==1/);
  assert.match(app,/create_supplier_purchase_draft/);
  assert.match(app,/add_purchase_draft_items/);

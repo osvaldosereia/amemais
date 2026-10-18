@@ -24,8 +24,8 @@
 .buy-page .buy-quick-card>.buy-one-panel{display:none!important}
 .buy-scroll-sentinel{min-height:55px;display:flex;align-items:center;justify-content:center;gap:14px;padding:14px;color:#5c6f87;font-size:.82rem}
 .buy-scroll-sentinel .buy-scroll-fallback[hidden]{display:none}
-.buy-drawer-backdrop.modalback.buy-page{display:flex!important;align-items:stretch!important;justify-content:flex-end!important;gap:0!important;padding:0!important;z-index:40000!important;background:#102d5070!important}
-.buy-drawer-backdrop>.buy-drawer.modal{width:min(680px,100vw)!important;max-width:none!important;max-height:100dvh!important;height:100dvh!important;margin:0!important;border-radius:16px 0 0 16px!important;padding:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;background:white;box-shadow:-14px 0 48px #102d5030}
+.buy-drawer-backdrop.modalback{display:flex!important;flex-direction:row!important;align-items:stretch!important;justify-content:flex-end!important;gap:0!important;padding:0!important;z-index:40000!important;background:#0e291e88!important}
+.buy-drawer-backdrop>.buy-drawer.modal{width:min(580px,100vw)!important;max-width:none!important;max-height:100dvh!important;height:100dvh!important;margin:0!important;border-radius:18px 0 0 18px!important;padding:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;background:white;box-shadow:-12px 0 44px #12331f2f!important;animation:ame-sheet-in-right .22s ease-out}
 .buy-drawer .buy-drawer-head{display:flex;justify-content:space-between;align-items:center;gap:18px;flex:0 0 auto}
 .buy-drawer .buy-drawer-head>div{min-width:0}
 .buy-drawer .buy-drawer-head small{display:block;color:#70849c;font-size:.72rem;margin-bottom:5px}
@@ -51,7 +51,10 @@
 @media(max-width:779px){
  .buy-page .buy-quick-card .buy-group-head{grid-template-columns:84px minmax(0,1fr)!important}
  .buy-page .buy-quick-card .buy-group-photo{width:84px!important;height:94px!important}
- .buy-drawer-backdrop>.buy-drawer.modal{width:100vw!important;border-radius:0!important}
+ .buy-drawer-backdrop.modalback{flex-direction:column!important;align-items:flex-end!important;justify-content:flex-end!important}
+ .buy-drawer-backdrop>.buy-drawer.modal{width:100vw!important;height:min(91dvh,960px)!important;min-height:300px!important;max-height:94dvh!important;border-radius:22px 22px 0 0!important;animation:ame-sheet-in-bottom .22s ease-out!important}
+ .buy-drawer .buy-drawer-head{padding:22px 16px 12px!important;min-height:66px!important}
+ .buy-drawer .buy-drawer-head::before{content:'';position:absolute;top:8px;left:calc(50% - 21px);width:42px;height:5px;border-radius:10px;background:#cadace}
  .buy-drawer-product .buy-group-head{display:grid!important;grid-template-columns:75px 1fr!important}
  .buy-drawer-product .buy-group-photo{width:75px!important;height:80px!important}
  .buy-drawer-product .buy-card-meta{grid-column:1/-1;margin:0}
@@ -61,3 +64,96 @@
  .buy-drawer-supplier-fields{flex-direction:column;align-items:stretch}
 }
 @media(prefers-reduced-motion:reduce){.buy-drawer-backdrop>.buy-drawer.modal{animation:none!important}}
+
+/* O painel lateral segue o mesmo componente visual de cadastro/SKU do CDSB. */
+.buy-drawer-backdrop .buy-drawer .buy-drawer-head{
+  background:#fff!important;border-bottom:1px solid #e0eae2!important;
+  min-height:68px;padding:16px 20px;position:relative;z-index:3;
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-head h2{
+  margin:0!important;color:#1b5036!important;line-height:1.3!important;
+  white-space:normal;overflow-wrap:break-word;
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-scroll{
+  display:flex;flex-direction:column;gap:0;min-width:0;min-height:0;
+  padding:0 0 calc(20px + env(safe-area-inset-bottom));
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-product{
+  display:flex!important;flex-direction:row!important;align-items:center!important;
+  min-width:0;gap:12px;padding:14px 18px;border-bottom:1px solid #e0eae2;
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-product .buy-group-photo{
+  flex:0 0 96px!important;max-width:96px!important;min-width:96px!important;
+  width:96px!important;height:96px!important;min-height:96px!important;max-height:96px!important;
+  border-radius:10px;
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-product-info{
+  min-width:0!important;flex:1 1 0!important;display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;align-content:center;gap:6px!important;
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-product-info strong{
+  min-width:0!important;font-size:.92rem!important;line-height:1.4!important;
+  overflow-wrap:normal!important;word-break:normal!important;
+  white-space:normal!important;color:#102d50;
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-product-info small{
+  display:block!important;font-size:.75rem;line-height:1.45;
+  white-space:normal;overflow-wrap:break-word;color:#667c90;
+}
+.buy-drawer-backdrop .buy-drawer .buy-one-panel .buy-panel-footer{
+  position:sticky;bottom:-1px;padding:14px 16px;
+  background:#fff;border-top:1px solid #dce9df;
+}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-slot{min-width:0}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-checkout{padding:16px 18px}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-checkout[hidden]{display:none!important}
+.buy-drawer-backdrop .buy-drawer .buy-drawer-checkout form{
+  display:grid;gap:13px;border-radius:12px;padding:16px;
+  border:1px solid #dbe8e0;background:#f8fbf9;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-heading strong{
+  display:block;font-size:1.02rem;color:#143e30;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-heading p{
+  margin:6px 0 0;font-size:.78rem;color:#5c7669;line-height:1.5;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-lines{
+  background:white;border:1px solid #e1e9ee;border-radius:9px;overflow:hidden;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-row{
+  display:flex;align-items:center;justify-content:space-between;
+  min-width:0;gap:12px;padding:10px 12px;border-bottom:1px solid #edf2f5;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-row:last-child{border-bottom:0}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-row span{
+  min-width:0;display:grid;gap:4px;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-row small{
+  display:block;color:#60798c;font-size:.7rem;overflow-wrap:anywhere;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-row strong{
+  font-size:.83rem;color:#143450;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-actions{
+  display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px;
+  border-top:1px solid #d7e4db;padding-top:13px;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-actions .button{
+  min-height:44px;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-success{
+  padding:18px;border:1px solid #cce6d2;border-radius:11px;background:#f3faf5;
+  display:grid;justify-items:start;gap:9px;color:#205239;
+}
+.buy-drawer-backdrop .buy-drawer .buy-draft-inline-success p{
+  font-size:.8rem;line-height:1.5;margin:0;
+}
+@media(max-width:779px){
+ .buy-drawer-backdrop .buy-drawer .buy-drawer-product{padding:12px;gap:9px}
+ .buy-drawer-backdrop .buy-drawer .buy-drawer-product .buy-group-photo{
+  flex:0 0 77px!important;min-width:77px!important;width:77px!important;
+  height:77px!important;min-height:77px!important;max-height:77px!important;
+ }
+ .buy-drawer-backdrop .buy-drawer .buy-drawer-checkout{padding:12px}
+ .buy-drawer-backdrop .buy-drawer .buy-draft-inline-actions .button{flex:1 1 150px}
+}
