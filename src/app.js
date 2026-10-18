@@ -258,7 +258,14 @@ function readPurchaseForm(form){
 async function exec(work,success='Operação registrada.'){
   if(state.loading)return;
   state.loading=true;
-  try { await work(); await loadData(); document.querySelector('.modalback')?.remove(); toast(typeof success==='function'?success():success); }
+  try {
+    await work();
+    await loadData();
+    const legacy=[...document.querySelectorAll('.modalback')].reverse().find(el=>
+      !el.classList.contains('cdsb-product-backdrop')&&!el.classList.contains('buy-drawer-backdrop'));
+    legacy?.remove();
+    toast(typeof success==='function'?success():success);
+  }
   catch(error){fail(error);}
   finally {state.loading=false;}
 }
@@ -392,6 +399,8 @@ async function loadData(){
   if(updated)state.profile=updated;
   if(!state.profile?.active)throw new Error('Seu usuário está desativado.');
   render();
+  if(productDrawer&&!productDrawer.article.querySelector('[data-unsaved="true"]'))
+    refreshOpenProductDrawer();
 }
 async function loadProfile(){
   const {data:{user},error}=await db.auth.getUser();
@@ -823,6 +832,7 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
 function refreshOpenProductDrawer(){
  if(!productDrawer||state.view!=='produtos')return;
  const {key,tab,overlay}=productDrawer;
+ if(!findProductGroup(key)){closeProductDrawer(false,true);return;}
  const scroll=overlay.querySelector('[data-product-drawer-main]')?.scrollTop||0;
  closeProductDrawer(false,true);
  openProductDrawer(key,{tab,scrollTop:scroll});
