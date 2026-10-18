@@ -30,3 +30,24 @@
 .cdsb-card-editor .cdsb-variant-summary{align-items:flex-start}
 .cdsb-card-editor .cdsb-card-workspace-tabs>button{flex:1 1 44%;min-height:41px}
 }
+
+/* Seletor de categorias do cadastro: pesquisa, caminho completo e último nível. */
+.cdsb-card-editor .cdsb-category-chooser{
+  display:grid;gap:10px;min-width:0;
+  padding:12px;border:1px solid #dbe5e2;border-radius:10px;
+  background:#f8fbf9;
+}
+.cdsb-card-editor .cdsb-category-chooser input[type="search"]{
+  background:#fff;
+  padding-inline:12px;
+}
+.cdsb-card-editor .cdsb-category-chooser select{
+  max-width:100%;white-space:nowrap;text-overflow:ellipsis;
+  background-color:#fff;
+}
+.cdsb-card-editor .cdsb-category-chooser [data-product-category-count]{
+  margin:0;font-weight:500;color:#446a5a;
+}
+.cdsb-card-editor .cdsb-category-chooser [data-product-category-current]{
+  margin:0;overflow-wrap:anywhere;
+}

@@ -16,6 +16,28 @@ export function categoryPath(categories,id){
  }
  return parts.join(' › ');
 }
+// Só folhas são selecionáveis. A categoria intermediária atual permanece
+// como exceção para não quebrar cadastros antigos durante a edição.
+export function selectableProductCategories(categories,currentId=null){
+ const parents=new Set(categories.map(c=>c.parent_id).filter(Boolean));
+ return categories.filter(c=>!parents.has(c.id)||c.id===currentId)
+  .map(c=>({
+    id:c.id,
+    label:categoryPath(categories,c.id)+(parents.has(c.id)?' (categoria geral atual)':''),
+    currentParent:parents.has(c.id)
+  }))
+  .sort((a,b)=>a.label.localeCompare(b.label,'pt-BR',{numeric:true,sensitivity:'base'}));
+}
+const normalizeCategorySearch=value=>String(value??'').normalize('NFD')
+ .replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
+export function filterProductCategories(options,query){
+ const terms=normalizeCategorySearch(query).split(/\s+/).filter(Boolean);
+ if(!terms.length)return options.slice();
+ return options.filter(opt=>{
+   const searchable=normalizeCategorySearch(opt.label);
+   return terms.every(term=>searchable.includes(term));
+ });
+}
 const button=(label,attr='',kind='')=>'<button type="button" class="button small '+kind+'" '+attr+'>'+safe(label)+'</button>';
 const save=label=>'<div class="cdsb-edit-footer"><button type="submit" class="button primary">'+label+'</button></div>';
 const dropdown=(name,items,current)=>'<select name="'+name+'">'+items.map(([value,label])=>
@@ -37,13 +59,25 @@ export function productCardWorkspace(group,{
  rank(a.apparel_size)-rank(b.apparel_size)||String(a.apparel_size||'').localeCompare(String(b.apparel_size||''),'pt-BR',{numeric:true}));
  const selected=currentSku(products,ui?.skuId)?.id;
  const editorTab=['cadastro','variacoes','compras','codigos'].includes(ui?.editorTab)?ui.editorTab:'cadastro';
- const cats=categories.map(c=>[c.id,categoryPath(categories,c.id)]).sort((a,b)=>a[1].localeCompare(b[1],'pt-BR'));
+ const cats=selectableProductCategories(categories,model?.category_id||main.category_id)
+  .map(c=>[c.id,c.label]);
  const tagValue=(model?.tags||main.tags||[]).join(', ');
  const title=model?.name||main.name;
  const hasVariants=Boolean(group.modelId);
  const catId=model?.category_id||main.category_id;
- const catSelect='<label>Categoria, subcategoria e níveis inferiores'+dropdown('category_id',cats,catId)+
-  '<small class="cdsb-edit-hint">Caminho atual: '+safe(categoryPath(categories,catId)||'Não informado')+'</small></label>';
+ const currentIsParent=categories.some(c=>c.parent_id===catId);
+ const catSelect='<div class="cdsb-category-chooser" data-product-category-chooser>'+
+  '<label>Pesquisar categoria ou subcategoria'+
+   '<input type="search" data-product-category-search placeholder="Ex.: imagens sacras, camisetas…" autocomplete="off" spellcheck="false" aria-label="Pesquisar categorias finais">'+
+  '</label>'+
+  '<label>Categoria, subcategoria e níveis inferiores'+
+   '<select name="category_id" data-product-category-select required aria-label="Selecionar categoria final">'+
+    cats.map(([value,label])=>'<option value="'+safe(value)+'"'+(String(value)===String(catId)?' selected':'')+'>'+safe(label)+'</option>').join('')+
+   '</select></label>'+
+  '<small class="cdsb-edit-hint" data-product-category-count>'+cats.length+' categorias disponíveis. Apenas a categoria final de cada ramo é exibida.</small>'+
+  '<small class="cdsb-edit-hint" data-product-category-current>Caminho selecionado: '+safe(categoryPath(categories,catId)||'Não informado')+
+   (currentIsParent?' (categoria geral existente)':'')+'</small>'+
+  '</div>';
  const cadastro='<form data-form="product-card-basic" data-id="'+safe(model?.id||main.id)+
    '" data-is-model="'+hasVariants+'">'+
   '<div class="cdsb-edit-fields">'+
