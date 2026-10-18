@@ -1,4 +1,4 @@
-import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018categories1';
+import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261016sixphotos1';
