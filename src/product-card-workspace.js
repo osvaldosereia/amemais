@@ -119,8 +119,10 @@ export function productCardWorkspace(group,{
    input('Estoque mínimo','min_stock',p.min_stock??0,'type="number" min="0" max="1000000" step="1" required')+
    input('Pedido mínimo','minimum_order_quantity',p.minimum_order_quantity??1,'type="number" min="1" max="1000000" step="1" required')+
    input('Preço de venda (R$)','sale_price',p.sale_price??'','type="number" min="0" max="99999999.99" step="0.01"')+
+   input('Preço de custo (R$)','cost_price',p.cost_price??'',
+     'type="number" min="0" max="99999999.99" step="0.01" placeholder="Não informado"')+
    '<label>Unidade de venda'+dropdown('sales_unit',[['UN','Unidade'],['PC','Peça'],['CX','Caixa']],p.sales_unit||'UN')+'</label>'+
-   '</div><p class="cdsb-edit-hint">O estoque mínimo e o pedido mínimo são independentes para cada SKU. Nenhuma dessas alterações movimenta saldos.</p>'+
+   '</div><p class="cdsb-edit-hint">Custo não informado fica vazio (não é R$ 0,00). Estoque mínimo e pedido mínimo são independentes por SKU. Nenhuma alteração movimenta saldos.</p>'+
    '<div class="cdsb-edit-footer">'+
     (hasVariants?button('Aplicar a todas as variações','data-action="product-card-purchase-all" data-model-id="'+safe(group.modelId)+'"'):'')+
     '<button type="submit" class="button primary">Salvar compras</button></div>';
