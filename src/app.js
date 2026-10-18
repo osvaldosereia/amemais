@@ -2001,7 +2001,10 @@ function openPurchaseDrawer(groupKey){
   '<small>'+group.variants.length+' variação(ões) · Livre: '+Number(group.available||0).toLocaleString('pt-BR')+
   ' · Encomendado: '+Number(group.pending||0).toLocaleString('pt-BR')+'</small>';
  product.append(details);
- overlay.querySelector('.buy-drawer-slot').append(panel);
+ const slot=overlay.querySelector('[data-buy-drawer-content]');
+ slot.innerHTML='<div class="buy-drawer-section-title"><strong>Variações e quantidades</strong>'+
+   '<small>Marque os SKUs e informe a quantidade a pedir.</small></div>';
+ slot.append(panel);
  document.body.append(overlay);panel.open=true;state.purchaseExpanded.add(groupKey);
  trigger?.setAttribute('aria-expanded','true');
  purchaseDrawer={overlay,card,panel,trigger,groupKey};
