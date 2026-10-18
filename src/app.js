@@ -1,3 +1,4 @@
+import {productCardWorkspace} from './product-card-workspace.js?v=20261017workspace1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261016sixphotos1';
@@ -693,7 +694,7 @@ function productGroupCard(group){
     historyForGroup:g=>state.movements.filter(m=>g.products.some(p=>p.id===m.product_id)).slice(0,10),
     purchases:purchasePendingByProduct(state.purchaseOrders,state.purchaseItems),
     categories:state.categories,suppliers:state.suppliers,gondolas:state.gondolas,
-    editorUi:state.productCardUi.get(group.key)||null,
+    editorUi:state.productCardUi.get(group.key)||null,renderEditor:productCardWorkspace,
     expanded:state.expandedProductGroups.has(group.key),canShare:canRegisterProducts(),
     canLabel:!isFranchisePortal()
   });
