@@ -41,8 +41,8 @@ test('desktop usa três colunas e mobile mantém a folha inferior',()=>{
  assert.match(css,/width:min\(580px,100vw\)/);
  assert.match(css,/flex-direction:row!important/);
  assert.match(css,/height:min\(92dvh,950px\)/);
- assert.match(index,/products-grid-drawer.css\?v=20261018productgrid1/);
- assert.match(secure,/app.js\?v=20261021categoryinline1/);
+ assert.match(index,/products-grid-drawer.css\?v=20261021producttabs1/);
+ assert.match(secure,/app.js\?v=20261021producttabs1/);
 });
 test('catálogo carrega 30 por vez, preservando filtros e scroll durante expansão',()=>{
  assert.match(app,/const pageSize=30,totalPages/);
@@ -53,9 +53,13 @@ test('catálogo carrega 30 por vez, preservando filtros e scroll durante expans�
  assert.match(app,/\.slice\(count\)\)grid\.append\(card\)/);
  assert.match(app,/data-action="product-load-more"/);
 });
-test('uma ficha contém resumo, cadastro, variações, compras, códigos, estoque, fotos e administração',()=>{
- for(const tab of ["resumo","cadastro","variacoes","compras","codigos","estoque","midia","admin"])
+test('ficha simplifica as abas e reúne variações, códigos e estoque no mesmo lugar',()=>{
+ for(const tab of ["cadastro","variacoes","compras","midia","admin"])
   assert.match(app,new RegExp("'"+tab+"'"));
+ assert.match(app,/\['cadastro','Produto'\],\['variacoes','Variações e estoque'\]/);
+ assert.match(app,/\['compras','Compras'\],\['midia','Fotos'\],\['admin','Mais'\]/);
+ assert.match(app,/!\['variacoes','codigos'\]\.includes\(section\.dataset\.editorPanel\)/);
+ assert.match(app,/stock\.hidden=tab!=='variacoes'/);
  assert.match(app,/role="dialog" aria-modal="true" aria-labelledby="cdsb-product-drawer-title"/);
  assert.match(app,/overlay\.className='modalback cdsb-product-backdrop'/);
  assert.match(app,/productGroupCard\(group\)/);
