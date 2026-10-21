@@ -1,4 +1,4 @@
-import {makeVariationCards,makeVariationChips,resolveCategoryVariations} from './category-variations.js?v=20261015categorymetadata2';
+import {makeVariationCards,makeVariationChips,resolveCategoryVariations} from './category-variations.js?v=20261021categoryinline1';
 // Espelho local do seletor: módulos de catálogo devem permanecer independentes de DOM/imports.
 const productSizeGondolaSelectHTML=(name,locations=[],current='',opts={})=>{
  const esc=v=>String(v??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[x]));
@@ -29,21 +29,19 @@ function sizeCard(size){
 }
 export function sizesSection(){
  return '<section class="form-section wide variant-switch-section">'+
-  '<label class="variation-switch"><input type="checkbox" name="use_sizes" data-use-sizes disabled>'+
-  '<span class="variation-switch-indicator"></span><span><strong>Cadastrar variações?</strong>'+
-  '<small data-variation-selection-caption>Escolha a categoria para ver as variações disponíveis.</small></span></label>'+
-  '<div data-variant-panel hidden>'+
+  '<input type="checkbox" name="use_sizes" data-use-sizes checked hidden>'+
+  '<div data-variant-panel>'+
   '<div class="size-inherited-fields">'+
    '<input type="hidden" name="apparel_type" value="Outro" disabled>'+
    '<input type="hidden" name="apparel_audience" value="Unissex" disabled>'+
    '<input type="hidden" name="apparel_age" value="Adulto" disabled>'+
    '<p class="help" data-apparel-category-summary>Os dados gerais serão herdados da categoria do produto.</p>'+
    '</div>'+
-  '<div class="size-selector-title"><strong>Escolha as variações disponíveis</strong>'+
-   '<button type="button" class="button small" data-action="size-common" disabled>Selecionar primeiras 4</button></div>'+
-  '<div class="size-chip-group" role="group" aria-label="Variações para cadastrar"></div>'+
+  '<div class="size-selector-title"><strong>Variações da categoria</strong>'+
+   '<small data-variation-selection-caption>Escolha uma categoria para carregar as opções.</small></div>'+
+  '<div class="size-chip-group" hidden></div>'+
   '<div class="size-variant-list"></div>'+
-  '<p class="help">Cada variação terá SKU, EAN e saldo independente. Os nomes vêm da categoria e podem ser editados em Categorias.</p>'+
+  '<p class="help">As opções da categoria já aparecem abaixo. Preencha SKU, EAN ou estoque para cadastrar uma variação; deixe tudo em branco para ignorá-la. Estoque 0 cadastra a variação sem saldo.</p>'+
   '</div></section>';
 }
 export function setSizesMode(form,checked){
@@ -78,7 +76,10 @@ export function setSizeSelected(form,size,enabled){
 }
 export function collectSizeVariants(form){
   const color='Única'; // Campo Cor foi removido. O banco mantém o identificador técnico.
-  const rows=[...form.querySelectorAll('[data-size-variant]')].filter(x=>!x.hidden);
+  const rows=[...form.querySelectorAll('[data-size-variant]')].filter(row=>{
+    const names=['size_sku','size_ean','size_gondola','size_prateleira','size_qty'];
+    return names.some(name=>String(row.querySelector('[name="'+name+'"]')?.value||'').trim()!=='');
+  });
   if(!rows.length)throw new Error('Selecione pelo menos um tamanho.');
   const usedSkus=new Set(),usedEans=new Set();
   return rows.map(row=>{

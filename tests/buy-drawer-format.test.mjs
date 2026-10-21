@@ -49,8 +49,8 @@ test('escopo isolado e versão nova, sem alterar cards ou demais painéis',()=>{
  assert.match(drawerStyles,/\.buy-drawer-backdrop \.buy-drawer \.buy-drawer-slot/);
  assert.match(drawerStyles,/@media\(max-width:600px\)/);
  assert.match(html,/buy-purchase-drawer\.css\?v=20261018sheetformat1/);
- assert.match(html,/secure-entry\.js\?v=20261018sheetformat1/);
- assert.match(entry,/app\.js\?v=20261018sheetformat1/);
+ assert.match(html,/secure-entry\.js\?v=20261021categoryinline1/);
+ assert.match(entry,/app\.js\?v=20261021categoryinline1/);
  const cleaned=drawerStyles.replace(/\/\*[\s\S]*?\*\//g,'').replace(/"[^"]*"|'[^']*'/g,'');
  let nesting=0;
  for(const char of cleaned){
