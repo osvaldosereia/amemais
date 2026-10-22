@@ -35,6 +35,6 @@ test('Sessões repetidas não disparam carregamentos concorrentes',()=>{
  assert.match(app,/db\.auth\.updateUser\(\{password\}\)/);
 });
 test('Versão de cache renovada somente na entrada da aplicação',()=>{
- assert.match(read('src/secure-entry.js'),/app\.js\?v=20261022prodvariants1/);
- assert.match(read('index.html'),/secure-entry\.js\?v=20261022prodvariants1/);
+ assert.match(read('src/secure-entry.js'),/app\.js\?v=20261022filteredportrait1/);
+ assert.match(read('index.html'),/secure-entry\.js\?v=20261022filteredportrait1/);
 });
