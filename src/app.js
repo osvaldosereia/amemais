@@ -1,7 +1,7 @@
 import {productCatalogCard} from './products-grid.js?v=20261022prodvariants1';
 import {findProductByCode} from './product-code-search.js?v=20261022ean9v1';
 import {variationFormHTML,readVariationForm,useOriginalVariation,singleVariantFormHTML,readSingleVariantForm} from './product-variation-coverage.js?v=20261022quickbalance1';
-import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261022quickbalance1';
+import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261022ean9v1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
