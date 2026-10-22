@@ -1121,8 +1121,9 @@ function productModelManager(modelId){
   overlay.querySelector('[data-action="modal-close"]')?.focus({preventScroll:true});
 }
 
-function productsPage(){
-  if(isFranchisePortal())return franchiseCatalogPage();
+// Consulta única para a listagem e para o documento impresso.
+// A paginação é apenas visual; a impressão recebe todos os modelos resultantes dos filtros.
+function selectedProductCatalogGroups(){
   const q=state.search.trim();
   const modelNames=new Map(state.apparelModels.map(m=>[m.id,m.name]));
   const gondolas=availableGondolas(state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active)));
@@ -1142,6 +1143,13 @@ function productsPage(){
     filterCatalogGondola(groupInventory(expanded,state.apparelModels),state.gondolaFilter),
     state.catalogSort,qtyAvailable,qtyStore
   );
+  return {groups,matched};
+}
+
+function productsPage(){
+  if(isFranchisePortal())return franchiseCatalogPage();
+  const {groups,matched}=selectedProductCatalogGroups();
+  const q=state.search.trim();
   const filtersApplied=Boolean(q||state.categoryFilter||state.tagFilter||state.gondolaFilter||state.showInactiveProducts);
   const available=state.items.filter(p=>p.active).length;
   const pageSize=30,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
@@ -2509,16 +2517,31 @@ function printActivityReport(){
 }
 async function printStockReport(){
  if(!hasPermission('stock.balance'))return;
- // Abra a janela antes do await para evitar bloqueio de pop-ups.
+ if(state.view!=='produtos')return;
+ // O mesmo conjunto e a mesma ordenação dos filtros do catálogo, sem limitar aos 30 cards carregados.
+ const {groups:selectedGroups}=selectedProductCatalogGroups();
+ if(!selectedGroups.length)return toast('Nenhum produto corresponde aos filtros para impressão.',true);
+ const selection=selectedGroups.flatMap(group=>group.products);
+ const description=[
+   state.search.trim()?'Busca: '+state.search.trim():'',
+   state.categoryFilter?'Categoria: '+categoryFull(state.categoryFilter):'',
+   state.tagFilter?'Tag: '+state.tagFilter:'',
+   state.gondolaFilter?'Gôndola: '+(availableGondolas(state.items).find(g=>g.key===state.gondolaFilter)?.label||state.gondolaFilter):'',
+   state.showInactiveProducts?'Inclui inativos':''
+ ].filter(Boolean).join(' · ')||'Todos os produtos ativos';
+ // Abrir antes das operações assíncronas evita bloqueio de pop-ups.
  const popup=window.open('','_blank');
  if(!popup)return toast('Libere as janelas de impressão no navegador.',true);
- popup.document.write('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Preparando estoque CDSB</title><body style="font:16px Arial;padding:25px">Preparando fotos e ficha A4 do estoque…</body></html>');
+ popup.document.write('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Preparando estoque CDSB</title><body style="font:16px Arial;padding:25px">Preparando impressão A4 vertical dos produtos filtrados…</body></html>');
  popup.document.close();
  try{
-  const groups=stockPrintGroups(state.items,state.apparelModels,state.balances,state.stockReservations);
+  const groups=stockPrintGroups(selection,state.apparelModels,state.balances,state.stockReservations,{
+    includeInactive:state.showInactiveProducts,
+    groupOrder:selectedGroups.map(group=>group.key)
+  });
   const photos=await signedPhotoUrls(groups.map(group=>group.photoPath));
   if(popup.closed)return;
-  const html=stockPrintHTML(groups,photos,new Date().toLocaleString('pt-BR'));
+  const html=stockPrintHTML(groups,photos,new Date().toLocaleString('pt-BR'),description);
   popup.document.open();popup.document.write(html);popup.document.close();
  }catch(error){if(!popup.closed)popup.close();fail(error);}
 }
