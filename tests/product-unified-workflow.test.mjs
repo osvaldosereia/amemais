@@ -43,7 +43,7 @@ test('Categorias recém-reorganizadas identificam Baby Look feminino e Infantil'
 });
 test('Conversão mantém o produto original e checa permissão, categoria e idempotência',()=>{
  assert.match(migration,/select \* into v_product from public\.products where id=p_product_id for update/i);
- assert.match(migration,/v_product\.apparel_model_id is not null/);
+ assert.match(migration,/v_product\.apparel_model_id is not null/i);
  assert.match(migration,/app_private\.category_variant_options/);
  assert.match(migration,/set apparel_model_id=v_model_id/i);
  assert.doesNotMatch(migration,/delete from public\.products/i);
