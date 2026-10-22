@@ -86,7 +86,7 @@ test('app reutiliza os filtros da lista para imprimir todos os resultados, não 
  const app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
  assert.match(app,/function selectedProductCatalogGroups\(\)/);
  assert.equal((app.match(/selectedProductCatalogGroups\(\)/g)||[]).length,3);
- assert.match(app,/const \{groups,matched\}=selectedProductCatalogGroups\(\)/);
+ assert.match(app,/const \{groups,matched,gondolas,codeResult\}=selectedProductCatalogGroups\(\)/);
  assert.match(app,/const \{groups:selectedGroups\}=selectedProductCatalogGroups\(\)/);
  assert.match(app,/const selection=selectedGroups\.flatMap\(group=>group\.products\)/);
  assert.match(app,/groupOrder:selectedGroups\.map\(group=>group\.key\)/);
