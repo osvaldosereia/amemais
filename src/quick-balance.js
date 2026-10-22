@@ -7,10 +7,17 @@ export const quickModes=[
  {id:'saida',label:'Dar saída',permission:'stock.exit'}
 ];
 export function findQuickStockProduct(items,code){
- const result=findProductByCode(items,code);
- if(result.status==='ambiguous')return {item:null,error:'Código corresponde a mais de um produto. Informe o SKU ou EAN completo.'};
- if(result.item)return {item:result.item,error:null};
- return {item:null,error:result.status==='empty'?'Informe o EAN ou SKU.':
+ const raw=String(code??'').trim();
+ let result=findProductByCode(items,raw);
+ // Aceita EAN digitado com separadores, sem alterar SKU original nem remover zeros à esquerda.
+ if(result.status==='notfound'&&/^[0-9\s-]+$/.test(raw)&&/[\s-]/.test(raw)){
+  const digits=raw.replace(/[\s-]/g,'');
+  if(digits.length>=8&&digits.length<=14)result=findProductByCode(items,digits);
+ }
+ if(result.status==='ambiguous')return {item:null,matches:result.matches,status:'ambiguous',
+  error:'Código corresponde a mais de um produto. Selecione o SKU correto abaixo.'};
+ if(result.item)return {item:result.item,matches:[result.item],status:result.status,error:null};
+ return {item:null,matches:[],status:result.status,error:result.status==='empty'?'Informe o EAN ou SKU.':
   'Código não encontrado. Confira o EAN ou SKU.'};
 }
 export function quickStockResult(item,{physical=0,reserved=0,mode='contagem',can=()=>false}={}){
@@ -65,8 +72,10 @@ export function quickBalancePage(result=quickStockResult(null)){
   '<p>Leia o EAN/SKU, escolha a operação e confirme. Sem justificativa manual.</p></div></div>'+
   '<div class="quick-balance-find"><label for="quick-balance-barcode">Código de barras ou SKU</label>'+
   '<div class="quick-balance-search-row"><input id="quick-balance-barcode" data-quick-balance-barcode '+
-  'placeholder="Bipe ou digite o EAN/SKU e pressione Enter" autocomplete="off" autofocus>'+
+  'type="search" enterkeyhint="search" inputmode="search" aria-label="Buscar EAN ou SKU" '+
+  'placeholder="Bipe ou digite o EAN/SKU" autocomplete="off" autofocus>'+
+  '<button class="button primary" type="button" data-action="quick-balance-search">Buscar</button>'+
   '<button class="button" type="button" data-action="quick-balance-camera">Ler pela câmera</button></div>'+
-  '<small>Leitor USB: pressione Enter para localizar e abrir o produto.</small></div>'+
+  '<small>Leitor USB: pressione Enter. Também é possível digitar e clicar em Buscar.</small></div>'+
   '<div data-quick-balance-result>'+result+'</div></section>';
 }
