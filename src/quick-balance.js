@@ -61,7 +61,7 @@ export function quickBalancePreview(mode,current,reserved,quantity){
  return 'Estoque físico: '+current+' → '+next+' unidade(s).'+
    (mode==='contagem'?' Diferença: '+(next-current>0?'+':'')+(next-current)+'.':'');
 }
-export function quickBalancePage(){
+export function quickBalancePage(result=quickStockResult(null)){
  return '<section class="quick-balance-page">'+
   '<div class="quick-balance-page-head"><div><h1>Balanço rápido</h1>'+
   '<p>Leia o EAN/SKU, escolha a operação e confirme. Sem justificativa manual.</p></div></div>'+
@@ -70,5 +70,5 @@ export function quickBalancePage(){
   'placeholder="Bipe ou digite o EAN/SKU e pressione Enter" autocomplete="off" autofocus>'+
   '<button class="button" type="button" data-action="quick-balance-camera">Ler pela câmera</button></div>'+
   '<small>Leitor USB: pressione Enter para localizar e abrir o produto.</small></div>'+
-  '<div data-quick-balance-result>'+quickStockResult(null)+'</div></section>';
+  '<div data-quick-balance-result>'+result+'</div></section>';
 }
