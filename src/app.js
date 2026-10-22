@@ -1,7 +1,7 @@
 import {productCatalogCard} from './products-grid.js?v=20261022prodvariants1';
 import {findProductByCode} from './product-code-search.js?v=20261022ean9v1';
 import {variationFormHTML,readVariationForm,useOriginalVariation,singleVariantFormHTML,readSingleVariantForm} from './product-variation-coverage.js?v=20261022quickbalance1';
-import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261022ean9v1';
+import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261022lookup2';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
@@ -4080,31 +4080,41 @@ function submitProductSearch(value){
  const input=document.getElementById('product-search');
  if(input)input.focus({preventScroll:true});
 }
+function showQuickBalanceProduct(p){
+ if(state.view!=='balanco'||!p?.active||p.force_archived_at)return;
+ state.quickBalanceId=p.id;
+ if(!quickModes.some(m=>m.id===state.quickBalanceMode&&hasPermission(m.permission)))
+  state.quickBalanceMode=quickModes.find(m=>hasPermission(m.permission))?.id||'contagem';
+ const holder=document.querySelector('[data-quick-balance-result]');
+ if(holder){
+  holder.innerHTML=quickStockResult(p,{
+   physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode:state.quickBalanceMode,can:hasPermission
+  });
+  hydrateImages();
+  const qty=holder.querySelector('[data-quick-balance-quantity]');
+  qty?.focus({preventScroll:true});qty?.select();
+ }
+}
 function selectQuickBalanceProduct(code){
  if(state.view!=='balanco')return;
  const match=findQuickStockProduct(state.items,code);
  const barcode=document.querySelector('[data-quick-balance-barcode]');
- if(barcode)barcode.value='';
  if(!match.item){
-   state.quickBalanceId=null;
-   const holder=document.querySelector('[data-quick-balance-result]');
-   if(holder)holder.innerHTML='<p class="quick-balance-error" role="alert">'+h(match.error)+'</p>';
-   barcode?.focus({preventScroll:true});
-   return;
+  state.quickBalanceId=null;
+  const holder=document.querySelector('[data-quick-balance-result]');
+  if(holder){
+   const options=(match.matches||[]).map(p=>
+    '<button class="quick-balance-choice" type="button" data-action="quick-balance-choose" data-id="'+h(p.id)+'">'+
+    '<strong>'+h(p.name)+'</strong><small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+
+    (p.apparel_size?' · '+h(p.apparel_size):'')+'</small></button>').join('');
+   holder.innerHTML='<div class="quick-balance-notice" role="status"><p>'+h(match.error)+'</p>'+
+    (options?'<div class="quick-balance-choices">'+options+'</div>':'')+'</div>';
+  }
+  if(barcode){barcode.value=String(code??'').trim();barcode.focus({preventScroll:true});barcode.select();}
+  return;
  }
- const p=match.item;
- state.quickBalanceId=p.id;
- if(!quickModes.some(m=>m.id===state.quickBalanceMode&&hasPermission(m.permission)))
-   state.quickBalanceMode=quickModes.find(m=>hasPermission(m.permission))?.id||'contagem';
- const holder=document.querySelector('[data-quick-balance-result]');
- if(holder){
-   holder.innerHTML=quickStockResult(p,{
-     physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode:state.quickBalanceMode,can:hasPermission
-   });
-   hydrateImages();
-   const qty=holder.querySelector('[data-quick-balance-quantity]');
-   qty?.focus({preventScroll:true});qty?.select();
- }
+ if(barcode)barcode.value='';
+ showQuickBalanceProduct(match.item);
 }
 async function submitQuickBalance(form){
  if(state.loading||state.view!=='balanco'||isFranchisePortal())return;
@@ -4736,6 +4746,18 @@ async function handleClick(event){
       const status=assertOk(await db.rpc('remove_product_safely',{p_product_id:id}));
       if(status==='archived')state.showInactiveProducts=false;
     },'Produto excluído ou desativado para preservar o histórico.');
+  }
+  if(action==='quick-balance-search'){
+    selectQuickBalanceProduct(document.querySelector('[data-quick-balance-barcode]')?.value||'');
+    return;
+  }
+  if(action==='quick-balance-choose'){
+    const p=product(id);
+    if(!p?.active||p.force_archived_at)return toast('Produto indisponível.',true);
+    const barcode=document.querySelector('[data-quick-balance-barcode]');
+    if(barcode)barcode.value='';
+    showQuickBalanceProduct(p);
+    return;
   }
   if(action==='quick-balance-camera'){
     try{return scanEAN(code=>selectQuickBalanceProduct(code));}
