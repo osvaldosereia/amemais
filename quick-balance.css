@@ -1,0 +1,40 @@
+/* Área exclusiva do balanço rápido: sem justificativas manuais. */
+.quick-balance-page{max-width:900px;margin:0 auto;display:grid;gap:17px;padding-bottom:40px}
+.quick-balance-page-head h1{font-size:1.5rem;color:#112f50;margin:0 0 6px}
+.quick-balance-page-head p,.quick-balance-find small{font-size:.83rem;color:#647d89}
+.quick-balance-find,.quick-balance-product,.quick-balance-placeholder{
+ background:#fff;border:1px solid #dce6ec;border-radius:14px;padding:19px}
+.quick-balance-find{display:grid;gap:10px}
+.quick-balance-find>label{font-weight:750;color:#17374d}
+.quick-balance-search-row{display:flex;gap:10px}
+.quick-balance-search-row input{flex:1;min-width:0;min-height:49px;padding:12px;border:1px solid #c7d8e4;border-radius:9px;font:inherit}
+.quick-balance-search-row .button{min-height:49px}
+.quick-balance-product{display:grid;gap:18px}
+.quick-balance-product-head{display:flex;gap:14px;align-items:center}
+.quick-balance-photo{width:95px;height:106px;object-fit:cover;border-radius:11px;background:#edf2f5;flex:none}
+.quick-balance-photo.is-empty{display:grid;place-items:center;font-size:2rem;color:#8799a9}
+.quick-balance-product-head>div:last-child{display:grid;gap:6px}
+.quick-balance-product-head strong{font-size:1.1rem;color:#123951}
+.quick-balance-product-head small{font-size:.8rem;color:#68808b;overflow-wrap:anywhere}
+.quick-balance-stock{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.quick-balance-stock>div{padding:14px 10px;border:1px solid #e1e9ef;border-radius:10px;background:#f6f9fb;display:grid;gap:7px;text-align:center}
+.quick-balance-stock small{font-size:.73rem;color:#6b7d89}
+.quick-balance-stock strong{font-size:1.45rem;color:#112f50;font-variant-numeric:tabular-nums}
+.quick-balance-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.quick-balance-modes button{min-height:45px;padding:9px 7px;border:1px solid #cddbe5;border-radius:9px;background:#f8fafc;color:#173c54;font-weight:700;cursor:pointer}
+.quick-balance-modes button.is-active{background:#102d50;color:#fff;border-color:#102d50}
+.quick-balance-product form{display:grid;gap:13px}
+.quick-balance-quantity{display:grid;gap:7px;font-weight:750;color:#15374b}
+.quick-balance-quantity input{width:100%;max-width:250px;height:58px;font-size:1.45rem;font-weight:750;padding:10px;border:1px solid #bfd3df;border-radius:9px}
+.quick-balance-preview{font-size:.84rem;color:#526d7a;margin:0}
+.quick-balance-submit{min-height:50px;justify-self:start;padding:12px 25px}
+.quick-balance-placeholder{color:#6b7c8c;text-align:center;padding:45px 20px}
+.quick-balance-placeholder strong{font-size:1.07rem;color:#244a5c}
+.quick-balance-error{padding:14px;color:#a63730}
+@media(max-width:560px){.quick-balance-find,.quick-balance-product{padding:13px}
+ .quick-balance-search-row{flex-direction:column}
+ .quick-balance-modes button{font-size:.73rem}
+ .quick-balance-product-head{align-items:flex-start}
+ .quick-balance-photo{width:80px;height:90px}
+ .quick-balance-submit{width:100%}
+}

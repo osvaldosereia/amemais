@@ -135,3 +135,30 @@ export function useOriginalVariation(form,size){
  }
  form.dataset.unsaved='true';
 }
+
+export function singleVariantFormHTML(item,{physical=0,canEdit=false,canStock=false}={}){
+ const stock=Number(physical||0);
+ const field=(label,name,value,attrs,disabled=false)=>
+ '<label class="variation-compact-field"><span>'+label+'</span><input name="'+name+
+ '" value="'+esc(value)+'" '+attrs+(disabled?' disabled':'')+'></label>';
+ return '<form class="variation-compact-form" data-form="product-single-variant" data-unsaved="false" '+
+  'data-id="'+esc(item.id)+'" data-expected="'+stock+'" data-expected-sku="'+esc(item.sku||'')+
+  '" data-expected-ean="'+esc(item.ean||'')+'">'+
+  '<div class="variation-compact-header"><strong>Produto único</strong><small>SKU sem tamanhos</small></div>'+
+  '<div class="variation-compact-row"><div class="variation-compact-fields">'+
+  field('Estoque','quantity',stock,'type="number" min="0" max="1000000" step="1" inputmode="numeric"',!canEdit||!canStock)+
+  field('EAN','ean',item.ean||'','inputmode="numeric" maxlength="14" placeholder="Código de barras"',!canEdit)+
+  field('SKU','sku',item.sku||'','maxlength="80" placeholder="Código interno"',!canEdit)+
+  '</div></div></form>';
+}
+export function readSingleVariantForm(form){
+ if(!form)throw Error('Campos do produto único não encontrados.');
+ const ean=form.querySelector('[name="ean"]')?.value.trim()||'';
+ const sku=form.querySelector('[name="sku"]')?.value.trim()||'';
+ const raw=form.querySelector('[name="quantity"]')?.value.trim()??form.dataset.expected;
+ if(!/^(0|[1-9]\d{0,6})$/.test(String(raw))||Number(raw)>1000000)throw Error('Estoque inválido. Informe de 0 a 1.000.000.');
+ if(ean&&!/^\d{8,14}$/.test(ean))throw Error('EAN inválido. Utilize de 8 a 14 dígitos.');
+ if(sku.length>80)throw Error('SKU longo demais (máximo 80 caracteres).');
+ return {sku,ean,quantity:Number(raw),expected:Number(form.dataset.expected),
+  expectedSku:form.dataset.expectedSku||'',expectedEan:form.dataset.expectedEan||''};
+}
