@@ -4031,6 +4031,70 @@ function submitProductSearch(value){
  const input=document.getElementById('product-search');
  if(input)input.focus({preventScroll:true});
 }
+function selectQuickBalanceProduct(code){
+ if(state.view!=='balanco')return;
+ const match=findQuickStockProduct(state.items,code);
+ const barcode=document.querySelector('[data-quick-balance-barcode]');
+ if(barcode)barcode.value='';
+ if(!match.item){
+   state.quickBalanceId=null;
+   const holder=document.querySelector('[data-quick-balance-result]');
+   if(holder)holder.innerHTML='<p class="quick-balance-error" role="alert">'+h(match.error)+'</p>';
+   barcode?.focus({preventScroll:true});
+   return;
+ }
+ const p=match.item;
+ state.quickBalanceId=p.id;
+ if(!quickModes.some(m=>m.id===state.quickBalanceMode&&hasPermission(m.permission)))
+   state.quickBalanceMode=quickModes.find(m=>hasPermission(m.permission))?.id||'contagem';
+ const holder=document.querySelector('[data-quick-balance-result]');
+ if(holder){
+   holder.innerHTML=quickStockResult(p,{
+     physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode:state.quickBalanceMode,can:hasPermission
+   });
+   hydrateImages();
+   const qty=holder.querySelector('[data-quick-balance-quantity]');
+   qty?.focus({preventScroll:true});qty?.select();
+ }
+}
+async function submitQuickBalance(form){
+ if(state.loading||state.view!=='balanco'||isFranchisePortal())return;
+ const p=product(form.dataset.id),mode=form.dataset.mode;
+ const permission=quickModes.find(m=>m.id===mode)?.permission;
+ if(!p?.active||!permission||!hasPermission(permission))
+   return toast('Produto ou permissão indisponível.',true);
+ const raw=form.querySelector('[data-quick-balance-quantity]')?.value.trim()||'';
+ if(!/^(0|[1-9][0-9]{0,6})$/.test(raw)||Number(raw)>1000000||
+   (mode!=='contagem'&&Number(raw)===0))return toast('Quantidade inválida.',true);
+ const expected=Number(form.dataset.expected),reserved=Number(form.dataset.reserved);
+ const message=quickBalancePreview(mode,expected,reserved,Number(raw));
+ if(message.startsWith('Quantidade insuficiente')||message.startsWith('Limite máximo'))
+   return toast(message,true);
+ const request=form.dataset.requestId||crypto.randomUUID();
+ form.dataset.requestId=request;
+ const button=form.querySelector('[type="submit"]');
+ state.loading=true;if(button){button.disabled=true;button.textContent='Salvando…';}
+ try{
+   assertOk(await db.rpc('quick_stock_update',{
+     p_product_id:p.id,p_mode:mode,p_expected:expected,p_quantity:Number(raw),
+     p_request_id:request
+   }));
+   await loadData();
+   state.quickBalanceId=p.id;
+   const selected=product(p.id);
+   if(selected?.active){
+     const result=document.querySelector('[data-quick-balance-result]');
+     if(result){result.innerHTML=quickStockResult(selected,{
+       physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode,can:hasPermission
+     });hydrateImages();}
+   }
+   const scan=document.querySelector('[data-quick-balance-barcode]');
+   scan?.focus({preventScroll:true});scan?.select();
+   toast(mode==='contagem'?'Estoque atualizado e auditado.':
+      mode==='entrada'?'Entrada registrada.':'Saída registrada.');
+ }catch(error){fail(error);}
+ finally{state.loading=false;if(button?.isConnected){button.disabled=false;button.textContent='Confirmar operação';}}
+}
 function searchAndManageSku(code){
  const value=String(code||'').trim();
  if(!value)return;
@@ -4623,6 +4687,26 @@ async function handleClick(event){
       const status=assertOk(await db.rpc('remove_product_safely',{p_product_id:id}));
       if(status==='archived')state.showInactiveProducts=false;
     },'Produto excluído ou desativado para preservar o histórico.');
+  }
+  if(action==='quick-balance-camera'){
+    try{return scanEAN(code=>selectQuickBalanceProduct(code));}
+    catch(error){return fail(error);}
+  }
+  if(action==='quick-balance-mode'){
+    if(state.view!=='balanco')return;
+    const mode=target.dataset.mode;
+    if(!quickModes.some(m=>m.id===mode&&hasPermission(m.permission)))return;
+    state.quickBalanceMode=mode;
+    const p=product(state.quickBalanceId);
+    if(!p)return;
+    const holder=document.querySelector('[data-quick-balance-result]');
+    if(holder){
+      holder.innerHTML=quickStockResult(p,{
+        physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode,can:hasPermission
+      });hydrateImages();
+      holder.querySelector('[data-quick-balance-quantity]')?.focus({preventScroll:true});
+    }
+    return;
   }
   if(action==='product-drawer-open'){openProductDrawer(target.dataset.group);return;}
   if(action==='product-drawer-close'){closeProductDrawer();return;}
@@ -5447,6 +5531,7 @@ async function handleSubmit(event){
   event.preventDefault();if(state.loading)return;
   const values=Object.fromEntries(new FormData(form).entries());
   const type=form.dataset.form;
+  if(type==='quick-balance-action')return submitQuickBalance(form);
   if(type==='order-operational')return submitOperational(form,false);
   if(type==='product-variation-table'||type==='product-single-variant'||
      (type==='product-card-basic'&&form.closest('.cdsb-product-drawer')))
@@ -6560,6 +6645,9 @@ document.addEventListener('keydown',event=>{
     input.value='';
     return;
   }
+  if(event.key==='Enter'&&event.target.matches('[data-quick-balance-barcode]')){
+    event.preventDefault();selectQuickBalanceProduct(event.target.value);return;
+  }
   if(event.key==='Enter'&&event.target.matches('[data-balance-scan-input]')){
     event.preventDefault();
     const input=event.target,panel=input.closest('[data-product-details]');
@@ -6613,6 +6701,13 @@ document.addEventListener('toggle',event=>{
 },true);
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches?.('[data-quick-balance-quantity]')){
+    const field=event.target,form=field.closest('form[data-form="quick-balance-action"]');
+    const preview=form?.querySelector('[data-quick-balance-preview]');
+    if(preview)preview.textContent=quickBalancePreview(form.dataset.mode,
+      Number(form.dataset.expected),Number(form.dataset.reserved),Number(field.value));
+    return;
+  }
   if(event.target.matches?.('[data-product-category-search]'))return;
   const form=event.target.closest?.('form[data-form]');
   if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes','product-variation-table','product-single-variant'].includes(form?.dataset.form))
