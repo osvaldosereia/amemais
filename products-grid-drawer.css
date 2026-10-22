@@ -202,3 +202,31 @@
  .cdsb-product-drawer .product-variant-inline-fields{grid-template-columns:1fr}
  .cdsb-product-drawer .product-variant-inline-host{padding:11px}
 }
+
+
+/* Cartão de variação: códigos legíveis e métricas alinhadas no drawer. */
+.cdsb-product-drawer .product-variant-overview-list{display:grid;gap:10px}
+.cdsb-product-drawer .product-variant-overview-row{
+ grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:10px!important;padding:12px!important;min-width:0!important;
+ border:1px solid #dfe7ef!important;border-radius:11px!important;background:#fff!important}
+.cdsb-product-drawer .product-variant-size{
+ grid-column:1;display:flex;align-items:center;gap:7px;min-width:0}
+.cdsb-product-drawer .product-variant-size strong{font-size:.92rem;color:#102d50}
+.cdsb-product-drawer .product-variant-identifiers{
+ grid-column:2/-1;display:flex;flex-direction:column;gap:5px;
+ min-width:0;overflow-wrap:anywhere}
+.cdsb-product-drawer .product-variant-identifiers small{
+ display:block;font-size:.71rem;color:#60788d;line-height:1.4}
+.cdsb-product-drawer .product-variant-figure{
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ text-align:center;gap:5px;padding:10px 4px;min-width:0;
+ border-radius:8px;background:#f2f6fa}
+.cdsb-product-drawer .product-variant-figure strong{
+ font-size:1.05rem;color:#102d50;font-variant-numeric:tabular-nums}
+.cdsb-product-drawer .product-variant-metric-label{
+ display:block;font-size:.68rem;color:#61788c;line-height:1.3}
+.cdsb-product-drawer .product-variant-figure.is-available{background:#eaf4ee}
+.cdsb-product-drawer .product-variant-row-action{
+ grid-column:1/-1!important;display:flex;justify-content:flex-end}
+.cdsb-product-drawer .product-variant-inline-host{box-sizing:border-box}
