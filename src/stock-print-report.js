@@ -59,12 +59,17 @@ export function stockPrintHTML(groups,photoUrls={},printedAt=new Date().toLocale
   const locations=[...new Set(group.rows.map(r=>r.location).filter(l=>l!=='—'))];
   const place=locations.length===1?locations[0]:locations.length>1?'Localização indicada por variação':'Gôndola não informada';
   const rows=group.rows.map(row=>'<div class="variant'+(row.active===false?' is-inactive':'')+'">'+
-   '<span class="variation">'+esc([row.color,row.size].filter(Boolean).join(' · '))+(row.active===false?' <em>Inativo</em>':'')+'</span>'+
-   '<span class="code">'+esc(row.sku||'—')+'</span>'+
-   '<span class="ean">'+esc(row.ean||'—')+'</span>'+
-   '<span class="where">'+esc(row.location)+'</span>'+
-   '<b class="qty">'+fmt(row.physical)+'</b><b class="qty">'+fmt(row.reserved)+'</b>'+
-   '<b class="qty available">'+fmt(row.available)+'</b><b class="qty">'+fmt(row.minimum)+'</b></div>').join('');
+   '<div class="variant-meta"><strong class="variation">'+
+    esc([row.color,row.size].filter(Boolean).join(' · '))+
+    (row.active===false?' <em>Inativo</em>':'')+'</strong>'+
+    '<span><b>SKU</b> '+esc(row.sku||'—')+' <b>EAN</b> '+esc(row.ean||'—')+'</span>'+
+    '<span class="where">'+esc(row.location)+'</span></div>'+
+   '<div class="variant-counts">'+
+    '<span><small>Fís.</small><b>'+fmt(row.physical)+'</b></span>'+
+    '<span><small>Res.</small><b>'+fmt(row.reserved)+'</b></span>'+
+    '<span class="available"><small>Livre</small><b>'+fmt(row.available)+'</b></span>'+
+    '<span><small>Mín.</small><b>'+fmt(row.minimum)+'</b></span>'+
+   '</div></div>').join('');
   return '<article class="stock-card"><div class="photo">'+image+'</div><section class="right">'+
    '<header class="product-heading"><div class="product-main"><h2>'+esc(group.title)+'</h2>'+
    (group.color?'<span>'+esc(group.color)+'</span>':'')+
@@ -73,8 +78,6 @@ export function stockPrintHTML(groups,photoUrls={},printedAt=new Date().toLocale
    '<span>Reservado <b>'+fmt(group.total.reserved)+'</b></span>'+
    '<span>Livre <b>'+fmt(group.total.available)+'</b></span>'+
    '<span>Mín. <b>'+fmt(group.total.minimum)+'</b></span></div></header>'+
-   '<div class="variant-head"><span>Cor / Tamanho</span><span>SKU</span><span>EAN</span><span>Gôndola / Localização</span>'+
-   '<span>Fís.</span><span>Res.</span><span>Livre</span><span>Mín.</span></div>'+
    rows+'</section></article>';
  }).join('');
  const css = `
@@ -102,12 +105,21 @@ body{font:8pt Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-
 .totals span{display:flex;flex-direction:column;text-align:center;padding:.9mm .6mm;border-radius:1.2mm;background:#eff5f0;white-space:nowrap;color:#47715a;font-size:5.6pt}
 .totals b{font-size:8pt;color:#175f40}
 .totals span:nth-child(3){background:#e2f1e5}.totals span:nth-child(3) b{color:#12623b}
-.variant-head,.variant{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(0,.75fr) minmax(0,.95fr) minmax(0,1.28fr) repeat(4,minmax(0,.43fr));gap:.9mm;align-items:center;padding:.9mm .5mm}
-.variant-head{background:#e9f2eb;color:#3f6450;font-weight:700;font-size:5.55pt;white-space:nowrap;border-radius:.7mm}
-.variant{font-size:6.2pt;border-bottom:1px solid #e6eee7;min-height:5mm}.variant:last-child{border:0}
-.variant>span{overflow-wrap:anywhere}.variation{font-weight:700;color:#1d4831}.variation em{font-weight:400;color:#a75a42;font-size:5pt}
-.where{color:#466a52}
-.qty{text-align:right;font-variant-numeric:tabular-nums;font-size:6.6pt}.qty.available{color:#0b7546}
+.variant{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,56mm);gap:2mm;align-items:center;padding:1.5mm 0;border-bottom:1px solid #e6eee7;min-height:10mm}
+.variant:last-child{border:0}
+.variant-meta{display:flex;flex-direction:column;gap:.7mm;min-width:0}
+.variant-meta strong{font-size:7.6pt;font-weight:700;color:#1d4831;line-height:1.2;overflow-wrap:anywhere}
+.variant-meta span{font-size:7pt;line-height:1.25;overflow-wrap:anywhere}
+.variant-meta span b{color:#3f6450;font-size:6.6pt;margin-left:1.3mm}
+.variant-meta span b:first-child{margin-left:0}
+.variant-meta .where{color:#466a52;font-size:6.8pt}
+.variation em{font-weight:400;color:#a75a42;font-size:6pt}
+.variant-counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.8mm;min-width:0}
+.variant-counts span{display:flex;flex-direction:column;gap:.5mm;align-items:center;text-align:center;background:#f3f7f3;border-radius:1mm;padding:1mm 0;min-width:0}
+.variant-counts small{font-size:5.8pt;color:#54725f;white-space:nowrap}
+.variant-counts b{font-size:8.1pt;color:#214e38;font-variant-numeric:tabular-nums}
+.variant-counts span.available{background:#e2f1e5}
+.variant-counts span.available b{color:#0b7546}
 .footer{margin-top:3mm;color:#587563;font-size:6.5pt;display:flex;justify-content:space-between;gap:4mm}
 @media screen{body{max-width:210mm;margin:auto;padding:9mm;background:#fff}.stock-card{box-shadow:0 1px 4px #d5dfd6}}
 @media print{body{width:100%} .report-header{break-after:avoid} .stock-card{break-inside:avoid;page-break-inside:avoid} .footer{break-inside:avoid}}
