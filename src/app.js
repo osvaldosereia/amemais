@@ -1,5 +1,6 @@
 import {productCatalogCard} from './products-grid.js?v=20261018productgrid1';
 import {variantInlineEditor,variantInlinePayload} from './product-variant-inline.js?v=20261022inlinevariant1';
+import {categoryVariationCoverage,categoryVariationCoverageHTML} from './product-variation-coverage.js?v=20261022variationcoverage1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
@@ -852,11 +853,17 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
  template.innerHTML=productGroupCard(group);
  const article=template.content.firstElementChild;
  if(!article)return;
+ // O editor legado também serve aos cards fora do drawer. Dentro da ficha,
+ // suas seções duplicadas são descartadas, não apenas ocultadas.
+ article.querySelectorAll('[data-editor-panel="variacoes"],[data-editor-panel="codigos"]').forEach(el=>el.remove());
+ article.querySelector('.cdsb-card-workspace-tabs')?.remove();
+ article.querySelector('[data-product-editor] > summary')?.remove();
  overlay.querySelector('[data-product-drawer-editor-slot]').append(article);
  // Em Produtos, códigos têm um único editor, abaixo de cada variação.
  const stock=article.querySelector('[data-product-details]');
  if(stock){
   stock.querySelectorAll('.card-balance-edit-variant,.product-variant-add').forEach(el=>el.remove());
+  stock.querySelector(':scope > summary')?.remove();
   const advanced=stock.querySelector('.product-advanced-stock');
   if(advanced){
    advanced.open=false;
@@ -866,6 +873,9 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
   const overview=stock.querySelector('.product-variant-overview');
   if(overview){
    const allowed=resolveCategoryVariations(state.categories,group.model?.category_id||main.category_id).options;
+   const allVariations=models?
+     state.items.filter(p=>p.apparel_model_id===group.modelId&&!p.force_archived_at):group.products;
+   const coverage=categoryVariationCoverage(allowed,allVariations,{isModel:models});
    const header=document.createElement('div');
    header.className='product-drawer-variation-heading';
    header.innerHTML='<div><strong>Variações cadastradas</strong><small>'+
@@ -873,6 +883,9 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
      (canEdit&&canRegisterProducts()&&allowed.length?
        '<button type="button" class="button primary small" data-action="product-drawer-show-add" aria-expanded="false">+ Adicionar variações</button>':'');
    overview.prepend(header);
+   const categoryOptions=document.createElement('div');
+   categoryOptions.innerHTML=categoryVariationCoverageHTML(coverage,{isModel:models,canEdit:canEdit&&canRegisterProducts()});
+   header.insertAdjacentElement('afterend',categoryOptions);
    if(canEdit&&canRegisterProducts()&&allowed.length){
     const add=document.createElement('div');
     add.className='product-drawer-add';
@@ -880,7 +893,7 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
     add.hidden=true;
     if(models){
      add.innerHTML='<form data-form="extra-sizes" data-model-id="'+h(group.modelId)+'">'+
-       addSizesContent(group.model,group.products,allowed,state.gondolas)+
+       addSizesContent(group.model,allVariations,allowed,state.gondolas)+
        '<div class="cdsb-edit-footer"><button type="submit" class="button primary">Cadastrar variações</button></div></form>';
     }else{
      add.innerHTML='<form data-form="product-drawer-convert" data-id="'+h(main.id)+'" data-unsaved="false">'+
@@ -4351,10 +4364,6 @@ async function handleClick(event){
   }
   if(action==='add-variants'){
     if(!canRegisterProducts())return;
-    if(target.closest('.cdsb-product-drawer')){
-      const button=productDrawer?.overlay.querySelector('[data-action="product-drawer-show-add"]');
-      button?.click();return;
-    }
     const model=state.apparelModels.find(m=>m.id===id);if(!model)return toast('Modelo não encontrado.',true);
     const variants=state.items.filter(p=>p.apparel_model_id===id);
     const options=resolveCategoryVariations(state.categories,model.category_id).options;
@@ -4602,6 +4611,50 @@ async function handleClick(event){
   if(action==='product-drawer-open'){openProductDrawer(target.dataset.group);return;}
   if(action==='product-drawer-close'){closeProductDrawer();return;}
   if(action==='product-drawer-tab'){switchProductDrawerTab(target.dataset.tab);return;}
+  if(action==='product-drawer-pick-size'){
+    const drawer=productDrawer;
+    if(!drawer||!canRegisterProducts()||!target.closest('.cdsb-product-drawer'))return;
+    const label=String(target.dataset.size||'');
+    const group=drawer.group;
+    const allowed=resolveCategoryVariations(state.categories,group.model?.category_id||group.main.category_id).options;
+    if(!allowed.includes(label))return toast('Tamanho não configurado na categoria.',true);
+    const area=drawer.overlay.querySelector('[data-product-drawer-add]');
+    if(!area)return;
+    area.hidden=false;
+    drawer.overlay.querySelector('.product-drawer-variation-heading [data-action="product-drawer-show-add"]')?.
+      setAttribute('aria-expanded','true');
+    if(group.modelId){
+      const form=area.querySelector('form[data-form="extra-sizes"]');
+      const button=[...form?.querySelectorAll('[data-action="extra-size-toggle"]')||[]].
+        find(el=>el.dataset.size===label);
+      const row=[...form?.querySelectorAll('[data-extra-size]')||[]].
+        find(el=>el.dataset.extraSize===label);
+      if(!button||!row)return toast('Este tamanho já foi cadastrado.',true);
+      if(row.hidden)toggleExtraSize(form,label);
+      row.scrollIntoView({block:'nearest',behavior:'smooth'});
+      row.querySelector('input:not([disabled])')?.focus({preventScroll:true});
+    }else{
+      const form=area.querySelector('form[data-form="product-drawer-convert"]');
+      const select=form?.querySelector('select[name="size"]');
+      if(select){
+        select.value=label;form.dataset.unsaved='true';
+        select.focus({preventScroll:true});
+      }
+      area.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+    return;
+  }
+  if(action==='product-drawer-reactivate-variation'){
+    if(!productDrawer||!canRegisterProducts()||!hasPermission('products.edit')||
+       !target.closest('.cdsb-product-drawer'))return;
+    const item=state.items.find(p=>p.id===id&&!p.force_archived_at);
+    if(!item||item.active||item.apparel_model_id!==productDrawer.group.modelId)return;
+    if(!window.confirm('Reativar o tamanho '+item.apparel_size+' mantendo seu SKU e histórico?'))return;
+    return saveProductCard(async()=>assertOk(await db.rpc('update_apparel_variant',{
+      p_product_id:item.id,p_size:item.apparel_size,p_color:item.apparel_color||'Única',
+      p_sku:item.sku,p_ean:item.ean,p_active:true
+    })),{modelId:item.apparel_model_id,success:'Variação reativada com o mesmo SKU e histórico.'});
+  }
   if(action==='product-drawer-show-add'){
     const drawer=productDrawer;
     if(!drawer||!canRegisterProducts())return;

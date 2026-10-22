@@ -14,6 +14,6 @@ if (insecure) {
     </section>
   </main>`;
 } else {
-  await import('./app.js?v=20261022productux2');
+  await import('./app.js?v=20261022variationcoverage1');
   await import('./catalog-transfer.js?v=20261018cost1');
 }
