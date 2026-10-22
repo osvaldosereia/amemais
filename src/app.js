@@ -757,20 +757,20 @@ function closeProductDrawer(restoreFocus=true,force=false){
 function switchProductDrawerTab(tab){
  const sheet=productDrawer;if(!sheet)return;
  if(!productDrawerTabs.some(x=>x[0]===tab))return;
- if(tab!==sheet.tab&&sheet.overlay.querySelector('[data-form="product-drawer-variant"]')){
-  if(!canDiscardInlineVariant())return;
-  resetInlineVariant();
- }
  if(!hasPermission('products.edit')&&!['cadastro','variacoes'].includes(tab))return;
+ const switching=tab!==sheet.tab;
+ const addition=switching?sheet.overlay.querySelector('[data-product-drawer-add]'):null;
+ // Verificar todos os rascunhos ANTES de descartar qualquer um.
+ if(switching&&sheet.overlay.querySelector('form[data-form="product-drawer-variant"]')&&
+   !canDiscardInlineVariant())return;
+ if(addition&&!addition.hidden&&
+   (addition.querySelector('[data-extra-size]:not([hidden])')||
+    addition.querySelector('form[data-form="product-drawer-convert"][data-unsaved="true"]'))&&
+   !window.confirm('Descartar a inclusão de variações não salva?'))return;
  if(!abandonCardDraft(sheet.article))return;
- if(tab!==sheet.tab){
-  const addition=sheet.overlay.querySelector('[data-product-drawer-add]');
-  if(addition&&!addition.hidden){
-   if((addition.querySelector('[data-extra-size]:not([hidden])')||
-     addition.querySelector('form[data-form="product-drawer-convert"]'))&&
-      !window.confirm('Descartar a inclusão de variações não salva?'))return;
-   resetProductDrawerVariationDraft(addition);
-  }
+ if(switching){
+  resetInlineVariant();
+  if(addition&&!addition.hidden)resetProductDrawerVariationDraft(addition);
  }
  const ui=cardUiFor(sheet.article);
  if(ui){ui.drawerTab=tab;ui.panel=tab==='variacoes'?'stock':'editor';
