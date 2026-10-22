@@ -1,6 +1,7 @@
 // Catálogo: importar e exportar planilhas compatíveis com AME MAIS ESTOQUE.
 // Sem importação automática: o gestor deve revisar o resumo e confirmar.
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import {classifyCatalogImport,normalizeImportEan} from './catalog-import-identity.js?v=20261022importnew1';
 const cfg=window.AME_CONFIG||{};
 const db=createClient(cfg.supabaseUrl,cfg.supabasePublishableKey,{
   auth:{autoRefreshToken:false,persistSession:true,detectSessionInUrl:false}
@@ -11,7 +12,7 @@ const HEADERS=['Importar','SKU','Nome','Codigo de barras','Tipo codigo','Unidade
 'Gondola','Prateleira','Foto URL','Codigo SAP','Codigo original','Observacoes','Confianca','Revisao'];
 const escapeHtml=(x)=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm=s=>String(s??'').trim().toLocaleLowerCase('pt-BR');
-let imported=[],busy=false,currentName='';
+let imported=[],busy=false,currentName='',previewCandidates=[];
 async function xlsx(){
   if(window.XLSX)return window.XLSX;
   if(!window.__ameXlsxLoading)window.__ameXlsxLoading=new Promise((resolve,reject)=>{
@@ -80,7 +81,7 @@ function modal(){
   el.className='ame-transfer-backdrop';
   el.innerHTML=`<section class="ame-transfer-window" role="dialog" aria-modal="true" aria-labelledby="ame-transfer-title">
     <header><div><h2 id="ame-transfer-title">Importar / exportar produtos</h2>
-      <p>Cadastros, variações e classificação. Não modifica estoques existentes.</p></div>
+      <p>Somente novos produtos. Cadastros, códigos, fotos e estoque existentes nunca são modificados.</p></div>
       <button type="button" data-transfer-close aria-label="Fechar">×</button></header>
     <main>
       <div class="ame-transfer-actions">
@@ -90,11 +91,10 @@ function modal(){
       <label class="ame-transfer-file">Selecionar planilha Excel ou CSV
         <input type="file" accept=".xlsx,.xls,.csv" data-transfer-file />
       </label>
-      <p class="ame-transfer-help">Importar = SIM inclui o registro; REVISAR e NAO nunca são gravados. Os códigos devem ser únicos.</p>
+      <p class="ame-transfer-help">Importar = SIM: somente novos. SKU ou EAN já cadastrado, inclusive pelos últimos nove dígitos, será ignorado.</p>
       <div class="ame-transfer-preview" data-transfer-preview>Selecione o arquivo organizado para revisar a importação.</div>
       <div class="ame-transfer-options" hidden data-transfer-options>
         <label><input type="checkbox" data-transfer-create-categories /> Criar categorias/subcategorias ausentes, como propostas na planilha</label>
-        <label><input type="checkbox" data-transfer-update /> Atualizar cadastros existentes pelo SKU (sem modificar estoque)</label>
         <label><input type="checkbox" data-transfer-stock /> Lançar estoque inicial somente para produtos novos com quantidade explicitamente informada</label>
         <button type="button" class="button primary" data-transfer-import>Confirmar importação</button>
       </div>
@@ -114,9 +114,9 @@ function modal(){
   });
   el.querySelector('[data-transfer-file]').addEventListener('change',async event=>{
     const file=event.target.files[0];if(!file)return;
-    currentName=file.name;status('Lendo '+file.name+'…');
+    currentName=file.name;previewCandidates=[];status('Lendo '+file.name+'…');
     try{imported=await parseFile(file);await preview();}catch(e){
-      imported=[];el.querySelector('[data-transfer-options]').hidden=true;status(e.message,true);
+      imported=[];previewCandidates=[];el.querySelector('[data-transfer-options]').hidden=true;status(e.message,true);
     }
   });
   return el;
@@ -191,29 +191,20 @@ async function preview(){
   const target=modal().querySelector('[data-transfer-preview]');
   const selected=imported.filter(r=>r.Importar.toUpperCase()==='SIM');
   const omitted=imported.length-selected.length;
-  const problems=[],localSku=new Set(),localBarcode=new Map();
+  const problems=[];
   const [existing,categories,suppliers]=await Promise.all([
-    allRows('products','id,sku,ean,active'),allRows('categories'),allRows('suppliers','id,name,active')
+    allRows('products','id,sku,ean,active,force_archived_at'),allRows('categories'),allRows('suppliers','id,name,active')
   ]);
-  const bySku=new Map(existing.filter(p=>p.active).map(p=>[p.sku,p]));
-  const byEan=new Map(existing.filter(p=>p.active&&p.ean).map(p=>[p.ean,p]));
+  const {newRows,skippedRows}=classifyCatalogImport(selected,existing);
+  previewCandidates=newRows;
   const supply=new Set(suppliers.filter(s=>s.active).map(s=>norm(s.name)));
   const pathMap=new Set(categories.map(c=>[c.parent_id||'raiz',norm(c.name)].join('|')));
-  const maybeNewCategory=new Set(),possibleUpdates=[];
-  for(const [i,r] of selected.entries()){
+  const maybeNewCategory=new Set();
+  for(const r of newRows){
     const tag='Linha '+r.__linha+' (SKU '+r.SKU+'): ';
     if(!r.SKU||r.SKU.length>80||r.Nome.length<2||r.Nome.length>180)problems.push(tag+'SKU/nome inválido');
-    if(localSku.has(r.SKU))problems.push(tag+'SKU duplicado na planilha');
-    localSku.add(r.SKU);
-    if(r['Codigo de barras']&&!/^\d{8,14}$/.test(r['Codigo de barras']))problems.push(tag+'código de barras inválido');
-    if(r['Codigo de barras']){
-      if(localBarcode.has(r['Codigo de barras']))problems.push(tag+'código de barras duplicado na planilha');
-      localBarcode.set(r['Codigo de barras'],r.SKU);
-      const old=byEan.get(r['Codigo de barras']);
-      if(old&&old.sku!==r.SKU)problems.push(tag+'código de barras pertence a outro SKU no banco');
-    }
-    const existingProduct=bySku.get(r.SKU);
-    if(existingProduct)possibleUpdates.push(r.SKU);
+    if(r['Codigo de barras']&&!/^\d{8,14}$/.test(normalizeImportEan(r['Codigo de barras'])))
+      problems.push(tag+'código de barras inválido');
     if(!r.Categoria||['A classificar','Operacionais'].includes(r.Categoria))problems.push(tag+'categoria pendente');
     if(r.Familia||r.Tamanho||r.Cor){
       if(!r.Familia||!r.Tamanho||!r.Cor)problems.push(tag+'Família, tamanho e cor incompletos');
@@ -237,14 +228,14 @@ async function preview(){
   const shown=problems.slice(0,16).map(p=>'<li>'+escapeHtml(p)+'</li>').join('');
   target.innerHTML=`<div class="ame-transfer-metrics">
     <strong>${imported.length} linhas</strong><strong>${selected.length} selecionadas</strong>
-    <strong>${omitted} não selecionadas</strong><strong>${possibleUpdates.length} SKUs já existentes</strong>
-    <strong>${maybeNewCategory.size} categorias-raiz novas</strong>
+    <strong>${omitted} não selecionadas</strong><strong>${skippedRows.length} existentes / duplicados ignorados</strong>
+    <strong>${newRows.length} produtos novos</strong><strong>${maybeNewCategory.size} categorias-raiz novas</strong>
     <strong class="${problems.length?'error':''}">${problems.length} problemas</strong>
   </div>`+
   (problems.length?'<p>Corrija antes de importar (primeiros 16):</p><ul>'+shown+'</ul>':
-    '<p>Nenhum conflito básico encontrado. Confirme as opções para gravar em lotes de até 60 produtos.</p>');
+    '<p>'+newRows.length+' produtos realmente novos; '+skippedRows.length+' linhas já cadastradas ou duplicadas serão ignoradas.</p>');
   const options=modal().querySelector('[data-transfer-options]');
-  options.hidden=!selected.length||problems.length>0;
+  options.hidden=!newRows.length||problems.length>0;
   options.querySelector('[data-transfer-stock]').checked=false;
   status(problems.length?'Há '+problems.length+' problemas. Nenhum cadastro foi gravado.':
     'Arquivo '+currentName+' lido. Nenhuma alteração realizada.');
@@ -252,16 +243,15 @@ async function preview(){
 async function importCatalog(){
   if(!imported.length)throw new Error('Selecione uma planilha.');
   const options=modal().querySelector('[data-transfer-options]');
-  const selected=imported.filter(r=>r.Importar.toUpperCase()==='SIM');
+  const selected=previewCandidates;
   const create=options.querySelector('[data-transfer-create-categories]').checked;
-  const update=options.querySelector('[data-transfer-update]').checked;
   const stock=options.querySelector('[data-transfer-stock]').checked;
   if(!selected.length)throw new Error('Nenhum produto marcado SIM.');
-  if(!confirm('Importar '+selected.length+' cadastros? '+(create?'Categorias ausentes serão criadas. ':'')+
-     (update?'Cadastros existentes serão atualizados. ':'')+
-     (stock?'Saldos iniciais informados serão lançados.':'Nenhum saldo inicial será lançado.')))return;
+  if(!confirm('Cadastrar '+selected.length+' novos produtos? Os existentes serão ignorados sem nenhuma alteração. '+
+     (create?'Categorias ausentes serão criadas. ':'')+
+     (stock?'Estoque inicial será lançado somente para produtos novos.':'Nenhum estoque inicial será lançado.')))return;
   busy=true;
-  const summary={inseridos:0,atualizados:0,ignorados:0,categoriasCriadas:0,estoquesLancados:0};
+  const summary={inseridos:0,atualizados:0,ignorados:imported.filter(r=>r.Importar.toUpperCase()==='SIM').length-selected.length,categoriasCriadas:0,estoquesLancados:0};
   try{
     for(let pos=0;pos<selected.length;pos+=60){
       status('Importando '+Math.min(pos+60,selected.length)+' de '+selected.length+'…');
@@ -270,19 +260,19 @@ async function importCatalog(){
           String(r[k]).replace(',','.'):r[k]]))
       }));
       const {data,error}=await db.rpc('import_products_batch',{
-        p_rows:payload,p_create_categories:create,p_update_existing:update,p_import_initial_stock:stock
+        p_rows:payload,p_create_categories:create,p_update_existing:false,p_import_initial_stock:stock
       });
       if(error)throw new Error('Lote iniciado na linha '+selected[pos].__linha+': '+error.message);
       Object.keys(summary).forEach(k=>summary[k]+=Number(data?.[k]||0));
     }
-    status('Concluído. '+summary.inseridos+' criados, '+summary.atualizados+' atualizados, '+
-      summary.ignorados+' ignorados; '+summary.categoriasCriadas+' categorias criadas e '+
+    status('Concluído. '+summary.inseridos+' novos cadastrados, '+
+      summary.ignorados+' existentes/duplicados ignorados sem alteração; '+summary.categoriasCriadas+' categorias criadas e '+
       summary.estoquesLancados+' lançamentos de estoque inicial. Atualize a página para ver o catálogo.');
     options.hidden=true;
   }catch(error){
     status('Importação interrompida: '+error.message+' Os lotes anteriores podem ter sido gravados. '+
-      'Até aqui: '+summary.inseridos+' criados, '+summary.atualizados+' atualizados. '+
-      'Uma nova importação ignora SKUs já existentes por padrão.',true);
+      'Até aqui: '+summary.inseridos+' novos criados, '+summary.ignorados+' duplicados ignorados. '+
+      'Uma nova importação não altera nenhum produto existente.',true);
   }finally{busy=false;}
 }
 function installButtons(){
