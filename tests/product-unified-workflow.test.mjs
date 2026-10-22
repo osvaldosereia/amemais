@@ -42,12 +42,12 @@ test('Categorias recém-reorganizadas identificam Baby Look feminino e Infantil'
  assert.equal(resolveCategoryVariations(cats,'baby').options.length,2);
 });
 test('Conversão mantém o produto original e checa permissão, categoria e idempotência',()=>{
- assert.match(migration,/select \* into v_product from public\.products where id=p_product_id for update/);
+ assert.match(migration,/select \* into v_product from public\.products where id=p_product_id for update/i);
  assert.match(migration,/v_product\.apparel_model_id is not null/);
  assert.match(migration,/app_private\.category_variant_options/);
- assert.match(migration,/set apparel_model_id=v_model_id/);
+ assert.match(migration,/set apparel_model_id=v_model_id/i);
  assert.doesNotMatch(migration,/delete from public\.products/i);
- assert.match(migration,/revoke all on function public\.convert_single_product_to_apparel/);
- assert.match(migration,/grant execute on function public\.convert_single_product_to_apparel/);
+ assert.match(migration,/revoke all on function public\.convert_single_product_to_apparel/i);
+ assert.match(migration,/grant execute on function public\.convert_single_product_to_apparel/i);
  assert.match(index,/secure-entry\.js\?v=20261022productux2/);
 });
