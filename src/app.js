@@ -761,8 +761,7 @@ function switchProductDrawerTab(tab){
   if(!canDiscardInlineVariant())return;
   resetInlineVariant();
  }
- if(['cadastro','variacoes','compras','admin','midia'].includes(tab)&&
-    !hasPermission('products.edit'))return;
+ if(!hasPermission('products.edit')&&!['cadastro','variacoes'].includes(tab))return;
  if(!abandonCardDraft(sheet.article))return;
  if(tab!==sheet.tab){
   const addition=sheet.overlay.querySelector('[data-product-drawer-add]');
@@ -813,7 +812,7 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
  const preferredTab=tab||ui.drawerTab;
  const selected=productDrawerTabs.some(([name])=>name===preferredTab)?preferredTab:'cadastro';
  const choices=productDrawerTabs.filter(([name])=>
-  canEdit||!['cadastro','variacoes','compras','midia','admin'].includes(name));
+  canEdit||['cadastro','variacoes'].includes(name));
  const overlay=document.createElement('div');
  overlay.className='modalback cdsb-product-backdrop';
  overlay.style.zIndex='41000';
@@ -874,13 +873,14 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
  // suas seções duplicadas são descartadas, não apenas ocultadas.
  article.querySelectorAll('[data-editor-panel="variacoes"],[data-editor-panel="codigos"]').forEach(el=>el.remove());
  article.querySelector('.cdsb-card-workspace-tabs')?.remove();
- article.querySelector('[data-product-editor] > summary')?.remove();
+ // Os summaries originais são mantidos para evitar o marcador implícito
+ // dos elementos details; o CSS do drawer já oculta esses cabeçalhos.
  overlay.querySelector('[data-product-drawer-editor-slot]').append(article);
  // Em Produtos, códigos têm um único editor, abaixo de cada variação.
  const stock=article.querySelector('[data-product-details]');
  if(stock){
   stock.querySelectorAll('.card-balance-edit-variant,.product-variant-add').forEach(el=>el.remove());
-  stock.querySelector(':scope > summary')?.remove();
+  // O summary do details é ocultado pelo CSS do drawer, não removido.
   const advanced=stock.querySelector('.product-advanced-stock');
   if(advanced){
    advanced.open=false;

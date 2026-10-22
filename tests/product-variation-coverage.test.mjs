@@ -66,7 +66,8 @@ test('Drawer mostra categorias e cadastro no mesmo painel, sem edições paralel
  assert.match(app,/if\(action==='product-drawer-pick-size'\)/);
  assert.match(app,/if\(action==='product-drawer-reactivate-variation'\)/);
  assert.match(app,/querySelectorAll\('\[data-editor-panel="variacoes"\],\[data-editor-panel="codigos"\]'\)/);
- assert.match(app,/stock\.querySelector\(':scope > summary'\)\?\.remove\(\)/);
+ assert.match(css,/\[data-product-details\]>summary/);
+ assert.match(app,/canEdit\|\|\['cadastro','variacoes'\]\.includes\(name\)/);
  assert.match(css,/\.product-variation-coverage-grid/);
  assert.match(html,/products-grid-drawer\.css\?v=20261022variationcoverage1/);
  assert.match(entry,/app\.js\?v=20261022variationcoverage1/);
