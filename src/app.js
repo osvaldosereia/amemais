@@ -1,4 +1,5 @@
-import {productCatalogCard} from './products-grid.js?v=20261018productgrid1';
+import {productCatalogCard} from './products-grid.js?v=20261022prodvariants1';
+import {findProductByCode} from './product-code-search.js?v=20261022ean9v1';
 import {variationFormHTML,readVariationForm,useOriginalVariation,singleVariantFormHTML,readSingleVariantForm} from './product-variation-coverage.js?v=20261022quickbalance1';
 import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261022quickbalance1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
@@ -1125,8 +1126,12 @@ function productsPage(){
   const q=state.search.trim();
   const modelNames=new Map(state.apparelModels.map(m=>[m.id,m.name]));
   const gondolas=availableGondolas(state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active)));
-  const matched=state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active)&&
-    catalogMatchesQuery(p,q,modelNames.get(p.apparel_model_id)||'')&&
+  const eligible=state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active));
+  const codeResult=/^\d{9,}$/.test(q)?findProductByCode(eligible,q):null;
+  const searched=codeResult?.status==='ambiguous'?[]:
+    codeResult?.item?[codeResult.item]:
+    eligible.filter(p=>catalogMatchesQuery(p,q,modelNames.get(p.apparel_model_id)||''));
+  const matched=searched.filter(p=>
     (!state.categoryFilter||categoryChain(p.category_id).some(c=>c.id===state.categoryFilter))&&
     (!state.tagFilter||(p.tags||[]).includes(state.tagFilter)));
   const groupKeys=new Set(matched.map(p=>p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id));
@@ -1179,7 +1184,9 @@ function productsPage(){
     '<div class="grouped-inventory-grid products-card-grid">'+(list.length?list.map(group=>productCatalogCard(group,{
       h,qtyStore,qtyReserved,qtyAvailable,categories:state.categories
     })).join(''):'<div class="muteblock"><strong>Nenhum produto corresponde aos filtros.</strong>'+
-      (filtersApplied?'<p>Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.</p>'+
+      (filtersApplied?'<p>'+(codeResult?.status==='ambiguous'?
+       'Os últimos nove dígitos deste EAN correspondem a mais de um produto. Informe o SKU ou EAN completo.':
+       'Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.')+'</p>'+
       (hasPermission('products.create')&&/^\\d{8,14}$/.test(state.search.trim())?button('Cadastrar produto com este EAN','product-new-ean','','primary'):'')+
       button('Mostrar todos os produtos','products-clear-filters','','primary'):
       '<p>Cadastre um novo produto ou verifique a opção Mostrar inativos.</p>')+'</div>')+'</div>'+
@@ -4117,9 +4124,9 @@ async function submitQuickBalance(form){
 function searchAndManageSku(code){
  const value=String(code||'').trim();
  if(!value)return;
- const match=state.items.find(p=>p.active&&!p.force_archived_at&&
-  (String(p.ean||'')===value||String(p.sku||'').toLocaleLowerCase('pt-BR')===value.toLocaleLowerCase('pt-BR')));
- state.view='produtos';state.search=value;state.productSearchDraft=value;state.page=0;
+ const resolved=findProductByCode(state.items,value),match=resolved.item;
+ const query=match?(String(match.ean||'')||String(match.sku||'')):value;
+ state.view='produtos';state.search=query;state.productSearchDraft=query;state.page=0;
  state.categoryFilter='';state.tagFilter='';state.gondolaFilter='';
  if(match)state.expandedProductGroups.add(match.apparel_model_id?
   'model:'+match.apparel_model_id:'product:'+match.id);
@@ -4128,7 +4135,7 @@ function searchAndManageSku(code){
    const key=match.apparel_model_id?'model:'+match.apparel_model_id:'product:'+match.id;
    const card=[...document.querySelectorAll('[data-product-card]')].find(x=>x.dataset.productCard===key);
    card?.scrollIntoView({block:'nearest',behavior:'smooth'});
- }else toast('Código não localizado. Confira o EAN ou SKU.',true);
+ }else toast(resolved.status==='ambiguous'?'Mais de um produto corresponde aos mesmos 9 dígitos finais. Informe o SKU ou EAN completo.':'Código não localizado. Confira o EAN ou SKU.',true);
 }
 function switchView(view) {
   if(state.view==='produtos'&&view!=='produtos'){
