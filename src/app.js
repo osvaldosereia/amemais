@@ -3905,9 +3905,9 @@ function userModal(){
     selectField('Perfil gerenciado (opcional)','access_profile_id',
       [['','Manter permissões da função'],...state.accessProfiles.filter(p=>p.is_active&&p.role_kind!=='admin').map(p=>[p.id,p.name])],'')+
     permissionFields('')+
-    field('Senha inicial','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"',
-      'Mínimo de 6 caracteres. Sem exigência de símbolos ou maiúsculas. A senha não será enviada por email.')+
-    field('Confirmar senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+    field('Senha inicial','password','password','','required minlength="6" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="new-password"',
+      'Use exatamente 6 dígitos numéricos (PIN). A senha não será enviada por email.')+
+    field('Confirmar senha','password_confirm','password','','required minlength="6" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="new-password"')+
     '</div><div class="note">O administrador entrega a senha ao funcionário por um canal seguro. O acesso é liberado imediatamente, sem confirmação por email.</div>',
     'user-new','Cadastrar usuário');
   setupFranchiseProfile(document.querySelector('.modal form[data-form="user-new"]'));
@@ -3916,29 +3916,29 @@ function adminPasswordModal(id){
   if(!isAdmin()||id===state.user?.id)return;
   const target=state.users.find(x=>x.id===id);if(!target)return;
   formModal('Definir senha · '+target.full_name,'<div class="formgrid">'+
-    field('Nova senha','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
-    field('Confirmar nova senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+    field('Nova senha','password','password','','required minlength="6" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="new-password"')+
+    field('Confirmar nova senha','password_confirm','password','','required minlength="6" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="new-password"')+
     '</div><p class="help">Não será enviado email de confirmação. Informe a nova senha diretamente ao colaborador.</p>',
     'user-password','Salvar senha');
   document.querySelector('.modalback form').dataset.id=id;
 }
 function recoveryPasswordModal(){
  formModal('Redefinir senha','<p class="help">Defina uma nova senha para esta conta. Esta operação não altera as senhas de outras pessoas.</p><div class="formgrid">'+
-   field('Nova senha','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
-   field('Confirme a nova senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+   field('Nova senha','password','password','','required minlength="6" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="new-password"')+
+   field('Confirme a nova senha','password_confirm','password','','required minlength="6" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="new-password"')+
    '</div>','recovery-password','Salvar nova senha');
 }
 function myPasswordModal(){
   if(!state.user||!state.profile?.active)return;
   formModal('Minha senha','<div class="formgrid">'+
-    field('Nova senha','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
-    field('Confirmar nova senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+    field('Nova senha','password','password','','required minlength="6" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="new-password"')+
+    field('Confirmar nova senha','password_confirm','password','','required minlength="6" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="new-password"')+
     '</div><p class="help">Sua senha é armazenada com segurança no Supabase Auth.</p>',
     'my-password','Atualizar minha senha');
 }
 function passwordsValid(values){
   const p=String(values.password||''),repeat=String(values.password_confirm||'');
-  if(p.length<6||p.length>128)throw new Error('Utilize uma senha de 6 a 128 caracteres.');
+  if(!/^[0-9]{6}$/.test(p))throw new Error('Utilize exatamente 6 dígitos numéricos para a nova senha.');
   if(p!==repeat)throw new Error('As senhas digitadas são diferentes.');
   return p;
 }
@@ -5442,7 +5442,7 @@ async function handleClick(event){
   if(action==='user-workspace-tab')return userWorkspaceModal(id,target.dataset.tab);
   if(action==='users-provision'){
    if(!isAdmin()||state.loading)return;
-   if(!window.confirm('Criar as 6 contas-padrão do CDSB com senhas temporárias fortes? Usuários atuais não serão bloqueados nem apagados. As senhas serão mostradas uma única vez nesta tela.'))return;
+   if(!window.confirm('Criar as 6 contas-padrão do CDSB com PINs temporários de 6 dígitos? Usuários atuais não serão bloqueados nem apagados. As senhas serão mostradas uma única vez nesta tela.'))return;
    state.loading=true;
    try{
     const {data,error}=await db.functions.invoke('cdsb-provision-users',{

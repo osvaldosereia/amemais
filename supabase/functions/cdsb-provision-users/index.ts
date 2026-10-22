@@ -21,8 +21,17 @@ const roles=[
   permissions:["products.read","orders.read","orders.separate"]}
 ];
 function randomPassword(){
- const bytes=new Uint8Array(27);crypto.getRandomValues(bytes);
- return btoa(String.fromCharCode(...bytes)).replaceAll("+","-").replaceAll("/","_").replaceAll("=","")+"aA7!";
+ // PIN temporário de seis dígitos, gerado com CSPRNG e sem viés de módulo.
+ const digits=[];
+ while(digits.length<6){
+  const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);
+  for(const value of bytes){
+   if(value>=250)continue;
+   digits.push(String(value%10));
+   if(digits.length===6)break;
+  }
+ }
+ return digits.join('');
 }
 Deno.serve(async req=>{
  if(req.method==="OPTIONS")return new Response(null,{headers});
