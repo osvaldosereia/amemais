@@ -116,9 +116,9 @@ export function variationOptionsToSave(form){
 }
 export function makeVariationCards(options,gondolas=[]){
  const h=escapeVariant;
- return options.map(label=>'<div class="size-variant-card" data-size-variant="'+h(label)+'" hidden>'+
+ return options.map(label=>'<div class="size-variant-card" data-size-variant="'+h(label)+'">'+
   '<div class="size-variant-heading"><strong>'+h(label)+'</strong>'+
-    '<button type="button" class="button small" data-action="size-remove" data-size="'+h(label)+'">Remover</button></div>'+
+    '</div>'+
   '<div class="size-fields">'+
    '<label class="field"><span>SKU (opcional)</span><input name="size_sku" maxlength="80" disabled placeholder="Gerado automaticamente"></label>'+
    '<label class="field"><span>EAN (opcional)</span><div class="inline apparel-ean">'+
@@ -126,7 +126,7 @@ export function makeVariationCards(options,gondolas=[]){
     '<button type="button" class="button small" data-action="size-scan">📷</button></div></label>'+
    gondolaSelectHTML('size_gondola',gondolas,'',{label:'Gôndola deste tamanho',disabled:true})+
    '<label class="field"><span>Prateleira</span><input name="size_prateleira" maxlength="40" disabled placeholder="Ex.: B"></label>'+
-   '<label class="field"><span>Estoque inicial</span><input name="size_qty" type="number" step="1" min="0" max="1000000" value="0" disabled required inputmode="numeric"></label>'+
+   '<label class="field"><span>Estoque inicial</span><input name="size_qty" type="number" step="1" min="0" max="1000000" placeholder="Em branco = não cadastrar" inputmode="numeric"></label>'+
   '</div></div>').join('');
 }
 export function makeVariationChips(options){
@@ -143,18 +143,21 @@ export function refreshCategorySizeOptions(form,categories,gondolas=[]){
  const chips=picker.querySelector('.size-chip-group');
  const list=picker.querySelector('.size-variant-list');
  if(!chips||!list)return;
- chips.innerHTML=makeVariationChips(options);list.innerHTML=makeVariationCards(options,gondolas);
+ chips.innerHTML='';list.innerHTML=makeVariationCards(options,gondolas);
+ list.querySelectorAll('input,select').forEach(input=>input.disabled=!options.length);
  const toggle=form.querySelector('[data-use-sizes]');
  if(toggle){
-  toggle.disabled=!options.length;
+  toggle.disabled=!options.length;toggle.checked=Boolean(options.length);
   if(!options.length&&toggle.checked){toggle.checked=false;toggle.dispatchEvent(new Event('change',{bubbles:true}));}
  }
  const caption=form.querySelector('[data-variation-selection-caption]');
  if(caption)caption.textContent=options.length?
   options.join(' · ')+(found.inherited?' (herdadas)':''):
   'Selecione uma categoria com variações configuradas para ativar esta opção.';
- const quick=picker.querySelector('[data-action="size-common"]');
- if(quick)quick.disabled=!options.length;
+ const single=form.querySelector('[data-single-fields]');
+ if(single){single.hidden=Boolean(options.length);single.querySelectorAll('input').forEach(input=>input.disabled=Boolean(options.length));}
+ const amount=form.querySelector('[data-single-stock]');
+ if(amount){amount.hidden=Boolean(options.length);amount.querySelectorAll('input').forEach(input=>input.disabled=Boolean(options.length));}
 }
 export function getVariationChoices(form){
  return [...(form?.querySelectorAll('[data-action="size-toggle"]')||[])].map(el=>el.dataset.size);

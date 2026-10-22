@@ -59,12 +59,12 @@
  font-size:1.05rem!important;line-height:1.35!important;
  min-width:0;overflow-wrap:anywhere;margin:0}
 .cdsb-product-drawer>.modalhead .button{min-height:42px;flex:0 0 42px}
-.product-drawer-tabs{display:flex;flex:0 0 auto;gap:6px;padding:10px 14px;
- max-height:120px;overflow-x:auto;overflow-y:auto;background:#f5f9f7;
+.product-drawer-tabs{display:flex;flex:0 0 auto;flex-wrap:wrap;gap:6px;padding:10px 14px;
+ overflow:visible;background:#f5f9f7;
  border-bottom:1px solid #e0eae2;scrollbar-width:thin}
 .product-drawer-tabs button{padding:9px 12px;border-radius:9px;border:1px solid #dbe6e0;
  background:#fff;min-height:39px;color:#225441;cursor:pointer;
- font-size:.73rem;font-weight:700;white-space:nowrap;flex:0 0 auto}
+ font-size:.73rem;font-weight:700;white-space:normal;line-height:1.2;flex:1 1 92px}
 .product-drawer-tabs button.is-active,.product-drawer-tabs button[aria-selected="true"]{
  background:#102d50;color:#fff;border-color:#102d50}
 .cdsb-product-drawer .product-drawer-main{flex:1 1 auto;min-height:0;

@@ -13,10 +13,10 @@ import { openTaxonomyPicker, closeTaxonomyPicker } from './taxonomy-ui.js?v=2026
 import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './catalog-ui.js?v=20261015variants1';
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js?v=20261016gondolas1';
-import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261016gondolas1';
-import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261016gondolas1';
+import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261021categoryinline1';
+import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261021categoryinline1';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261017workspace1';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261021categoryinline1';
 import {catalogSortOptions,availableGondolas,gondolaKey,catalogMatchesQuery,orderCatalogGroups,filterCatalogGondola} from './catalog-order.js?v=20261016sort1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261016damage-direct1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
@@ -701,9 +701,8 @@ let productDrawer=null;
 let productInfiniteObserver=null;
 let productInfiniteBusy=false;
 const productDrawerTabs=[
- ['resumo','Visão geral'],['cadastro','Cadastro'],['variacoes','Variações'],
- ['compras','Compras e reposição'],['codigos','Códigos e localização'],
- ['estoque','Estoque'],['midia','Fotos'],['admin','Administração']
+ ['cadastro','Produto'],['variacoes','Variações e estoque'],
+ ['compras','Compras'],['midia','Fotos'],['admin','Mais']
 ];
 function findProductGroup(key){
  const all=state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active));
@@ -726,36 +725,37 @@ function closeProductDrawer(restoreFocus=true,force=false){
 function switchProductDrawerTab(tab){
  const sheet=productDrawer;if(!sheet)return;
  if(!productDrawerTabs.some(x=>x[0]===tab))return;
- if(tab==='variacoes'&&!sheet.group.modelId)return;
- if(['cadastro','variacoes','compras','codigos','admin','midia'].includes(tab)&&
+ if(['cadastro','variacoes','compras','admin','midia'].includes(tab)&&
     !hasPermission('products.edit'))return;
  if(!abandonCardDraft(sheet.article))return;
  const ui=cardUiFor(sheet.article);
- if(ui){ui.drawerTab=tab;ui.panel=tab==='estoque'?'stock':'editor';
-  if(['cadastro','variacoes','compras','codigos'].includes(tab))ui.editorTab=tab;}
+ if(ui){ui.drawerTab=tab;ui.panel=tab==='variacoes'?'stock':'editor';
+  if(['cadastro','variacoes','compras'].includes(tab))ui.editorTab=tab;}
  sheet.tab=tab;
  sheet.overlay.querySelectorAll('[data-product-drawer-tab]').forEach(button=>{
   const active=button.dataset.tab===tab;
   button.classList.toggle('is-active',active);
   button.setAttribute('aria-selected',String(active));
  });
- sheet.overlay.querySelector('[data-product-drawer-overview]').hidden=tab!=='resumo';
+ sheet.overlay.querySelector('[data-product-drawer-overview]').hidden=tab!=='cadastro';
  sheet.overlay.querySelector('[data-product-drawer-photo]')?.toggleAttribute('hidden',tab!=='midia');
  const article=sheet.article;
  const editor=article.querySelector('[data-product-editor]');
  const stock=article.querySelector('[data-product-details]');
  if(editor){
-  const show=['cadastro','variacoes','compras','codigos','admin'].includes(tab);
+  const show=['cadastro','variacoes','compras','admin'].includes(tab);
   editor.hidden=!show;editor.open=show;
   editor.querySelectorAll('[data-editor-panel]').forEach(section=>{
-   section.hidden=tab==='admin'||section.dataset.editorPanel!==tab;
+   section.hidden=tab==='admin'||(tab==='variacoes'
+    ?!['variacoes','codigos'].includes(section.dataset.editorPanel)
+    :section.dataset.editorPanel!==tab);
   });
   const advanced=editor.querySelector('.card-admin-tools');
   if(advanced){advanced.hidden=tab!=='admin';advanced.open=tab==='admin';}
   for(const button of editor.querySelectorAll('[data-action="product-editor-tab"]'))
    button.setAttribute('aria-selected',String(button.dataset.tab===tab));
  }
- if(stock){stock.hidden=tab!=='estoque';stock.open=tab==='estoque';}
+ if(stock){stock.hidden=tab!=='variacoes';stock.open=tab==='variacoes';}
  const panel=sheet.overlay.querySelector('[data-product-drawer-main]');
  if(panel)panel.scrollTop=0;
 }
@@ -767,10 +767,10 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
  const models=Boolean(group.modelId);
  const canEdit=hasPermission('products.edit');
  const ui=state.productCardUi.get(key)||{};
- const selected=tab||ui.drawerTab||'resumo';
+ const preferredTab=tab||ui.drawerTab;
+ const selected=productDrawerTabs.some(([name])=>name===preferredTab)?preferredTab:'cadastro';
  const choices=productDrawerTabs.filter(([name])=>
-  models||name!=='variacoes').filter(([name])=>
-  canEdit||!['cadastro','variacoes','compras','codigos','midia','admin'].includes(name));
+  canEdit||!['cadastro','variacoes','compras','midia','admin'].includes(name));
  const overlay=document.createElement('div');
  overlay.className='modalback cdsb-product-backdrop';
  overlay.style.zIndex='41000';

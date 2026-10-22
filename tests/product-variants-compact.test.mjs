@@ -38,15 +38,14 @@ test('consulta imediata mostra saldo físico, reservado, disponível e edição 
  assert.match(section,/Reservado/);
  assert.match(section,/Disponível/);
 });
-test('balanço e movimentação aparecem em seção fechada, preservando controles existentes',()=>{
+test('balanço rápido já abre no produto e preserva movimentação e histórico',()=>{
  assert.match(html,/<summary>Variações \(4\)<\/summary>/);
- assert.match(html,/<details class="product-advanced-stock"><summary>Operações de estoque/);
+ assert.match(html,/<details class="product-advanced-stock" open><summary>Ajuste rápido de estoque/);
  assert.match(html,/data-stock-panel="balanco"/);
  assert.match(html,/data-stock-panel="movimentar"/);
  assert.match(html,/data-stock-panel="historico"/);
  assert.match(html,/data-action="product-balance-save"/);
  assert.match(html,/data-action="product-stock-mode"/);
- assert.doesNotMatch(html,/<details class="product-advanced-stock" open/);
 });
 test('card fechado contém todos os saldos, com layout de três colunas',async()=>{
  const header=html.split('grouped-inventory-top')[1].split('grouped-inventory-actions')[0];
