@@ -267,7 +267,7 @@ export function groupedCard(group,{h,photoButton,qtyStore,qtyEvent,qtyReserved=(
   const model=group.model;
   const basicName=model?.name||main.name;
   const basicTags=model?.tags||main.tags||[];
-  let edition=isProducts&&canEdit?
+  let edition=isProducts&&canEdit&&typeof renderEditor!=='function'?
    '<details class="product-card-editor card-workspace" data-product-editor>'+
     '<summary>Editar cadastro do produto</summary>'+
     '<div class="card-workspace-tabs" role="tablist" aria-label="Editar produto">'+
