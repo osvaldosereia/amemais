@@ -1143,12 +1143,12 @@ function selectedProductCatalogGroups(){
     filterCatalogGondola(groupInventory(expanded,state.apparelModels),state.gondolaFilter),
     state.catalogSort,qtyAvailable,qtyStore
   );
-  return {groups,matched};
+  return {groups,matched,gondolas,codeResult};
 }
 
 function productsPage(){
   if(isFranchisePortal())return franchiseCatalogPage();
-  const {groups,matched}=selectedProductCatalogGroups();
+  const {groups,matched,gondolas,codeResult}=selectedProductCatalogGroups();
   const q=state.search.trim();
   const filtersApplied=Boolean(q||state.categoryFilter||state.tagFilter||state.gondolaFilter||state.showInactiveProducts);
   const available=state.items.filter(p=>p.active).length;
