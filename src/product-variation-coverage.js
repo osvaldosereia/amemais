@@ -11,10 +11,15 @@ export function categoryVariationCoverage(options=[],products=[],{isModel=false}
   if(!key)continue;
   if(!normalized.has(key)||(!normalized.get(key).active&&item.active))normalized.set(key,item);
  }
- const rows=[...new Set(options.map(o=>String(o||'').trim()).filter(Boolean))].map(label=>{
-  const p=normalized.get(variationKey(label));
-  return {label,kind:p?(p.active?'registered':'inactive'):'missing',productId:p?.id||null};
- });
+ const seen=new Set();
+ const rows=[];
+ for(const candidate of options){
+  const label=String(candidate||'').trim(),key=variationKey(label);
+  if(!key||seen.has(key))continue;
+  seen.add(key);
+  const p=normalized.get(key);
+  rows.push({label,kind:p?(p.active?'registered':'inactive'):'missing',productId:p?.id||null});
+ }
  const keys=new Set(rows.map(row=>variationKey(row.label)));
  const legacy=registered.filter(p=>!keys.has(variationKey(p.apparel_size)));
  return {
@@ -40,7 +45,7 @@ export function categoryVariationCoverageHTML(coverage,{canEdit=false,isModel=fa
   return '<button type="button" class="product-variation-coverage-chip is-'+row.kind+
    '" data-action="'+(row.kind==='inactive'?'product-drawer-reactivate-variation':'product-drawer-pick-size')+'"'+
    (row.kind==='inactive'?' data-id="'+esc(row.productId)+'"':' data-size="'+esc(row.label)+'"')+
-   ' aria-label="'+(row.kind==='inactive'?'Reativar ':'Cadastrar ')+esc(row.label)+'">'+visual+'</button>';
+   ' aria-label="'+(row.kind==='inactive'?'Reativar ':isModel?'Adicionar ':'Definir ')+esc(row.label)+'">'+visual+'</button>';
  }).join('');
  const others=coverage.legacy.length?
   '<p class="product-variation-coverage-warning">Tamanhos antigos fora das opções atuais: '+

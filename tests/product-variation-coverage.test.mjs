@@ -30,6 +30,19 @@ test('M e Tamanho M são equivalentes; nunca cadastrar duplicado no seletor',()=
  assert.match(selection,/Tamanho M ✓/);
  assert.doesNotMatch(selection,/data-extra-size="Tamanho M"/);
 });
+test('Categorias com aliases P e Tamanho P não duplicam chips',()=>{
+ const result=categoryVariationCoverage(['P','Tamanho P','Tamanho M'],[],{isModel:true});
+ assert.equal(result.rows.length,2);
+ assert.equal(result.missing,2);
+});
+test('A área de inclusão é limpa ao cancelar e ao trocar de seção',()=>{
+ assert.match(app,/function resetProductDrawerVariationDraft\(area\)/);
+ assert.match(app,/row\.hidden=true/);
+ assert.match(app,/input\.disabled=true/);
+ assert.match(app,/button\.classList\.remove\('selected'\)/);
+ assert.match(app,/resetProductDrawerVariationDraft\(addition\)/);
+ assert.match(app,/resetProductDrawerVariationDraft\(area\)/);
+});
 test('Inativo é diferente de ausente e dados históricos não são apagados',()=>{
  const input=[{id:'inativo',apparel_size:'GG',active:false,apparel_color:'Única'},
  {id:'legado',apparel_size:'G3',active:true,apparel_color:'Única'}];

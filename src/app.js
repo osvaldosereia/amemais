@@ -722,6 +722,23 @@ function resetInlineVariant(){
   btn.textContent='Editar';btn.setAttribute('aria-expanded','false');
  }
 }
+function resetProductDrawerVariationDraft(area){
+ if(!area)return;
+ const form=area.querySelector('form');
+ form?.reset();
+ if(form)form.dataset.unsaved='false';
+ for(const row of area.querySelectorAll('[data-extra-size]')){
+  row.hidden=true;
+  row.querySelectorAll('input,select').forEach(input=>{input.disabled=true;});
+ }
+ for(const button of area.querySelectorAll('[data-action="extra-size-toggle"]')){
+  button.classList.remove('selected');
+  button.setAttribute('aria-pressed','false');
+ }
+ area.hidden=true;
+ productDrawer?.overlay.querySelector('.product-drawer-variation-heading [data-action="product-drawer-show-add"]')?.
+  setAttribute('aria-expanded','false');
+}
 function closeProductDrawer(restoreFocus=true,force=false){
  if(!productDrawer)return true;
  if(!force){
@@ -753,7 +770,7 @@ function switchProductDrawerTab(tab){
    if((addition.querySelector('[data-extra-size]:not([hidden])')||
      addition.querySelector('form[data-form="product-drawer-convert"]'))&&
       !window.confirm('Descartar a inclusão de variações não salva?'))return;
-   addition.hidden=true;
+   resetProductDrawerVariationDraft(addition);
   }
  }
  const ui=cardUiFor(sheet.article);
@@ -4664,11 +4681,12 @@ async function handleClick(event){
       if((area.querySelector('[data-extra-size]:not([hidden])')||
         area.querySelector('form[data-form="product-drawer-convert"][data-unsaved="true"]'))&&
         !window.confirm('Descartar as variações não salvas?'))return;
-      area.querySelector('form')?.reset();
+      resetProductDrawerVariationDraft(area);
+      return;
     }
-    area.hidden=!area.hidden;
+    area.hidden=false;
     drawer.overlay.querySelector('.product-drawer-variation-heading [data-action="product-drawer-show-add"]')?.
-      setAttribute('aria-expanded',String(!area.hidden));
+      setAttribute('aria-expanded','true');
     if(!area.hidden){
       area.scrollIntoView({block:'nearest',behavior:'smooth'});
       area.querySelector('select[name="size"],[data-action="extra-size-toggle"],input,button')?.
