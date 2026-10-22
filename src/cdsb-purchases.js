@@ -141,6 +141,32 @@ export function filterPurchaseGroups(groups=[],filters={},categories=[]){
  });
 }
 
+// Estoque disponível por SKU no próprio card. Apenas consulta: não seleciona itens nem abre o drawer.
+export function purchaseCardVariantStock(variants=[]){
+ const rank=['PP','P','M','G','GG','XGG','XXGG','EXGG'];
+ const label=p=>{
+  const size=String(p.apparel_size||'Único').trim().replace(/^tamanho\\s+/i,'')||'Único';
+  const color=String(p.apparel_color||'').trim();
+  return color&&color.toLocaleLowerCase('pt-BR')!=='única'?size+' · '+color:size;
+ };
+ const ordered=[...variants].sort((a,b)=>{
+  const left=label(a),right=label(b);
+  const l=rank.indexOf(left.toUpperCase()),r=rank.indexOf(right.toUpperCase());
+  return (l<0?100:l)-(r<0?100:r)||buyCollator.compare(left,right)||
+   buyCollator.compare(String(a.sku||a.id||''),String(b.sku||b.id||''));
+ });
+ return '<section class="buy-card-stock" aria-label="Estoque livre por variação">'+
+  '<div class="buy-card-stock-head"><strong>Estoque por variação</strong><small>Disponível</small></div>'+
+  '<div class="buy-card-stock-grid">'+ordered.map(p=>{
+   const name=label(p),qty=Math.max(0,Number(p.free)||0);
+   return '<div class="buy-card-stock-item'+(qty===0?' is-zero':'')+'"'+
+    ' title="'+h(name+': '+f(qty)+' unidade(s) disponíveis')+'">'+
+    '<span class="buy-card-stock-size">'+h(name)+'</span>'+
+    '<b class="buy-card-stock-qty" aria-label="'+h(f(qty)+' unidades disponíveis')+'">'+f(qty)+'</b>'+
+    '</div>';
+  }).join('')+'</div></section>';
+}
+
 export function purchasesPage({products=[],models=[],suppliers=[],categories=[],tags=[],balances=[],reservations=[],orders=[],items=[],button,filter='',catalog={},cart=new Map(),expanded=new Set(),tab='reposicao',tasksHTML='',orderFilter='',tasks=[]}) {
  const groups=purchasingGroups(products,models,balances,reservations,orders,items);
  const cartCount=[...cart.values()].reduce((n,q)=>n+(Number(q)||0),0);
@@ -214,7 +240,7 @@ export function purchasesPage({products=[],models=[],suppliers=[],categories=[],
       '</div></div>'+
     '<div class="buy-card-meta"><div><small>Fornecedor</small><strong>'+h(supplier)+'</strong></div>'+
      '<div><small>Categoria</small><strong>'+h(categoryName)+'</strong></div></div>'+
-   '</div>'+
+   '</div>'+purchaseCardVariantStock(g.variants)+
    '<div class="buy-card-toolbar" role="group" aria-label="Operações para '+h(g.title)+'">'+
      action(isExpanded?'Fechar compra':'Abrir compra','buy-open-group','cart',
       'aria-expanded="'+String(isExpanded)+'" aria-controls="buy-panel-'+h(g.key)+'"',true)+
