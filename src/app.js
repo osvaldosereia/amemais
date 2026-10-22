@@ -42,7 +42,7 @@ import {supplierDirectoryPayload,staffDirectoryPayload,procurementTaskDraft,supp
 import {createPurchasePDF,downloadPurchasePDF} from './purchase-pdf.js?v=20261016buypdf1';
 import {renderOperationsDashboard} from './dashboard-home.js?v=20261016home1';
 import {accessCenterHTML} from './access-center.js?v=20261017access1';
-import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261015report1';
+import {stockPrintGroups,stockPrintHTML} from './stock-print-report.js?v=20261022filteredportrait1';
 import {shelfLabelPicker,shelfLabelData,shelfLabelsHTML,collectShelfLabels} from './shelf-labels.js?v=20261016label57';
 
 // Ícones vetoriais locais: carregam mesmo sem bibliotecas externas.
