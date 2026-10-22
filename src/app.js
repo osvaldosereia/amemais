@@ -408,7 +408,16 @@ async function loadData(){
   if(productDrawer&&!productDrawer.article.querySelector('[data-unsaved="true"]'))
     refreshOpenProductDrawer();
 }
-async function loadProfile(){
+let profileLoading=null;
+function loadProfile(){
+ if(profileLoading)return profileLoading;
+ const pending=loadProfileInner();
+ profileLoading=pending;
+ void pending.then(()=>{if(profileLoading===pending)profileLoading=null;},
+    ()=>{if(profileLoading===pending)profileLoading=null;});
+ return pending;
+}
+async function loadProfileInner(){
   const {data:{user},error}=await db.auth.getUser();
   if(error||!user){state.user=null;state.profile=null;render();return;}
   state.user=user;
@@ -424,7 +433,7 @@ async function loadProfile(){
   }catch(err){fail(err);render();}
 }
 function loginScreen(message=''){
-  const legacy=false;
+  const legacy=state.loginMode==='link';
   root.innerHTML='<div class="login-wrap"><section class="login">'+
   '<div class="brand-login"><img src="./cdsb-brand.svg?v=20261016logo2" alt="CDSB — Centro de Distribuição São Bento" width="388" height="127"><small>CONTROLE DE ESTOQUE</small></div>'+
   '<h1>Entrar no sistema</h1><p class="muted">'+
@@ -433,11 +442,14 @@ function loginScreen(message=''){
   (message?'<div class="alert">'+h(message)+'</div>':'')+
   (state.loginNotice?'<div class="note" role="status">'+h(state.loginNotice)+'</div>':'')+
   '<form data-form="'+(legacy?'login-link':'login-password')+'">'+
-  field('Usuário','username','text','','required autocomplete="username" autocapitalize="none" spellcheck="false"')+
-  (legacy?'':field('Senha','password','password','','required autocomplete="current-password"'))+
+  (legacy?
+   field('Email da conta antiga','email','email','','required autocomplete="email" autocapitalize="none" spellcheck="false"'):
+   field('Usuário','username','text','','required autocomplete="username" autocapitalize="none" spellcheck="false"')+
+   field('Senha','password','password','','required autocomplete="current-password"'))+
   '<button class="button primary" type="submit">'+(legacy?'Enviar link para meu email':'Entrar')+'</button></form>'+
   '<button type="button" class="plain" style="margin-top:12px" data-action="login-mode">'+
-  (legacy?'Voltar ao login por senha':'Ainda não tenho senha (acesso antigo)')+'</button>'+
+  (legacy?'Voltar ao login por senha':'Acessar conta antiga por email')+'</button>'+
+  (!legacy?'<button type="button" class="plain" style="margin-top:12px" data-action="forgot">Esqueci minha senha</button>':'')+
   '<p class="help" style="margin-top:12px">Novas contas são criadas pelo administrador. Não existe cadastro público.</p>'+
   '</section></div>';
 }
@@ -3910,6 +3922,12 @@ function adminPasswordModal(id){
     'user-password','Salvar senha');
   document.querySelector('.modalback form').dataset.id=id;
 }
+function recoveryPasswordModal(){
+ formModal('Redefinir senha','<p class="help">Defina uma nova senha para esta conta. Esta operação não altera as senhas de outras pessoas.</p><div class="formgrid">'+
+   field('Nova senha','password','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+   field('Confirme a nova senha','password_confirm','password','','required minlength="6" maxlength="128" autocomplete="new-password"')+
+   '</div>','recovery-password','Salvar nova senha');
+}
 function myPasswordModal(){
   if(!state.user||!state.profile?.active)return;
   formModal('Minha senha','<div class="formgrid">'+
@@ -4390,7 +4408,7 @@ async function handleClick(event){
   if(action==='forgot'){
     const email=window.prompt('Informe o email da sua conta:');
     if(!email)return;
-    const res=await db.auth.resetPasswordForEmail(email.trim(),{redirectTo:location.href.split('#')[0]});
+    const res=await db.auth.resetPasswordForEmail(email.trim(),{redirectTo:location.origin+location.pathname});
     if(res.error)fail(res.error);else toast('Se o email estiver cadastrado, as instruções serão enviadas.');
     return;
   }
@@ -5542,7 +5560,21 @@ async function handleSubmit(event){
     try{
       const username=String(values.username||'').trim();
       const response=await db.functions.invoke('username-login',{body:{username,password:String(values.password||'')}});
-      if(response.error||!response.data?.access_token)throw new Error('Usuário ou senha inválidos.');
+      if(response.error||!response.data?.access_token){
+        let message=response.data?.error||'Usuário ou senha inválidos.';
+        const status=response.error?.context?.status;
+        try{
+          const detail=await response.error?.context?.json?.();
+          if(detail?.error)message=detail.error;
+        }catch{}
+        if(!response.data?.error&&status===429)
+          message='Muitas tentativas de acesso. Aguarde alguns minutos antes de tentar novamente.';
+        else if(!response.data?.error&&status>=500)
+          message='Serviço de login temporariamente indisponível. Tente novamente.';
+        else if(!response.data?.error&&response.error?.name==='FunctionsFetchError')
+          message='Não foi possível conectar ao serviço de login. Confira a conexão.';
+        throw new Error(message);
+      }
       assertOk(await db.auth.setSession({
         access_token:response.data.access_token,refresh_token:response.data.refresh_token
       }));
@@ -6566,6 +6598,19 @@ async function handleSubmit(event){
     },'Senha atualizada. Informe a nova senha ao colaborador.');
     return;
   }
+  if(type==='recovery-password'){
+    let password;
+    try{password=passwordsValid(values);}catch(e){fail(e);return;}
+    state.loading=true;
+    try{
+      assertOk(await db.auth.updateUser({password}));
+      toast('Senha redefinida. Utilize sua nova senha nos próximos acessos.');
+      closeTopModal();
+      state.loginMode='password';
+    }catch(error){fail(error);}
+    finally{state.loading=false;}
+    return;
+  }
   if(type==='my-password'){
     let password;
     try{password=passwordsValid(values);}catch(e){fail(e);return;}
@@ -7053,9 +7098,22 @@ async function start(){
   db=createClient(cfg.supabaseUrl,cfg.supabasePublishableKey,{
     auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
   });
-  db.auth.onAuthStateChange((event)=>{
-    if(event==='SIGNED_IN'){state.loginNotice='';setTimeout(()=>loadProfile().catch(fail),0);}
-    if(event==='SIGNED_OUT'){state.user=null;state.profile=null;state.setupPending=false;render();}
+  db.auth.onAuthStateChange((event,session)=>{
+    if(event==='PASSWORD_RECOVERY'){
+      state.loginNotice='';
+      setTimeout(()=>recoveryPasswordModal(),0);
+      return;
+    }
+    if(event==='SIGNED_IN'){
+      state.loginNotice='';
+      // O Supabase emite SIGNED_IN também em retornos ao foco e em outras abas.
+      // Não reconsultar toda a conta quando a mesma sessão já está carregada.
+      if(state.user?.id===session?.user?.id&&state.profile?.active&&state.ownPermissions.length)return;
+      setTimeout(()=>loadProfile().catch(fail),0);
+    }
+    if(event==='SIGNED_OUT'){
+      state.user=null;state.profile=null;state.ownPermissions=[];state.setupPending=false;render();
+    }
   });
   await loadProfile();
 }

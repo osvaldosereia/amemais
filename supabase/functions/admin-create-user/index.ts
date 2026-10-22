@@ -18,7 +18,7 @@ Deno.serve(async (request) => {
     const jwt = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
     if (!jwt) return respond({ error: 'Entre novamente para continuar.' }, 401);
     const origin = request.headers.get('Origin');
-    if (!['https://osvaldosereia.github.io','https://cdsb.net.br'].includes(origin || '')) {
+    if (!['https://osvaldosereia.github.io','https://cdsb.net.br','https://www.cdsb.net.br'].includes(origin || '')) {
       return respond({ error: 'Origem não autorizada.' }, 403);
     }
 
@@ -49,16 +49,25 @@ Deno.serve(async (request) => {
         return respond({error:'Altere sua própria senha pelo botão Minha senha.'},400);
       }
       const { data: target, error: targetError } = await admin.from('staff_profiles')
-        .select('id,active').eq('id',targetId).maybeSingle();
+        .select('id,active,archived_at,email').eq('id',targetId).maybeSingle();
       if (targetError || !target) return respond({error:'Colaborador não encontrado.'},404);
-      const {error:updateError} = await admin.auth.admin.updateUserById(targetId,{password});
-      if (updateError) return respond({error:'Não foi possível definir a senha. Confira o usuário.'},400);
+      if (!target.active || target.archived_at) return respond({error:'Reative a conta antes de definir sua senha.'},400);
+      const {data:authTarget,error:authLookupError}=await admin.auth.admin.getUserById(targetId);
+      if (authLookupError || !authTarget?.user || authTarget.user.email?.toLowerCase()!==target.email?.toLowerCase())
+        return respond({error:'Cadastro e autenticação estão inconsistentes. Revise esta conta antes de redefinir a senha.'},409);
+      // Contas criadas anteriormente por link/convite podem estar sem confirmação.
+      // A nova senha administrativa habilita o login imediatamente, sem email.
+      const {data:updated,error:updateError} = await admin.auth.admin.updateUserById(targetId,{
+        password,email_confirm:true
+      });
+      if (updateError || !updated?.user)
+        return respond({error:'Não foi possível definir a senha no serviço de autenticação.'},400);
       const {error:auditError} = await admin.from('audit_log').insert({
         entity:'staff_profiles',entity_id:targetId,action:'PASSWORD_RESET_BY_ADMIN',
-        actor_id:user.id,details:{ performed_by:'admin' }
+        actor_id:user.id,details:{ performed_by:'admin',activated_unconfirmed_email:!authTarget.user.email_confirmed_at }
       });
       if (auditError) console.error('Falha ao auditar redefinição de senha', auditError.code);
-      return respond({ success:true, action:'set-password', warning:auditError?'Senha definida, mas houve falha na auditoria.':undefined });
+      return respond({ success:true, action:'set-password', confirmed:true, warning:auditError?'Senha definida, mas houve falha na auditoria.':undefined });
     }
 
     if (action !== 'create') return respond({error:'Operação inválida.'},400);
