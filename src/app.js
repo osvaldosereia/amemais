@@ -1,5 +1,6 @@
 import {productCatalogCard} from './products-grid.js?v=20261018productgrid1';
-import {variationFormHTML,readVariationForm,useOriginalVariation} from './product-variation-coverage.js?v=20261022variationform1';
+import {variationFormHTML,readVariationForm,useOriginalVariation,singleVariantFormHTML,readSingleVariantForm} from './product-variation-coverage.js?v=20261022quickbalance1';
+import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261022quickbalance1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
@@ -78,11 +79,13 @@ const h = v => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&l
 const niceDate = value => value ? new Intl.DateTimeFormat('pt-BR', { timeZone:'America/Cuiaba' }).format(new Date(value.length === 10 ? value + 'T12:00:00' : value)) : '—';
 const niceTime = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short', timeZone:'America/Cuiaba' }).format(new Date(value)) : '—';
 const actionNames = {entrada:'Entrada',venda_loja:'Baixa (loja)',saida_loja:'Saída para filial / franquia',saida_pedido:'Saída de pedido avulso',transferencia:'Enviado ao evento',venda_evento:'Baixa antiga (evento)',devolucao:'Retornou à loja',baixa_evento:'Não retornou ao estoque',ajuste_loja:'Ajuste'};
+const movementLabel = m => m.action==='saida_loja'&&String(m.note||'').startsWith('Saída rápida por EAN/SKU')?'Saída rápida':(actionNames[m.action]||m.action);
 const roles = {admin:'Administrador CDSB',gerente:'Gerente CDSB',estoquista:'Separador CDSB',evento:'Responsável por loja temporária',consulta:'Consulta',franquia:'Loja permanente'};
 const profileLabel = u => u?.role==='admin'?'Administrador CDSB':u?.role==='franquia'?'Loja permanente':u?.role==='estoquista'?'Separador CDSB':u?.role==='evento'?'Loja temporária':(roles[u?.role]||u?.role||'—');
 const nav = [
   {id:'inicio',label:'Início',ico:'home'},
   {id:'produtos',label:'Produtos',ico:'package'},
+  {id:'balanco',label:'Balanço rápido',ico:'scan'},
   {id:'lojas',label:'Lojas',ico:'home'},
   {id:'pedidos',label:'Pedidos',ico:'clipboard'},
   {id:'compras',label:'Compras',ico:'clipboard'},
@@ -98,7 +101,7 @@ const state = {
   eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseReceipts:[],purchaseReceiptItems:[],procurementTasks:[],staffContactDetails:[],purchaseSupplierFilter:'',purchaseTab:'reposicao',purchaseOrderFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'priority',onlyReplenishment:true,page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],accessProfiles:[],accessProfilePermissions:[],profileAssignments:[],accessTab:'pessoas',staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
-  search:'',productSearchDraft:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
+  quickBalanceId:null,quickBalanceMode:'contagem',search:'',productSearchDraft:'',catalogSort:'name-asc',gondolaFilter:'',page:0,eventFilter:'',movementFilter:'',movementUser:'',movementPeriod:30,categoryFilter:'',tagFilter:'',ordersContext:null,pendingOrderFocus:null,activeStore:null,activeStoreTab:'resumo',eventUnitTab:'resumo',storeHubFilter:{type:'todas',status:'all',search:''},
   imageCache:new Map(),collapsedCategories:new Set(),catalogExpanded:new Set(),catalogSearch:'',catalogTagsSearch:'',loading:false,toastTimer:0,passwordRecovery:false,loginMode:'password',loginNotice:'',setupPending:false
 };
 let db = null;
@@ -138,7 +141,8 @@ const permittedView = v => {
  if(v==='meu-evento')return state.profile?.role==='evento';
  if(v==='separador')return hasPermission('orders.separate');
  if(v==='inicio')return true;
- if(v==='saida'||v==='balanco'||v==='inventario')return false; // Conferência e ajustes acontecem nos cards de Produtos.
+ if(v==='balanco')return !isFranchisePortal()&&(hasPermission('stock.balance')||hasPermission('stock.entry')||hasPermission('stock.exit'));
+ if(v==='saida'||v==='inventario')return false;
  if(v==='pedidos-lojas')return false;
  if(v==='pedidos')return canUseStoreOrders()||hasPermission('orders.read')||hasPermission('orders.internal')||hasPermission('orders.assign')||hasPermission('orders.separate')||hasPermission('events.separate');
  if(v==='separacao')return permittedView('pedidos');
@@ -610,7 +614,7 @@ function render(){
   const mark='<img class="cdsb-brand-logo" src="./cdsb-brand.svg?v=20261016logo2" alt="CDSB — Centro de Distribuição São Bento" width="270" height="89">';
   const sectionNav=isFranchisePortal()?[{id:'minha-loja',label:'Minha Loja',ico:'home'},{id:'pedidos',label:'Meus pedidos',ico:'clipboard'}]:
   state.profile?.role==='evento'&&hasPermission('events.request')?[{id:'meu-evento',label:'Meu Evento',ico:'calendar'},{id:'eventos',label:'Detalhes',ico:'clipboard'}]:
-  state.profile?.role==='estoquista'&&hasPermission('orders.separate')?[{id:'separador',label:'Separação',ico:'clipboard'},{id:'pedidos',label:'Todos os pedidos',ico:'package'}]:nav;
+  state.profile?.role==='estoquista'&&hasPermission('orders.separate')?[{id:'separador',label:'Separação',ico:'clipboard'},{id:'pedidos',label:'Todos os pedidos',ico:'package'},...(permittedView('balanco')?[{id:'balanco',label:'Balanço rápido',ico:'scan'}]:[])]:nav;
  const menu=sectionNav.filter(x=>permittedView(x.id))
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+((state.view===x.id||(state.view==='entrada'&&x.id==='produtos')||(['eventos','lojas-admin'].includes(state.view)&&x.id==='lojas'))?'active':'')+'">'+
       uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('')+
@@ -658,6 +662,11 @@ function pageContent(){
   if(state.view==='minha-loja')return permanentPage();
  if(state.view==='meu-evento')return temporaryPage();
  if(state.view==='separador')return separationHomePage();
+ if(state.view==='balanco'){
+   const p=product(state.quickBalanceId);
+   return quickBalancePage(p?.active?quickStockResult(p,{
+     physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode:state.quickBalanceMode,can:hasPermission}):undefined);
+ }
  if(state.view==='entrada'||state.view==='saida')return renderStockOperationPage();
   if(state.view==='avarias')return damageStockPage();
   if(state.view==='produtos')return productsPage();
@@ -712,7 +721,7 @@ function findProductGroup(key){
 }
 function productDrawerChanged(){
  return Boolean(productDrawer?.overlay.querySelector(
-  'form[data-form="product-card-basic"][data-unsaved="true"],form[data-form="product-variation-table"][data-unsaved="true"]'
+  'form[data-form="product-card-basic"][data-unsaved="true"],form[data-form="product-variation-table"][data-unsaved="true"],form[data-form="product-single-variant"][data-unsaved="true"]'
  ));
 }
 function closeProductDrawer(restoreFocus=true,force=false){
@@ -847,22 +856,21 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
  if(stock){
   stock.querySelectorAll('.card-balance-edit-variant,.product-variant-add').forEach(el=>el.remove());
   // O summary do details é ocultado pelo CSS do drawer, não removido.
-  const advanced=stock.querySelector('.product-advanced-stock');
-  if(advanced){
-   advanced.open=false;
-   const summary=advanced.querySelector(':scope > summary');
-   if(summary)summary.textContent='Operações de estoque · balanço, movimentações e histórico';
-  }
+  // Movimentações e balanço vivem exclusivamente na tela de Balanço rápido.
+  stock.querySelector('.product-advanced-stock')?.remove();
   const overview=stock.querySelector('.product-variant-overview');
   if(overview){
    const categoryId=group.model?.category_id||main.category_id;
    const allowed=resolveCategoryVariations(state.categories,categoryId).options;
    const all=models?
       state.items.filter(p=>p.apparel_model_id===group.modelId&&!p.force_archived_at):group.products;
-   overview.innerHTML=variationFormHTML(allowed,all,{
-     isModel:models,canEdit:canEdit&&canRegisterProducts(),main,
-     modelId:group.modelId,physicalFor:qtyStore
-   });
+   overview.innerHTML=!models&&!allowed.length?
+     singleVariantFormHTML(main,{physical:qtyStore(main.id),canEdit,
+       canStock:hasPermission('stock.balance')}):
+     variationFormHTML(allowed,all,{
+       isModel:models,canEdit:canEdit&&canRegisterProducts(),main,
+       modelId:group.modelId,physicalFor:qtyStore
+     });
    const form=overview.querySelector('form[data-form="product-variation-table"]');
    if(form)form.dataset.category=categoryId;
   }
@@ -897,7 +905,7 @@ function syncDrawerVariationCategory(categoryId){
  const basic=sheet.article.querySelector('form[data-form="product-card-basic"]');
  const holder=sheet.article.querySelector('[data-product-details] .product-variant-overview');
  if(!holder||!basic)return;
- const old=holder.querySelector('form[data-form="product-variation-table"]');
+ const old=holder.querySelector('form[data-form="product-variation-table"],form[data-form="product-single-variant"]');
  if(old?.dataset.unsaved==='true'&&
     !window.confirm('Descartar as alterações de tamanhos para carregar a nova categoria?')){
    const selector=basic.querySelector('[name="category_id"]');
@@ -908,9 +916,12 @@ function syncDrawerVariationCategory(categoryId){
  const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
  const allowed=resolveCategoryVariations(state.categories,categoryId).options;
  const products=isModel?state.items.filter(p=>p.apparel_model_id===group.modelId&&!p.force_archived_at):group.products;
- holder.innerHTML=variationFormHTML(allowed,products,{
-   isModel,canEdit:canRegisterProducts(),main,modelId:group.modelId,physicalFor:qtyStore
- });
+ holder.innerHTML=!isModel&&!allowed.length?
+   singleVariantFormHTML(main,{physical:qtyStore(main.id),
+     canEdit:hasPermission('products.edit'),canStock:hasPermission('stock.balance')}):
+   variationFormHTML(allowed,products,{
+     isModel,canEdit:canRegisterProducts(),main,modelId:group.modelId,physicalFor:qtyStore
+   });
  const form=holder.querySelector('form[data-form="product-variation-table"]');
  if(form)form.dataset.category=categoryId;
 }
@@ -919,6 +930,7 @@ async function saveProductDrawerChanges(){
  if(!sheet||state.loading||!hasPermission('products.edit')||isFranchisePortal())return;
  const basic=sheet.article.querySelector('form[data-form="product-card-basic"]');
  const table=sheet.article.querySelector('form[data-form="product-variation-table"]');
+ const single=sheet.article.querySelector('form[data-form="product-single-variant"]');
  if(!basic)return toast('Formulário do cadastro não encontrado. Atualize a página.',true);
  if(!basic.reportValidity())return;
  const data=Object.fromEntries(new FormData(basic).entries());
@@ -934,9 +946,9 @@ async function saveProductDrawerChanges(){
     throw new Error('Confira nome, categoria e tags (2 a 40 caracteres).');
   if(table?.dataset.category!==category)
     throw new Error('Atualize as variações depois de trocar a categoria.');
-  variation=readVariationForm(table);
+  variation=single?readSingleVariantForm(single):readVariationForm(table);
   const allowed=resolveCategoryVariations(state.categories,category).options;
-  if(variation.rows.some(row=>!allowed.includes(row.size)))
+  if(!single&&variation.rows.some(row=>!allowed.includes(row.size)))
     throw new Error('Há tamanhos incompatíveis com a categoria selecionada.');
  }catch(error){
   if(notice){notice.textContent=error.message;notice.hidden=false;}return fail(error);
@@ -947,13 +959,20 @@ async function saveProductDrawerChanges(){
  state.loading=true;
  if(button){button.disabled=true;button.textContent='Salvando…';}
  try{
-  const modelId=assertOk(await db.rpc('save_product_workspace',{
-   p_id:isModel?sheet.group.modelId:item.id,p_is_model:isModel,
-   p_name:name,p_category:category,p_tags:tags,p_active:data.active!=='false',
-   p_original_size:variation.originalSize||null,p_type:meta.type,
-   p_audience:meta.audience,p_age_group:meta.ageGroup,p_rows:variation.rows
-  }));
-  const target=modelId?'model:'+modelId:'product:'+item.id,tab=sheet.tab;
+  const result=single?
+   assertOk(await db.rpc('save_single_product_workspace',{
+    p_product_id:item.id,p_name:name,p_category:category,p_tags:tags,
+    p_active:data.active!=='false',p_sku:variation.sku,p_ean:variation.ean,
+    p_expected_sku:variation.expectedSku,p_expected_ean:variation.expectedEan,
+    p_expected_quantity:variation.expected,p_quantity:variation.quantity
+   })):
+   assertOk(await db.rpc('save_product_workspace',{
+    p_id:isModel?sheet.group.modelId:item.id,p_is_model:isModel,
+    p_name:name,p_category:category,p_tags:tags,p_active:data.active!=='false',
+    p_original_size:variation.originalSize||null,p_type:meta.type,
+    p_audience:meta.audience,p_age_group:meta.ageGroup,p_rows:variation.rows
+   }));
+  const target=!single&&result?'model:'+result:'product:'+item.id,tab=sheet.tab;
   closeProductDrawer(false,true);
   await loadData();
   if(findProductGroup(target))openProductDrawer(target,{tab});
@@ -1688,7 +1707,7 @@ function movementTable(rows){
   if(!rows.length)return '<div class="muteblock">Nenhuma movimentação registrada.</div>';
   return '<div class="tablewrap"><table class="table"><thead><tr><th>Data e hora</th><th>Produto</th><th>Operação</th><th>Quantidade</th><th>Responsável</th><th>Observação</th></tr></thead><tbody>'+
     rows.map(m=>'<tr><td>'+niceTime(m.created_at)+'</td><td>'+h(product(m.product_id)?.name||m.product_id.slice(0,8))+'</td>'+
-    '<td>'+h(actionNames[m.action]||m.action)+(m.event_id?' <small>· '+h(eventById(m.event_id)?.name||'Evento')+'</small>':'')+'</td><td class="qty">'+m.quantity+'</td>'+
+    '<td>'+h(movementLabel(m))+(m.event_id?' <small>· '+h(eventById(m.event_id)?.name||'Evento')+'</small>':'')+'</td><td class="qty">'+m.quantity+'</td>'+
     '<td>'+h(username(m.actor_id))+'</td><td>'+h(m.note||'—')+'</td></tr>').join('')+'</tbody></table></div>';
 }
 function movementsPage(){
@@ -2458,7 +2477,7 @@ function printActivityReport(){
  if(!hasPermission('movements.read'))return;
  const rows=[
   ...state.movements.map(m=>({at:m.created_at,who:m.actor_id,
-    what:actionNames[m.action]||m.action,
+    what:movementLabel(m),
     detail:product(m.product_id)?.name||'Produto',qty:Number(m.quantity||0)})),
   ...state.audits.map(a=>({at:a.created_at,who:a.actor_id,
     what:a.action,detail:a.entity,qty:null}))
@@ -3948,7 +3967,7 @@ function exportCsv(){
   state.movements.filter(m=>(!state.eventFilter||m.event_id===state.eventFilter)&&
     (!state.movementFilter||m.action===state.movementFilter)&&
     (!q||[product(m.product_id)?.name,m.note,m.actor_id,username(m.actor_id)].join(' ').toLocaleLowerCase('pt-BR').includes(q)))
-    .forEach(m=>rows.push([niceTime(m.created_at),product(m.product_id)?.name||'',product(m.product_id)?.ean||'',actionNames[m.action]||m.action,m.quantity,m.delta_store,m.delta_event,eventById(m.event_id)?.name||'',username(m.actor_id),m.note||'']));
+    .forEach(m=>rows.push([niceTime(m.created_at),product(m.product_id)?.name||'',product(m.product_id)?.ean||'',movementLabel(m),m.quantity,m.delta_store,m.delta_event,eventById(m.event_id)?.name||'',username(m.actor_id),m.note||'']));
   const data='\uFEFF'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n');
   const blob=new Blob([data],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='ame-mais-movimentacoes-'+dateToday()+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -4013,6 +4032,70 @@ function submitProductSearch(value){
  const input=document.getElementById('product-search');
  if(input)input.focus({preventScroll:true});
 }
+function selectQuickBalanceProduct(code){
+ if(state.view!=='balanco')return;
+ const match=findQuickStockProduct(state.items,code);
+ const barcode=document.querySelector('[data-quick-balance-barcode]');
+ if(barcode)barcode.value='';
+ if(!match.item){
+   state.quickBalanceId=null;
+   const holder=document.querySelector('[data-quick-balance-result]');
+   if(holder)holder.innerHTML='<p class="quick-balance-error" role="alert">'+h(match.error)+'</p>';
+   barcode?.focus({preventScroll:true});
+   return;
+ }
+ const p=match.item;
+ state.quickBalanceId=p.id;
+ if(!quickModes.some(m=>m.id===state.quickBalanceMode&&hasPermission(m.permission)))
+   state.quickBalanceMode=quickModes.find(m=>hasPermission(m.permission))?.id||'contagem';
+ const holder=document.querySelector('[data-quick-balance-result]');
+ if(holder){
+   holder.innerHTML=quickStockResult(p,{
+     physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode:state.quickBalanceMode,can:hasPermission
+   });
+   hydrateImages();
+   const qty=holder.querySelector('[data-quick-balance-quantity]');
+   qty?.focus({preventScroll:true});qty?.select();
+ }
+}
+async function submitQuickBalance(form){
+ if(state.loading||state.view!=='balanco'||isFranchisePortal())return;
+ const p=product(form.dataset.id),mode=form.dataset.mode;
+ const permission=quickModes.find(m=>m.id===mode)?.permission;
+ if(!p?.active||!permission||!hasPermission(permission))
+   return toast('Produto ou permissão indisponível.',true);
+ const raw=form.querySelector('[data-quick-balance-quantity]')?.value.trim()||'';
+ if(!/^(0|[1-9][0-9]{0,6})$/.test(raw)||Number(raw)>1000000||
+   (mode!=='contagem'&&Number(raw)===0))return toast('Quantidade inválida.',true);
+ const expected=Number(form.dataset.expected),reserved=Number(form.dataset.reserved);
+ const message=quickBalancePreview(mode,expected,reserved,Number(raw));
+ if(message.startsWith('Quantidade insuficiente')||message.startsWith('Limite máximo'))
+   return toast(message,true);
+ const request=form.dataset.requestId||crypto.randomUUID();
+ form.dataset.requestId=request;
+ const button=form.querySelector('[type="submit"]');
+ state.loading=true;if(button){button.disabled=true;button.textContent='Salvando…';}
+ try{
+   assertOk(await db.rpc('quick_stock_update',{
+     p_product_id:p.id,p_mode:mode,p_expected:expected,p_quantity:Number(raw),
+     p_request_id:request
+   }));
+   await loadData();
+   state.quickBalanceId=p.id;
+   const selected=product(p.id);
+   if(selected?.active){
+     const result=document.querySelector('[data-quick-balance-result]');
+     if(result){result.innerHTML=quickStockResult(selected,{
+       physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode,can:hasPermission
+     });hydrateImages();}
+   }
+   const scan=document.querySelector('[data-quick-balance-barcode]');
+   scan?.focus({preventScroll:true});scan?.select();
+   toast(mode==='contagem'?'Estoque atualizado e auditado.':
+      mode==='entrada'?'Entrada registrada.':'Saída registrada.');
+ }catch(error){fail(error);}
+ finally{state.loading=false;if(button?.isConnected){button.disabled=false;button.textContent='Confirmar operação';}}
+}
 function searchAndManageSku(code){
  const value=String(code||'').trim();
  if(!value)return;
@@ -4037,7 +4120,7 @@ function switchView(view) {
   if(view==='pedidos-lojas'||view==='separacao')view='pedidos';
   if(view==='eventos'&&state.profile?.role!=='evento')view='lojas';
   state.activeStore=null;state.activeStoreTab='resumo';
-  if(['roupas','saida','balanco','inventario'].includes(view))view='produtos';
+  if(['roupas','saida','inventario'].includes(view))view='produtos';
   if(!permittedView(view))return;
   state.view=view;state.search='';state.productSearchDraft='';state.page=0;state.ordersContext=null;
   if(view!=='eventos'){state.activeEvent=null;state.eventWorkflow=null;state.eventReturnQuery='';}
@@ -4605,6 +4688,26 @@ async function handleClick(event){
       const status=assertOk(await db.rpc('remove_product_safely',{p_product_id:id}));
       if(status==='archived')state.showInactiveProducts=false;
     },'Produto excluído ou desativado para preservar o histórico.');
+  }
+  if(action==='quick-balance-camera'){
+    try{return scanEAN(code=>selectQuickBalanceProduct(code));}
+    catch(error){return fail(error);}
+  }
+  if(action==='quick-balance-mode'){
+    if(state.view!=='balanco')return;
+    const mode=target.dataset.mode;
+    if(!quickModes.some(m=>m.id===mode&&hasPermission(m.permission)))return;
+    state.quickBalanceMode=mode;
+    const p=product(state.quickBalanceId);
+    if(!p)return;
+    const holder=document.querySelector('[data-quick-balance-result]');
+    if(holder){
+      holder.innerHTML=quickStockResult(p,{
+        physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode,can:hasPermission
+      });hydrateImages();
+      holder.querySelector('[data-quick-balance-quantity]')?.focus({preventScroll:true});
+    }
+    return;
   }
   if(action==='product-drawer-open'){openProductDrawer(target.dataset.group);return;}
   if(action==='product-drawer-close'){closeProductDrawer();return;}
@@ -5429,8 +5532,10 @@ async function handleSubmit(event){
   event.preventDefault();if(state.loading)return;
   const values=Object.fromEntries(new FormData(form).entries());
   const type=form.dataset.form;
+  if(type==='quick-balance-action')return submitQuickBalance(form);
   if(type==='order-operational')return submitOperational(form,false);
-  if(type==='product-variation-table'||(type==='product-card-basic'&&form.closest('.cdsb-product-drawer')))
+  if(type==='product-variation-table'||type==='product-single-variant'||
+     (type==='product-card-basic'&&form.closest('.cdsb-product-drawer')))
     return saveProductDrawerChanges();
   if(type==='login-password'){
     state.loading=true;
@@ -6541,6 +6646,9 @@ document.addEventListener('keydown',event=>{
     input.value='';
     return;
   }
+  if(event.key==='Enter'&&event.target.matches('[data-quick-balance-barcode]')){
+    event.preventDefault();selectQuickBalanceProduct(event.target.value);return;
+  }
   if(event.key==='Enter'&&event.target.matches('[data-balance-scan-input]')){
     event.preventDefault();
     const input=event.target,panel=input.closest('[data-product-details]');
@@ -6594,9 +6702,16 @@ document.addEventListener('toggle',event=>{
 },true);
 document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
+  if(event.target.matches?.('[data-quick-balance-quantity]')){
+    const field=event.target,form=field.closest('form[data-form="quick-balance-action"]');
+    const preview=form?.querySelector('[data-quick-balance-preview]');
+    if(preview)preview.textContent=quickBalancePreview(form.dataset.mode,
+      Number(form.dataset.expected),Number(form.dataset.reserved),Number(field.value));
+    return;
+  }
   if(event.target.matches?.('[data-product-category-search]'))return;
   const form=event.target.closest?.('form[data-form]');
-  if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes','product-variation-table'].includes(form?.dataset.form))
+  if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes','product-variation-table','product-single-variant'].includes(form?.dataset.form))
     form.dataset.unsaved='true';
 },true);
 document.addEventListener('change',event=>{
@@ -6608,7 +6723,7 @@ document.addEventListener('change',event=>{
     syncDrawerVariationCategory(event.target.value);
   if(event.target.matches?.('[data-product-category-search]'))return;
   const form=event.target.closest?.('form[data-form]');
-  if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes','product-variation-table'].includes(form?.dataset.form))
+  if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes','product-variation-table','product-single-variant'].includes(form?.dataset.form))
     form.dataset.unsaved='true';
 },true);
 document.addEventListener('input',event=>{

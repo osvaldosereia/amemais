@@ -6,11 +6,12 @@ const app=await readFile(new URL('../src/app.js',import.meta.url),'utf8');
 const entry=await readFile(new URL('../index.html',import.meta.url),'utf8');
 const stock=await readFile(new URL('../src/stock-workflows.js',import.meta.url),'utf8');
 
-test('aba Produtos não oferece inventário formal ou balanço independente',()=>{
+test('aba Produtos não oferece inventário formal; balanço rápido tem seção própria',()=>{
  assert.doesNotMatch(app,/Conferência formal|Inventário formal|Nova sessão de inventário/);
  assert.doesNotMatch(app,/data-view="inventario"|return inventoryPage\(\)/);
  assert.doesNotMatch(app,/function inventoryPage\(\)|function quickBalancePage\(\)/);
- assert.match(app,/\['roupas','saida','balanco','inventario'\]\.includes\(view\)/);
+ assert.match(app,/\['roupas','saida','inventario'\]\.includes\(view\)/);
+ assert.match(app,/id:'balanco',label:'Balanço rápido'/);
 });
 test('sem requisições recorrentes a sessões antigas de inventário',()=>{
  assert.doesNotMatch(app,/from\('inventory_sessions'\)|from\('inventory_session_items'\)/);
