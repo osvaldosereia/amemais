@@ -145,7 +145,7 @@ export function filterPurchaseGroups(groups=[],filters={},categories=[]){
 export function purchaseCardVariantStock(variants=[]){
  const rank=['PP','P','M','G','GG','XGG','XXGG','EXGG'];
  const label=p=>{
-  const size=String(p.apparel_size||'Único').trim().replace(/^tamanho\\s+/i,'')||'Único';
+  const size=String(p.apparel_size||'Único').trim().replace(/^tamanho\s+/i,'')||'Único';
   const color=String(p.apparel_color||'').trim();
   return color&&color.toLocaleLowerCase('pt-BR')!=='única'?size+' · '+color:size;
  };
