@@ -33,6 +33,6 @@ test('Ações do estoque no drawer desviam da modal legada e possuem versão de 
  assert.match(source,/target\.closest\('\.cdsb-product-drawer \[data-product-details\]'\)/);
  assert.match(source,/openProductVariantInline\(id\)/);
  assert.match(source,/if\(type==='product-drawer-variant'\)/);
- assert.match(index,/products-grid-drawer\.css\?v=20261022inlinevariant1/);
- assert.match(index,/secure-entry\.js\?v=20261022inlinevariant1/);
+ assert.match(index,/products-grid-drawer\.css\?v=20261022productux2/);
+ assert.match(index,/secure-entry\.js\?v=20261022productux2/);
 });
