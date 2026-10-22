@@ -60,7 +60,7 @@ export function inferApparelMetadata(categories,categoryId){
  ];
  const type=garmentTypes.find(([pattern])=>match(pattern))?.[1]||'Outro';
  const audience=match(/^(masculino|masculina|masculinos)\b/)?'Masculino':
-  match(/^(feminino|feminina|femininos)\b/)?'Feminino':'Unissex';
+  match(/^(feminino|feminina|femininos|baby look|babylook)\b/)?'Feminino':'Unissex';
  const ageGroup=match(/^(bebe|bebes|baby)$/)?'Bebê':match(/^(infantil|crianca|criancas|juvenil)\b/)?'Infantil':'Adulto';
  return {type,audience,ageGroup};
 }

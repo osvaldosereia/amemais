@@ -358,17 +358,21 @@ function sizeLine(size,gondolas=[]){
     '<label>Prateleira<input name="prateleira" maxlength="40" disabled placeholder="Ex.: B"></label>'+
     '<label>Estoque inicial<input name="quantity" type="number" inputmode="numeric" min="0" max="1000000" step="1" value="0" disabled required></label></div>';
 }
+// Normaliza variações legadas (M, Tamanho M, TAMANHO M) no seletor.
+const comparableApparelSize=value=>String(value||'').trim()
+ .replace(/^tamanho\s+/i,'').toLocaleLowerCase('pt-BR');
+
 export function addSizesContent(model,variants,choices=[],gondolas=[]){
   const color=variants.find(p=>p.active)?.apparel_color||'Única';
   const existing=new Set(variants.filter(p=>p.active&&
     String(p.apparel_color||'').toLocaleLowerCase('pt-BR')===color.toLocaleLowerCase('pt-BR'))
-    .map(p=>String(p.apparel_size||'').toLocaleLowerCase('pt-BR')));
-  const available=choices.filter(size=>!existing.has(String(size).toLocaleLowerCase('pt-BR')));
+    .map(p=>comparableApparelSize(p.apparel_size)));
+  const available=choices.filter(size=>!existing.has(comparableApparelSize(size)));
   return '<p class="muted">Adicione novas variações permitidas pela categoria. As existentes e seu histórico serão preservados.</p>'+
    '<input type="hidden" name="new_color" value="'+esc(color)+'">'+
    (available.length?
     '<div class="note">Selecione as variações a cadastrar. SKU e EAN podem ser informados individualmente.</div>'+
-    '<div class="add-sizes-picker">'+choices.map(size=>existing.has(String(size).toLocaleLowerCase('pt-BR'))?
+    '<div class="add-sizes-picker">'+choices.map(size=>existing.has(comparableApparelSize(size))?
       '<span class="size-chip size-chip-existing" title="Variação já cadastrada" aria-label="'+esc(size)+' já existe">'+esc(size)+' ✓</span>':
       '<button type="button" data-action="extra-size-toggle" data-size="'+esc(size)+
       '" class="size-chip" aria-pressed="false">'+esc(size)+'</button>').join('')+'</div>'+
@@ -378,7 +382,7 @@ export function addSizesContent(model,variants,choices=[],gondolas=[]){
 export function updateExtraSizeButtons(form,products){
   const color=(form.querySelector('[name="new_color"]')?.value||'Única').trim().toLowerCase();
   for(const btn of form.querySelectorAll('[data-action="extra-size-toggle"]')){
-    const taken=products.some(p=>p.active&&p.apparel_size===btn.dataset.size&&String(p.apparel_color).toLowerCase()===color);
+    const taken=products.some(p=>p.active&&comparableApparelSize(p.apparel_size)===comparableApparelSize(btn.dataset.size)&&String(p.apparel_color).toLowerCase()===color);
     btn.disabled=taken;
     btn.title=taken?'Este tamanho já existe nesta cor':'';
     if(taken){
@@ -408,7 +412,7 @@ export function collectExtraSizes(form,products){
     const take=n=>(row.querySelector('[name="'+n+'"]')?.value||'').trim();
     const size=row.dataset.extraSize,sku=take('sku')||null,ean=take('ean')||null,raw=take('quantity');
     const quantity=Number(raw);
-    if(products.some(p=>p.active&&p.apparel_size===size&&String(p.apparel_color).toLowerCase()===color.toLowerCase()))
+    if(products.some(p=>p.active&&comparableApparelSize(p.apparel_size)===comparableApparelSize(size)&&String(p.apparel_color).toLowerCase()===color.toLowerCase()))
       throw new Error('O tamanho '+size+' já existe nessa cor.');
     if(sku&&sku.length>80)throw new Error('SKU muito longo: '+size);
     if(ean&&!/^[0-9]{8,14}$/.test(ean))throw new Error('EAN inválido: '+size);
