@@ -18,7 +18,7 @@ test('Ficha do produto tem somente uma edição de SKU por variação',()=>{
  assert.match(styles,/\.product-drawer-variation-heading/);
 });
 test('Adicionar variação aparece dentro do drawer e não usa modal externo',()=>{
- assert.match(app,/addSizesContent\(group\.model,group\.products,allowed,state\.gondolas\)/);
+ assert.match(app,/addSizesContent\(group\.model,allVariations,allowed,state\.gondolas\)/);
  assert.match(app,/form data-form="extra-sizes"/);
  assert.match(app,/data-form="product-drawer-convert"/);
  assert.match(app,/db\.rpc\('convert_single_product_to_apparel'/);
@@ -49,5 +49,5 @@ test('Conversão mantém o produto original e checa permissão, categoria e idem
  assert.doesNotMatch(migration,/delete from public\.products/i);
  assert.match(migration,/revoke all on function public\.convert_single_product_to_apparel/i);
  assert.match(migration,/grant execute on function public\.convert_single_product_to_apparel/i);
- assert.match(index,/secure-entry\.js\?v=20261022productux2/);
+ assert.match(index,/secure-entry\.js\?v=20261022variationcoverage1/);
 });
