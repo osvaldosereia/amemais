@@ -28,7 +28,8 @@ test('SKU antigo exige apenas identificação do tamanho na própria lista',()=>
  assert.match(html,/data-original-quantity="3"/);
 });
 test('sem telas intermediárias e com salvamento fixo',()=>{
- assert.match(app,/overview\.innerHTML=variationFormHTML/);
+ assert.match(app,/overview\.innerHTML=!models&&!allowed\.length\?/);
+ assert.match(app,/variationFormHTML\(allowed,all/);
  assert.match(app,/data-product-drawer-save-footer/);
  assert.match(app,/saveProductDrawerChanges\(\)/);
  assert.match(app,/db\.rpc\('save_product_workspace'/);
