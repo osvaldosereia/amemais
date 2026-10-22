@@ -113,8 +113,7 @@ body{font:8pt Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-
 @media print{body{width:100%} .report-header{break-after:avoid} .stock-card{break-inside:avoid;page-break-inside:avoid} .footer{break-inside:avoid}}
 `;
  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Posição de estoque · CDSB</title>'+
- '<style>'+css+
-
+ '<style>'+css+'</style></head><body>'+
  '<div class="report-header"><div><small>CDSB · CENTRO DE DISTRIBUIÇÃO SÃO BENTO</small>'+
  '<h1>Posição de estoque</h1>'+(selectionLabel?'<p class="selection">'+esc(selectionLabel)+'</p>':'')+'</div><aside>Emissão: '+esc(printedAt)+'<br>'+
  fmt(groups.length)+' produtos · '+fmt(totals.variations)+' variações · '+fmt(totals.physical)+' unidades físicas'+
