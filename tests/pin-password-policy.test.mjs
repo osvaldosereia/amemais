@@ -32,6 +32,6 @@ test('Provisionamento padrão utiliza seis números criptograficamente aleatóri
  assert.match(provisioning,/return digits\.join\(''\)/);
 });
 test('Cache atualizado e nenhuma senha de produção redefinida no patch',()=>{
- assert.match(read('index.html'),/secure-entry\.js\?v=20261022pin6v1/);
- assert.match(read('src/secure-entry.js'),/app\.js\?v=20261022pin6v1/);
+ assert.match(read('index.html'),/secure-entry\.js\?v=20261022stockcards1/);
+ assert.match(read('src/secure-entry.js'),/app\.js\?v=20261022stockcards1/);
 });

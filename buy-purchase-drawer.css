@@ -357,3 +357,46 @@
 @media(max-width:600px){
  .buy-drawer-backdrop .buy-drawer .buy-drawer-section-title{padding:14px 12px 8px!important}
 }
+
+
+/* Resumo de estoque por variação no card fechado: somente leitura, sem abrir o pedido. */
+.buy-page .buy-quick-card .buy-card-stock{
+ display:grid;gap:8px;padding:9px 12px 11px;
+ margin:0;background:#f9fbfe;border-top:1px solid #e3ebf3;min-width:0;
+}
+.buy-page .buy-quick-card .buy-card-stock-head{
+ display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;
+}
+.buy-page .buy-quick-card .buy-card-stock-head strong{
+ font-size:.73rem;font-weight:750;color:#183b5b;line-height:1.35;
+}
+.buy-page .buy-quick-card .buy-card-stock-head small{
+ font-size:.67rem;font-weight:600;color:#6a7e91;line-height:1.35;
+}
+.buy-page .buy-quick-card .buy-card-stock-grid{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:6px;min-width:0;
+}
+.buy-page .buy-quick-card .buy-card-stock-item{
+ display:flex;align-items:center;justify-content:space-between;gap:5px;
+ min-width:0;min-height:35px;box-sizing:border-box;
+ padding:6px 8px;background:#fff;border:1px solid #d9e4ef;
+ border-radius:8px;color:#173953;
+}
+.buy-page .buy-quick-card .buy-card-stock-size{
+ flex:1 1 auto;min-width:0;font-weight:650;font-size:.73rem;line-height:1.25;
+ overflow-wrap:anywhere;
+}
+.buy-page .buy-quick-card .buy-card-stock-qty{
+ flex:0 0 auto;font-size:.85rem;font-weight:800;line-height:1.2;
+ color:#102d50;font-variant-numeric:tabular-nums;
+}
+.buy-page .buy-quick-card .buy-card-stock-item.is-zero{
+ background:#f2f5f9;color:#79899a;border-color:#e6ebf1;
+}
+.buy-page .buy-quick-card .buy-card-stock-item.is-zero .buy-card-stock-qty{color:#7d8b9b}
+@media(max-width:370px){
+ .buy-page .buy-quick-card .buy-card-stock-item{padding:6px}
+ .buy-page .buy-quick-card .buy-card-stock-size{font-size:.7rem}
+ .buy-page .buy-quick-card .buy-card-stock-qty{font-size:.8rem}
+}
