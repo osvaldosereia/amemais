@@ -1,114 +1,132 @@
-// Cobertura das variações: a categoria define opções, não cria SKUs.
-const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export const variationKey=value=>String(value??'').normalize('NFD')
- .replace(/[\u0300-\u036f]/g,'').trim().replace(/^tamanho\s+/i,'')
- .replace(/\s+/g,' ').toLocaleLowerCase('pt-BR');
-export function categoryVariationCoverage(options=[],products=[],{isModel=false}={}){
- const registered=isModel?products.filter(p=>p&&!p.force_archived_at&&p.apparel_size):[];
- const normalized=new Map();
- for(const item of registered){
-  const key=variationKey(item.apparel_size);
-  if(!key)continue;
-  if(!normalized.has(key)||(!normalized.get(key).active&&item.active))normalized.set(key,item);
- }
+// Uma lista compacta das variações definidas na categoria.
+// Campos ainda não cadastrados: estoque zero, EAN e SKU vazios.
+// Nenhum código ou saldo é gerado até o salvamento explícito.
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export const variationKey=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+ .trim().replace(/^tamanho\s+/i,'').replace(/\s+/g,' ').toLocaleLowerCase('pt-BR');
+export function uniqueCategoryVariations(options=[]){
  const seen=new Set();
- const rows=[];
- for(const candidate of options){
-  const label=String(candidate||'').trim(),key=variationKey(label);
-  if(!key||seen.has(key))continue;
-  seen.add(key);
-  const p=normalized.get(key);
-  rows.push({label,kind:p?(p.active?'registered':'inactive'):'missing',productId:p?.id||null});
- }
- const keys=new Set(rows.map(row=>variationKey(row.label)));
- const legacy=registered.filter(p=>!keys.has(variationKey(p.apparel_size)));
- return {
-  rows,legacy,registered:rows.filter(r=>r.kind==='registered').length,
-  inactive:rows.filter(r=>r.kind==='inactive').length,
-  missing:rows.filter(r=>r.kind==='missing').length,
-  unassigned:!isModel&&products.some(p=>p&&!p.force_archived_at&&!p.apparel_size)
- };
+ return options.filter(label=>{
+   const key=variationKey(label);if(!key||seen.has(key))return false;
+   seen.add(key);return true;
+ });
 }
-const text=(v,kind='')=>'<span class="'+kind+'">'+esc(v)+'</span>';
-const field=(name,placeholder='',attrs='')=>'<input name="'+name+'" '+attrs+
- ' placeholder="'+esc(placeholder)+'" aria-label="'+name+'" autocomplete="off">';
-export function variationTableHTML(options,products,{
+const editableInput=(name,value,extra='',disabled=false)=>
+ '<input name="'+name+'" value="'+esc(value)+'" '+extra+(disabled?' disabled':'')+'>';
+export function variationFormHTML(options=[],products=[],{
  isModel=false,canEdit=false,main=null,modelId=null,physicalFor=()=>0
 }={}){
- const coverage=categoryVariationCoverage(options,products,{isModel});
- if(!coverage.rows.length)
-  return '<p class="product-variation-table-empty">Não há tamanhos definidos nesta categoria. Configure-os em Categorias.</p>';
- const byId=new Map(products.map(p=>[p.id,p]));
- const color=products.find(p=>p.active)?.apparel_color||'Única';
- const intro=isModel?
-  'Os tamanhos já cadastrados aparecem para consulta. Para cadastrar novos SKUs, informe uma quantidade maior que zero.':
-  'Marque qual tamanho pertence ao SKU existente. Os demais tamanhos só serão cadastrados se o estoque inicial for maior que zero.';
- const lines=coverage.rows.map(r=>{
-  const p=byId.get(r.productId);
-  const cell=p?'<div class="variation-table-existing-code">'+esc(p.sku||'—')+'</div>':
-   field('sku','Automático','maxlength="80"');
-  const ean=p?'<div class="variation-table-existing-code">'+esc(p.ean||'—')+'</div>':
-   field('ean','Opcional','maxlength="14" inputmode="numeric"');
-  const qty=p?'<strong class="variation-table-quantity">'+Number(physicalFor(p.id)||0).toLocaleString('pt-BR')+'</strong>':
-   field('quantity','0','type="number" min="0" max="1000000" step="1" value="0" inputmode="numeric"');
-  const choose=!isModel&&!p?
-    '<label class="variation-table-original-label"><input type="radio" name="existing_size" value="'+esc(r.label)+
-    '" required><span>SKU atual</span></label>':'';
-  const status=p?'<span class="variation-table-status is-'+(p.active?'registered':'inactive')+'">'+(p.active?'Cadastrado':'Inativo')+'</span>':
-    '<span class="variation-table-status is-missing">Novo</span>';
-  const edit=p&&canEdit?'<button type="button" class="button small" data-action="'+
-    (p.active?'apparel-variant-edit':'product-drawer-reactivate-variation')+'" data-id="'+esc(p.id)+'">'+
-    (p.active?'Editar':'Reativar')+'</button>':'';
-  return '<tr data-variation-table-row data-size="'+esc(r.label)+'" data-kind="'+esc(r.kind)+'">'+
-    '<th scope="row"><strong>'+esc(r.label)+'</strong>'+status+choose+'</th>'+
-    '<td>'+cell+'</td><td>'+ean+'</td><td>'+qty+'</td>'+
-    '<td>'+edit+'</td></tr>';
- }).join('');
- const legacy=coverage.legacy.length?
-   '<p class="variation-table-legacy">Tamanhos antigos preservados: '+
-     esc([...new Set(coverage.legacy.map(p=>p.apparel_size))].join(' · '))+'</p>':'';
- return '<form data-form="product-variation-table" data-model-id="'+esc(modelId||'')+
-   '" data-id="'+esc(main?.id||'')+'" data-is-model="'+String(isModel)+'" data-unsaved="false" class="variation-table-form">'+
-   '<header class="variation-table-heading"><div><strong>Tamanhos da categoria</strong>'+
-    '<p>'+esc(intro)+'</p></div><small>'+coverage.rows.length+' tamanho(s)</small></header>'+
-   (!isModel?'<div class="variation-table-original-notice"><strong>SKU atual: '+esc(main?.sku||'—')+
-     '</strong><small>EAN: '+esc(main?.ean||'—')+' · o saldo existente não será alterado</small></div>':'')+
-   '<div class="variation-table-scroll"><table class="variation-table"><thead><tr>'+
-    '<th scope="col">Tamanho</th><th scope="col">SKU</th><th scope="col">EAN</th>'+
-    '<th scope="col">'+(isModel?'Estoque físico / inicial':'Estoque inicial')+'</th>'+
-    '<th scope="col">Ação</th></tr></thead><tbody>'+lines+'</tbody></table></div>'+
-   legacy+
-   (canEdit?'<div class="variation-table-bottom"><small>Quantidade 0 = não cadastrar. SKU vazio = gerar automaticamente.</small>'+
-    '<button class="button primary" type="submit">'+(isModel?'Cadastrar tamanhos com estoque':'Salvar tamanhos e estoque')+
-    '</button></div>':'')+'</form>';
-}
-export function variationTablePayload(input,{isModel=false,existing=[],allowed=[]}={}){
- const size=String(input?.existingSize||'').trim();
- if(!isModel&&(!size||!allowed.includes(size)))
-  throw new Error('Selecione qual tamanho pertence ao SKU atual.');
- const allowedKeys=new Set(allowed.map(variationKey)),taken=new Set(existing.map(p=>variationKey(p.apparel_size)).filter(Boolean));
- const entries=[],usedSizes=new Set(),usedCodes=new Set();
- for(const row of input?.rows||[]){
-  const label=String(row.size||'').trim(),key=variationKey(label);
-  if(!allowedKeys.has(key))throw new Error('Tamanho indisponível nesta categoria: '+label);
-  if(!isModel&&variationKey(size)===key)continue;
-  if(taken.has(key))continue;
-  const raw=String(row.quantity??'').trim(),number=Number(raw);
-  if(!/^\d+$/.test(raw)||!Number.isInteger(number)||number<0||number>1000000)
-   throw new Error('Estoque inválido no tamanho '+label+'.');
-  if(!number)continue;
-  if(usedSizes.has(key))throw new Error('Tamanho repetido: '+label);
-  usedSizes.add(key);
-  const sku=String(row.sku||'').trim(),ean=String(row.ean||'').replace(/[\s-]/g,'');
-  if(sku.length>80)throw new Error('SKU acima do limite no tamanho '+label+'.');
-  if(ean&&!/^\d{8,14}$/.test(ean))throw new Error('EAN inválido no tamanho '+label+'.');
-  for(const code of [sku&&'sku:'+sku.toLowerCase(),ean&&'ean:'+ean]){
-   if(!code)continue;
-   if(usedCodes.has(code))throw new Error('Código repetido: '+code.split(':')[1]);
-   usedCodes.add(code);
-  }
-  entries.push({size:label,sku:sku||null,ean:ean||null,quantity:number});
+ const choices=uniqueCategoryVariations(options),bySize=new Map();
+ for(const p of products){
+  if(!p||p.force_archived_at||!p.apparel_size)continue;
+  const key=variationKey(p.apparel_size);
+  if(!bySize.has(key)||(!bySize.get(key).active&&p.active))bySize.set(key,p);
  }
- if(isModel&&!entries.length)throw new Error('Informe estoque maior que zero para pelo menos um tamanho novo.');
- return {existingSize:size,entries};
+ if(!choices.length)return '<p class="variation-compact-empty">Esta categoria não possui variações definidas. Configure os tamanhos em Categorias.</p>';
+ const group=choices.map(label=>{
+  const existing=isModel?bySize.get(variationKey(label)):null;
+  const inactive=Boolean(existing&&!existing.active);
+  const stock=existing?Number(physicalFor(existing.id)||0):0;
+  const disabled=!canEdit||inactive;
+  const input=(title,name,value,attrs='')=>
+   '<label class="variation-compact-field"><span>'+title+'</span>'+
+    editableInput(name,value,attrs,disabled)+'</label>';
+  const badge=existing?'<small class="variation-compact-badge '+(inactive?'is-inactive':'is-registered')+'">'+
+     (inactive?'Inativa':'Cadastrada')+'</small>':'';
+  const originalPick=!isModel&&canEdit?
+   '<label class="variation-compact-legacy-pick"><input type="radio" name="original_size" value="'+esc(label)+
+   '" data-original-size> SKU atual</label>':'';
+  return '<div class="variation-compact-row" data-variation-row data-size="'+esc(label)+'" '+
+   'data-id="'+esc(existing?.id||'')+'" data-status="'+(inactive?'inactive':existing?'registered':'new')+'" '+
+   'data-expected-quantity="'+esc(stock)+'" data-expected-sku="'+esc(existing?.sku||'')+'" '+
+   'data-expected-ean="'+esc(existing?.ean||'')+'">'+
+   '<div class="variation-compact-title"><strong>'+esc(label)+'</strong>'+badge+originalPick+'</div>'+
+   '<div class="variation-compact-fields">'+
+     input('Estoque','quantity',stock,'type="number" min="0" max="1000000" step="1" inputmode="numeric"')+
+     input('EAN','ean',existing?.ean||'','inputmode="numeric" maxlength="14" placeholder="Código de barras"')+
+     input('SKU','sku',existing?.sku||'','maxlength="80" placeholder="Código interno"')+
+   '</div></div>';
+ }).join('');
+ const outside=products.filter(p=>p.apparel_size&&!choices.some(s=>variationKey(s)===variationKey(p.apparel_size)));
+ return '<form data-form="product-variation-table" class="variation-compact-form" '+
+   'data-is-model="'+String(isModel)+'" data-model-id="'+esc(modelId||'')+
+   '" data-id="'+esc(main?.id||'')+'" data-unsaved="false" '+
+   'data-original-sku="'+esc(!isModel?main?.sku||'':'')+
+   '" data-original-ean="'+esc(!isModel?main?.ean||'':'')+
+   '" data-original-quantity="'+esc(!isModel?physicalFor(main?.id):0)+'">'+
+   '<div class="variation-compact-header"><strong>Variações da categoria</strong>'+
+      '<small>'+choices.length+' tamanhos · preencha diretamente</small></div>'+
+   (!isModel?'<p class="variation-compact-help">Produto antigo com SKU '+esc(main?.sku||'—')+
+    ': marque a qual tamanho ele pertence. O estoque e os códigos originais serão preservados.</p>':
+    '<p class="variation-compact-help">Tamanhos novos começam com estoque 0 e códigos vazios. Preencha apenas o necessário.</p>')+
+   '<div class="variation-compact-list">'+group+'</div>'+
+   (outside.length?'<p class="variation-compact-help">Variações antigas preservadas: '+
+     esc(outside.map(p=>p.apparel_size).join(' · '))+'</p>':'')+
+   '</form>';
+}
+export function readVariationForm(form){
+ if(!form)return {originalSize:'',rows:[]};
+ const originalSize=form.querySelector('[data-original-size]:checked')?.value||'';
+ const rows=[...form.querySelectorAll('[data-variation-row]')].filter(row=>row.dataset.status!=='inactive')
+  .map(row=>({
+   size:row.dataset.size,
+   id:row.dataset.id||null,
+   sku:row.querySelector('[name="sku"]')?.value.trim()||'',
+   ean:row.querySelector('[name="ean"]')?.value.trim()||'',
+   quantity:row.querySelector('[name="quantity"]')?.value.trim()||'',
+   expected_quantity:Number(row.dataset.expectedQuantity||0),
+   expected_sku:row.dataset.expectedSku||'',
+   expected_ean:row.dataset.expectedEan||''
+  }));
+ const codes=new Set();
+ for(const row of rows){
+  if(!/^\d{1,7}$/.test(row.quantity)||Number(row.quantity)>1000000)
+   throw new Error('Estoque inválido para '+row.size+'. Informe de 0 a 1.000.000.');
+  if(row.sku.length>80)throw new Error('SKU muito longo em '+row.size+'.');
+  if(row.ean&&!/^\d{8,14}$/.test(row.ean.replace(/[\s-]/g,'')))
+   throw new Error('EAN inválido em '+row.size+'. Use de 8 a 14 dígitos.');
+  for(const value of [row.sku&&'SKU:'+row.sku.toLowerCase(),
+   row.ean&&'EAN:'+row.ean.replace(/[\s-]/g,'')]){
+    if(!value)continue;
+    if(codes.has(value))throw new Error('Código repetido entre tamanhos: '+value.split(':')[1]);
+    codes.add(value);
+  }
+ }
+ const changed=rows.some(row=>
+  row.sku!==(row.expected_sku||'')||
+  row.ean!==(row.expected_ean||'')||
+  Number(row.quantity)!==row.expected_quantity);
+ if(form.dataset.isModel!=='true'&&changed&&!originalSize)
+  throw new Error('Marque qual tamanho corresponde ao SKU já existente.');
+ return {originalSize,rows};
+}
+export function useOriginalVariation(form,size){
+ if(!form||form.dataset.isModel==='true')return;
+ const mainSku=form.dataset.originalSku||'',mainEan=form.dataset.originalEan||'';
+ const mainQty=String(Number(form.dataset.originalQuantity||0));
+ for(const row of form.querySelectorAll('[data-variation-row]')){
+  const isOriginal=row.dataset.size===size;
+  const originalInput=row.querySelector('[data-original-size]');
+  if(originalInput)originalInput.checked=isOriginal;
+  // Guardar rascunhos dos demais tamanhos ao trocar a escolha do tamanho legado.
+  if(!isOriginal){
+    if(row.dataset.originalApplied==='true'){
+      for(const field of ['sku','ean','quantity']){
+       const el=row.querySelector('[name="'+field+'"]');
+       if(el)el.value=row.dataset['draft'+field.charAt(0).toUpperCase()+field.slice(1)]|| (field==='quantity'?'0':'');
+      }
+      row.dataset.originalApplied='false';
+    }
+    continue;
+  }
+  if(row.dataset.originalApplied==='true')continue;
+  for(const [field,value] of [['sku',mainSku],['ean',mainEan],['quantity',mainQty]]){
+   const input=row.querySelector('[name="'+field+'"]');
+   if(!input)continue;
+   row.dataset['draft'+field.charAt(0).toUpperCase()+field.slice(1)]=input.value;
+   input.value=value;
+  }
+  row.dataset.originalApplied='true';
+ }
+ form.dataset.unsaved='true';
 }
