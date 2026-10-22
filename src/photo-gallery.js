@@ -8,10 +8,9 @@ export function galleryMarkup(item){
  '<small>Até 6 fotos por modelo; a primeira é a capa</small></div>'+
  '<div data-gallery class="product-gallery-grid">'+paths.map((path,i)=>photoTile({path},i)).join('')+'</div>'+
  '<div class="gallery-controls"><button type="button" class="button" data-action="choose-photo">+ Adicionar fotos</button>'+
- '<button type="button" class="button" data-action="take-photo">📷 Câmera</button>'+
+ '<button type="button" class="button" data-action="take-photo">📷 Abrir câmera</button>'+
  '<small data-photo-status>Selecione até 6 fotos. Você pode trocar, remover ou escolher a principal.</small></div>'+
  '<input hidden type="file" name="gallery_file" accept="image/*" multiple>'+
- '<input hidden type="file" name="camera_file" accept="image/*" capture="environment">'+
  '<input hidden type="file" name="gallery_replace_file" accept="image/*"></section>';
 }
 function photoTile(item,i){

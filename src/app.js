@@ -3,7 +3,8 @@ import {variationFormHTML,readVariationForm,useOriginalVariation} from './produc
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js';
-import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261016sixphotos1';
+import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261022camera1';
+import {openPhotoCamera} from './photo-camera.js?v=20261022camera1';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015covergrant1';
 import {renderStoreHub,locationOrders,matchesStoreOrder,filterStoreHub} from './store-hub.js?v=20261016stores1';
 import {renderStoreUnit} from './store-unit.js?v=20261016stores1';
@@ -5094,9 +5095,20 @@ async function handleClick(event){
   }
   if(action==='quick-category')return categoryModal(chosenCategory(target.closest('form')),true);
   if(action==='quick-tag')return tagModal(true);
-  if(action==='take-photo'||action==='choose-photo'){
+  if(action==='take-photo'){
     const form=target.closest('form');
-    form?.querySelector(action==='take-photo'?'input[name="camera_file"]':'input[name="gallery_file"]')?.click();return;
+    if(!form)return;
+    if(galleryState(form).length>=6)return toast('A galeria já tem seis fotos. Exclua uma antes de fotografar.',true);
+    openPhotoCamera({form,onCapture:async file=>{
+      if(!form.isConnected)throw Error('A ficha de fotos foi fechada. Abra o produto novamente.');
+      await galleryAddFiles(form,[file],compressPhoto);
+      hydrateImages();
+    }});
+    return;
+  }
+  if(action==='choose-photo'){
+    target.closest('form')?.querySelector('input[name="gallery_file"]')?.click();
+    return;
   }
   if(action==='admin-order-delete-open'){
     if(!isAdmin()||isFranchisePortal())return toast('Somente administradores podem excluir pedidos.',true);
@@ -6910,7 +6922,7 @@ document.addEventListener('change',event=>{
   }
   if(event.target.matches('select[name="apparel_type"]'))apparelSyncCategory(event.target,state,{categoryFull});
   if(event.target.matches('select[name="cover_mode"]'))syncCoverFileField(event.target.closest('form'));
-  if(event.target.matches('input[name="camera_file"],input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
+  if(event.target.matches('input[name="gallery_file"]'))handlePhotoInput(event.target).catch(fail);
   if(event.target.matches('input[name="gallery_replace_file"]')){
    const input=event.target,form=input.closest('form'),file=input.files?.[0];
    if(form&&file)galleryReplaceFile(form,form.__replaceIndex,file,compressPhoto)
