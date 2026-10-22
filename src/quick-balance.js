@@ -1,3 +1,4 @@
+import {findProductByCode} from './product-code-search.js';
 // Área independente de balanço e movimentação rápida por EAN/SKU.
 const h=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const quickModes=[
@@ -6,14 +7,11 @@ export const quickModes=[
  {id:'saida',label:'Dar saída',permission:'stock.exit'}
 ];
 export function findQuickStockProduct(items,code){
- const value=String(code||'').trim().toLocaleLowerCase('pt-BR');
- if(!value)return {item:null,error:'Informe o EAN ou SKU.'};
- const results=items.filter(p=>p.active&&!p.force_archived_at&&
-  (String(p.ean||'').toLocaleLowerCase('pt-BR')===value||
-    String(p.sku||'').toLocaleLowerCase('pt-BR')===value));
- if(results.length>1)return {item:null,error:'Código vinculado a mais de um produto. Corrija os cadastros antes de movimentar.'};
- return results.length?{item:results[0],error:null}:
-  {item:null,error:'Código não encontrado. Confira o EAN ou SKU.'};
+ const result=findProductByCode(items,code);
+ if(result.status==='ambiguous')return {item:null,error:'Código corresponde a mais de um produto. Informe o SKU ou EAN completo.'};
+ if(result.item)return {item:result.item,error:null};
+ return {item:null,error:result.status==='empty'?'Informe o EAN ou SKU.':
+  'Código não encontrado. Confira o EAN ou SKU.'};
 }
 export function quickStockResult(item,{physical=0,reserved=0,mode='contagem',can=()=>false}={}){
  if(!item)return '<div class="quick-balance-placeholder"><strong>Aguardando leitura</strong>'+

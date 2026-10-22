@@ -1,4 +1,28 @@
 // Catálogo CDSB: apresentação compacta da mesma família/SKU, sem ações cadastrais na lista.
+const sizeOrder=['PP','P','M','G','GG','XGG','XXGG','EXGG'];
+const sizeCollator=new Intl.Collator('pt-BR',{numeric:true,sensitivity:'base'});
+const variantName=p=>{
+ const size=String(p.apparel_size||'Único').replace(/^tamanho\s+/i,'').trim()||'Único';
+ const color=String(p.apparel_color||'').trim();
+ return color&&color.toLocaleLowerCase('pt-BR')!=='única'?size+' · '+color:size;
+};
+export function productCardVariantStock(products,{h,qtyAvailable}){
+ const ordered=[...products].sort((a,b)=>{
+  const aName=variantName(a),bName=variantName(b);
+  const ar=sizeOrder.indexOf(aName.split(' · ')[0].toUpperCase());
+  const br=sizeOrder.indexOf(bName.split(' · ')[0].toUpperCase());
+  return (ar<0?99:ar)-(br<0?99:br)||
+   sizeCollator.compare(aName,bName)||sizeCollator.compare(String(a.sku||a.id||''),String(b.sku||b.id||''));
+ });
+ return '<section class="product-grid-variants" aria-label="Estoque disponível por variação">'+
+  '<div class="product-grid-variants-head"><strong>Estoque por variação</strong><small>Disponível</small></div>'+
+  '<div class="product-grid-variants-list">'+ordered.map(p=>{
+   const qty=Math.max(0,Number(qtyAvailable(p.id))||0),size=variantName(p);
+   return '<div class="product-grid-variant'+(qty===0?' is-zero':'')+'" title="'+h(size+': '+qty+' unidades disponíveis')+'">'+
+    '<span class="product-grid-variant-name">'+h(size)+'</span>'+
+    '<b class="product-grid-variant-qty" aria-label="'+h(qty+' unidades disponíveis')+'">'+qty.toLocaleString('pt-BR')+'</b></div>';
+  }).join('')+'</div></section>';
+}
 export function productCatalogCard(group,{h,qtyStore,qtyReserved,qtyAvailable,categories=[]}){
  const products=group.products.filter(p=>p.active);
  const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
@@ -21,7 +45,7 @@ export function productCatalogCard(group,{h,qtyStore,qtyReserved,qtyAvailable,ca
    '<div><small>Disponível</small><strong>'+available.toLocaleString('pt-BR')+'</strong></div>'+
    '<div><small>Físico</small><strong>'+physical.toLocaleString('pt-BR')+'</strong></div>'+
    '<div><small>Reservado</small><strong>'+reserved.toLocaleString('pt-BR')+'</strong></div>'+
-  '</div>'+
+  '</div>'+productCardVariantStock(products,{h,qtyAvailable})+
   '<button type="button" class="button primary product-grid-open" data-action="product-drawer-open" data-group="'+h(group.key)+'" aria-label="Abrir produto '+h(group.title)+'">Abrir produto</button>'+
  '</article>';
 }

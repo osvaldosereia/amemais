@@ -217,3 +217,16 @@
  .cdsb-product-drawer .variation-compact-field>input{font-size:.76rem!important;padding:7px!important}
  .cdsb-product-drawer .product-drawer-save-footer .button{min-width:154px}
 }
+
+/* Disponibilidade dos tamanhos no card fechado, no mesmo padrão de Compras. */
+.products-panel .product-grid-variants{padding:10px 12px 11px;background:#f9fbfe;display:grid;gap:8px;border-bottom:1px solid #e5edf4;min-width:0}
+.products-panel .product-grid-variants-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.products-panel .product-grid-variants-head strong{font-size:.73rem;font-weight:750;color:#183b5b}
+.products-panel .product-grid-variants-head small{font-size:.67rem;font-weight:600;color:#6a7e91}
+.products-panel .product-grid-variants-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}
+.products-panel .product-grid-variant{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:0;min-height:35px;padding:6px 8px;background:#fff;border:1px solid #d9e4ef;border-radius:8px;color:#173953}
+.products-panel .product-grid-variant-name{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;font-size:.73rem;font-weight:650;line-height:1.25}
+.products-panel .product-grid-variant-qty{flex:none;color:#102d50;font-size:.85rem;font-weight:800;font-variant-numeric:tabular-nums}
+.products-panel .product-grid-variant.is-zero{background:#f2f5f9;color:#79899a;border-color:#e6ebf1}
+.products-panel .product-grid-variant.is-zero .product-grid-variant-qty{color:#7d8b9b}
+@media(max-width:370px){.products-panel .product-grid-variant{padding:6px}.products-panel .product-grid-variant-name{font-size:.7rem}.products-panel .product-grid-variant-qty{font-size:.8rem}}
