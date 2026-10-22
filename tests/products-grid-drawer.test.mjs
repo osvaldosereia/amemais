@@ -41,8 +41,8 @@ test('desktop usa três colunas e mobile mantém a folha inferior',()=>{
  assert.match(css,/width:min\(580px,100vw\)/);
  assert.match(css,/flex-direction:row!important/);
  assert.match(css,/height:min\(92dvh,950px\)/);
- assert.match(index,/products-grid-drawer.css\?v=20261022variationcoverage1/);
- assert.match(secure,/app.js\?v=20261022variationcoverage1/);
+ assert.match(index,/products-grid-drawer.css\?v=20261022variationform1/);
+ assert.match(secure,/app.js\?v=20261022variationform1/);
 });
 test('catálogo carrega 30 por vez, preservando filtros e scroll durante expansão',()=>{
  assert.match(app,/const pageSize=30,totalPages/);
@@ -75,9 +75,9 @@ test('ficha simplifica as abas e reúne variações, códigos e estoque no mesmo
 test('salvamentos mantêm painel e alterações não salvas exigem confirmação',()=>{
  assert.match(app,/function refreshOpenProductDrawer\(/);
  assert.match(app,/render\(\);\s*refreshOpenProductDrawer\(\)/);
- assert.match(app,/if\(!abandonCardDraft\(sheet\.article\)\)return/);
+ assert.match(app,/function productDrawerChanged\(\)/);
  assert.match(app,/if\(type==='product-drawer-photo'\)/);
  assert.match(app,/if\(inDrawer\)\{\s*return saveProductCard/);
- assert.match(app,/product-drawer-add/);
+ assert.match(app,/data-product-drawer-save-footer/);
  assert.match(app,/if\(productDrawer\)\{closeProductDrawer\(\);return;\}/);
 });

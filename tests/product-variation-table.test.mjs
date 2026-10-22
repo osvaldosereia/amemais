@@ -1,41 +1,44 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {variationTablePayload,variationTableHTML} from '../src/product-variation-coverage.js';
-const sizes=['Tamanho P','Tamanho M','Tamanho G'];
-const p={id:'u1',sku:'1000209',ean:'100002096',active:true,apparel_size:null};
-test('Produto Único mostra a tabela de tamanhos, SKU, EAN e estoque desde a abertura',()=>{
- const html=variationTableHTML(sizes,[p],{isModel:false,canEdit:true,main:p});
- assert.match(html,/data-form="product-variation-table"/);
- assert.match(html,/name="existing_size"/);
+import {variationFormHTML,readVariationForm} from '../src/product-variation-coverage.js';
+const choices=['Tamanho P','Tamanho M','Tamanho G'];
+const model=[{id:'p',apparel_size:'M',active:true,sku:'SKU-M',ean:'1234567890123'}];
+test('tamanhos existentes mantêm campos e saldos reais; novos começam em zero',()=>{
+ const html=variationFormHTML(choices,model,{isModel:true,canEdit:true,physicalFor:()=>7});
+ assert.match(html,/data-id="p"/);
+ assert.match(html,/data-expected-quantity="7"/);
+ assert.match(html,/value="SKU-M"/);
+ assert.match(html,/value="1234567890123"/);
+ assert.equal((html.match(/value="0" type=/g)||[]).length,0);
  assert.equal((html.match(/name="quantity"/g)||[]).length,3);
- assert.equal((html.match(/name="sku"/g)||[]).length,3);
- assert.match(html,/Salvar tamanhos e estoque/);
- assert.doesNotMatch(html,/Ativar tamanhos neste produto/);
+ assert.match(html,/value="0"/);
 });
-test('Só cria variações com estoque maior que zero',()=>{
- const payload=variationTablePayload({existingSize:'Tamanho P',rows:[
- {size:'Tamanho P',quantity:19,sku:'ORIGINAL'},
- {size:'Tamanho M',quantity:0,sku:'NAO-CRIAR'},
- {size:'Tamanho G',quantity:8,sku:'G-1',ean:'1234567890123'}
- ]},{allowed:sizes});
- assert.equal(payload.existingSize,'Tamanho P');
- assert.deepEqual(payload.entries,[{size:'Tamanho G',sku:'G-1',ean:'1234567890123',quantity:8}]);
+const fakeRow=({size='Tamanho P',sku='',ean='',qty='0',id='',previousQty=0,previousSku='',previousEan=''})=>({
+ dataset:{size,id,status:id?'registered':'new',expectedQuantity:String(previousQty),
+   expectedSku:previousSku,expectedEan:previousEan},
+ querySelector:selector=>{
+  const n=(selector.match(/name="([^"]+)"/)||[])[1];
+  const value={sku,ean,quantity:qty}[n];
+  return value===undefined?null:{value};
+ }
 });
-test('Validação impede EAN e tamanhos duplicados',()=>{
- assert.throws(()=>variationTablePayload({existingSize:'Tamanho M',rows:[
-  {size:'Tamanho P',quantity:3,ean:'123'}]},{allowed:sizes}),/EAN inválido/);
- assert.throws(()=>variationTablePayload({existingSize:'Tamanho M',rows:[
- {size:'Tamanho P',quantity:3,sku:'DUP'},{size:'Tamanho G',quantity:2,sku:'DUP'}
- ]},{allowed:sizes}),/Código repetido/);
+const fakeForm=(rows,{original='',isModel='true'}={})=>({
+ dataset:{isModel},querySelector:sel=>sel==='[data-original-size]:checked'&&original?{value:original}:null,
+ querySelectorAll:sel=>sel==='[data-variation-row]'?rows:[]
 });
-test('Tamanhos existentes nunca são inseridos outra vez',()=>{
- const html=variationTableHTML(sizes,[{id:'p',active:true,apparel_size:'M',sku:'100'}],
- {isModel:true,canEdit:true,physicalFor:()=>5});
- assert.equal((html.match(/name="quantity"/g)||[]).length,2);
- assert.match(html,/Cadastrado/);
- const data=variationTablePayload({rows:[{size:'Tamanho M',quantity:10},
- {size:'Tamanho P',quantity:0},{size:'Tamanho G',quantity:1}]},
- {isModel:true,allowed:sizes,existing:[{apparel_size:'M'}]});
- assert.equal(data.entries.length,1);
- assert.equal(data.entries[0].size,'Tamanho G');
+test('valida estoque, EAN e códigos repetidos no preenchimento direto',()=>{
+ const saved=readVariationForm(fakeForm([
+  fakeRow({size:'Tamanho P',qty:'0'}),fakeRow({size:'Tamanho G',qty:'9',sku:'NEW-G',ean:'1234567890123'})
+ ]));
+ assert.equal(saved.rows.length,2);
+ assert.equal(saved.rows[1].quantity,'9');
+ assert.throws(()=>readVariationForm(fakeForm([fakeRow({qty:'-1'})])),/Estoque inválido/);
+ assert.throws(()=>readVariationForm(fakeForm([fakeRow({ean:'123',qty:'1'})])),/EAN inválido/);
+ assert.throws(()=>readVariationForm(fakeForm([
+   fakeRow({sku:'repeat'}),fakeRow({size:'Tamanho G',sku:'repeat'})
+ ])),/Código repetido/);
+});
+test('SKU Único não pode ser reclassificado sem tamanho definido',()=>{
+ assert.throws(()=>readVariationForm(fakeForm([fakeRow({qty:'4'})],{isModel:'false'})),/Marque qual tamanho/);
+ assert.equal(readVariationForm(fakeForm([fakeRow({qty:'4'})],{isModel:'false',original:'Tamanho P'})).originalSize,'Tamanho P');
 });
