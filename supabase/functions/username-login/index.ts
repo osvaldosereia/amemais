@@ -25,6 +25,7 @@ Deno.serve(async (request: Request) => {
   if (request.method !== 'POST') return reply({error:'Método inválido.'},405);
 
   const denied = () => reply({ error:'Usuário ou senha inválidos.' },401);
+  const waiting = () => reply({error:'Muitas tentativas de acesso. Aguarde alguns minutos antes de tentar novamente.',code:'rate_limited'},429);
   try {
     if (Number(request.headers.get('content-length') || 0) > 4096) return denied();
     const {username,password} = await request.json();
@@ -48,12 +49,20 @@ Deno.serve(async (request: Request) => {
     if (!target?.active) return denied();
     const auth = createClient(url,anon,{auth:{persistSession:false,autoRefreshToken:false}});
     const result = await auth.auth.signInWithPassword({email:target.email,password});
-    if (result.error || !result.data.session || result.data.user?.id!==target.id) return denied();
+    if (result.error) {
+      if (result.error.status===429 || result.error.code==='over_request_rate_limit' ||
+          result.error.code==='over_email_send_rate_limit') return waiting();
+      if (result.error.code==='email_not_confirmed')
+        return reply({error:'Esta conta ainda não foi ativada. Solicite ao administrador que redefina sua senha.',code:'email_not_confirmed'},403);
+      if (result.error.status>=500) return reply({error:'Serviço de autenticação temporariamente indisponível.',code:'service_unavailable'},503);
+      return denied();
+    }
+    if (!result.data.session || result.data.user?.id!==target.id) return denied();
     return reply({
       access_token:result.data.session.access_token,
       refresh_token:result.data.session.refresh_token
     });
   } catch (_error) {
-    return denied();
+    return reply({error:'Não foi possível completar o login. Confira a conexão e tente novamente.',code:'login_unavailable'},503);
   }
 });
