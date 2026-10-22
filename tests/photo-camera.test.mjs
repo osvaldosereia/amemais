@@ -43,8 +43,8 @@ test('Libera tracks ao fechar, aborta permissão tardia e não envia foto automa
 });
 test('Novos arquivos têm versão própria para impedir cache de interface antiga',()=>{
  assert.match(index,/photo-camera\.css\?v=20261022camera1/);
- assert.match(index,/secure-entry\.js\?v=20261022filteredportrait1/);
- assert.match(entry,/app\.js\?v=20261022filteredportrait1/);
+ assert.match(index,/secure-entry\.js\?v=20261022gondolafix1/);
+ assert.match(entry,/app\.js\?v=20261022gondolafix1/);
  assert.match(app,/photo-camera\.js\?v=20261022camera1/);
  assert.match(app,/photo-gallery\.js\?v=20261022camera1/);
 });
