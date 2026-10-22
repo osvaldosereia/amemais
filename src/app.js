@@ -15,7 +15,7 @@ import { rankTagsForCategory, catalogCategoryRows, catalogTagCards } from './cat
 import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitApparel,
   apparelFillSizes, apparelVariantEditModal, saveApparelVariant, apparelPhotoModal, saveApparelPhoto, apparelSyncCategory } from './apparel.js?v=20261016gondolas1';
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261021categoryinline1';
-import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave} from './category-variations.js?v=20261021categoryinline1';
+import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave,inferApparelMetadata} from './category-variations.js?v=20261021categoryinline1';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
   eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261021categoryinline1';
 import {catalogSortOptions,availableGondolas,gondolaKey,catalogMatchesQuery,orderCatalogGroups,filterCatalogGondola} from './catalog-order.js?v=20261016sort1';
@@ -702,7 +702,7 @@ let productDrawer=null;
 let productInfiniteObserver=null;
 let productInfiniteBusy=false;
 const productDrawerTabs=[
- ['cadastro','Produto'],['variacoes','Variações e estoque'],
+ ['cadastro','Produto'],['variacoes','Variações'],
  ['compras','Compras'],['midia','Fotos'],['admin','Mais']
 ];
 function findProductGroup(key){
@@ -727,7 +727,7 @@ function closeProductDrawer(restoreFocus=true,force=false){
   if(!canDiscardInlineVariant())return false;
   const photoForm=productDrawer.overlay.querySelector('[data-form="product-drawer-photo"]');
   const pendingPhotos=photoForm&&galleryHasChanges(photoForm);
-  const draftVariants=Boolean(productDrawer.overlay.querySelector('[data-extra-size]:not([hidden])'));
+  const draftVariants=Boolean(productDrawer.overlay.querySelector('[data-extra-size]:not([hidden]),form[data-form="product-drawer-convert"][data-unsaved="true"]'));
   if((pendingPhotos||draftVariants)&&!window.confirm('Há fotos ou variações não salvas. Descartar essas alterações?'))return false;
   if(!abandonCardDraft(productDrawer.article))return false;
  }
@@ -746,6 +746,15 @@ function switchProductDrawerTab(tab){
  if(['cadastro','variacoes','compras','admin','midia'].includes(tab)&&
     !hasPermission('products.edit'))return;
  if(!abandonCardDraft(sheet.article))return;
+ if(tab!==sheet.tab){
+  const addition=sheet.overlay.querySelector('[data-product-drawer-add]');
+  if(addition&&!addition.hidden){
+   if((addition.querySelector('[data-extra-size]:not([hidden])')||
+     addition.querySelector('form[data-form="product-drawer-convert"]'))&&
+      !window.confirm('Descartar a inclusão de variações não salva?'))return;
+   addition.hidden=true;
+  }
+ }
  const ui=cardUiFor(sheet.article);
  if(ui){ui.drawerTab=tab;ui.panel=tab==='variacoes'?'stock':'editor';
   if(['cadastro','variacoes','compras'].includes(tab))ui.editorTab=tab;}
@@ -761,12 +770,10 @@ function switchProductDrawerTab(tab){
  const editor=article.querySelector('[data-product-editor]');
  const stock=article.querySelector('[data-product-details]');
  if(editor){
-  const show=['cadastro','variacoes','compras','admin'].includes(tab);
+  const show=['cadastro','compras','admin'].includes(tab);
   editor.hidden=!show;editor.open=show;
   editor.querySelectorAll('[data-editor-panel]').forEach(section=>{
-   section.hidden=tab==='admin'||(tab==='variacoes'
-    ?!['variacoes','codigos'].includes(section.dataset.editorPanel)
-    :section.dataset.editorPanel!==tab);
+   section.hidden=tab==='admin'||section.dataset.editorPanel!==tab;
   });
   const advanced=editor.querySelector('.card-admin-tools');
   if(advanced){advanced.hidden=tab!=='admin';advanced.open=tab==='admin';}
@@ -846,6 +853,50 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
  const article=template.content.firstElementChild;
  if(!article)return;
  overlay.querySelector('[data-product-drawer-editor-slot]').append(article);
+ // Em Produtos, códigos têm um único editor, abaixo de cada variação.
+ const stock=article.querySelector('[data-product-details]');
+ if(stock){
+  stock.querySelectorAll('.card-balance-edit-variant,.product-variant-add').forEach(el=>el.remove());
+  const advanced=stock.querySelector('.product-advanced-stock');
+  if(advanced){
+   advanced.open=false;
+   const summary=advanced.querySelector(':scope > summary');
+   if(summary)summary.textContent='Operações de estoque · balanço, movimentações e histórico';
+  }
+  const overview=stock.querySelector('.product-variant-overview');
+  if(overview){
+   const allowed=resolveCategoryVariations(state.categories,group.model?.category_id||main.category_id).options;
+   const header=document.createElement('div');
+   header.className='product-drawer-variation-heading';
+   header.innerHTML='<div><strong>Variações cadastradas</strong><small>'+
+     h(group.products.length+' SKU(s) · saldo individual')+'</small></div>'+
+     (canEdit&&canRegisterProducts()&&allowed.length?
+       '<button type="button" class="button primary small" data-action="product-drawer-show-add" aria-expanded="false">+ Adicionar variações</button>':'');
+   overview.prepend(header);
+   if(canEdit&&canRegisterProducts()&&allowed.length){
+    const add=document.createElement('div');
+    add.className='product-drawer-add';
+    add.dataset.productDrawerAdd='';
+    add.hidden=true;
+    if(models){
+     add.innerHTML='<form data-form="extra-sizes" data-model-id="'+h(group.modelId)+'">'+
+       addSizesContent(group.model,group.products,allowed,state.gondolas)+
+       '<div class="cdsb-edit-footer"><button type="submit" class="button primary">Cadastrar variações</button></div></form>';
+    }else{
+     add.innerHTML='<form data-form="product-drawer-convert" data-id="'+h(main.id)+'" data-unsaved="false">'+
+      '<strong>Ativar tamanhos neste produto</strong>'+
+      '<p class="cdsb-edit-hint">Primeiro identifique o tamanho do SKU atual. O código, estoque e histórico serão preservados.</p>'+
+      '<label class="product-inline-field"><span>Tamanho correspondente ao SKU atual</span>'+
+      '<select name="size" required><option value="">Selecione o tamanho atual</option>'+
+       allowed.map(size=>'<option value="'+h(size)+'">'+h(size)+'</option>').join('')+
+      '</select></label>'+
+      '<div class="cdsb-edit-footer"><button type="button" class="button" data-action="product-drawer-show-add">Cancelar</button>'+
+      '<button type="submit" class="button primary">Ativar variações</button></div></form>';
+    }
+    overview.append(add);
+   }
+  }
+ }
  if(canEdit){
   const form=document.createElement('form');
   form.dataset.form='product-drawer-photo';
@@ -854,16 +905,6 @@ function openProductDrawer(key,{tab=null,scrollTop=0}={}){
   form.innerHTML=photoChooser(group.model||main)+
    '<div class="cdsb-edit-footer"><button type="submit" class="button primary">Salvar fotos</button></div>';
   overlay.querySelector('[data-product-drawer-photo]').append(form);
-  if(models){
-   const entry=article.querySelector('[data-editor-panel="variacoes"]');
-   const add=document.createElement('div');
-   add.className='product-drawer-add';
-   add.innerHTML='<button type="button" class="button" data-action="product-drawer-show-add">+ Adicionar variações</button>'+
-    '<div data-product-drawer-add hidden><form data-form="extra-sizes" data-model-id="'+h(group.modelId)+'">'+
-     addSizesContent(group.model,group.products,resolveCategoryVariations(state.categories,group.model?.category_id).options,state.gondolas)+
-     '<div class="cdsb-edit-footer"><button type="submit" class="button primary">Salvar novas variações</button></div></form></div>';
-   entry?.append(add);
-  }
  }
  document.body.append(overlay);
  const trigger=[...root.querySelectorAll('[data-action="product-drawer-open"]')].find(b=>b.dataset.group===key)||null;
@@ -4563,11 +4604,23 @@ async function handleClick(event){
   if(action==='product-drawer-tab'){switchProductDrawerTab(target.dataset.tab);return;}
   if(action==='product-drawer-show-add'){
     const drawer=productDrawer;
-    if(!drawer||!canRegisterProducts()||!drawer.group.modelId)return;
+    if(!drawer||!canRegisterProducts())return;
     const area=drawer.overlay.querySelector('[data-product-drawer-add]');
     if(!area)return;
+    if(!area.hidden){
+      if((area.querySelector('[data-extra-size]:not([hidden])')||
+        area.querySelector('form[data-form="product-drawer-convert"][data-unsaved="true"]'))&&
+        !window.confirm('Descartar as variações não salvas?'))return;
+      area.querySelector('form')?.reset();
+    }
     area.hidden=!area.hidden;
-    if(!area.hidden)area.querySelector('input,select,button')?.focus({preventScroll:true});
+    drawer.overlay.querySelector('.product-drawer-variation-heading [data-action="product-drawer-show-add"]')?.
+      setAttribute('aria-expanded',String(!area.hidden));
+    if(!area.hidden){
+      area.scrollIntoView({block:'nearest',behavior:'smooth'});
+      area.querySelector('select[name="size"],[data-action="extra-size-toggle"],input,button')?.
+        focus({preventScroll:true});
+    }
     return;
   }
   if(action==='product-card-sizes'||action==='product-card-edit-toggle'){
@@ -5654,6 +5707,33 @@ async function handleSubmit(event){
     return saveProductCard(async()=>savePhotoGallery(form,{db,assertOk,modelId,productId}),
       {modelId,productId,success:'Fotos atualizadas. O painel permanece aberto.'});
   }
+  if(type==='product-drawer-convert'){
+    if(!productDrawer||!canRegisterProducts()||!hasPermission('products.create')||
+      !hasPermission('products.edit')||!form.closest('.cdsb-product-drawer'))return;
+    const productId=form.dataset.id,item=product(productId);
+    const size=String(values.size||'').trim();
+    if(!item||item.apparel_model_id||!item.active||item.force_archived_at||
+      !productDrawer.group.products.some(p=>p.id===item.id))
+      return toast('Produto indisponível para ativar variações.',true);
+    const allowed=resolveCategoryVariations(state.categories,item.category_id).options;
+    if(!allowed.includes(size))return toast('Selecione um tamanho permitido pela categoria.',true);
+    if(item.name.length>110)return toast('Reduza o nome do produto para até 110 caracteres antes de ativar variações.',true);
+    const meta=inferApparelMetadata(state.categories,item.category_id);
+    state.loading=true;
+    try{
+      const modelId=assertOk(await db.rpc('convert_single_product_to_apparel',{
+        p_product_id:productId,p_size:size,p_type:meta.type,
+        p_audience:meta.audience,p_age_group:meta.ageGroup
+      }));
+      closeProductDrawer(false,true);
+      await loadData();
+      state.productCardUi.delete('product:'+productId);
+      openProductDrawer('model:'+modelId,{tab:'variacoes'});
+      toast('Variações ativadas: SKU, EAN, saldos e histórico do produto original preservados.');
+    }catch(error){fail(error);}
+    finally{state.loading=false;}
+    return;
+  }
   if(type==='product-drawer-variant'){
     if(!hasPermission('products.edit')||isFranchisePortal()||!productDrawer||
       !form.closest('.cdsb-product-drawer'))return;
@@ -6575,13 +6655,13 @@ document.addEventListener('submit',event=>{handleSubmit(event).catch(fail);});
 document.addEventListener('input',event=>{
   if(event.target.matches?.('[data-product-category-search]'))return;
   const form=event.target.closest?.('form[data-form]');
-  if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes','product-drawer-variant'].includes(form?.dataset.form))
+  if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes','product-drawer-variant','product-drawer-convert'].includes(form?.dataset.form))
     form.dataset.unsaved='true';
 },true);
 document.addEventListener('change',event=>{
   if(event.target.matches?.('[data-product-category-search]'))return;
   const form=event.target.closest?.('form[data-form]');
-  if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes','product-drawer-variant'].includes(form?.dataset.form))
+  if(['product-card-basic','product-card-variant','product-card-purchase','product-card-codes','product-drawer-variant','product-drawer-convert'].includes(form?.dataset.form))
     form.dataset.unsaved='true';
 },true);
 document.addEventListener('input',event=>{
