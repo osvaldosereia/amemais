@@ -79,6 +79,7 @@ const h = v => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&l
 const niceDate = value => value ? new Intl.DateTimeFormat('pt-BR', { timeZone:'America/Cuiaba' }).format(new Date(value.length === 10 ? value + 'T12:00:00' : value)) : '—';
 const niceTime = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short', timeZone:'America/Cuiaba' }).format(new Date(value)) : '—';
 const actionNames = {entrada:'Entrada',venda_loja:'Baixa (loja)',saida_loja:'Saída para filial / franquia',saida_pedido:'Saída de pedido avulso',transferencia:'Enviado ao evento',venda_evento:'Baixa antiga (evento)',devolucao:'Retornou à loja',baixa_evento:'Não retornou ao estoque',ajuste_loja:'Ajuste'};
+const movementLabel = m => m.action==='saida_loja'&&String(m.note||'').startsWith('Saída rápida por EAN/SKU')?'Saída rápida':(actionNames[m.action]||m.action);
 const roles = {admin:'Administrador CDSB',gerente:'Gerente CDSB',estoquista:'Separador CDSB',evento:'Responsável por loja temporária',consulta:'Consulta',franquia:'Loja permanente'};
 const profileLabel = u => u?.role==='admin'?'Administrador CDSB':u?.role==='franquia'?'Loja permanente':u?.role==='estoquista'?'Separador CDSB':u?.role==='evento'?'Loja temporária':(roles[u?.role]||u?.role||'—');
 const nav = [
@@ -613,7 +614,7 @@ function render(){
   const mark='<img class="cdsb-brand-logo" src="./cdsb-brand.svg?v=20261016logo2" alt="CDSB — Centro de Distribuição São Bento" width="270" height="89">';
   const sectionNav=isFranchisePortal()?[{id:'minha-loja',label:'Minha Loja',ico:'home'},{id:'pedidos',label:'Meus pedidos',ico:'clipboard'}]:
   state.profile?.role==='evento'&&hasPermission('events.request')?[{id:'meu-evento',label:'Meu Evento',ico:'calendar'},{id:'eventos',label:'Detalhes',ico:'clipboard'}]:
-  state.profile?.role==='estoquista'&&hasPermission('orders.separate')?[{id:'separador',label:'Separação',ico:'clipboard'},{id:'pedidos',label:'Todos os pedidos',ico:'package'}]:nav;
+  state.profile?.role==='estoquista'&&hasPermission('orders.separate')?[{id:'separador',label:'Separação',ico:'clipboard'},{id:'pedidos',label:'Todos os pedidos',ico:'package'},...(permittedView('balanco')?[{id:'balanco',label:'Balanço rápido',ico:'scan'}]:[])]:nav;
  const menu=sectionNav.filter(x=>permittedView(x.id))
     .map(x=>'<button type="button" data-action="view" data-view="'+h(x.id)+'" class="'+((state.view===x.id||(state.view==='entrada'&&x.id==='produtos')||(['eventos','lojas-admin'].includes(state.view)&&x.id==='lojas'))?'active':'')+'">'+
       uiIcon(x.ico,19)+'<span>'+h(x.label)+'</span></button>').join('')+
@@ -1706,7 +1707,7 @@ function movementTable(rows){
   if(!rows.length)return '<div class="muteblock">Nenhuma movimentação registrada.</div>';
   return '<div class="tablewrap"><table class="table"><thead><tr><th>Data e hora</th><th>Produto</th><th>Operação</th><th>Quantidade</th><th>Responsável</th><th>Observação</th></tr></thead><tbody>'+
     rows.map(m=>'<tr><td>'+niceTime(m.created_at)+'</td><td>'+h(product(m.product_id)?.name||m.product_id.slice(0,8))+'</td>'+
-    '<td>'+h(actionNames[m.action]||m.action)+(m.event_id?' <small>· '+h(eventById(m.event_id)?.name||'Evento')+'</small>':'')+'</td><td class="qty">'+m.quantity+'</td>'+
+    '<td>'+h(movementLabel(m))+(m.event_id?' <small>· '+h(eventById(m.event_id)?.name||'Evento')+'</small>':'')+'</td><td class="qty">'+m.quantity+'</td>'+
     '<td>'+h(username(m.actor_id))+'</td><td>'+h(m.note||'—')+'</td></tr>').join('')+'</tbody></table></div>';
 }
 function movementsPage(){
@@ -2476,7 +2477,7 @@ function printActivityReport(){
  if(!hasPermission('movements.read'))return;
  const rows=[
   ...state.movements.map(m=>({at:m.created_at,who:m.actor_id,
-    what:actionNames[m.action]||m.action,
+    what:movementLabel(m),
     detail:product(m.product_id)?.name||'Produto',qty:Number(m.quantity||0)})),
   ...state.audits.map(a=>({at:a.created_at,who:a.actor_id,
     what:a.action,detail:a.entity,qty:null}))
@@ -3966,7 +3967,7 @@ function exportCsv(){
   state.movements.filter(m=>(!state.eventFilter||m.event_id===state.eventFilter)&&
     (!state.movementFilter||m.action===state.movementFilter)&&
     (!q||[product(m.product_id)?.name,m.note,m.actor_id,username(m.actor_id)].join(' ').toLocaleLowerCase('pt-BR').includes(q)))
-    .forEach(m=>rows.push([niceTime(m.created_at),product(m.product_id)?.name||'',product(m.product_id)?.ean||'',actionNames[m.action]||m.action,m.quantity,m.delta_store,m.delta_event,eventById(m.event_id)?.name||'',username(m.actor_id),m.note||'']));
+    .forEach(m=>rows.push([niceTime(m.created_at),product(m.product_id)?.name||'',product(m.product_id)?.ean||'',movementLabel(m),m.quantity,m.delta_store,m.delta_event,eventById(m.event_id)?.name||'',username(m.actor_id),m.note||'']));
   const data='\uFEFF'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n');
   const blob=new Blob([data],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='ame-mais-movimentacoes-'+dateToday()+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
