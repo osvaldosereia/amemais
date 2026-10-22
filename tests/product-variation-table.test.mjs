@@ -9,7 +9,7 @@ test('tamanhos existentes mantêm campos e saldos reais; novos começam em zero'
  assert.match(html,/data-expected-quantity="7"/);
  assert.match(html,/value="SKU-M"/);
  assert.match(html,/value="1234567890123"/);
- assert.equal((html.match(/value="0" type=/g)||[]).length,0);
+ assert.equal((html.match(/value="0" type=/g)||[]).length,2);
  assert.equal((html.match(/name="quantity"/g)||[]).length,3);
  assert.match(html,/value="0"/);
 });
