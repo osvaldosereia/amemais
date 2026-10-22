@@ -51,6 +51,7 @@ export function variationFormHTML(options=[],products=[],{
  return '<form data-form="product-variation-table" class="variation-compact-form" '+
    'data-is-model="'+String(isModel)+'" data-model-id="'+esc(modelId||'')+
    '" data-id="'+esc(main?.id||'')+'" data-unsaved="false" '+
+   'data-original-id="'+esc(!isModel?main?.id||'':'')+'" '+
    'data-original-sku="'+esc(!isModel?main?.sku||'':'')+
    '" data-original-ean="'+esc(!isModel?main?.ean||'':'')+
    '" data-original-quantity="'+esc(!isModel?physicalFor(main?.id):0)+'">'+
@@ -115,11 +116,15 @@ export function useOriginalVariation(form,size){
        const el=row.querySelector('[name="'+field+'"]');
        if(el)el.value=row.dataset['draft'+field.charAt(0).toUpperCase()+field.slice(1)]|| (field==='quantity'?'0':'');
       }
+      row.dataset.id='';row.dataset.expectedSku='';row.dataset.expectedEan='';row.dataset.expectedQuantity='0';
       row.dataset.originalApplied='false';
     }
     continue;
   }
   if(row.dataset.originalApplied==='true')continue;
+  row.dataset.id=form.dataset.originalId||'';
+  row.dataset.expectedSku=mainSku;row.dataset.expectedEan=mainEan;
+  row.dataset.expectedQuantity=mainQty;
   for(const [field,value] of [['sku',mainSku],['ean',mainEan],['quantity',mainQty]]){
    const input=row.querySelector('[name="'+field+'"]');
    if(!input)continue;
