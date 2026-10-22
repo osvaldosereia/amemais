@@ -56,7 +56,7 @@ test('catálogo carrega 30 por vez, preservando filtros e scroll durante expans�
 test('ficha simplifica as abas e reúne variações, códigos e estoque no mesmo lugar',()=>{
  for(const tab of ["cadastro","variacoes","compras","midia","admin"])
   assert.match(app,new RegExp("'"+tab+"'"));
- assert.match(app,/\['cadastro','Produto'\],\['variacoes','Variações e estoque'\]/);
+ assert.match(app,/\['cadastro','Produto'\],\['variacoes','Variações'\]/);
  assert.match(app,/\['compras','Compras'\],\['midia','Fotos'\],\['admin','Mais'\]/);
  assert.match(app,/section\.hidden=tab==='admin'\|\|section\.dataset\.editorPanel!==tab/);
  assert.match(app,/stock\.hidden=tab!=='variacoes'/);
