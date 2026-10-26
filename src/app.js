@@ -2,7 +2,7 @@ import {productCatalogCard} from './products-grid.js?v=20261022prodvariants1';
 import {findProductByCode} from './product-code-search.js?v=20261022ean9v1';
 import {variationFormHTML,readVariationForm,useOriginalVariation,singleVariantFormHTML,readSingleVariantForm} from './product-variation-coverage.js?v=20261022quickbalance1';
 import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261026foto100k1';
-import {saveQuickBalancePhoto} from './quick-balance-photo.js?v=20261026foto100k1';
+import {saveQuickBalancePhoto,existingPhotoPaths} from './quick-balance-photo.js?v=20261026foto100k1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js?v=20261026foto100k1';
@@ -4771,6 +4771,10 @@ async function handleClick(event){
     const form=section?.querySelector('form[data-form="quick-balance-action"]');
     if(!selected?.active||selected.force_archived_at||state.quickBalanceId!==selected.id||
        form?.dataset.id!==selected.id)return toast('Releia o produto antes de fotografar.',true);
+    const photoOwner=selected.apparel_model_id?
+      state.apparelModels.find(model=>model.id===selected.apparel_model_id):selected;
+    if(photoOwner&&existingPhotoPaths(photoOwner).length>=6)
+      return toast('A galeria já tem seis fotos. Remova uma na ficha do produto antes de fotografar.',true);
     try{
       return openPhotoCamera({form,saveImmediately:true,onCapture:async file=>{
         if(!form.isConnected||state.view!=='balanco'||state.quickBalanceId!==selected.id)
