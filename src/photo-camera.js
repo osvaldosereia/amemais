@@ -22,7 +22,7 @@ export function cameraVideoConstraints(deviceId){
   }
  };
 }
-export function openPhotoCamera({form,onCapture}){
+export function openPhotoCamera({form,onCapture,saveImmediately=false}){
  if(!form||typeof onCapture!=='function')throw Error('Galeria de fotos indisponível.');
  activeClose?.();
  const origin=document.activeElement;
@@ -43,6 +43,8 @@ export function openPhotoCamera({form,onCapture}){
   '<p class="product-photo-camera-note">Depois de fotografar, clique em <strong>Salvar fotos</strong> na ficha do produto.</p>'+
   '</section>';
  document.body.append(backdrop);
+ if(saveImmediately)backdrop.querySelector('.product-photo-camera-note').textContent=
+  'A foto será compactada e salva automaticamente no cadastro (até 100 KB).';
  const video=backdrop.querySelector('video');
  const statusNode=backdrop.querySelector('[data-photo-camera-status]');
  const wait=backdrop.querySelector('[data-photo-camera-wait]');
