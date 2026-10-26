@@ -9,7 +9,7 @@ const product={id:'a-id',name:'Produto A',active:true,ean:'12345678'};
 const tinyFile={type:'image/webp',size:79000};
 const compress=async (_file,max)=>{assert.equal(max,100000);return tinyFile;};
 
-function fakeDb({model=null,initial={image_path:'antiga.jpg',image_paths:['antiga.jpg']},errorUpload=null,errorDb=null}={}){
+function fakeDb({model=null,initial={active:true,image_path:'antiga.jpg',image_paths:['antiga.jpg']},errorUpload=null,errorDb=null}={}){
  const calls={uploads:[],updates:[],rpcs:[]};
  const db={
   from(table){
@@ -71,7 +71,7 @@ test('Foto do SKU com variação atualiza a galeria do modelo por RPC existente'
 });
 
 test('Galeria cheia impede envio e não apaga nenhuma foto',async()=>{
- const {db,calls}=fakeDb({initial:{image_paths:['1','2','3','4','5','6']}});
+ const {db,calls}=fakeDb({initial:{active:true,image_paths:['1','2','3','4','5','6']}});
  await assert.rejects(saveQuickBalancePhoto({db,product,file:new Blob(),compressPhoto:compress}),/seis fotos/);
  assert.equal(calls.uploads.length,0);
  assert.equal(calls.updates.length,0);
