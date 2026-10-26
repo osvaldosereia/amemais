@@ -1195,7 +1195,7 @@ function productsPage(){
       (filtersApplied?'<p>'+(codeResult?.status==='ambiguous'?
        'Os últimos nove dígitos deste EAN correspondem a mais de um produto. Informe o SKU ou EAN completo.':
        'Existem '+available+' variação(ões) ativa(s) cadastrada(s). Limpe a busca e os filtros para encontrá-las.')+'</p>'+
-      (hasPermission('products.create')&&/^\\d{8,14}$/.test(state.search.trim())?button('Cadastrar produto com este EAN','product-new-ean','','primary'):'')+
+      (hasPermission('products.create')&&/^\d{8,14}$/.test(state.search.trim())?button('Cadastrar produto com este EAN','product-new-ean','','primary'):'')+
       button('Mostrar todos os produtos','products-clear-filters','','primary'):
       '<p>Cadastre um novo produto ou verifique a opção Mostrar inativos.</p>')+'</div>')+'</div>'+
     '<div class="panelbody inline" style="justify-content:space-between"><small>'+
@@ -4129,8 +4129,13 @@ async function submitQuickBalance(form){
  const message=quickBalancePreview(mode,expected,reserved,Number(raw));
  if(message.startsWith('Quantidade insuficiente')||message.startsWith('Limite máximo'))
    return toast(message,true);
- const request=form.dataset.requestId||crypto.randomUUID();
- form.dataset.requestId=request;
+ // Repetição da mesma operação reutiliza o UUID; uma quantidade diferente recebe um novo.
+ const operationKey=JSON.stringify([p.id,mode,expected,Number(raw)]);
+ if(form.dataset.operationKey!==operationKey){
+   form.dataset.requestId=crypto.randomUUID();
+   form.dataset.operationKey=operationKey;
+ }
+ const request=form.dataset.requestId;
  const button=form.querySelector('[type="submit"]');
  state.loading=true;if(button){button.disabled=true;button.textContent='Salvando…';}
  try{
@@ -5970,7 +5975,7 @@ async function handleSubmit(event){
     if(ean && !/^\d{8,14}$/.test(ean)){toast('O EAN deve conter de 8 a 14 dígitos.',true);return;}
     const rawPrice=String(values.sale_price??'').trim().replace(',','.');
     const salePrice=rawPrice===''?null:Number(rawPrice);
-    if(rawPrice!==''&&(!/^\\d+(\\.\\d{1,2})?$/.test(rawPrice)||!Number.isFinite(salePrice)||salePrice>99999999.99)){
+    if(rawPrice!==''&&(!/^\d+(\.\d{1,2})?$/.test(rawPrice)||!Number.isFinite(salePrice)||salePrice>99999999.99)){
       toast('Preço de venda inválido. Use até duas casas decimais.',true);return;
     }
     const salesUnit=String(values.sales_unit||'UN');
@@ -5985,7 +5990,7 @@ async function handleSubmit(event){
     };
     if(editing)payload.active=values.active==='true';
     else payload.created_by=state.user.id;
-    let photoWarning=false;
+    let photoWarning=false,postCreateWarning=false;
     await exec(async()=>{
       let productId=id;
       if(editing)assertOk(await db.from('products').update(payload).eq('id',id));
@@ -6003,14 +6008,26 @@ async function handleSubmit(event){
         }));
       }
       if(!editing){
-       assertOk(await db.from('products').update({
-         sale_price:payload.sale_price,sales_unit:payload.sales_unit,cost_price:payload.cost_price
-       }).eq('id',productId));
-       const procurement=procurementValues(form);
-       assertOk(await db.rpc('set_product_procurement',{
-        p_product:productId,p_supplier:procurement.supplier_id,p_min_stock:procurement.min_stock
-       }));
-       assertOk(await db.from('products').update({minimum_order_quantity:procurement.minimum_order_quantity}).eq('id',productId));}
+        // Produto e estoque inicial já foram criados pela RPC. Não pedir novo cadastro
+        // caso apenas os dados complementares falhem.
+        try{
+          const commercial=assertOk(await db.from('products').update({
+            sale_price:payload.sale_price,sales_unit:payload.sales_unit,cost_price:payload.cost_price
+          }).eq('id',productId).select('id').maybeSingle());
+          if(!commercial)throw new Error('Informações comerciais não foram atualizadas.');
+          const procurement=procurementValues(form);
+          assertOk(await db.rpc('set_product_procurement',{
+            p_product:productId,p_supplier:procurement.supplier_id,p_min_stock:procurement.min_stock
+          }));
+          const minimum=assertOk(await db.from('products').update({
+            minimum_order_quantity:procurement.minimum_order_quantity
+          }).eq('id',productId).select('id').maybeSingle());
+          if(!minimum)throw new Error('Pedido mínimo não atualizado.');
+        }catch(error){
+          postCreateWarning=true;
+          console.error('Produto criado; informações complementares pendentes',error);
+        }
+      }
       if(galleryHasChanges(form)){
         try{
           const existing=editing?product(id):null;
@@ -6023,7 +6040,9 @@ async function handleSubmit(event){
           console.error('Produto salvo; foto pendente',error);
         }
       }
-    },()=>photoWarning?
+    },()=>postCreateWarning?
+      'Produto cadastrado, mas informações comerciais pendentes. Abra o produto e revise preço e compras.':
+      photoWarning?
       (editing?'Produto atualizado; foto não enviada.':'Produto cadastrado; foto pendente de envio.'):
       (editing?'Produto atualizado.':'Produto cadastrado.'));
     return;
