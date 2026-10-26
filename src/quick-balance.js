@@ -55,7 +55,12 @@ export function quickStockResult(item,{physical=0,reserved=0,mode='contagem',can
       h(quickBalancePreview(active.id,stock,reservedUnits,quantity))+'</p>'+
    '<button class="button primary quick-balance-submit" type="submit">'+
     (active.id==='contagem'?'Atualizar estoque':active.id==='entrada'?'Confirmar entrada':'Confirmar saída')+
-    '</button></form></section>';
+    '</button></form>'+
+  (can('products.edit')?
+   '<div class="quick-balance-photo-action">'+
+   '<button type="button" class="button quick-balance-photo-button" data-action="quick-balance-product-photo" data-id="'+h(item.id)+'">📷 Tirar foto e salvar no cadastro</button>'+
+   '<small>A foto é compactada para até 100 KB e salva automaticamente, sem alterar o estoque.</small>'+
+   '</div>':'')+'</section>';
 }
 export function quickBalancePreview(mode,current,reserved,quantity){
  const n=Number(quantity);if(!Number.isInteger(n)||n<0||n>1000000)return 'Informe uma quantidade válida.';

@@ -42,7 +42,7 @@ test('desktop usa três colunas e mobile mantém a folha inferior',()=>{
  assert.match(css,/flex-direction:row!important/);
  assert.match(css,/height:min\(92dvh,950px\)/);
  assert.match(index,/products-grid-drawer.css\?v=20261022prodvariants1/);
- assert.match(secure,/app.js\?v=20261022lookup2/);
+ assert.match(secure,/app.js\?v=20261026foto100k1/);
 });
 test('catálogo carrega 30 por vez, preservando filtros e scroll durante expansão',()=>{
  assert.match(app,/const pageSize=30,totalPages/);
