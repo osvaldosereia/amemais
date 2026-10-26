@@ -1,12 +1,13 @@
 import {productCatalogCard} from './products-grid.js?v=20261022prodvariants1';
 import {findProductByCode} from './product-code-search.js?v=20261022ean9v1';
 import {variationFormHTML,readVariationForm,useOriginalVariation,singleVariantFormHTML,readSingleVariantForm} from './product-variation-coverage.js?v=20261022quickbalance1';
-import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261022lookup2';
+import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261026foto100k1';
+import {saveQuickBalancePhoto} from './quick-balance-photo.js?v=20261026foto100k1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import { compressPhoto } from './photos.js';
+import { compressPhoto } from './photos.js?v=20261026foto100k1';
 import {galleryMarkup,galleryState,galleryRemove,galleryMain,galleryAddFiles,galleryReplaceFile,savePhotoGallery,galleryHasChanges} from './photo-gallery.js?v=20261022camera1';
-import {openPhotoCamera} from './photo-camera.js?v=20261022camera1';
+import {openPhotoCamera} from './photo-camera.js?v=20261026foto100k1';
 import {uploadEventCover,generateEventCover} from './event-cover.js?v=20261015covergrant1';
 import {renderStoreHub,locationOrders,matchesStoreOrder,filterStoreHub} from './store-hub.js?v=20261016stores1';
 import {renderStoreUnit} from './store-unit.js?v=20261016stores1';
@@ -4762,6 +4763,44 @@ async function handleClick(event){
   if(action==='quick-balance-camera'){
     try{return scanEAN(code=>selectQuickBalanceProduct(code));}
     catch(error){return fail(error);}
+  }
+  if(action==='quick-balance-product-photo'){
+    if(state.loading||state.view!=='balanco'||isFranchisePortal()||!hasPermission('products.edit'))return;
+    const selected=product(id);
+    const section=target.closest('.quick-balance-product');
+    const form=section?.querySelector('form[data-form="quick-balance-action"]');
+    if(!selected?.active||selected.force_archived_at||state.quickBalanceId!==selected.id||
+       form?.dataset.id!==selected.id)return toast('Releia o produto antes de fotografar.',true);
+    try{
+      return openPhotoCamera({form,saveImmediately:true,onCapture:async file=>{
+        if(!form.isConnected||state.view!=='balanco'||state.quickBalanceId!==selected.id)
+          throw Error('A ficha mudou. Localize o produto novamente.');
+        if(state.loading)throw Error('Aguarde a operação atual terminar.');
+        state.loading=true;
+        try{
+          const saved=await saveQuickBalancePhoto({
+            db,product:selected,file,compressPhoto
+          });
+          state.items=state.items.map(item=>
+            (saved.modelId?item.apparel_model_id===saved.modelId:item.id===selected.id)?
+             {...item,image_path:saved.path,image_paths:saved.paths}:item);
+          if(saved.modelId)state.apparelModels=state.apparelModels.map(model=>
+            model.id===saved.modelId?
+             {...model,image_path:saved.path,image_paths:saved.paths}:model);
+          // Não reconstruir o formulário: a quantidade de estoque digitada permanece.
+          const existing=section.querySelector('.quick-balance-photo');
+          if(existing){
+            const image=document.createElement('img');
+            image.className='quick-balance-photo';
+            image.alt='Foto de '+selected.name;
+            image.dataset.photoPath=saved.path;
+            existing.replaceWith(image);
+            await hydrateImages();
+          }
+          toast('Foto salva no cadastro ('+Math.ceil(saved.bytes/1000)+' KB). Estoque preservado.');
+        }finally{state.loading=false;}
+      }});
+    }catch(error){fail(error);return;}
   }
   if(action==='quick-balance-mode'){
     if(state.view!=='balanco')return;
