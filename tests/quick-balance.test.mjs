@@ -49,5 +49,5 @@ test('Movimentos auditados e protegidos no banco',()=>{
 });
 test('Versão cache de CSS e aplicação',()=>{
  assert.match(read('index.html'),/quick-balance\.css\?v=20261026foto100k1/);
- assert.match(read('src/secure-entry.js'),/app\.js\?v=20261027lookup1/);
+ assert.match(read('src/secure-entry.js'),/app\.js\?v=20261027catalogrecovery1/);
 });

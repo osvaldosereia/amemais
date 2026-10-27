@@ -299,8 +299,9 @@ async function fetchAllProducts(){
 }
 async function loadData(){
   if(!state.user)return;
+  // Mantém o catálogo disponível mesmo se uma consulta auxiliar falhar.
+  state.items=assertOk(await fetchAllProducts())||[];
   const resources=[
-    ['items',fetchAllProducts()],
     ['apparelModels',db.from('apparel_models').select('*').order('created_at',{ascending:false}).limit(1000)],
     ['categories',fetchAllCategories()],
     ['tags',db.from('tags').select('*').order('name').limit(1000)],
@@ -389,8 +390,22 @@ async function loadData(){
     resources.push(['stockBatches',db.from('stock_operation_batches').select('id,operation,destination_id,note,created_at').order('created_at',{ascending:false}).limit(100)]);
     resources.push(['stockBatchLines',db.from('stock_movements').select('product_id,operation_batch_id,quantity').not('operation_batch_id','is',null).order('created_at',{ascending:false}).limit(2500)]);
   }
-  const results=await Promise.all(resources.map(async ([key,request])=>[key,await request]));
-  for(const [key,result] of results) state[key]=assertOk(result)||[];
+  const results=await Promise.allSettled(resources.map(async ([key,request])=>[key,await request]));
+  for(let i=0;i<results.length;i++){
+    const key=resources[i][0],settled=results[i];
+    if(settled.status==='rejected'){
+      console.error(`[CDSB] Falha ao carregar ${key}`,settled.reason);
+      if(key!=='ownPermissions')state[key]=[];
+      continue;
+    }
+    const response=settled.value[1];
+    if(response?.error){
+      console.error(`[CDSB] Falha ao carregar ${key}`,response.error);
+      if(key!=='ownPermissions')state[key]=[];
+      continue;
+    }
+    state[key]=assertOk(response)||[];
+  }
   if(state.purchaseCartUser!==state.user.id){
     state.purchaseCartUser=state.user.id;
     try{state.purchaseCart=parsePurchaseCart(sessionStorage.getItem('cdsb-purchase-cart:'+state.user.id));}

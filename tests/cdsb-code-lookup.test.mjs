@@ -52,8 +52,8 @@ test('busca no frontend usa recuperação autenticada e módulos com cache atual
  assert.match(app,/\.like\('ean','%'\+digits\.slice\(-9\)\)/);
  assert.match(app,/await refreshCodeCandidates\(code\)/);
  assert.match(app,/async function handleOperationScanCode\(code\)/);
- assert.match(entry,/app\.js\?v=20261027lookup1/);
- assert.match(html,/secure-entry\.js\?v=20261027lookup1/);
+ assert.match(entry,/app\.js\?v=20261027catalogrecovery1/);
+ assert.match(html,/secure-entry\.js\?v=20261027catalogrecovery1/);
  assert.match(sql,/v_exact_order_count/);
  assert.match(sql,/right\(btrim\(p\.ean\),9\)=right\(v_code,9\)/);
 });

@@ -52,5 +52,5 @@ test('catálogo inteiro continua carregado em páginas de 750, não somente os p
  assert.match(app,/async function fetchAllProducts\(\)/);
  assert.match(app,/const limit=750,all=\[\]/);
  assert.match(app,/\.range\(offset,offset\+limit-1\)/);
- assert.match(app,/\['items',fetchAllProducts\(\)\]/);
+ assert.match(app,/state\.items=assertOk\(await fetchAllProducts\(\)\)\|\|\[\]/);
 });

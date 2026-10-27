@@ -45,6 +45,6 @@ test('painel reutiliza padrão visual direito e folha inferior do CDSB',()=>{
 });
 test('CSS e JS novos têm cache atualizado',()=>{
  assert.match(index,/buy-purchase-drawer\.css\?v=20261022stockcards1/);
- assert.match(index,/secure-entry\.js\?v=20261027lookup1/);
- assert.match(entry,/app\.js\?v=20261027lookup1/);
+ assert.match(index,/secure-entry\.js\?v=20261027catalogrecovery1/);
+ assert.match(entry,/app\.js\?v=20261027catalogrecovery1/);
 });
