@@ -4990,6 +4990,7 @@ async function handleClick(event){
             image.className='quick-balance-photo';
             image.alt='Foto de '+selected.name;
             image.dataset.photoPath=saved.path;
+            // Não reconstruir o formulário: preserva a quantidade digitada após salvar a foto.
             existing.replaceWith(image);
             await hydrateImages();
           }
