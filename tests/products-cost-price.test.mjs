@@ -32,7 +32,7 @@ test('importação e exportação incluem o custo, sem preencher preços desconh
  assert.match(sql,/v_cost := nullif\(/);
  assert.match(sql,/cost_price=coalesce\(v_cost,cost_price\)/);
  assert.match(sql,/v_model,v_size,v_color,v_price,v_cost,v_unit/);
- assert.match(entry,/catalog-transfer\.js\?v=20261022importnew1/);
+ assert.match(entry,/catalog-transfer\.js\?v=20261027bling30011/);
 });
 test('importador não altera estoque quando apenas o custo é atualizado',()=>{
  assert.match(sql,/cost_price=coalesce\(v_cost,cost_price\)/);
