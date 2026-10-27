@@ -35,7 +35,7 @@ import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.j
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261016dest1';
 import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCartAction,
  setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
- confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261016cart1';
+ confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261027lookup1';
 import {pickerHome,permanentHome,temporaryHome} from './cdsb-portals.js?v=20261015shortcodes1';
 import {purchaseSuggestions,purchasesPage,supplierListHTML,purchaseOrderRows,purchaseOrderDocument,replenishmentDocument,printPage,purchasePendingByProduct,purchasingGroups} from './cdsb-purchases.js?v=20261022stockcards1';
 import {validPurchaseQty,setPurchaseCartItem,cleanPurchaseCart,purchaseCartSummary,purchaseCartBySupplier,purchaseCartReviewGroups,serializePurchaseCart,parsePurchaseCart} from './purchase-cart.js?v=20261018buygrid1';
