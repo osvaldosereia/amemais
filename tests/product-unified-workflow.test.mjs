@@ -33,5 +33,5 @@ test('Babyl ook é feminino; infantil permanece como infantil',()=>{
  assert.equal(resolveCategoryVariations(cats,'baby').options.length,2);
 });
 test('cache busting do frontend utiliza a versão publicada',()=>{
- assert.match(index,/secure-entry\.js\?v=20261026foto100k1/);
+ assert.match(index,/secure-entry\.js\?v=20261027lookup1/);
 });
