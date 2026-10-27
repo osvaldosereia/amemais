@@ -114,7 +114,7 @@ function cards(group,store){
     const variation=[p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||p.name;
     return '<div class="lot-variant"><div><strong>'+esc(variation)+'</strong>'+
      '<small>SKU '+esc(p.sku||'—')+' · EAN '+esc(p.ean||'—')+'</small>'+
-     (store.showAvailable?'<small class="'+(p.available>0?'':'lot-zero')+'">Livre: '+Number(p.available||0)+'</small>':'')+
+     (store.showAvailable?'<small class="'+(p.available>0?'':'lot-zero')+'">'+esc(p.availabilityLabel||('Livre: '+Number(p.available||0)))+'</small>':'')+
      '</div><label>Quantidade <input type="number" inputmode="numeric" step="1" min="0" max="1000000"'+
       ' data-plan-qty data-id="'+esc(p.id)+'" value="'+current+'" aria-label="Quantidade de '+esc(variation)+'"></label></div>';
    }).join('')+

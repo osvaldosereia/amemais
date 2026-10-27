@@ -21,18 +21,18 @@ import { apparelPage, apparelModal, apparelAddRow, apparelRemoveRow, submitAppar
 import { sizesSection, setSizesMode, setSizeSelected, saveSizedProduct } from './product-variants.js?v=20261021categoryinline1';
 import {resolveCategoryVariations,refreshCategorySizeOptions,renderCategoryVariationFields,variationOptionsToSave,inferApparelMetadata} from './category-variations.js?v=20261021categoryinline1';
 import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, updateExtraSizeButtons, toggleExtraSize, collectExtraSizes,
-  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261021categoryinline1';
+  eventBatchContent, collectEventBatch, eventReturnPage, filterWorkflowRows } from './stock-workflows.js?v=20261027eventorigin1';
 import {catalogSortOptions,availableGondolas,gondolaKey,catalogMatchesQuery,orderCatalogGroups,filterCatalogGondola} from './catalog-order.js?v=20261016sort1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261016damage-direct1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
 import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261027inactiveproducts1';
-import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261016stores2';
+import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261027eventorigin1';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261016compact1';
 import {operationalFormMarkup,operationalDifferenceRows} from './order-operations.js?v=20261016partial1';
 import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,findVerificationProduct} from './final-verification.js?v=20261027lookup1';
 import {pickingThermalHTML} from './thermal-picking.js?v=20261016thermal57';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261016stores1';
-import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261016dest1';
+import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261027eventorigin1';
 import {makeOrderCatalog,orderCartMarkup,mountOrderCart,renderOrderCart,orderCartAction,
  setOrderCartQuantity,orderCartSearchKey,collectOrderCartItems,confirmOrderCartReview,
  confirmEventOrderReview,editOrderReview} from './order-cart.js?v=20261027lookup1';
@@ -100,7 +100,7 @@ const nav = [
 const state = {
   user:null,profile:null,view:'inicio',activeEvent:null,items:[],categories:[],tags:[],gondolas:[],apparelModels:[],apparelOpen:new Set(),expandedProductGroups:new Set(),productCardUi:new Map(),showInactiveProducts:false,eventWorkflow:null,eventReturnQuery:'',events:[],members:[],
   balances:[],movements:[],users:[],audits:[],orders:[],orderItems:[],customerAccess:[],unifiedOrderAdjustments:[],removedOrders:[],orderCodes:[],orderCodeMap:new Map(),orderVerificationRows:[],orderOperationalRows:[],
-  eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
+  eventPickPlans:[],eventPickItems:[],eventPickBatches:[],eventBatchItems:[],eventBranchStockReservations:[],eventStockSources:[],eventShipments:[],eventSettlements:[],damages:[],damageActions:[],
   stores:[],suppliers:[],purchaseOrders:[],purchaseItems:[],purchaseReceipts:[],purchaseReceiptItems:[],procurementTasks:[],staffContactDetails:[],purchaseSupplierFilter:'',purchaseTab:'reposicao',purchaseOrderFilter:'',purchaseCatalog:{search:'',category:'',tag:'',gondola:'',sort:'priority',onlyReplenishment:true,page:0},purchaseCart:new Map(),purchaseExpanded:new Set(),purchaseCartUser:null,userPermissions:[],accessProfiles:[],accessProfilePermissions:[],profileAssignments:[],accessTab:'pessoas',staffStores:[],ownPermissions:[],storeBalances:[],branchMovements:[],branchReturns:[],storeOrders:[],storeOrderItems:[],storeOrderAdjustments:[],storeOrderReceipts:[],stockReservations:[],consignationClosures:[],stockDestinations:[],stockBatches:[],stockBatchLines:[],stockQuery:{entrada:'',saida:''},
   stockCarts:{entrada:new Map(),saida:new Map()},stockRequestIds:{entrada:null,saida:null},stockSelectedDestination:'',
   quickBalanceId:null,quickBalanceMode:'contagem',storeBalanceProductId:null,storeBalanceCandidates:[],
@@ -336,12 +336,16 @@ async function loadData(){
   if(!isFranchisePortal()&&(hasPermission('orders.separate')||hasPermission('events.separate')||hasPermission('events.read')||hasPermission('events.manage'))){
     resources.push(['eventPickBatches',db.from('event_pick_batches').select('*').order('created_at',{ascending:false}).limit(2000)]);
     resources.push(['eventBatchItems',db.from('event_pick_batch_items').select('*').limit(10000)]);
+    resources.push(['eventBranchStockReservations',db.from('event_branch_stock_reservations')
+      .select('batch_id,product_id,store_id,quantity,status').eq('status','ativa').limit(10000)]);
   }
-  if(hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.close')){
+  if(hasPermission('events.read')||hasPermission('events.manage')||hasPermission('events.close')||hasPermission('events.return')){
     resources.push(['eventPickPlans',db.from('event_pick_plans').select('*').limit(1000)]);
     resources.push(['eventPickItems',db.from('event_pick_plan_items').select('*').limit(10000)]);
     resources.push(['eventShipments',db.from('event_shipments').select('*').order('created_at',{ascending:false}).limit(1000)]);
     resources.push(['eventSettlements',db.from('event_settlement_drafts').select('*').limit(1000)]);
+    resources.push(['eventStockSources',db.from('event_stock_sources')
+      .select('event_id,product_id,source_store_id,quantity,remaining_quantity,created_at').limit(20000)]);
   }
   if(hasPermission('stock.balance')||hasPermission('events.manage')||hasPermission('events.close')){
     resources.push(['damages',db.from('stock_damages').select('*').order('created_at',{ascending:false}).limit(1000)]);
@@ -1268,7 +1272,8 @@ function returnWorkflowPage(){
   if(!canReturn(e.id)||e.status!=='ativo'){
     state.eventWorkflow=null;return eventDetails();
   }
-  return eventReturnPage(e,state.items,state.apparelModels,state.balances,photoButton);
+  return eventReturnPage(e,state.items,state.apparelModels,state.balances,photoButton,
+  state.eventStockSources.filter(x=>x.event_id===e.id),state.stores);
 }
 function eventDetails(){
  const e=eventById(state.activeEvent);
@@ -1301,6 +1306,18 @@ function damageStockPage(){
  if(!permittedView('avarias'))return '<div class="muteblock">Sem autorização.</div>';
  return damageListHTML(state.damages,state.items,state.events,state.damageActions,{h,button});
 }
+function eventTransferAvailability(productId,batchId=null){
+ const centralPhysical=Number(state.balances.find(x=>x.product_id===productId&&!x.event_id)?.quantity||0);
+ const centralHeld=state.stockReservations.filter(x=>x.status==='ativa'&&x.product_id===productId&&
+  (!batchId||x.event_batch_id!==batchId)).reduce((sum,x)=>sum+Number(x.quantity||0),0);
+ const central=Math.max(0,centralPhysical-centralHeld);
+ const branch=state.stores.find(x=>x.active&&x.kind==='filial'&&!x.is_primary&&/cristo rei/i.test(x.name||''));
+ const branchPhysical=branch?Number(state.storeBalances.find(x=>x.store_id===branch.id&&x.product_id===productId)?.quantity||0):0;
+ const branchHeld=branch?state.eventBranchStockReservations.filter(x=>x.status==='ativa'&&x.store_id===branch.id&&
+  x.product_id===productId&&(!batchId||x.batch_id!==batchId)).reduce((sum,x)=>sum+Number(x.quantity||0),0):0;
+ const branchAvailable=Math.max(0,branchPhysical-branchHeld);
+ return {total:central+branchAvailable,label:'CD '+central+(branch?' · '+branch.name+' '+branchAvailable:'')};
+}
 function eventBatchModal(eventId=state.activeEvent,batchId=null){
  const e=eventById(eventId),batch=batchId?state.eventPickBatches.find(x=>x.id===batchId):null;
  if(!e||!['rascunho','ativo'].includes(e.status)||!((isManager()&&hasPermission('events.separate'))||
@@ -1308,15 +1325,8 @@ function eventBatchModal(eventId=state.activeEvent,batchId=null){
  if(batch&&!['aguardando','pendente_estoque','em_separacao','separado'].includes(batch.status))
   return toast('Este pedido já foi enviado ou cancelado.',true);
  const saved=batch?state.eventBatchItems.filter(x=>x.batch_id===batch.id):[];
- // Pré-calcula o saldo livre em O(produtos + reservas), mesmo com catálogos grandes.
- const free=new Map();
- for(const balance of state.balances)if(!balance.event_id)
-  free.set(balance.product_id,Number(balance.quantity)||0);
- for(const hold of state.stockReservations)
-  if(hold.status==='ativa'&&(!batch||hold.event_batch_id!==batch.id))
-   free.set(hold.product_id,(free.get(hold.product_id)||0)-Number(hold.quantity||0));
  const groups=eventPickingRows(state.items,state.apparelModels,saved,
-  id=>Math.max(0,free.get(id)||0));
+  id=>eventTransferAvailability(id,batch?.id||null));
  const canSeeAvailable=isManager();
  formModal((batch?'Editar pedido #'+orderCode('evento',batch.id):'Novo pedido')+' · '+e.name,
   eventLotForm(lotCatalogMarkup(groups,state.categories,state.apparelModels,{showAvailable:canSeeAvailable}),
@@ -1601,7 +1611,7 @@ function eventPlanModal(additional=false){
  if(!e||!(additional?e.status==='ativo':e.status==='rascunho')||
     !hasPermission('events.separate')||!isManager())return;
  const planned=additional?[]:state.eventPickItems.filter(x=>x.event_id===e.id);
- const groups=eventPickingRows(state.items,state.apparelModels,planned,qtyAvailable);
+ const groups=eventPickingRows(state.items,state.apparelModels,planned,id=>eventTransferAvailability(id));
  formModal((additional?'Envio adicional':'Lista de separação')+' · '+e.name,
    eventPlanForm(groups,{h,additional}),
    additional?'event-supplement-send':'event-plan-save',
@@ -1630,7 +1640,9 @@ function eventSettlementModal(){
  const groups=groupInventory(state.items.filter(p=>balances.some(b=>b.product_id===p.id)),state.apparelModels);
  const draft=state.eventSettlements.find(x=>x.event_id===e.id);
  formModal('Conferir fechamento · '+e.name,
-   eventSettlementForm(groups,balances,draft,{h}),
+   eventSettlementForm(groups,balances,draft,{
+    h,sources:state.eventStockSources.filter(x=>x.event_id===e.id),stores:state.stores
+   }),
    'event-settlement-save','Salvar conferência');
  const form=document.querySelector('.modalback form[data-form="event-settlement-save"]');
  if(form){
@@ -1692,7 +1704,7 @@ async function submitEventSettlement(form,finish=false){
  let payload;
  try{payload=collectEventSettlement(form);}catch(error){return toast(error.message,true);}
  if(finish&&payload.missing) return toast('Confira o destino de todas as unidades antes de concluir.',true);
- if(finish&&!window.confirm('Produtos bons voltarão ao CDSB. Avarias ficarão suspensas e quantidades não devolvidas serão registradas como diferença, sem contabilizar vendas. Confirmar?'))return;
+ if(finish&&!window.confirm('Produtos bons voltarão à origem registrada (CD ou filial). Avarias ficarão suspensas e quantidades não devolvidas serão registradas como diferença, sem contabilizar vendas. Confirmar?'))return;
  return exec(async()=>{
   assertOk(await db.rpc('save_event_settlement',{
    p_event:e.id,p_items:payload.items,p_note:payload.note||null
@@ -5294,7 +5306,7 @@ async function handleClick(event){
   if(action==='event-batch-dispatch'){
     const b=state.eventPickBatches.find(x=>x.id===id);
     if(!b||b.status!=='separado'||!isManager()||!hasPermission('orders.dispatch'))return;
-    if(!window.confirm('Confirmar saída física do pedido '+b.sequence+'? O estoque central será baixado agora.'))return;
+    if(!window.confirm('Confirmar saída física do pedido '+b.sequence+'? O CD será usado primeiro; se faltar, o saldo reservado da loja Cristo Rei cobrirá o restante. A origem será mantida para devoluções.'))return;
     return exec(async()=>assertOk(await db.rpc('dispatch_event_pick_batch',{p_batch:id})),
       'Pedido enviado. Saída física registrada e reservas consumidas.');
   }
@@ -5319,7 +5331,7 @@ async function handleClick(event){
   if(action==='event-dispatch'){
     const e=eventById(state.activeEvent);
     if(!e||e.status!=='rascunho'||!hasPermission('events.separate'))return;
-    if(!window.confirm('Confirmar envio físico da lista separada? Após o envio, ajustes serão movimentações adicionais auditadas.'))return;
+    if(!window.confirm('Confirmar envio físico da lista separada? O CD será usado primeiro; se faltar, o saldo da loja Cristo Rei poderá cobrir o restante. A origem ficará registrada para devoluções.'))return;
     return exec(async()=>assertOk(await db.rpc('dispatch_event_pick_plan',{p_event:e.id})),
       'Mercadorias enviadas. A loja temporária está ativa.');
   }

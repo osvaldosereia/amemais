@@ -454,14 +454,26 @@ export function collectEventBatch(form){
   if(!result.length)throw new Error('Informe a quantidade de pelo menos um produto.');
   return result;
 }
-export function eventReturnPage(event,items,models,balances,photoButton){
+export function eventReturnPage(event,items,models,balances,photoButton,sources=[],stores=[]){
   const eligible=items.filter(p=>balances.some(b=>b.product_id===p.id&&b.event_id===event.id&&b.quantity>0));
   const groups=groupInventory(eligible,models);
   const count=balances.filter(b=>b.event_id===event.id).reduce((a,b)=>a+b.quantity,0);
+  const storeById=new Map(stores.map(x=>[x.id,x]));
+  const originText=productId=>{
+    const remaining=sources.filter(x=>x.product_id===productId&&Number(x.remaining_quantity)>0);
+    if(!remaining.length)return 'Origem não identificada';
+    const grouped=new Map();
+    for(const row of remaining){
+      const store=storeById.get(row.source_store_id);
+      const label=row.source_store_id?(store?.is_primary?'CD':store?.name||'Loja de origem'):'Origem não identificada (retorno ao CD)';
+      grouped.set(label,(grouped.get(label)||0)+Number(row.remaining_quantity||0));
+    }
+    return [...grouped].map(([label,qty])=>label+' '+qty).join(' · ');
+  };
   return '<div class="crumb"><button type="button" class="plain" data-action="event-return-back">← Voltar ao evento</button></div>'+
     '<header class="pagehead"><div><h1>Devolução rápida</h1><p>'+esc(event.name)+
     ' · '+count+' unidade(s) pendente(s) de retorno ou venda</p></div></header>'+
-    '<div class="return-workflow-guide"><strong>Como devolver</strong><span>1. Leia o EAN ou busque o produto. 2. Informe quantos voltaram. 3. Confirme. O estoque da loja aumenta imediatamente.</span></div>'+
+    '<div class="return-workflow-guide"><strong>Como devolver</strong><span>1. Leia o EAN ou busque o produto. 2. Informe quantos voltaram. 3. Confirme. O saldo volta à origem registrada.</span></div>'+
     '<section class="return-search-box"><input id="event-return-search" type="search" class="search" placeholder="EAN, SKU, tamanho ou nome..." autocomplete="off" aria-label="Buscar produto na devolução">'+
     '<button class="button primary" type="button" data-action="event-return-scan">📷 Ler EAN</button></section>'+
     '<p class="muted" data-return-count>'+eligible.length+' variação(ões) ainda no evento.</p>'+
@@ -474,7 +486,7 @@ export function eventReturnPage(event,items,models,balances,photoButton){
           esc([p.name,p.ean,p.sku,p.apparel_size,p.apparel_color].join(' ').toLowerCase())+'">'+
           '<div class="return-variant-info"><strong>'+esc(g.modelId?p.apparel_color+' · '+p.apparel_size:p.name)+'</strong>'+
           '<small>'+esc(p.ean||p.sku||'Sem código')+'</small>'+
-          '<small>No evento: <b>'+qty+'</b></small></div>'+
+          '<small>No evento: <b>'+qty+'</b></small><small>Origem registrada: '+esc(originText(p.id))+'</small></div>'+
           '<div class="return-variant-entry"><button class="return-all" data-action="return-all" type="button" aria-label="Preencher '+qty+' unidades para devolver">Tudo</button>'+
           '<input name="quantity" type="number" inputmode="numeric" step="1" min="1" max="'+qty+
           '" placeholder="Qtd." required aria-label="Quantidade devolvida de '+esc(p.name)+'">'+
