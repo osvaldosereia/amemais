@@ -15,5 +15,5 @@ if (insecure) {
   </main>`;
 } else {
   await import('./app.js?v=20261027catalogrecovery1');
-  await import('./catalog-transfer.js?v=20261027blingactivefix1');
+  await import('./catalog-transfer.js?v=20261027bling30011&rev=activefix1');
 }
