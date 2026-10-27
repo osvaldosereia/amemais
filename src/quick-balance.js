@@ -1,4 +1,4 @@
-import {findProductByCode} from './product-code-search.js';
+import {findProductByCode} from './product-code-search.js?v=20261027lookup1';
 // Área independente de balanço e movimentação rápida por EAN/SKU.
 const h=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const quickModes=[
