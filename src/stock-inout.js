@@ -1,3 +1,4 @@
+import {findProductByCode} from './product-code-search.js';
 // AME MAIS | Entrada / Saída de estoque físico, independente de Eventos e Pedidos.
 // Todo item escolhido representa uma variação real de public.products.
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -6,8 +7,9 @@ export const opSizes=['PP','P','M','G','GG','XGG','XXGG','EXGG','Único'];
 export function stockOperationResults(products,models,query,groupInventory){
   const q=(query||'').trim().toLocaleLowerCase('pt-BR');
   if(!q)return [];
-  const exact=products.filter(p=>p.active&&(p.ean===query.trim()||String(p.sku||'').toLocaleLowerCase('pt-BR')===q));
-  const matches=exact.length?exact:products.filter(p=>p.active&&asText(p).includes(q));
+  const resolved=findProductByCode(products,query);
+  const matches=resolved.matches.length?resolved.matches:
+    products.filter(p=>p.active&&!p.force_archived_at&&asText(p).includes(q));
   // Navegar por modelos inteiros ajuda a escolher o tamanho correto.
   const keys=new Set(matches.map(p=>p.apparel_model_id?'m:'+p.apparel_model_id:'p:'+p.id));
   const grouped=groupInventory(products.filter(p=>p.active&&keys.has(p.apparel_model_id?'m:'+p.apparel_model_id:'p:'+p.id)),models);
