@@ -1,7 +1,7 @@
 import {productCatalogCard} from './products-grid.js?v=20261022prodvariants1';
-import {findProductByCode} from './product-code-search.js?v=20261022ean9v1';
+import {findProductByCode} from './product-code-search.js?v=20261027lookup1';
 import {variationFormHTML,readVariationForm,useOriginalVariation,singleVariantFormHTML,readSingleVariantForm} from './product-variation-coverage.js?v=20261022quickbalance1';
-import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261026foto100k1';
+import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261027lookup1';
 import {saveQuickBalancePhoto,existingPhotoPaths} from './quick-balance-photo.js?v=20261026foto100k1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -25,11 +25,11 @@ import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, up
 import {catalogSortOptions,availableGondolas,gondolaKey,catalogMatchesQuery,orderCatalogGroups,filterCatalogGondola} from './catalog-order.js?v=20261016sort1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261016damage-direct1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
-import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261015stockcards1';
+import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261027lookup1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261016stores2';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261016compact1';
 import {operationalFormMarkup,operationalDifferenceRows} from './order-operations.js?v=20261016partial1';
-import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,findVerificationProduct} from './final-verification.js?v=20261016orderflow1';
+import {finalVerificationMarkup,verificationProgress,verificationCanDispatch,findVerificationProduct} from './final-verification.js?v=20261027lookup1';
 import {pickingThermalHTML} from './thermal-picking.js?v=20261016thermal57';
 import {eventLotsOverview,eventLotForm,selectedEventModels} from './event-lots.js?v=20261016stores1';
 import {lotCatalogMarkup,mountLotCatalog,filterLotCatalog,onLotQuantityInput,lotCatalogAction,collectLotItems,selectedLotCount} from './event-lot-catalog.js?v=20261016dest1';
@@ -1338,15 +1338,15 @@ function operationalLocateSku(form,rawCode){
  if(!order)return;
  const code=String(rawCode||'').trim();
  if(!code)return;
- const matches=order.lines.filter(line=>line.ean===code||line.sku===code);
- if(matches.length!==1)return toast(matches.length?'EAN/SKU ambíguo neste pedido.':'Produto não pertence ao pedido.',true);
- const row=[...form.querySelectorAll('[data-op-line]')].find(el=>el.dataset.product===matches[0].id);
+ const resolved=findProductByCode(order.lines,code,{activeOnly:false});
+ if(!resolved.item)return toast(resolved.status==='ambiguous'?'EAN/SKU ambíguo neste pedido.':'Produto não pertence ao pedido.',true);
+ const row=[...form.querySelectorAll('[data-op-line]')].find(el=>el.dataset.product===resolved.item.id);
  if(!row)return;
  form.querySelectorAll('.op-line.is-selected').forEach(el=>el.classList.remove('is-selected'));
  row.classList.add('is-selected');
  row.scrollIntoView({behavior:'smooth',block:'center'});
  row.querySelector('[data-op-qty]')?.focus({preventScroll:true});
- toast('SKU localizado: '+(matches[0].modelTitle||matches[0].name)+'. Informe a quantidade encontrada.');
+ toast('SKU localizado: '+(resolved.item.modelTitle||resolved.item.name)+'. Informe a quantidade encontrada.');
 }
 function operationalModal(kind,id,mode='separacao'){
  const order=unifiedOrderById(kind,id);
@@ -2754,24 +2754,27 @@ function addStockOperationItem(id){
   updateStockOperationBasket();
   toast('Incluído: '+p.name);
 }
-function handleOperationScanCode(code){
+async function handleOperationScanCode(code){
   const kind=state.view;
   if(!['entrada','saida'].includes(kind))return;
-  const match=state.items.filter(p=>p.active&&(p.ean===code||p.sku===code));
-  const input=document.getElementById('stock-op-search');
-  if(match.length===1){
-    addStockOperationItem(match[0].id);
-    state.stockQuery[kind]=code;
-    if(input)input.value=code;
+  try{
+    let resolved=findProductByCode(state.items,code);
+    if(!resolved.item){
+      await refreshCodeCandidates(code);
+      if(state.view!==kind)return;
+      resolved=findProductByCode(state.items,code);
+    }
+    const input=document.getElementById('stock-op-search');
+    const query=resolved.item?(resolved.item.ean||resolved.item.sku):code;
+    state.stockQuery[kind]=query;
+    if(input)input.value=query;
     refreshStockOperationSearch();
+    if(resolved.item)addStockOperationItem(resolved.item.id);
+    else toast(resolved.status==='ambiguous'?'Código corresponde a mais de uma variação. Selecione o SKU na lista.':
+      (state.items.length===0?'Nenhum produto foi carregado. Verifique o acesso ao catálogo.':
+      kind==='entrada'?'EAN não cadastrado. Use + Cadastrar produto.':'EAN não encontrado nos produtos ativos.'),true);
     input?.focus({preventScroll:true});
-  }else{
-    state.stockQuery[kind]=code;
-    if(input){input.value=code;input.focus({preventScroll:true});}
-    refreshStockOperationSearch();
-    toast(match.length?'Selecione a variação correta na lista.':
-      (kind==='entrada'?'EAN não cadastrado. Use + Cadastrar produto.':'EAN não encontrado nos produtos ativos.'),true);
-  }
+  }catch(error){fail(error);}
 }
 async function saveStockOperation(form){
   if(!hasPermission(state.view==='entrada'?'stock.entry':'stock.exit')||state.loading)return;
@@ -4096,9 +4099,48 @@ function showQuickBalanceProduct(p){
   qty?.focus({preventScroll:true});qty?.select();
  }
 }
-function selectQuickBalanceProduct(code){
+// Consulta pontual autenticada: recupera código ausente do catálogo carregado na memória.
+// Não altera produtos nem saldo. A RLS da tabela products continua valendo.
+async function refreshCodeCandidates(code){
+  if(!db||!state.user)return 0;
+  const query=String(code??'').trim();
+  if(!query)return 0;
+  const digits=/^[0-9\s-]+$/.test(query)?query.replace(/[\s-]/g,''):null;
+  const codes=[...new Set([query,digits].filter(Boolean))];
+  const selectCode=async (field,value)=>{
+    const response=await db.from('products').select('*').eq(field,value)
+      .eq('active',true).is('force_archived_at',null).limit(50);
+    return assertOk(response)||[];
+  };
+  const exact=(await Promise.all(codes.flatMap(value=>[
+    selectCode('ean',value),selectCode('sku',value)
+  ]))).flat();
+  let found=exact;
+  if(!found.length&&digits?.length>=9){
+    const response=await db.from('products').select('*').like('ean','%'+digits.slice(-9))
+      .eq('active',true).is('force_archived_at',null).limit(100);
+    found=assertOk(response)||[];
+  }
+  if(found.length){
+    const merged=new Map(state.items.map(item=>[item.id,item]));
+    for(const item of found)merged.set(item.id,item);
+    state.items=[...merged.values()];
+  }
+  return found.length;
+}
+async function selectQuickBalanceProduct(code){
  if(state.view!=='balanco')return;
- const match=findQuickStockProduct(state.items,code);
+ let match=findQuickStockProduct(state.items,code);
+ if(!match.item&&String(code??'').trim()){
+   try{
+     await refreshCodeCandidates(code);
+     if(state.view!=='balanco')return;
+     match=findQuickStockProduct(state.items,code);
+   }catch(error){fail(error);return;}
+ }
+ if(!match.item&&state.items.length===0){
+   match={...match,error:'Nenhum produto foi carregado. Verifique a permissão de consulta ao catálogo e atualize a página.'};
+ }
  const barcode=document.querySelector('[data-quick-balance-barcode]');
  if(!match.item){
   state.quickBalanceId=null;
@@ -4925,10 +4967,11 @@ async function handleClick(event){
     try{
       return scanEAN(code=>{
         const container=target.closest('[data-product-details]');
-        const row=[...container.querySelectorAll('[data-balance-item]')].find(r=>{
-          const p=product(r.dataset.productId);
-          return p&&(p.ean===code||p.sku===code);
-        });
+        const candidates=[...container.querySelectorAll('[data-balance-item]')]
+           .map(r=>product(r.dataset.productId)).filter(Boolean);
+         const resolved=findProductByCode(candidates,code);
+         const row=resolved.item?[...container.querySelectorAll('[data-balance-item]')]
+           .find(r=>r.dataset.productId===resolved.item.id):null;
         if(!row)return toast('EAN/SKU não pertence a este produto.',true);
         const field=row.querySelector('[data-balance-count]');
         field?.focus();field?.select();
@@ -5082,7 +5125,15 @@ async function handleClick(event){
     if(lotCatalogAction(form,target))refreshEventLotCounter(form);
     return;
   }
-  if(action==='event-plan-scan')return scanInto('[data-plan-search]',target.closest('form'));
+  if(action==='event-plan-scan')return scanEAN(code=>{
+    const form=target.closest('form');
+    const field=form?.querySelector('[data-plan-search]');
+    if(!field)return;
+    const resolved=findProductByCode(state.items,code);
+    field.value=resolved.item?(resolved.item.ean||resolved.item.sku):code;
+    field.dispatchEvent(new Event('input',{bubbles:true}));
+    if(resolved.status==='ambiguous')toast('Há códigos com os mesmos nove dígitos finais. Informe o SKU.',true);
+  });
   if(action==='event-batch-new')return eventBatchModal(target.dataset.event||state.activeEvent);
   if(action==='event-batch-edit')return eventBatchModal(
     state.eventPickBatches.find(b=>b.id===id)?.event_id,id);
@@ -5112,9 +5163,9 @@ async function handleClick(event){
     return scanEAN(code=>{
       const form=document.querySelector('.modalback form[data-form="event-batch-picking"]');
       if(!form)return;
-      const matches=state.items.filter(p=>p.active&&(p.ean===code||p.sku===code));
-      if(matches.length!==1)return toast('EAN/SKU não encontrado ou ambíguo.',true);
-      const input=[...form.querySelectorAll('[data-pick-qty]')].find(el=>el.dataset.id===matches[0].id);
+      const resolved=findProductByCode(state.items,code);
+       if(!resolved.item)return toast('EAN/SKU não encontrado ou ambíguo.',true);
+       const input=[...form.querySelectorAll('[data-pick-qty]')].find(el=>el.dataset.id===resolved.item.id);
       if(!input)return toast('Produto não consta deste pedido.',true);
       const current=Number(input.value||0),maximum=Number(input.dataset.expected);
       if(current>=maximum)return toast('Este tamanho já está totalmente conferido.',true);
@@ -5416,9 +5467,9 @@ async function handleClick(event){
     return scanEAN(code=>{
       const form=document.querySelector('.modalback form[data-form="avulso-picking"]');
       if(!form)return;
-      const matches=state.items.filter(p=>p.active&&(p.ean===code||p.sku===code));
-      if(matches.length!==1)return toast('EAN/SKU não encontrado ou ambíguo.',true);
-      const input=[...form.querySelectorAll('[data-pick-qty]')].find(el=>el.dataset.id===matches[0].id);
+      const resolved=findProductByCode(state.items,code);
+       if(!resolved.item)return toast('EAN/SKU não encontrado ou ambíguo.',true);
+       const input=[...form.querySelectorAll('[data-pick-qty]')].find(el=>el.dataset.id===resolved.item.id);
       if(!input)return toast('Produto não pertence ao pedido.',true);
       const counted=Number(input.value||0),max=Number(input.dataset.expected);
       if(counted>=max)return toast('Todas as unidades deste SKU já foram conferidas.',true);
@@ -5467,9 +5518,9 @@ async function handleClick(event){
     return scanEAN(code=>{
       const form=document.querySelector('.modalback form[data-form="store-order-picking"]');
       if(!form)return;
-      const matches=state.items.filter(p=>p.active&&(p.ean===code||p.sku===code));
-      if(matches.length!==1)return toast('EAN/SKU não localizado ou ambíguo.',true);
-      const input=[...form.querySelectorAll('[data-pick-qty]')].find(x=>x.dataset.id===matches[0].id);
+      const resolved=findProductByCode(state.items,code);
+       if(!resolved.item)return toast('EAN/SKU não localizado ou ambíguo.',true);
+       const input=[...form.querySelectorAll('[data-pick-qty]')].find(x=>x.dataset.id===resolved.item.id);
       if(!input)return toast('Produto não pertence ao pedido.',true);
       const qty=Number(input.value||0),max=Number(input.dataset.expected);
       if(qty>=max)return toast('Quantidade do SKU já conferida.',true);
@@ -6787,17 +6838,18 @@ document.addEventListener('keydown',event=>{
     return;
   }
   if(event.key==='Enter'&&event.target.matches('[data-quick-balance-barcode]')){
-    event.preventDefault();selectQuickBalanceProduct(event.target.value);return;
+    event.preventDefault();void selectQuickBalanceProduct(event.target.value);return;
   }
   if(event.key==='Enter'&&event.target.matches('[data-balance-scan-input]')){
     event.preventDefault();
     const input=event.target,panel=input.closest('[data-product-details]');
     const code=input.value.trim();
     if(!panel||!code)return;
-    const row=[...panel.querySelectorAll('[data-balance-item]')].find(r=>{
-      const p=product(r.dataset.productId);
-      return p&&(String(p.ean||'')===code||String(p.sku||'')===code);
-    });
+    const candidates=[...panel.querySelectorAll('[data-balance-item]')]
+      .map(r=>product(r.dataset.productId)).filter(Boolean);
+    const resolved=findProductByCode(candidates,code);
+    const row=resolved.item?[...panel.querySelectorAll('[data-balance-item]')]
+      .find(r=>r.dataset.productId===resolved.item.id):null;
     if(!row)return toast('Código não pertence às variações deste produto.',true);
     input.value='';
     const count=row.querySelector('[data-balance-count]');
@@ -7055,10 +7107,7 @@ document.addEventListener('keydown',event=>{
   if(event.target.id==='stock-op-search'&&event.key==='Enter'){
     event.preventDefault();
     const q=event.target.value.trim();
-    const candidates=state.items.filter(p=>p.active&&(p.ean===q||p.sku===q));
-    if(candidates.length===1)handleOperationScanCode(q);
-    else if(candidates.length>1)toast('Há mais de uma variação para esse código. Selecione na lista.',true);
-    else if(q)toast(state.view==='entrada'?'Produto não localizado. Use + Cadastrar produto.':'Produto não localizado entre os produtos ativos.',true);
+    if(q)void handleOperationScanCode(q);
   }
 });
 document.addEventListener('change',event=>{
