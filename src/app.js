@@ -1203,7 +1203,7 @@ function productsPage(){
       '<div class="product-filter-tools">'+
         button(state.showInactiveProducts?'✓ Inativos visíveis':'Mostrar inativos',
           'products-toggle-inactive','','small catalog-inactive-toggle'+(state.showInactiveProducts?' active':'') )+
-        (isAdmin()&&inactiveCount?button('Ativar inativos ('+inactiveCount.toLocaleString('pt-BR')+')',
+        (state.profile?.role==='admin'&&inactiveCount?button('Ativar inativos ('+inactiveCount.toLocaleString('pt-BR')+')',
           'products-activate-inactive','','small primary'):'')+
         (filtersApplied?button('Limpar filtros','products-clear-filters','','small'):'')+
       '</div>'+
