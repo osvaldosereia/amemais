@@ -1168,6 +1168,7 @@ function productsPage(){
   const q=state.search.trim();
   const filtersApplied=Boolean(q||state.categoryFilter||state.tagFilter||state.gondolaFilter||state.showInactiveProducts);
   const available=state.items.filter(p=>p.active).length;
+  const inactiveCount=state.items.filter(p=>!p.active&&!p.force_archived_at).length;
   const pageSize=30,totalPages=Math.max(1,Math.ceil(groups.length/pageSize));
   state.page=Math.max(0,Math.min(state.page,totalPages-1));
   const list=groups.slice(0,(state.page+1)*pageSize);
@@ -1202,6 +1203,8 @@ function productsPage(){
       '<div class="product-filter-tools">'+
         button(state.showInactiveProducts?'✓ Inativos visíveis':'Mostrar inativos',
           'products-toggle-inactive','','small catalog-inactive-toggle'+(state.showInactiveProducts?' active':'') )+
+        (isAdmin()&&inactiveCount?button('Ativar inativos ('+inactiveCount.toLocaleString('pt-BR')+')',
+          'products-activate-inactive','','small primary'):'')+
         (filtersApplied?button('Limpar filtros','products-clear-filters','','small'):'')+
       '</div>'+
     '</div>'+
@@ -4775,6 +4778,25 @@ async function handleClick(event){
   if(action==='commercial-order-print')return printCommercialOrder(id);
   if(action==='event-print-summary')return printEventSummary(id);
   if(action==='product-new')return productModal();
+  if(action==='products-activate-inactive'){
+    if(!isAdmin())return fail(new Error('Apenas o administrador pode ativar todos os produtos inativos.'));
+    const inactiveCount=state.items.filter(p=>!p.active&&!p.force_archived_at).length;
+    if(!inactiveCount)return toast('Não há produtos inativos para ativar.');
+    if(!window.confirm('Ativar '+inactiveCount.toLocaleString('pt-BR')+' produtos inativos? Produtos arquivados serão preservados.'))return;
+    let result=null;
+    return exec(async()=>{
+      result=assertOk(await db.rpc('activate_inactive_products_bulk'));
+      state.showInactiveProducts=false;
+      state.page=0;
+    },()=>{
+      const activated=Number(result?.activated||0).toLocaleString('pt-BR');
+      const conflicts=Number(result?.skipped_conflicts||0);
+      const archived=Number(result?.archived_preserved||0);
+      return 'Produtos ativados: '+activated+
+        (conflicts?' · '+conflicts.toLocaleString('pt-BR')+' mantidos inativos por conflito de SKU/EAN':'')+
+        (archived?' · '+archived.toLocaleString('pt-BR')+' arquivados preservados':'');
+    });
+  }
   if(action==='products-toggle-inactive'){state.showInactiveProducts=!state.showInactiveProducts;state.page=0;render();return;}
   if(action==='products-clear-filters'){
     state.search='';state.productSearchDraft='';state.categoryFilter='';state.tagFilter='';state.gondolaFilter='';state.page=0;
