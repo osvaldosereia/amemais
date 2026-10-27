@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
 const source=await readFile(new URL('../src/order-cart.js',import.meta.url),'utf8');
-const api=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const api=await import('../src/order-cart.js');
 const variants=[
  {id:'p1',name:'Camiseta HDH preta',apparel_model_id:'m1',apparel_size:'P',apparel_color:'Preta',sku:'SKU-P',ean:'789001',active:true},
  {id:'p2',name:'Camiseta HDH preta',apparel_model_id:'m1',apparel_size:'M',apparel_color:'Preta',sku:'SKU-M',ean:'789002',active:true},

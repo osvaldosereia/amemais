@@ -6,7 +6,7 @@ const moduleCode=async name=>{
  return import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 };
 const {groupInventory,groupedCard}=await moduleCode('stock-workflows.js');
-const {stockOperationPage,operationCartLines}=await moduleCode('stock-inout.js');
+const {stockOperationPage,operationCartLines}=await import('../src/stock-inout.js');
 const products=['P','M','G'].map((size,i)=>({
  id:'product-'+i,apparel_model_id:'model-1',name:'Camiseta / '+size,
  apparel_color:'Preta',apparel_size:size,active:true,

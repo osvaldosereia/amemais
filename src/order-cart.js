@@ -1,3 +1,4 @@
+import {findProductByCode} from './product-code-search.js?v=20261027lookup1';
 // Montagem de pedidos de lojas e franquias: estado local, sem criar reservas
 // até que o usuário revise e confirme o pedido.
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
@@ -168,9 +169,9 @@ export function orderCartSearchKey(form,query){
  const s=form?.__orderCart;if(!s)return false;
  const q=norm(query).replace(/[\s-]/g,'');
  if(!q)return false;
- const found=s.groups.flatMap(g=>g.variants).filter(v=>norm(v.ean).replace(/[\s-]/g,'')===q||norm(v.sku).replace(/[\s-]/g,'')===q);
- if(found.length!==1)return false;
- const v=found[0];
+ const resolved=findProductByCode(s.groups.flatMap(g=>g.variants),query,{activeOnly:false});
+ if(!resolved.item)return false;
+ const v=resolved.item;
  const now=Number(s.selection.get(v.id)||0);
  if(now>=1000000)return false;
  setOrderCartQuantity(form,v.id,now+1);

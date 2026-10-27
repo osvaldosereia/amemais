@@ -1,3 +1,4 @@
+import {findProductByCode} from './product-code-search.js?v=20261027lookup1';
 // Conferência final por leitor EAN/SKU + quantidade física.
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function verificationProgress(order,rows=[]){
@@ -19,10 +20,10 @@ export function verificationProgress(order,rows=[]){
 export function findVerificationProduct(order,code){
  const text=String(code??'').trim();
  if(!text)return {error:'Leia o EAN ou o código interno.'};
- const matches=order.lines.filter(x=>[x.ean,x.sku].some(v=>String(v||'')===text));
- if(!matches.length)return {error:'Este EAN/SKU não pertence ao pedido.'};
- if(matches.length>1)return {error:'Código vinculado a mais de uma variação. Corrija o cadastro.'};
- return {line:matches[0]};
+ const result=findProductByCode(order.lines,text,{activeOnly:false});
+ if(result.status==='ambiguous')return {error:'Código vinculado a mais de uma variação. Corrija o cadastro.'};
+ if(!result.item)return {error:'Este EAN/SKU não pertence ao pedido.'};
+ return {line:result.item};
 }
 export function finalVerificationMarkup(order,rows=[]){
  const progress=verificationProgress(order,rows);
