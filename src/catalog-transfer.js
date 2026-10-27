@@ -9,10 +9,32 @@ const db=createClient(cfg.supabaseUrl,cfg.supabasePublishableKey,{
 const HEADERS=['Importar','SKU','Nome','Codigo de barras','Tipo codigo','Unidade','Preco venda','Preco custo','Ativo',
 'Categoria','Subcategoria','Subsubcategoria','Tags','Familia','Tamanho','Cor','Tipo roupa',
 'Publico','Faixa etaria','Fornecedor','Estoque minimo','Pedido minimo','Estoque inicial',
-'Gondola','Prateleira','Foto URL','Codigo SAP','Codigo original','Observacoes','Confianca','Revisao'];
+'Gondola','Prateleira','Foto URL','Codigo SAP','Codigo original','NCM','CEST','Figura de ICMS','Figura de PIS/COFINS','Observacoes','Confianca','Revisao'];
 const escapeHtml=(x)=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm=s=>String(s??'').trim().toLocaleLowerCase('pt-BR');
-let imported=[],busy=false,currentName='',previewCandidates=[];
+const normalizeHeader=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .toLocaleLowerCase('pt-BR').replace(/[^a-z0-9]/g,'');
+const cellText=value=>{
+  if(value===null||value===undefined)return '';
+  if(typeof value==='number'&&Number.isFinite(value)&&Number.isInteger(value))return String(value);
+  return String(value).trim();
+};
+const HEADER_ALIASES={
+  'SKU':['SKU','Cód. Produto','Código do Produto','Código Produto','Cod Produto'],
+  'Nome':['Nome','Descrição','Descricao'],
+  'Codigo de barras':['Codigo de barras','EAN','GTIN'],
+  'Tipo codigo':['Tipo codigo','Tipo código'],
+  'Unidade':['Unidade','Unidade de Medida'],
+  'Categoria':['Categoria','Divisão','Divisao'],
+  'Subcategoria':['Subcategoria','Seção','Secao'],
+  'Subsubcategoria':['Subsubcategoria'],
+  'Importar':['Importar'],
+  'NCM':['NCM'],
+  'CEST':['CEST'],
+  'Figura de ICMS':['Figura de ICMS','Figura ICMS'],
+  'Figura de PIS/COFINS':['Figura de PIS/COFINS','Figura PIS/COFINS','Figura de PIS COFINS']
+};
+let imported=[],busy=false,currentName='',currentFormat='ame',previewCandidates=[];
 async function xlsx(){
   if(window.XLSX)return window.XLSX;
   if(!window.__ameXlsxLoading)window.__ameXlsxLoading=new Promise((resolve,reject)=>{
@@ -68,10 +90,49 @@ async function parseFile(file){
     rows=lib.utils.sheet_to_json(sheet,{defval:'',raw:true});
   }else throw new Error('Escolha Excel (.xlsx/.xls) ou CSV.');
   if(!rows.length)throw new Error('Planilha vazia.');
-  const missing=['SKU','Nome','Categoria','Importar'].filter(k=>!Object.hasOwn(rows[0],k));
-  if(missing.length)throw new Error('Formato incompatível. Colunas faltando: '+missing.join(', ')+'. Baixe o modelo.');
-  return rows.map((raw,i)=>Object.fromEntries([...HEADERS,'__linha'].map(h=>
-    [h,h==='__linha'?i+2:String(raw[h]??'').trim()])));
+  const columnByName=new Map(Object.keys(rows[0]).map(key=>[normalizeHeader(key),key]));
+  const hasAny=aliases=>aliases.some(alias=>columnByName.has(normalizeHeader(alias)));
+  const isBling=hasAny(['Cód. Produto','Código do Produto','Código Produto','Cod Produto'])&&
+    hasAny(['Descrição','Descricao'])&&hasAny(['EAN','GTIN'])&&hasAny(['Divisão','Divisao']);
+  const required=isBling?[]:['SKU','Nome','Categoria','Importar'];
+  const missing=required.filter(key=>!hasAny(HEADER_ALIASES[key]||[key]));
+  if(missing.length)throw new Error('Formato incompatível. Colunas faltando: '+missing.join(', ')+'. Use o modelo AME MAIS ou o relatório Bling 30011.');
+  currentFormat=isBling?'bling':'ame';
+  const read=(row,aliases)=>{
+    for(const alias of aliases){
+      const key=columnByName.get(normalizeHeader(alias));
+      if(key!==undefined&&row[key]!==null&&row[key]!==undefined&&String(row[key]).trim()!=='')
+        return cellText(row[key]);
+    }
+    return '';
+  };
+  return rows.map((raw,i)=>{
+    const result=Object.fromEntries(HEADERS.map(key=>[key,read(raw,HEADER_ALIASES[key]||[key])]));
+    if(isBling){
+      const levels=[
+        read(raw,['Divisão','Divisao']),read(raw,['Seção','Secao']),
+        read(raw,['Grupo']),read(raw,['SubGrupo'])
+      ].filter(Boolean).filter((value,index,values)=>
+        index===0||normalizeHeader(value)!==normalizeHeader(values[index-1]));
+      result.Importar='SIM';
+      result.SKU=read(raw,HEADER_ALIASES.SKU);
+      result.Nome=read(raw,HEADER_ALIASES.Nome);
+      result['Codigo de barras']=read(raw,HEADER_ALIASES['Codigo de barras']);
+      result.Unidade=read(raw,HEADER_ALIASES.Unidade);
+      result.Categoria=levels[0]||'';
+      result.Subcategoria=levels[1]||'';
+      result.Subsubcategoria=levels.slice(2).join(' > ');
+      const brand=read(raw,['Marca','Brand']);
+      const tags=[...result.Tags.split(','),brand].map(value=>value.trim()).filter(Boolean);
+      result.Tags=[...new Map(tags.map(value=>[normalizeHeader(value),value])).values()].join(', ');
+      result.NCM=read(raw,HEADER_ALIASES.NCM);
+      result.CEST=read(raw,HEADER_ALIASES.CEST);
+      result['Figura de ICMS']=read(raw,HEADER_ALIASES['Figura de ICMS']);
+      result['Figura de PIS/COFINS']=read(raw,HEADER_ALIASES['Figura de PIS/COFINS']);
+    }
+    result.__linha=i+2;
+    return result;
+  });
 }
 function modal(){
   let el=document.querySelector('#ame-transfer-modal');
@@ -91,7 +152,7 @@ function modal(){
       <label class="ame-transfer-file">Selecionar planilha Excel ou CSV
         <input type="file" accept=".xlsx,.xls,.csv" data-transfer-file />
       </label>
-      <p class="ame-transfer-help">Importar = SIM: somente novos. SKU ou EAN já cadastrado, inclusive pelos últimos nove dígitos, será ignorado.</p>
+      <p class="ame-transfer-help">Aceita o modelo AME MAIS e o relatório Bling 30011. SKU ou EAN já cadastrado, inclusive pelos últimos nove dígitos, será ignorado.</p>
       <div class="ame-transfer-preview" data-transfer-preview>Selecione o arquivo organizado para revisar a importação.</div>
       <div class="ame-transfer-options" hidden data-transfer-options>
         <label><input type="checkbox" data-transfer-create-categories /> Criar categorias/subcategorias ausentes, como propostas na planilha</label>
@@ -179,7 +240,8 @@ async function exportCatalog(){
         'Estoque minimo':p.min_stock??0,'Pedido minimo':p.minimum_order_quantity??1,
         'Estoque inicial':'','Gondola':p.gondola||'','Prateleira':p.prateleira||'',
         'Foto URL':p.external_photo_url||'','Codigo SAP':p.sap_code||'',
-        'Codigo original':p.legacy_code||'','Observacoes':'',
+        'Codigo original':p.legacy_code||'','NCM':p.ncm||'','CEST':p.cest||'',
+        'Figura de ICMS':p.icms_figure||'','Figura de PIS/COFINS':p.pis_cofins_figure||'','Observacoes':'',
         'Confianca':'Cadastro existente','Revisao':''
       };
     });
@@ -236,6 +298,7 @@ async function preview(){
     '<p>'+newRows.length+' produtos realmente novos; '+skippedRows.length+' linhas já cadastradas ou duplicadas serão ignoradas.</p>');
   const options=modal().querySelector('[data-transfer-options]');
   options.hidden=!newRows.length||problems.length>0;
+  options.querySelector('[data-transfer-create-categories]').checked=currentFormat==='bling';
   options.querySelector('[data-transfer-stock]').checked=false;
   status(problems.length?'Há '+problems.length+' problemas. Nenhum cadastro foi gravado.':
     'Arquivo '+currentName+' lido. Nenhuma alteração realizada.');

@@ -39,7 +39,7 @@ test('Opção de atualizar removida e importador envia flag false até em págin
  assert.match(front,/p_update_existing:false/);
  assert.match(front,/previewCandidates=newRows/);
  assert.match(front,/classifyCatalogImport\(selected,existing\)/);
- assert.match(read('src/secure-entry.js'),/catalog-transfer\.js\?v=20261022importnew1/);
+ assert.match(read('src/secure-entry.js'),/catalog-transfer\.js\?v=20261027bling30011/);
 });
 test('Banco ignora duplicados antes de qualquer inclusão ou ajuste, mesmo com flag true',()=>{
  assert.match(sql,/pg_advisory_xact_lock/);
