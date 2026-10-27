@@ -5375,7 +5375,9 @@ async function handleClick(event){
     if(!store||!store.active||store.kind!=='filial'||!assignedStore(store.id)||
        !(hasPermission('stores.manage')||hasPermission('orders.receive')))return;
    }
-   state.activeStoreTab=chosen;render();return;
+   state.activeStoreTab=chosen;render();
+   if(chosen==='balanco')document.querySelector('[data-store-balance-barcode]')?.focus({preventScroll:true});
+   return;
   }
   if(action==='store-hub-admin'){
    if(!hasPermission('stores.manage'))return;

@@ -75,7 +75,7 @@ export function renderStoreUnit({store,orders=[],storeBalances=[],products=[],br
    '<p>Leia o EAN com o leitor USB, digite o código ou utilize a câmera.</p></div>';
  const balancePanel='<div class="su-panel"><div class="su-section-header"><h2>Balanço rápido desta loja</h2></div>'+
   '<div class="quick-balance-find"><label for="store-balance-barcode">Código de barras ou SKU</label>'+
-  '<div class="quick-balance-search-row"><input id="store-balance-barcode" data-store-balance-barcode type="search" '+
+  '<div class="quick-balance-search-row"><input id="store-balance-barcode" data-store-balance-barcode type="search" autofocus '+
   'enterkeyhint="search" inputmode="search" aria-label="Buscar EAN ou SKU" placeholder="Bipe ou digite o EAN/SKU" '+
   'value="'+esc(balanceCode)+'" autocomplete="off">'+
   '<button class="button primary" type="button" data-action="store-balance-search">Buscar</button>'+
