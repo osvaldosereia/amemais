@@ -1,8 +1,8 @@
-import {productCatalogCard} from './products-grid.js?v=20261022prodvariants1';
+import {productCatalogCard} from './products-grid.js?v=20261027inactiveproducts1';
 import {findProductByCode} from './product-code-search.js?v=20261027lookup1';
 import {variationFormHTML,readVariationForm,useOriginalVariation,singleVariantFormHTML,readSingleVariantForm} from './product-variation-coverage.js?v=20261022quickbalance1';
-import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261027lookup1';
-import {saveQuickBalancePhoto,existingPhotoPaths} from './quick-balance-photo.js?v=20261026foto100k1';
+import {quickBalancePage,quickStockResult,findQuickStockProduct,quickModes,quickBalancePreview} from './quick-balance.js?v=20261027inactiveproducts1';
+import {saveQuickBalancePhoto,existingPhotoPaths} from './quick-balance-photo.js?v=20261027inactiveproducts1';
 import {productCardWorkspace,filterProductCategories} from './product-card-workspace.js?v=20261018cost1';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { compressPhoto } from './photos.js?v=20261026foto100k1';
@@ -25,7 +25,7 @@ import { groupInventory, recentInventoryGroups, groupedCard, addSizesContent, up
 import {catalogSortOptions,availableGondolas,gondolaKey,catalogMatchesQuery,orderCatalogGroups,filterCatalogGondola} from './catalog-order.js?v=20261016sort1';
 import {skuPanelModes,renderSkuPanel,validateSkuAction} from './sku-panel.js?v=20261016damage-direct1';
 import { eventHistoryCards, ordersPageMarkup, createInternalOrderForm, collectInternalOrder } from './orders-events.js?v=20261014unified1';
-import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261027lookup1';
+import { stockOperationPage, stockOperationResults, stockOperationSearchHTML, stockCartHTML, stockOperationHistoryHTML, operationCartLines } from './stock-inout.js?v=20261027inactiveproducts1';
 import { eventPickingRows,eventPlanForm,eventSettlementForm,eventCompactDetail,damageListHTML,a4PickingHTML } from './event-simple.js?v=20261016stores2';
 import {makeUnifiedOrders,unifiedOrdersPage,filterUnifiedOrders,pickingOrderRows,shortageEditRows,pickingA4HTML} from './unified-orders.js?v=20261016compact1';
 import {operationalFormMarkup,operationalDifferenceRows} from './order-operations.js?v=20261016partial1';
@@ -693,7 +693,7 @@ function pageContent(){
  if(state.view==='separador')return separationHomePage();
  if(state.view==='balanco'){
    const p=product(state.quickBalanceId);
-   return quickBalancePage(p?.active?quickStockResult(p,{
+   return quickBalancePage(p&&!p.force_archived_at?quickStockResult(p,{
      physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode:state.quickBalanceMode,can:hasPermission}):undefined);
  }
  if(state.view==='entrada'||state.view==='saida')return renderStockOperationPage();
@@ -745,7 +745,7 @@ const productDrawerTabs=[
  ['compras','Compras'],['midia','Fotos'],['admin','Mais']
 ];
 function findProductGroup(key){
- const all=state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active));
+ const all=state.items.filter(p=>!p.force_archived_at);
  return groupInventory(all,state.apparelModels).find(g=>g.key===key)||null;
 }
 function productDrawerChanged(){
@@ -1141,10 +1141,11 @@ function productModelManager(modelId){
 // A paginação é apenas visual; a impressão recebe todos os modelos resultantes dos filtros.
 function selectedProductCatalogGroups(){
   const q=state.search.trim();
+  const includeInactive=state.showInactiveProducts||Boolean(q);
   const modelNames=new Map(state.apparelModels.map(m=>[m.id,m.name]));
-  const gondolas=availableGondolas(state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active)));
-  const eligible=state.items.filter(p=>!p.force_archived_at&&(state.showInactiveProducts||p.active));
-  const codeResult=/^\d{9,}$/.test(q)?findProductByCode(eligible,q):null;
+  const eligible=state.items.filter(p=>!p.force_archived_at&&(includeInactive||p.active));
+  const gondolas=availableGondolas(eligible);
+  const codeResult=/^\d{9,}$/.test(q)?findProductByCode(eligible,q,{activeOnly:false}):null;
   const searched=codeResult?.status==='ambiguous'?[]:
     codeResult?.item?[codeResult.item]:
     eligible.filter(p=>catalogMatchesQuery(p,q,modelNames.get(p.apparel_model_id)||''));
@@ -1152,8 +1153,8 @@ function selectedProductCatalogGroups(){
     (!state.categoryFilter||categoryChain(p.category_id).some(c=>c.id===state.categoryFilter))&&
     (!state.tagFilter||(p.tags||[]).includes(state.tagFilter)));
   const groupKeys=new Set(matched.map(p=>p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id));
-  // A busca por um único EAN retorna o modelo completo com todos os seus tamanhos.
-  const expanded=state.items.filter(p=>(state.showInactiveProducts||p.active)&&
+  // Uma busca por SKU, EAN ou nome inclui as variações ativas e inativas do mesmo modelo.
+  const expanded=state.items.filter(p=>!p.force_archived_at&&(includeInactive||p.active)&&
     groupKeys.has(p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id));
   const groups=orderCatalogGroups(
     filterCatalogGondola(groupInventory(expanded,state.apparelModels),state.gondolaFilter),
@@ -2760,7 +2761,7 @@ function updateStockOperationBasket(redraw=true,clearError=true){
 }
 function addStockOperationItem(id){
   if(!hasPermission(state.view==='entrada'?'stock.entry':'stock.exit')||!['entrada','saida'].includes(state.view))return;
-  const p=product(id);if(!p?.active)return toast('Produto não encontrado ou inativo.',true);
+  const p=product(id);if(!p||p.force_archived_at)return toast('Produto não encontrado ou arquivado.',true);
   const cart=state.stockCarts[state.view],previous=cart.get(id);
   if(previous){
     if(previous.quantity>=1000000)return toast('Quantidade máxima por variação: 1.000.000.',true);
@@ -2776,11 +2777,11 @@ async function handleOperationScanCode(code){
   const kind=state.view;
   if(!['entrada','saida'].includes(kind))return;
   try{
-    let resolved=findProductByCode(state.items,code);
+    let resolved=findProductByCode(state.items.filter(p=>!p.force_archived_at),code,{activeOnly:false});
     if(!resolved.item){
       await refreshCodeCandidates(code);
       if(state.view!==kind)return;
-      resolved=findProductByCode(state.items,code);
+      resolved=findProductByCode(state.items.filter(p=>!p.force_archived_at),code,{activeOnly:false});
     }
     const input=document.getElementById('stock-op-search');
     const query=resolved.item?(resolved.item.ean||resolved.item.sku):code;
@@ -2790,7 +2791,7 @@ async function handleOperationScanCode(code){
     if(resolved.item)addStockOperationItem(resolved.item.id);
     else toast(resolved.status==='ambiguous'?'Código corresponde a mais de uma variação. Selecione o SKU na lista.':
       (state.items.length===0?'Nenhum produto foi carregado. Verifique o acesso ao catálogo.':
-      kind==='entrada'?'EAN não cadastrado. Use + Cadastrar produto.':'EAN não encontrado nos produtos ativos.'),true);
+      kind==='entrada'?'EAN não cadastrado. Use + Cadastrar produto.':'EAN não encontrado neste cadastro.'),true);
     input?.focus({preventScroll:true});
   }catch(error){fail(error);}
 }
@@ -2813,6 +2814,10 @@ async function saveStockOperation(form){
       p_operation:kind,p_items:lines,p_destination_id:kind==='saida'?dest:null,
       p_note:String(data.get('note')||'').trim()||null,p_request_id:requestId
     }));
+    const productsById=new Map(state.items.map(item=>[item.id,item]));
+    const reactivatedCount=lines.filter(line=>!productsById.get(line.product_id)?.active).length;
+    const changedIds=new Set(lines.map(line=>line.product_id));
+    state.items=state.items.map(item=>changedIds.has(item.id)?{...item,active:true}:item);
     for(const row of response.items||[]){
       const balance=state.balances.find(b=>b.product_id===row.product_id&&!b.event_id);
       if(balance)balance.quantity=Number(row.new_stock);
@@ -2838,7 +2843,8 @@ async function saveStockOperation(form){
     refreshStockOperationSearch();
     updateStockOperationBasket();
     toast((kind==='entrada'?'Entrada':'Saída')+' registrada: '+lines.length+
-      ' tipo(s) e '+lines.reduce((sum,line)=>sum+line.quantity,0)+' unidade(s).');
+      ' tipo(s) e '+lines.reduce((sum,line)=>sum+line.quantity,0)+' unidade(s).'+
+      (reactivatedCount?' '+reactivatedCount+' produto(s) inativo(s) reativado(s).':''));
   }catch(error){
     const message=error?.message||'Falha ao registrar a operação. Não tente cadastrar os produtos de novo.';
     const banner=document.querySelector('[data-stock-error]');
@@ -4103,7 +4109,7 @@ function submitProductSearch(value){
  if(input)input.focus({preventScroll:true});
 }
 function showQuickBalanceProduct(p){
- if(state.view!=='balanco'||!p?.active||p.force_archived_at)return;
+ if(state.view!=='balanco'||!p||p.force_archived_at)return;
  state.quickBalanceId=p.id;
  if(!quickModes.some(m=>m.id===state.quickBalanceMode&&hasPermission(m.permission)))
   state.quickBalanceMode=quickModes.find(m=>hasPermission(m.permission))?.id||'contagem';
@@ -4127,7 +4133,7 @@ async function refreshCodeCandidates(code){
   const codes=[...new Set([query,digits].filter(Boolean))];
   const selectCode=async (field,value)=>{
     const response=await db.from('products').select('*').eq(field,value)
-      .eq('active',true).is('force_archived_at',null).limit(50);
+      .is('force_archived_at',null).limit(50);
     return assertOk(response)||[];
   };
   const exact=(await Promise.all(codes.flatMap(value=>[
@@ -4136,7 +4142,7 @@ async function refreshCodeCandidates(code){
   let found=exact;
   if(!found.length&&digits?.length>=9){
     const response=await db.from('products').select('*').like('ean','%'+digits.slice(-9))
-      .eq('active',true).is('force_archived_at',null).limit(100);
+      .is('force_archived_at',null).limit(100);
     found=assertOk(response)||[];
   }
   if(found.length){
@@ -4181,11 +4187,12 @@ async function submitQuickBalance(form){
  if(state.loading||state.view!=='balanco'||isFranchisePortal())return;
  const p=product(form.dataset.id),mode=form.dataset.mode;
  const permission=quickModes.find(m=>m.id===mode)?.permission;
- if(!p?.active||!permission||!hasPermission(permission))
+ if(!p||p.force_archived_at||!permission||!hasPermission(permission))
    return toast('Produto ou permissão indisponível.',true);
  const raw=form.querySelector('[data-quick-balance-quantity]')?.value.trim()||'';
  if(!/^(0|[1-9][0-9]{0,6})$/.test(raw)||Number(raw)>1000000||
    (mode!=='contagem'&&Number(raw)===0))return toast('Quantidade inválida.',true);
+ const wasInactive=!p.active;
  const expected=Number(form.dataset.expected),reserved=Number(form.dataset.reserved);
  const message=quickBalancePreview(mode,expected,reserved,Number(raw));
  if(message.startsWith('Quantidade insuficiente')||message.startsWith('Limite máximo'))
@@ -4202,7 +4209,7 @@ async function submitQuickBalance(form){
    await loadData();
    state.quickBalanceId=p.id;
    const selected=product(p.id);
-   if(selected?.active){
+   if(selected&&!selected.force_archived_at){
      const result=document.querySelector('[data-quick-balance-result]');
      if(result){result.innerHTML=quickStockResult(selected,{
        physical:qtyStore(p.id),reserved:qtyReserved(p.id),mode,can:hasPermission
@@ -4210,15 +4217,16 @@ async function submitQuickBalance(form){
    }
    const scan=document.querySelector('[data-quick-balance-barcode]');
    scan?.focus({preventScroll:true});scan?.select();
-   toast(mode==='contagem'?'Estoque atualizado e auditado.':
-      mode==='entrada'?'Entrada registrada.':'Saída registrada.');
+   const message=mode==='contagem'?'Estoque atualizado e auditado.':
+      mode==='entrada'?'Entrada registrada.':'Saída registrada.';
+   toast(message+(wasInactive?' Produto inativo ativado.':''));
  }catch(error){fail(error);}
  finally{state.loading=false;if(button?.isConnected){button.disabled=false;button.textContent='Confirmar operação';}}
 }
 function searchAndManageSku(code){
  const value=String(code||'').trim();
  if(!value)return;
- const resolved=findProductByCode(state.items,value),match=resolved.item;
+ const resolved=findProductByCode(state.items.filter(p=>!p.force_archived_at),value,{activeOnly:false}),match=resolved.item;
  const query=match?(String(match.ean||'')||String(match.sku||'')):value;
  state.view='produtos';state.search=query;state.productSearchDraft=query;state.page=0;
  state.categoryFilter='';state.tagFilter='';state.gondolaFilter='';
@@ -4848,7 +4856,7 @@ async function handleClick(event){
     const selected=product(id);
     const section=target.closest('.quick-balance-product');
     const form=section?.querySelector('form[data-form="quick-balance-action"]');
-    if(!selected?.active||selected.force_archived_at||state.quickBalanceId!==selected.id||
+    if(!selected||selected.force_archived_at||state.quickBalanceId!==selected.id||
        form?.dataset.id!==selected.id)return toast('Releia o produto antes de fotografar.',true);
     const photoOwner=selected.apparel_model_id?
       state.apparelModels.find(model=>model.id===selected.apparel_model_id):selected;
@@ -4866,7 +4874,7 @@ async function handleClick(event){
           });
           state.items=state.items.map(item=>
             (saved.modelId?item.apparel_model_id===saved.modelId:item.id===selected.id)?
-             {...item,image_path:saved.path,image_paths:saved.paths}:item);
+             {...item,image_path:saved.path,image_paths:saved.paths,active:true}:item);
           if(saved.modelId)state.apparelModels=state.apparelModels.map(model=>
             model.id===saved.modelId?
              {...model,image_path:saved.path,image_paths:saved.paths}:model);
@@ -4880,7 +4888,8 @@ async function handleClick(event){
             existing.replaceWith(image);
             await hydrateImages();
           }
-          toast('Foto salva no cadastro ('+Math.ceil(saved.bytes/1000)+' KB). Estoque preservado.');
+          toast((selected.active?'':'Produto inativo ativado. ')+
+            'Foto salva no cadastro ('+Math.ceil(saved.bytes/1000)+' KB). Estoque preservado.');
         }finally{state.loading=false;}
       }});
     }catch(error){fail(error);return;}
@@ -5006,7 +5015,7 @@ async function handleClick(event){
         const container=target.closest('[data-product-details]');
         const candidates=[...container.querySelectorAll('[data-balance-item]')]
            .map(r=>product(r.dataset.productId)).filter(Boolean);
-         const resolved=findProductByCode(candidates,code);
+         const resolved=findProductByCode(candidates,code,{activeOnly:false});
          const row=resolved.item?[...container.querySelectorAll('[data-balance-item]')]
            .find(r=>r.dataset.productId===resolved.item.id):null;
         if(!row)return toast('EAN/SKU não pertence a este produto.',true);
@@ -5048,7 +5057,7 @@ async function handleClick(event){
        ||isFranchisePortal())return;
     const row=target.closest('[data-product-id]'),p=product(id);
     const input=row?.querySelector('[data-count-free]');
-    if(!p?.active||!row||!input||row.dataset.productId!==id)return;
+    if(!p||p.force_archived_at||!row||!input||row.dataset.productId!==id)return;
     const raw=input.value.trim();
     if(!/^(0|[1-9][0-9]{0,6})$/.test(raw)||Number(raw)>1000000)
      return toast('Informe um saldo livre de 0 a 1.000.000 unidades.',true);
@@ -6884,7 +6893,7 @@ document.addEventListener('keydown',event=>{
     if(!panel||!code)return;
     const candidates=[...panel.querySelectorAll('[data-balance-item]')]
       .map(r=>product(r.dataset.productId)).filter(Boolean);
-    const resolved=findProductByCode(candidates,code);
+    const resolved=findProductByCode(candidates,code,{activeOnly:false});
     const row=resolved.item?[...panel.querySelectorAll('[data-balance-item]')]
       .find(r=>r.dataset.productId===resolved.item.id):null;
     if(!row)return toast('Código não pertence às variações deste produto.',true);

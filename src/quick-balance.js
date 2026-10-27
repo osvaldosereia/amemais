@@ -8,11 +8,12 @@ export const quickModes=[
 ];
 export function findQuickStockProduct(items,code){
  const raw=String(code??'').trim();
- let result=findProductByCode(items,raw);
+ const eligible=(Array.isArray(items)?items:[]).filter(p=>p&&!p.force_archived_at);
+ let result=findProductByCode(eligible,raw,{activeOnly:false});
  // Aceita EAN digitado com separadores, sem alterar SKU original nem remover zeros à esquerda.
  if(result.status==='notfound'&&/^[0-9\s-]+$/.test(raw)&&/[\s-]/.test(raw)){
   const digits=raw.replace(/[\s-]/g,'');
-  if(digits.length>=8&&digits.length<=14)result=findProductByCode(items,digits);
+  if(digits.length>=8&&digits.length<=14)result=findProductByCode(eligible,digits,{activeOnly:false});
  }
  if(result.status==='ambiguous')return {item:null,matches:result.matches,status:'ambiguous',
   error:'Código corresponde a mais de um produto. Selecione o SKU correto abaixo.'};
@@ -38,7 +39,7 @@ export function quickStockResult(item,{physical=0,reserved=0,mode='contagem',can
     '<div class="quick-balance-photo is-empty" aria-hidden="true">▧</div>')+
    '<div><strong>'+h(item.name)+'</strong>'+
     '<small>'+(item.apparel_size?h(item.apparel_size)+' · ':'')+'SKU '+h(item.sku||'—')+
-    ' · EAN '+h(item.ean||'—')+'</small></div></header>'+
+    ' · EAN '+h(item.ean||'—')+(item.active?'':' · Inativo')+'</small></div></header>'+
   '<div class="quick-balance-stock">'+
    '<div><small>Físico</small><strong>'+stock+'</strong></div>'+
    '<div><small>Reservado</small><strong>'+reservedUnits+'</strong></div>'+
@@ -59,7 +60,7 @@ export function quickStockResult(item,{physical=0,reserved=0,mode='contagem',can
   (can('products.edit')?
    '<div class="quick-balance-photo-action">'+
    '<button type="button" class="button quick-balance-photo-button" data-action="quick-balance-product-photo" data-id="'+h(item.id)+'">📷 Tirar foto e salvar no cadastro</button>'+
-   '<small>A foto é compactada para até 100 KB e salva automaticamente, sem alterar o estoque.</small>'+
+   '<small>A foto é compactada para até 100 KB; salvar ativa um produto inativo e preserva o estoque.</small>'+
    '</div>':'')+'</section>';
 }
 export function quickBalancePreview(mode,current,reserved,quantity){

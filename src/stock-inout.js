@@ -7,27 +7,28 @@ export const opSizes=['PP','P','M','G','GG','XGG','XXGG','EXGG','Único'];
 export function stockOperationResults(products,models,query,groupInventory){
   const q=(query||'').trim().toLocaleLowerCase('pt-BR');
   if(!q)return [];
-  const resolved=findProductByCode(products,query);
+  const eligible=products.filter(p=>!p.force_archived_at);
+  const resolved=findProductByCode(eligible,query,{activeOnly:false});
   const matches=resolved.matches.length?resolved.matches:
-    products.filter(p=>p.active&&!p.force_archived_at&&asText(p).includes(q));
+    eligible.filter(p=>asText(p).includes(q));
   // Navegar por modelos inteiros ajuda a escolher o tamanho correto.
   const keys=new Set(matches.map(p=>p.apparel_model_id?'m:'+p.apparel_model_id:'p:'+p.id));
-  const grouped=groupInventory(products.filter(p=>p.active&&keys.has(p.apparel_model_id?'m:'+p.apparel_model_id:'p:'+p.id)),models);
+  const grouped=groupInventory(eligible.filter(p=>keys.has(p.apparel_model_id?'m:'+p.apparel_model_id:'p:'+p.id)),models);
   return grouped.slice(0,16);
 }
 export function stockOperationSearchHTML({groups,h=esc,qtyStore,qtyAvailable=qtyStore,kind='entrada'}){
-  if(!groups.length)return '<p class="stock-no-results">Produto não localizado neste cadastro ativo.</p>';
+  if(!groups.length)return '<p class="stock-no-results">Produto não localizado neste cadastro.</p>';
   return groups.map(group=>
     '<section class="stock-search-group"><strong>'+h(group.title)+'</strong>'+
     group.products.map(p=>'<button type="button" class="stock-pick" data-action="stock-pick" data-id="'+h(p.id)+'">'+
       '<span class="stock-pick-name">'+h(group.modelId?[p.apparel_color,p.apparel_size].filter(Boolean).join(' · '):p.name)+
-        '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small></span>'+
+        '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+(p.active?'':' · Inativo')+'</small></span>'+
       '<span class="stock-pick-quantity">'+(kind==='saida'?qtyAvailable(p.id):qtyStore(p.id))+' un. '+(kind==='saida'?'livres':'físicas')+'</span>'+
       '<span aria-hidden="true" class="stock-pick-add">+ Adicionar</span></button>').join('')+
     '</section>').join('');
 }
 export function stockCartHTML({cart,items,models,qtyStore,qtyAvailable=qtyStore,groupInventory,kind,photoButton,h=esc}){
-  const grouped=groupInventory(items.filter(p=>p.active&&cart.has(p.id)),models);
+  const grouped=groupInventory(items.filter(p=>!p.force_archived_at&&cart.has(p.id)),models);
   if(!grouped.length)return '<div class="stock-cart-empty">Nenhum item adicionado. Busque ou leia o EAN para começar.</div>';
   const type=kind==='entrada'?'Entrada':'Saída';
   return grouped.map(group=>'<article class="stock-cart-card">'+
@@ -39,7 +40,7 @@ export function stockCartHTML({cart,items,models,qtyStore,qtyAvailable=qtyStore,
       const after=physical+(kind==='entrada'?qty:-qty);
       return '<div class="stock-cart-line" data-stock-line="'+h(p.id)+'">'+
         '<div class="stock-line-meta"><strong>'+h(group.modelId?[p.apparel_color,p.apparel_size].filter(Boolean).join(' · '):p.name)+'</strong>'+
-        '<small>EAN '+h(p.ean||'—')+' · SKU '+h(p.sku||'—')+'</small>'+
+        '<small>EAN '+h(p.ean||'—')+' · SKU '+h(p.sku||'—')+(p.active?'':' · Será ativado ao registrar')+'</small>'+
         '<small>Físico: <b>'+physical+'</b> · Livre: <b>'+free+'</b> · Após '+type.toLowerCase()+': <b data-stock-projected>'+after+'</b> un. físicos</small></div>'+
         '<div class="stock-line-controls">'+
           '<button type="button" data-action="stock-minus" data-id="'+h(p.id)+'" aria-label="Diminuir uma unidade">−</button>'+
@@ -78,7 +79,7 @@ export function operationCartLines(cart,products,qtyStore,kind,qtyAvailable=qtyS
   const byId=new Map(products.map(p=>[p.id,p])),arr=[];
   for(const [id,line] of cart){
     const p=byId.get(id),quantity=Number(line.quantity);
-    if(!p?.active)throw Error('Há produtos excluídos na lista. Remova-os antes de salvar.');
+    if(!p||p.force_archived_at)throw Error('Há produtos excluídos na lista. Remova-os antes de salvar.');
     if(!Number.isInteger(quantity)||quantity<1||quantity>1000000)
       throw Error('Informe quantidade entre 1 e 1.000.000 para cada item.');
     const current=qtyStore(id);

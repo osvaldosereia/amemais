@@ -17,14 +17,14 @@ export function productCardVariantStock(products,{h,qtyAvailable}){
  return '<section class="product-grid-variants" aria-label="Estoque disponível por variação">'+
   '<div class="product-grid-variants-head"><strong>Estoque por variação</strong><small>Disponível</small></div>'+
   '<div class="product-grid-variants-list">'+ordered.map(p=>{
-   const qty=Math.max(0,Number(qtyAvailable(p.id))||0),size=variantName(p);
-   return '<div class="product-grid-variant'+(qty===0?' is-zero':'')+'" title="'+h(size+': '+qty+' unidades disponíveis')+'">'+
-    '<span class="product-grid-variant-name">'+h(size)+'</span>'+
+   const qty=Math.max(0,Number(qtyAvailable(p.id))||0),size=variantName(p),label=size+(p.active?'':' · Inativo');
+   return '<div class="product-grid-variant'+(qty===0?' is-zero':'')+'" title="'+h(label+': '+qty+' unidades disponíveis')+'">'+
+    '<span class="product-grid-variant-name">'+h(label)+'</span>'+
     '<b class="product-grid-variant-qty" aria-label="'+h(qty+' unidades disponíveis')+'">'+qty.toLocaleString('pt-BR')+'</b></div>';
   }).join('')+'</div></section>';
 }
 export function productCatalogCard(group,{h,qtyStore,qtyReserved,qtyAvailable,categories=[]}){
- const products=group.products.filter(p=>p.active);
+ const products=group.products.filter(p=>!p.force_archived_at);
  const main=group.products.find(p=>p.image_path||p.image_paths?.length)||group.main;
  const imagePath=main?.image_path||main?.image_paths?.[0]||group.model?.image_path||group.model?.image_paths?.[0];
  const photo=imagePath?'<img class="product-grid-photo" data-photo-path="'+h(imagePath)+'" loading="lazy" alt="Foto de '+h(group.title)+'">':
@@ -35,12 +35,14 @@ export function productCatalogCard(group,{h,qtyStore,qtyReserved,qtyAvailable,ca
  const locations=[...new Set(products.map(p=>[p.gondola?'Gôndola '+p.gondola:'',p.prateleira?'Prateleira '+p.prateleira:''].filter(Boolean).join(' · ')).filter(Boolean))];
  const location=locations.length>1?'Localizações por variação':locations[0]||'Gôndola não informada';
  const category=categories.find(c=>c.id===(group.model?.category_id||main?.category_id))?.name||'Sem categoria';
+ const inactiveCount=products.filter(p=>!p.active).length;
  const sku=group.modelId?products.length+' variação(ões)':'SKU '+(main?.sku||'—')+' · EAN '+(main?.ean||'—');
- const inactive=products.length===0;
+ const inactive=products.length>0&&inactiveCount===products.length;
  return '<article class="product-grid-card'+(inactive?' is-inactive':'')+'" data-product-card="'+h(group.key)+'">'+
   '<div class="product-grid-main"><div class="product-grid-media">'+photo+'</div>'+
    '<div class="product-grid-copy"><small>'+h(sku)+'</small>'+
-    '<h3>'+h(group.title)+'</h3><span class="product-grid-subtitle">'+h(category)+' · '+h(location)+'</span></div></div>'+
+    '<h3>'+h(group.title)+'</h3><span class="product-grid-subtitle">'+h(category)+' · '+h(location)+
+    (inactiveCount?' · '+inactiveCount+' '+(inactiveCount===1?'variação inativa':'variações inativas'):'')+'</span></div></div>'+
   '<div class="product-grid-stock">'+
    '<div><small>Disponível</small><strong>'+available.toLocaleString('pt-BR')+'</strong></div>'+
    '<div><small>Físico</small><strong>'+physical.toLocaleString('pt-BR')+'</strong></div>'+

@@ -14,16 +14,16 @@ export function existingPhotoPaths(item){
 }
 
 export async function saveQuickBalancePhoto({db,product,file,compressPhoto}){
- if(!product?.id||!product.active||product.force_archived_at)
-  throw Error('Produto inativo ou indisponível. Releia o código.');
+ if(!product?.id||product.force_archived_at)
+  throw Error('Produto arquivado ou indisponível. Releia o código.');
  if(typeof compressPhoto!=='function')throw Error('Compactador de fotos indisponível.');
  const modelId=product.apparel_model_id||null;
  const source=modelId?
   assertOk(await db.from('apparel_models')
    .select('id,image_path,image_paths,force_archived_at').eq('id',modelId).single()):
   assertOk(await db.from('products')
-   .select('id,active,force_archived_at,image_path,image_paths').eq('id',product.id).single());
- if(!source||source.force_archived_at||(!modelId&&!source.active))
+   .select('id,force_archived_at,image_path,image_paths').eq('id',product.id).single());
+ if(!source||source.force_archived_at)
   throw Error('Cadastro indisponível para salvar a foto.');
  const current=existingPhotoPaths(source);
  if(current.length>=6)
@@ -44,7 +44,7 @@ export async function saveQuickBalancePhoto({db,product,file,compressPhoto}){
   }else{
    const updated=assertOk(await db.from('products').update({
     image_paths:paths,image_path:path
-   }).eq('id',product.id).eq('active',true).is('force_archived_at',null)
+   }).eq('id',product.id).is('force_archived_at',null)
     .select('id').maybeSingle());
    if(!updated)throw Error('Não foi possível vincular a fotografia ao cadastro.');
   }
