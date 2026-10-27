@@ -14,6 +14,6 @@ if (insecure) {
     </section>
   </main>`;
 } else {
-  await import('./app.js?v=20261027catalogrecovery1&rev=autoactivate1');
+  await import('./app.js?v=20261027catalogrecovery1&rev=storebalance1');
   await import('./catalog-transfer.js?v=20261027bling30011&rev=activefix1');
 }
