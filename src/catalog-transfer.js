@@ -115,6 +115,7 @@ async function parseFile(file){
       ].filter(Boolean).filter((value,index,values)=>
         index===0||normalizeHeader(value)!==normalizeHeader(values[index-1]));
       result.Importar='SIM';
+      if(!result.Ativo.trim())result.Ativo='SIM';
       result.SKU=read(raw,HEADER_ALIASES.SKU);
       result.Nome=read(raw,HEADER_ALIASES.Nome);
       result['Codigo de barras']=read(raw,HEADER_ALIASES['Codigo de barras']);
