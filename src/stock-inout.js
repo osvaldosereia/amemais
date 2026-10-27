@@ -1,4 +1,4 @@
-import {findProductByCode} from './product-code-search.js';
+import {findProductByCode} from './product-code-search.js?v=20261027lookup1';
 // AME MAIS | Entrada / Saída de estoque físico, independente de Eventos e Pedidos.
 // Todo item escolhido representa uma variação real de public.products.
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
