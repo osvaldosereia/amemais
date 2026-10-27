@@ -1,4 +1,4 @@
-import {findProductByCode} from './product-code-search.js';
+import {findProductByCode} from './product-code-search.js?v=20261027lookup1';
 // Conferência final por leitor EAN/SKU + quantidade física.
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function verificationProgress(order,rows=[]){
