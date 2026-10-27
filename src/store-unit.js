@@ -13,13 +13,14 @@ export function displayOrderStage(order){
  return map[order.status]||order.status||'Em andamento';
 }
 export function renderStoreUnit({store,orders=[],storeBalances=[],products=[],branchMovements=[],
- branchReturns=[],storeOrderReceipts=[],tab='resumo',context={}}){
+ branchReturns=[],storeOrderReceipts=[],tab='resumo',balanceProduct=null,balanceCandidates=[],
+ balanceError='',balanceCode='',context={}}){
  const ctx={button:()=>'',time:x=>x,canBrowseOrders:false,canManageStores:false,
    canMove:false,canReturn:false,canRequest:false,...context};
  if(!store||store.is_primary||store.kind==='central')return '<p class="su-empty">Unidade indisponível.</p>';
  const franchise=store.kind==='franquia';
  const validTabs=franchise?['resumo','pedidos','recebimentos','cadastro']:
-  ['resumo','pedidos','estoque','movimentacoes','configuracoes'];
+  ['resumo','pedidos','estoque',...(ctx.canMove?['balanco']:[]),'movimentacoes','configuracoes'];
  const activeTab=validTabs.includes(tab)?tab:'resumo';
  const scopedBalances=franchise?[]:storeBalances.filter(x=>x.store_id===store.id&&Number(x.quantity)>0);
  const stock=scopedBalances.reduce((s,b)=>s+Number(b.quantity||0),0);
@@ -35,11 +36,53 @@ export function renderStoreUnit({store,orders=[],storeBalances=[],products=[],br
   orderAction(o)+'</article>').join('')+'</div>':'<p class="su-empty">Nenhum pedido para exibir.</p>';
  const tabs=validTabs.map(t=>'<button type="button" data-action="store-unit-tab" data-tab="'+t+
   '" class="'+(t===activeTab?'is-current':'')+'" aria-selected="'+(t===activeTab)+'" role="tab">'+
-  ({resumo:'Visão geral',pedidos:'Pedidos',estoque:'Estoque',movimentacoes:'Movimentações',
-   configuracoes:'Configurações',recebimentos:'Recebimentos',cadastro:'Cadastro'}[t])+'</button>').join('');
+  ({resumo:'Visão geral',pedidos:'Pedidos',estoque:'Estoque',balanco:'Balanço rápido',
+   movimentacoes:'Movimentações',configuracoes:'Configurações',
+   recebimentos:'Recebimentos',cadastro:'Cadastro'}[t])+'</button>').join('');
  const changeStock=ctx.canMove&&!franchise&&store.active?
   '<div class="actions">'+ctx.button('Movimentar estoque','branch-stock-new','data-id="'+esc(store.id)+'"','small primary')+
   (ctx.canReturn&&stock>0?ctx.button('Devolver à central','branch-return-new','data-id="'+esc(store.id)+'"','small'):'')+'</div>':'';
+ const balanceQuantity=balanceProduct?Number(storeBalances.find(x=>
+  x.store_id===store.id&&x.product_id===balanceProduct.id)?.quantity||0):0;
+ const balanceChoices=balanceCandidates.map(p=>
+  '<button class="quick-balance-choice" type="button" data-action="store-balance-choose" data-id="'+esc(p.id)+'">'+
+  '<strong>'+esc(p.name)+'</strong><small>SKU '+esc(p.sku||'—')+' · EAN '+esc(p.ean||'—')+
+  (p.apparel_size?' · '+esc(p.apparel_size):'')+'</small></button>').join('');
+ const balanceCard=balanceProduct?
+  '<section class="quick-balance-product" data-store-balance-product="'+esc(balanceProduct.id)+'">'+
+   '<header class="quick-balance-product-head">'+
+    ((balanceProduct.image_path||balanceProduct.image_paths?.[0])?
+     '<img class="quick-balance-photo" data-photo-path="'+esc(balanceProduct.image_path||balanceProduct.image_paths?.[0])+
+     '" alt="Foto de '+esc(balanceProduct.name)+'">':
+     '<div class="quick-balance-photo is-empty" aria-hidden="true">▧</div>')+
+    '<div><strong>'+esc(balanceProduct.name)+'</strong><small>'+
+     (balanceProduct.apparel_size?esc(balanceProduct.apparel_size)+' · ':'')+'SKU '+esc(balanceProduct.sku||'—')+
+     ' · EAN '+esc(balanceProduct.ean||'—')+(balanceProduct.active?'':' · Inativo')+'</small></div></header>'+
+   '<div class="quick-balance-stock"><div><small>Saldo nesta loja</small><strong>'+fmt(balanceQuantity)+'</strong></div></div>'+
+   '<form data-form="store-balance-count" data-id="'+esc(balanceProduct.id)+'" data-store="'+esc(store.id)+
+    '" data-expected="'+balanceQuantity+'">'+
+    '<label class="quick-balance-quantity"><span>Quantidade física contada</span>'+
+    '<input name="quantity" type="number" min="0" max="1000000" step="1" inputmode="numeric" value="'+
+    balanceQuantity+'" required data-store-balance-quantity></label>'+
+    '<p class="quick-balance-preview" data-store-balance-preview aria-live="polite">'+
+    'A contagem altera somente o saldo desta loja. O saldo do CD fica separado.</p>'+
+    '<button class="button primary quick-balance-submit" type="submit">Salvar contagem</button></form>'+
+   (ctx.canEditProducts?
+    '<div class="quick-balance-photo-action"><button type="button" class="button quick-balance-photo-button" '+
+    'data-action="store-balance-photo" data-id="'+esc(balanceProduct.id)+'">📷 Tirar foto e salvar no cadastro</button>'+
+    '<small>A foto é compartilhada na galeria do produto no sistema.</small></div>':'')+'</section>':
+  '<div class="quick-balance-placeholder"><strong>Aguardando leitura</strong>'+
+   '<p>Leia o EAN com o leitor USB, digite o código ou utilize a câmera.</p></div>';
+ const balancePanel='<div class="su-panel"><div class="su-section-header"><h2>Balanço rápido desta loja</h2></div>'+
+  '<div class="quick-balance-find"><label for="store-balance-barcode">Código de barras ou SKU</label>'+
+  '<div class="quick-balance-search-row"><input id="store-balance-barcode" data-store-balance-barcode type="search" autofocus '+
+  'enterkeyhint="search" inputmode="search" aria-label="Buscar EAN ou SKU" placeholder="Bipe ou digite o EAN/SKU" '+
+  'value="'+esc(balanceCode)+'" autocomplete="off">'+
+  '<button class="button primary" type="button" data-action="store-balance-search">Buscar</button>'+
+  '<button class="button" type="button" data-action="store-balance-camera">Ler pela câmera</button></div>'+
+  '<small>O produto será contado no estoque de '+esc(store.name)+'. A contagem é salva sem alterar o CD.</small></div>'+
+  (balanceError?'<p class="quick-balance-error" role="status">'+esc(balanceError)+'</p>':'')+
+  (balanceChoices?'<div class="quick-balance-choices">'+balanceChoices+'</div>':'')+balanceCard+'</div>';
  let panel='';
  if(activeTab==='resumo'){
   panel='<div class="su-panel"><div class="su-section-header"><h2>Resumo da unidade</h2></div>'+
@@ -52,6 +95,8 @@ export function renderStoreUnit({store,orders=[],storeBalances=[],products=[],br
   panel='<div class="su-panel"><div class="su-section-header"><h2>Pedidos da unidade</h2>'+
    (canMakeOrder?ctx.button('+ Novo pedido','store-order-new','data-store="'+esc(store.id)+'"','primary'):'')+
    '</div>'+rows(orders)+'</div>';
+ }else if(activeTab==='balanco'){
+  panel=balancePanel;
  }else if(activeTab==='estoque'){
   panel='<div class="su-panel"><div class="su-section-header"><h2>Estoque desta loja</h2>'+changeStock+'</div>'+
    (scopedBalances.length?'<div class="su-data-list">'+scopedBalances.filter(x=>Number(x.quantity)>0).map(b=>

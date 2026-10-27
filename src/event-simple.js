@@ -7,7 +7,10 @@ export function eventPickingRows(items,models,planItems=[],qtyAvailable=()=>0){
  for(const p of items.filter(p=>p.active||quantities.has(p.id))){
   const key=p.apparel_model_id?'model:'+p.apparel_model_id:'product:'+p.id;
   if(!groups.has(key))groups.set(key,{key,title:modelById.get(p.apparel_model_id)?.name||p.name,products:[]});
-  groups.get(key).products.push({...p,planned:quantities.get(p.id)||0,available:qtyAvailable(p.id)});
+  const availability=qtyAvailable(p.id);
+  const stock=availability&&typeof availability==='object'?availability:{total:Number(availability)||0,label:''};
+  groups.get(key).products.push({...p,planned:quantities.get(p.id)||0,
+   available:Number(stock.total)||0,availabilityLabel:String(stock.label||'')});
  }
  return [...groups.values()].sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'))
  .map(g=>({...g,products:g.products.sort((a,b)=>
@@ -24,16 +27,28 @@ export function eventPlanForm(groups,{h=esc,additional=false,showAvailable=true}
       '<div class="event-plan-row" data-plan-row data-search="'+h([p.name,p.apparel_size,p.apparel_color,p.ean,p.sku].join(' ').toLowerCase())+'">'+
         '<div><strong>'+h([p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||p.name)+'</strong>'+
         '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small>'+
-        (showAvailable?'<small>Livre no CDSB: <b>'+format(p.available)+'</b></small>':'')+'</div>'+
+        (showAvailable?'<small>'+h(p.availabilityLabel||('Livre no CDSB: '+format(p.available)))+'</small>':'')+'</div>'+
         '<label><span>Separar</span><input type="number" inputmode="numeric" min="0" max="1000000" step="1"'+
          ' data-plan-qty data-id="'+h(p.id)+'" value="'+(additional?0:p.planned||0)+'" aria-label="Quantidade de '+h(p.name)+'"></label>'+
       '</div>').join('')+'</section>').join('')+'</div>'+
  (additional?'<label class="field"><span>Motivo do complemento *</span><textarea name="reason" required maxlength="180" placeholder="Ex.: reposição adicional solicitada"></textarea></label>':'')+
  '<p class="help">Ao salvar, o pedido entra na seção Pedidos. A impressão em A4 e a saída física são feitas ali, uma remessa por vez.</p>';
 }
-export function eventSettlementForm(groups,balances,draft=null,{h=esc}={}){
+export function eventSettlementForm(groups,balances,draft=null,{h=esc,sources=[],stores=[]}={}){
  const counted=new Map((draft?.items||[]).map(x=>[x.product_id,x]));
  const qtyMap=new Map(balances.map(x=>[x.product_id,Number(x.quantity)||0]));
+ const storeById=new Map(stores.map(x=>[x.id,x]));
+ const originText=productId=>{
+  const remaining=sources.filter(x=>x.product_id===productId&&Number(x.remaining_quantity)>0);
+  if(!remaining.length)return 'Origem não identificada';
+  const grouped=new Map();
+  for(const row of remaining){
+   const store=storeById.get(row.source_store_id);
+   const label=row.source_store_id?(store?.is_primary?'CD':store?.name||'Loja de origem'):'Origem não identificada (retorno ao CD)';
+   grouped.set(label,(grouped.get(label)||0)+Number(row.remaining_quantity||0));
+  }
+  return [...grouped].map(([label,qty])=>label+' '+qty).join(' · ');
+ };
  return '<p class="help">O CDSB controla somente o que enviou e o que retornou. Informe devoluções, avarias e quantidades não devolvidas. Não registramos vendas.</p>'+
  '<div class="event-settle-groups">'+groups.map(g=>'<section class="event-settle-group">'+
  '<h3>'+h(g.title)+'</h3>'+g.products.filter(p=>(qtyMap.get(p.id)||0)>0).map(p=>{
@@ -41,7 +56,8 @@ export function eventSettlementForm(groups,balances,draft=null,{h=esc}={}){
   const values=prior?.expected===expected?prior:null;
   return '<article class="event-settle-row" data-settle-row data-id="'+h(p.id)+'" data-expected="'+expected+'">'+
    '<header><div><strong>'+h([p.apparel_color,p.apparel_size].filter(Boolean).join(' · ')||p.name)+'</strong>'+
-   '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small></div>'+
+   '<small>SKU '+h(p.sku||'—')+' · EAN '+h(p.ean||'—')+'</small>'+
+   '<small>Origem para devolução: '+h(originText(p.id))+'</small></div>'+
    '<span class="event-settle-expected">'+expected+' a conferir</span></header>'+
    '<div class="event-settle-fields">'+[
      ['good','Devolvidas boas'],['damaged','Avariadas'],['lost','Não devolvidas']
