@@ -32,8 +32,8 @@ test('EAN parcial com nove últimos dígitos em colisão nunca seleciona automat
  assert.deepEqual(result.matches.map(x=>x.id),['zero','nine']);
  assert.match(result.error,/Selecione o SKU correto/);
 });
-test('não localiza produto excluído ou inativo',()=>{
- assert.equal(findQuickStockProduct(sample.map(p=>({...p,active:false})),'1003160').item,null);
+test('localiza produto inativo e continua ocultando produto arquivado',()=>{
+ assert.equal(findQuickStockProduct(sample.map(p=>({...p,active:false})),'1003160').item?.id,'p25');
  assert.equal(findQuickStockProduct([{...sample[0],force_archived_at:'2026-10-22'}],'1003160').item,null);
 });
 test('busca funciona pelo botão, Enter, leitor e seleção explícita de ambíguos',()=>{

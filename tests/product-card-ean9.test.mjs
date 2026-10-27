@@ -69,8 +69,8 @@ test('CSS mantém três colunas desktop e layout compacto mobile',()=>{
 });
 test('Pesquisa do catálogo e leitura por câmera reutilizam busca exata e fallback',()=>{
  const app=read('src/app.js');
- assert.match(app,/findProductByCode\(eligible,q\)/);
- assert.match(app,/findProductByCode\(state\.items,value\)/);
+ assert.match(app,/findProductByCode\(eligible,q,\{activeOnly:false\}\)/);
+ assert.match(app,/findProductByCode\(state\.items\.filter\(p=>!p\.force_archived_at\),value,\{activeOnly:false\}\)/);
  assert.match(app,/codeResult\?\.status==='ambiguous'/);
  assert.match(app,/searchAndManageSku\(code\)/);
  assert.match(app,/catalogMatchesQuery\(p,q,/);
